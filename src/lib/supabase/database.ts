@@ -1,3 +1,11 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export type UserRoleRow = "club" | "admin" | "super-admin";
 export type ApplicationStatusRow =
   | "new"
@@ -7,6 +15,14 @@ export type ApplicationStatusRow =
   | "rejected";
 export type TournamentStatusRow = "coming-soon" | "active" | "full" | "completed";
 export type InternalCategoryRow = "S" | "A" | "B" | "C";
+export type ClubStatusRow = "active" | "inactive";
+export type EmailTemplateTypeRow =
+  | "application-received"
+  | "application-accepted"
+  | "waiting-list"
+  | "application-rejected"
+  | "follow-up"
+  | "general";
 
 export type ProfileRow = {
   id: string;
@@ -27,6 +43,7 @@ export type ClubRow = {
   logo_url: string | null;
   contact_phone: string | null;
   created_by: string | null;
+  status: ClubStatusRow;
   created_at: string;
   updated_at: string;
 };
@@ -91,6 +108,26 @@ export type ApplicationReviewRow = {
   reviewed_by: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type EmailTemplateRow = {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  type: EmailTemplateTypeRow;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AppSettingRow = {
+  id: string;
+  key: string;
+  value: Json;
+  description: string | null;
+  updated_at: string;
+  updated_by: string | null;
 };
 
 type ForeignKey = {
@@ -196,6 +233,21 @@ export type Database = {
           },
         ]
       >;
+      email_templates: Table<
+        EmailTemplateRow,
+        Partial<EmailTemplateRow> & {
+          name: string;
+          subject: string;
+          body: string;
+          type: EmailTemplateTypeRow;
+        },
+        Partial<EmailTemplateRow>
+      >;
+      app_settings: Table<
+        AppSettingRow,
+        Partial<AppSettingRow> & { key: string },
+        Partial<AppSettingRow>
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -213,6 +265,8 @@ export type Database = {
       application_status: ApplicationStatusRow;
       tournament_status: TournamentStatusRow;
       internal_category: InternalCategoryRow;
+      club_status: ClubStatusRow;
+      email_template_type: EmailTemplateTypeRow;
     };
     CompositeTypes: Record<string, never>;
   };

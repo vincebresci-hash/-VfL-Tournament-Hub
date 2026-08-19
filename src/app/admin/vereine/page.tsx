@@ -1,13 +1,27 @@
 import type { Metadata } from "next";
-import { AdminPlaceholder } from "@/components/admin/AdminPlaceholder";
+import { AdminClubsBoard } from "@/components/admin/AdminClubsBoard";
+import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
+import { listAdminClubs } from "@/lib/db/admin-queries";
 
 export const metadata: Metadata = { title: "Vereine" };
 
-export default function AdminClubsPage() {
+export default async function AdminClubsPage() {
+  const { clubs, ready } = await listAdminClubs();
+
   return (
-    <AdminPlaceholder
-      title="Vereine"
-      description="Die Vereinsübersicht folgt später und wird an denselben Datenbestand angebunden."
-    />
+    <div>
+      <AdminPageHeader
+        title="Vereine"
+        description="Registrierte Vereine, Ansprechpartner und Bewerbungszahlen aus der Datenbank."
+      />
+      {!ready ? (
+        <AdminNotice>
+          Die Vereinsdaten stehen bereit, sobald die SQL-Migration im Supabase SQL Editor
+          ausgeführt wurde.
+        </AdminNotice>
+      ) : (
+        <AdminClubsBoard clubs={clubs} />
+      )}
+    </div>
   );
 }

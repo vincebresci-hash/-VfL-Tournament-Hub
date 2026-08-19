@@ -6,6 +6,7 @@ import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
 import { getTournamentIdBySlug } from "@/lib/db/queries";
+import { getAppSettings } from "@/lib/settings";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
   validateApplicationForm,
@@ -36,6 +37,11 @@ export async function submitTournamentApplicationAction(input: {
   const session = await getAuthSession();
   if (!session || !canAccessClub(session.user.role) || !session.user.clubId) {
     return { error: "Bitte zuerst anmelden." };
+  }
+
+  const settings = await getAppSettings();
+  if (!settings.applicationsEnabled) {
+    return { error: "Bewerbungen sind derzeit deaktiviert." };
   }
 
   const tournamentId = await getTournamentIdBySlug(input.tournamentSlug);

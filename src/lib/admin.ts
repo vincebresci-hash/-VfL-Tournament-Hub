@@ -6,6 +6,8 @@ import type {
   TeamStrength,
 } from "@/types/application";
 import type { AgeGroup, Tournament } from "@/types/tournament";
+import type { ClubRecordStatus, EmailTemplateType } from "@/types/admin";
+import type { UserRole } from "@/types/auth";
 
 export const applicationStatusLabel: Record<ApplicationStatus, string> = {
   new: "Neu",
@@ -226,3 +228,28 @@ export function getStatusDecisionCopy(status: ApplicationStatus) {
       return "Status wirklich ändern?";
   }
 }
+
+export const clubRecordStatusLabel: Record<ClubRecordStatus, string> = {
+  active: "Aktiv",
+  inactive: "Inaktiv",
+};
+
+export const clubRecordStatusClassName: Record<ClubRecordStatus, string> = {
+  active: "bg-navy text-white/86",
+  inactive: "bg-[#e8eaee] text-muted",
+};
+
+export const emailTemplateTypeLabel: Record<EmailTemplateType, string> = {
+  "application-received": "Bewerbung eingegangen",
+  "application-accepted": "Bewerbung angenommen",
+  "waiting-list": "Warteliste",
+  "application-rejected": "Bewerbung abgelehnt",
+  "follow-up": "Rückfrage",
+  general: "Allgemeine Nachricht",
+};
+
+export const userRoleLabel: Record<UserRole, string> = {
+  club: "Verein",
+  admin: "Admin",
+  "super-admin": "Super-Admin",
+};

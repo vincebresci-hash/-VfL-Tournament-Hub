@@ -12,6 +12,7 @@ import { getAuthSession } from "@/lib/auth/session";
 import { getApplicationPrefill, loadClubWorkspace } from "@/lib/club/workspace";
 import { formatDateDe } from "@/lib/format";
 import { canApplyToTournament } from "@/lib/tournament-status";
+import { getAppSettings } from "@/lib/settings";
 import {
   getPublicTournamentBySlug,
   getPublicTournaments,
@@ -53,8 +54,9 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
   const prefill = workspace
     ? getApplicationPrefill(workspace, tournament.ageGroup)
     : undefined;
+  const settings = await getAppSettings();
 
-  if (!canApplyToTournament(tournament.status)) {
+  if (!canApplyToTournament(tournament.status) || !settings.applicationsEnabled) {
     return (
       <ApplyShell>
         <Container className="py-16 sm:py-20">
@@ -62,7 +64,9 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
             Bewerbung nicht möglich
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-muted">
-            Für {tournament.name} können derzeit keine Bewerbungen gesendet werden.
+            {settings.applicationsEnabled
+              ? `Für ${tournament.name} können derzeit keine Bewerbungen gesendet werden.`
+              : "Bewerbungen sind derzeit global deaktiviert."}
           </p>
           <Link
             href={`/turniere/${tournament.slug}`}

@@ -8,6 +8,8 @@ export function isMissingRelationError(error: { message?: string; code?: string 
 
   return (
     code === "42P01" ||
+    code === "42703" ||
+    code === "PGRST204" ||
     code === "PGRST205" ||
     code === "PGRST202" ||
     message.includes("does not exist") ||
