@@ -1,0 +1,42 @@
+import type { Metadata } from "next";
+import { Barlow_Condensed, Geist } from "next/font/google";
+import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-barlow",
+  subsets: ["latin", "latin-ext"],
+  weight: ["500", "600", "700"],
+});
+
+export const metadata: Metadata = {
+  title: {
+    default: APP_NAME,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
+};
+
+export default function RootLayout({ children }: LayoutProps<"/">) {
+  return (
+    <html
+      lang="de"
+      className={`${geistSans.variable} ${barlowCondensed.variable} h-full antialiased`}
+    >
+      <body className="min-h-full flex flex-col bg-background font-sans text-ink">
+        <a
+          href="#inhalt"
+          className="absolute left-4 top-4 z-[100] -translate-y-[180%] bg-brand-yellow px-4 py-2 text-sm font-semibold text-navy transition-transform focus:translate-y-0"
+        >
+          Zum Inhalt springen
+        </a>
+        {children}
+      </body>
+    </html>
+  );
+}
