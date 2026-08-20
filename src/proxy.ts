@@ -11,7 +11,6 @@ import {
   buildAdminLoginHref,
   buildLoginHref,
   isAdminPath,
-  isApplyPath,
   isClubPath,
 } from "@/lib/auth/redirects";
 import {
@@ -73,22 +72,6 @@ export async function proxy(request: NextRequest) {
     }
 
     return supabaseResponse;
-  }
-
-  if (isApplyPath(pathname)) {
-    if (user && canAccessClub(role)) {
-      return supabaseResponse;
-    }
-
-    if (user && canAccessAdmin(role)) {
-      return redirectWithSession(request, supabaseResponse, ADMIN_HOME);
-    }
-
-    return redirectWithSession(
-      request,
-      supabaseResponse,
-      buildLoginHref(pathname + search),
-    );
   }
 
   return supabaseResponse;

@@ -87,10 +87,6 @@ export function isClubPath(pathname: string) {
   return pathname === "/verein" || pathname.startsWith("/verein/");
 }
 
-export function isApplyPath(pathname: string) {
-  return /^\/turniere\/[^/]+\/bewerben\/?$/.test(pathname);
-}
-
 export function buildLoginHref(redirectPath?: string | null) {
   if (!redirectPath || !isSafeInternalPath(redirectPath)) {
     return CLUB_LOGIN;
