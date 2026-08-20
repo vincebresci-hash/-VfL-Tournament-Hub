@@ -21,11 +21,14 @@ import type {
   ClubRecordStatus,
   EmailTemplate,
   EmailTemplateType,
+  EmailLog,
+  EmailLogStatus,
 } from "@/types/admin";
-import { CLUB_RECORD_STATUSES, EMAIL_TEMPLATE_TYPES } from "@/types/admin";
+import { CLUB_RECORD_STATUSES, EMAIL_LOG_STATUSES, EMAIL_TEMPLATE_TYPES } from "@/types/admin";
 import type {
   ApplicationRow,
   ClubRow,
+  EmailLogRow,
   EmailTemplateRow,
   ProfileRow,
   TeamRow,
@@ -74,6 +77,14 @@ function asEmailType(value: string | null | undefined): EmailTemplateType {
   }
 
   return "general";
+}
+
+function asEmailLogStatus(value: string | null | undefined): EmailLogStatus {
+  if (value && EMAIL_LOG_STATUSES.includes(value as EmailLogStatus)) {
+    return value as EmailLogStatus;
+  }
+
+  return "failed";
 }
 
 function primaryContact(
@@ -493,6 +504,40 @@ export async function getEmailTemplate(id: string): Promise<EmailTemplate | null
   }
 
   return toEmailTemplate(data as EmailTemplateRow);
+}
+
+export async function listEmailLogs(): Promise<{
+  logs: EmailLog[];
+  ready: boolean;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("email_logs")
+    .select(
+      "id, application_id, template_id, template_type, to_email, subject, status, error, provider, created_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error || !data) {
+    return { logs: [], ready: !isMissingRelationError(error) };
+  }
+
+  return {
+    ready: true,
+    logs: (data as EmailLogRow[]).map((row) => ({
+      id: row.id,
+      applicationId: row.application_id,
+      templateId: row.template_id,
+      templateType: row.template_type ? asEmailType(row.template_type) : null,
+      toEmail: row.to_email,
+      subject: row.subject,
+      status: asEmailLogStatus(row.status),
+      error: row.error,
+      provider: row.provider,
+      createdAt: row.created_at,
+    })),
+  };
 }
 
 export async function getAdminDashboardData(): Promise<AdminDashboardData> {

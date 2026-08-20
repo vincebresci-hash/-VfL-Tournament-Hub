@@ -33,7 +33,10 @@ type InternalRatingUpdate = {
 type AdminDataContextValue = {
   applications: AdminApplication[];
   getApplication: (id: string) => AdminApplication | undefined;
-  updateStatus: (id: string, status: ApplicationStatus) => void;
+  updateStatus: (
+    id: string,
+    status: ApplicationStatus,
+  ) => Promise<{ error: string | null; notice: string | null }>;
   updateInternalRating: (id: string, update: InternalRatingUpdate) => void;
   usingDemoData: boolean;
 };
@@ -86,7 +89,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
       usingDemoData,
       getApplication: (id) =>
         applications.find((application) => application.id === id),
-      updateStatus: (id, status) => {
+      updateStatus: async (id, status) => {
+        const previous = applications.find((application) => application.id === id);
         setApplications((current) =>
           current.map((application) =>
             application.id === id
@@ -94,9 +98,23 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
               : application,
           ),
         );
-        if (!usingDemoData) {
-          void updateApplicationStatusAction(id, status);
+
+        if (usingDemoData) {
+          return { error: null, notice: "Status gespeichert." };
         }
+
+        const result = await updateApplicationStatusAction(id, status);
+        if (result.error && previous) {
+          setApplications((current) =>
+            current.map((application) =>
+              application.id === id
+                ? { ...application, applicationStatus: previous.applicationStatus }
+                : application,
+            ),
+          );
+        }
+
+        return result;
       },
       updateInternalRating: (id, update) => {
         setApplications((current) =>

@@ -38,8 +38,8 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
     <div>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[14px] leading-6 text-muted">
-          Vorlagen können gespeichert und später über Resend oder einen anderen
-          Anbieter versendet werden. Es werden derzeit keine E-Mails verschickt.
+          Status-Mails nutzen die aktiven Vorlagen. Inaktive Vorlagen werden nicht
+          versendet, der Status wird trotzdem gespeichert.
         </p>
         <Link
           href="/admin/emails/neu"

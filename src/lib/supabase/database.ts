@@ -19,6 +19,7 @@ export type ClubStatusRow = "active" | "inactive";
 export type EmailTemplateTypeRow =
   | "application-received"
   | "application-accepted"
+  | "application-under-review"
   | "waiting-list"
   | "application-rejected"
   | "follow-up"
@@ -137,6 +138,24 @@ export type AppSettingRow = {
   updated_by: string | null;
 };
 
+export type EmailLogStatusRow = "sent" | "failed" | "skipped";
+
+export type EmailLogRow = {
+  id: string;
+  application_id: string | null;
+  template_id: string | null;
+  template_type: EmailTemplateTypeRow | null;
+  to_email: string;
+  subject: string | null;
+  body: string | null;
+  status: EmailLogStatusRow;
+  error: string | null;
+  provider: string | null;
+  provider_message_id: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 type ForeignKey = {
   foreignKeyName: string;
   columns: string[];
@@ -252,6 +271,27 @@ export type Database = {
         AppSettingRow,
         Partial<AppSettingRow> & { key: string },
         Partial<AppSettingRow>
+      >;
+      email_logs: Table<
+        EmailLogRow,
+        Partial<EmailLogRow> & { to_email: string; status: EmailLogStatusRow },
+        Partial<EmailLogRow>,
+        [
+          {
+            foreignKeyName: "email_logs_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "email_logs_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "email_templates";
+            referencedColumns: ["id"];
+          },
+        ]
       >;
     };
     Views: Record<string, never>;

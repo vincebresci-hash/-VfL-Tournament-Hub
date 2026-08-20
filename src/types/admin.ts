@@ -9,6 +9,7 @@ export type ClubRecordStatus = (typeof CLUB_RECORD_STATUSES)[number];
 export const EMAIL_TEMPLATE_TYPES = [
   "application-received",
   "application-accepted",
+  "application-under-review",
   "waiting-list",
   "application-rejected",
   "follow-up",
@@ -120,6 +121,23 @@ export type EmailTemplateInput = {
   body: string;
   type: EmailTemplateType;
   active: boolean;
+};
+
+export const EMAIL_LOG_STATUSES = ["sent", "failed", "skipped"] as const;
+
+export type EmailLogStatus = (typeof EMAIL_LOG_STATUSES)[number];
+
+export type EmailLog = {
+  id: string;
+  applicationId: string | null;
+  templateId: string | null;
+  templateType: EmailTemplateType | null;
+  toEmail: string;
+  subject: string | null;
+  status: EmailLogStatus;
+  error: string | null;
+  provider: string | null;
+  createdAt: string;
 };
 
 export type AppSettings = {

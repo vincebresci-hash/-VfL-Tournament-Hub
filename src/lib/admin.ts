@@ -242,6 +242,7 @@ export const clubRecordStatusClassName: Record<ClubRecordStatus, string> = {
 export const emailTemplateTypeLabel: Record<EmailTemplateType, string> = {
   "application-received": "Bewerbung eingegangen",
   "application-accepted": "Bewerbung angenommen",
+  "application-under-review": "In Prüfung",
   "waiting-list": "Warteliste",
   "application-rejected": "Bewerbung abgelehnt",
   "follow-up": "Rückfrage",

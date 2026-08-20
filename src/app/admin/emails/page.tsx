@@ -1,18 +1,22 @@
 import type { Metadata } from "next";
+import { EmailLogsList } from "@/components/admin/EmailLogsList";
 import { EmailTemplatesBoard } from "@/components/admin/EmailTemplatesBoard";
 import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
-import { listEmailTemplates } from "@/lib/db/admin-queries";
+import { listEmailLogs, listEmailTemplates } from "@/lib/db/admin-queries";
 
 export const metadata: Metadata = { title: "E-Mails" };
 
 export default async function AdminEmailsPage() {
-  const { templates, ready } = await listEmailTemplates();
+  const [{ templates, ready }, { logs, ready: logsReady }] = await Promise.all([
+    listEmailTemplates(),
+    listEmailLogs(),
+  ]);
 
   return (
     <div>
       <AdminPageHeader
         title="E-Mails"
-        description="Interne Vorlagen für Rückmeldungen. Der Versand wird später angebunden."
+        description="Vorlagen für Statusrückmeldungen. Beim Speichern eines Bewerbungsstatus wird die passende Mail an contact_email gesendet."
       />
       {!ready ? (
         <AdminNotice>
@@ -22,6 +26,7 @@ export default async function AdminEmailsPage() {
       ) : (
         <EmailTemplatesBoard templates={templates} />
       )}
+      {logsReady ? <EmailLogsList logs={logs} /> : null}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadg
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { InternalRating } from "@/components/admin/InternalRating";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
+import { AdminNotice } from "@/components/admin/AdminPanel";
 import {
   getClubTypeLabel,
   getStatusDecisionCopy,
@@ -37,6 +38,9 @@ export function ApplicationDetail({
   const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(
     null,
   );
+  const [notice, setNotice] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   if (!application) {
     return null;
@@ -62,6 +66,13 @@ export function ApplicationDetail({
         </div>
         <ApplicationStatusBadge status={application.applicationStatus} />
       </div>
+
+      {notice ? <AdminNotice>{notice}</AdminNotice> : null}
+      {statusError ? (
+        <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+          {statusError}
+        </p>
+      ) : null}
 
       <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="grid gap-5">
@@ -154,6 +165,7 @@ export function ApplicationDetail({
                 <button
                   key={decision.status}
                   type="button"
+                  disabled={saving}
                   onClick={() => setPendingStatus(decision.status)}
                   className={
                     decision.status === "accepted"
@@ -202,10 +214,21 @@ export function ApplicationDetail({
         title={pendingStatus ? getStatusDecisionCopy(pendingStatus) : ""}
         onCancel={() => setPendingStatus(null)}
         onConfirm={() => {
-          if (pendingStatus) {
-            updateStatus(application.id, pendingStatus);
+          if (!pendingStatus) {
+            return;
           }
+
+          const nextStatus = pendingStatus;
           setPendingStatus(null);
+          setSaving(true);
+          setNotice(null);
+          setStatusError(null);
+
+          void updateStatus(application.id, nextStatus).then((result) => {
+            setNotice(result.notice);
+            setStatusError(result.error);
+            setSaving(false);
+          });
         }}
       />
     </div>

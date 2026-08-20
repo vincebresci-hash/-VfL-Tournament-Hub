@@ -15,6 +15,7 @@ import type {
 } from "@/types/application";
 import { EMAIL_TEMPLATE_TYPES, type AppSettings, type EmailTemplateInput } from "@/types/admin";
 import { settingsToRows } from "@/lib/settings";
+import { sendApplicationStatusEmail } from "@/lib/email/status-mail";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -42,31 +43,75 @@ export async function loadAdminApplicationsAction(): Promise<{
 export async function updateApplicationStatusAction(
   applicationId: string,
   status: ApplicationStatus,
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; notice: string | null }> {
   const access = await requireAdmin();
   if (access.error || !access.session) {
-    return { error: access.error };
+    return { error: access.error, notice: null };
   }
 
   if (!APPLICATION_STATUSES.includes(status)) {
-    return { error: "Ungültiger Status." };
+    return { error: "Ungültiger Status.", notice: null };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: current, error: currentError } = await supabase
     .from("applications")
-    .update({ status })
-    .eq("id", applicationId);
+    .select("id, status")
+    .eq("id", applicationId)
+    .maybeSingle();
 
-  if (error) {
-    return { error: toUserFacingDbError("Der Status konnte nicht geändert werden.", error) };
+  if (currentError || !current) {
+    return {
+      error: toUserFacingDbError("Die Bewerbung wurde nicht gefunden.", currentError),
+      notice: null,
+    };
+  }
+
+  const previousStatus = current.status as ApplicationStatus;
+  const statusChanged = previousStatus !== status;
+
+  if (statusChanged) {
+    const { error } = await supabase
+      .from("applications")
+      .update({ status })
+      .eq("id", applicationId);
+
+    if (error) {
+      return {
+        error: toUserFacingDbError("Der Status konnte nicht geändert werden.", error),
+        notice: null,
+      };
+    }
   }
 
   revalidatePath("/admin/bewerbungen");
   revalidatePath(`/admin/bewerbungen/${applicationId}`);
   revalidatePath("/admin");
   revalidatePath("/admin/turniere");
-  return { error: null };
+  revalidatePath("/admin/emails");
+
+  if (!statusChanged) {
+    return { error: null, notice: "Status gespeichert." };
+  }
+
+  const mail = await sendApplicationStatusEmail({
+    applicationId,
+    status,
+    actorId: access.session.user.id,
+  });
+
+  if (mail.sent) {
+    return { error: null, notice: "Status gespeichert und E-Mail versendet." };
+  }
+
+  if (mail.skipped) {
+    return { error: null, notice: "Status gespeichert." };
+  }
+
+  return {
+    error: null,
+    notice: "Status gespeichert, E-Mail konnte jedoch nicht versendet werden.",
+  };
 }
 
 export async function upsertApplicationReviewAction(

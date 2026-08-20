@@ -94,8 +94,10 @@ export function EmailTemplateForm({ template }: EmailTemplateFormProps) {
         {template ? "Vorlage bearbeiten" : "Neue Vorlage"}
       </h1>
       <p className="mt-2 text-[15px] leading-7 text-muted">
-        Platzhalter: {"{{club_name}}"}, {"{{team_name}}"}, {"{{tournament_name}}"}.
-        Der Versand selbst folgt später.
+        Platzhalter: {"{{contact_first_name}}"}, {"{{contact_last_name}}"},{" "}
+        {"{{club_name}}"}, {"{{team_name}}"}, {"{{tournament_name}}"},{" "}
+        {"{{age_group}}"}, {"{{tournament_date}}"}, {"{{location}}"},{" "}
+        {"{{application_status}}"}.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 grid gap-5 border border-line bg-white p-5 sm:p-6">
@@ -136,7 +138,7 @@ export function EmailTemplateForm({ template }: EmailTemplateFormProps) {
         <Field
           id="template-body"
           label="Text"
-          hint="Noch keine echten E-Mails. Die Vorlage wird nur gespeichert."
+          hint="Platzhalter werden beim Versand automatisch ersetzt."
         >
           <TextAreaInput
             id="template-body"
