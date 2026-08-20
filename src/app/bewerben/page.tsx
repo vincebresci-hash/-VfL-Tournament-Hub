@@ -1,6 +1,6 @@
 import { PlaceholderPage } from "@/components/layout/PlaceholderPage";
 import { formatDateDe } from "@/lib/format";
-import { getPublicTournamentBySlug } from "@/lib/tournaments";
+import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 
 export const metadata = { title: "Turnier bewerben" };
 
@@ -11,7 +11,7 @@ type BewerbenPageProps = {
 export default async function BewerbenPage({ searchParams }: BewerbenPageProps) {
   const params = await searchParams;
   const slug = Array.isArray(params.turnier) ? params.turnier[0] : params.turnier;
-  const tournament = slug ? getPublicTournamentBySlug(slug) : undefined;
+  const tournament = slug ? await getPublicTournamentBySlug(slug) : null;
 
   return (
     <PlaceholderPage title="Turnier bewerben">

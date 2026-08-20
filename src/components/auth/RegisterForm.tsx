@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
-import { AuthAlert } from "@/components/auth/AuthShell";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toRegisterErrorMessage } from "@/lib/auth/messages";
 import { CLUB_HOME } from "@/lib/auth/roles";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";

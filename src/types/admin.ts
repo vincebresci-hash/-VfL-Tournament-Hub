@@ -211,4 +211,36 @@ export type AdminTournamentRecord = {
   status: "coming-soon" | "active" | "full" | "completed";
   maxTeams: number | null;
   description: string | null;
+  imageUrl: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  address: string | null;
+  shortDescription: string | null;
+  birthYear: number | null;
+  waitlistEnabled: boolean;
+  applicationsOpen: boolean;
+  applicationStart: string | null;
+  applicationDeadline: string | null;
+  archivedAt: string | null;
+};
+
+export type AdminTournamentInput = {
+  name: string;
+  slug: string;
+  ageGroup: string;
+  birthYear: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  location: string;
+  address: string;
+  shortDescription: string;
+  description: string;
+  maxTeams: string;
+  status: "coming-soon" | "active" | "full" | "completed";
+  applicationsOpen: boolean;
+  waitlistEnabled: boolean;
+  applicationStart: string;
+  applicationDeadline: string;
+  imageUrl: string;
 };

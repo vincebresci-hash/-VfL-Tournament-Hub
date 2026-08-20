@@ -5,11 +5,10 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
-import { getTournamentIdBySlug } from "@/lib/db/queries";
 import { getAppSettings } from "@/lib/settings";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { getEmailProvider } from "@/lib/email/provider";
-import { getPublicTournamentBySlug } from "@/lib/tournaments";
+import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
   validateApplicationForm,
   type ApplicationFormValues,
@@ -36,12 +35,9 @@ export async function submitTournamentApplicationAction(input: {
     return { error: "Bewerbungen sind derzeit deaktiviert." };
   }
 
-  const tournamentId = await getTournamentIdBySlug(input.tournamentSlug);
-  if (!tournamentId) {
-    return {
-      error:
-        "Das Turnier wurde in der Datenbank nicht gefunden. Bitte zuerst die SQL-Migration ausführen.",
-    };
+  const tournament = await getPublicTournamentBySlug(input.tournamentSlug);
+  if (!tournament || !tournament.applicationsOpen) {
+    return { error: "Bewerbungen für dieses Turnier sind derzeit nicht möglich." };
   }
 
   const session = await getAuthSession();
@@ -50,8 +46,8 @@ export async function submitTournamentApplicationAction(input: {
   );
 
   const result = isClubUser
-    ? await submitClubApplication(input, tournamentId)
-    : await submitGuestApplication(input, tournamentId);
+    ? await submitClubApplication(input, tournament.id)
+    : await submitGuestApplication(input, tournament.id);
 
   if (result.error) {
     return result;
@@ -252,7 +248,7 @@ async function notifyApplicant(
     return;
   }
 
-  const tournament = getPublicTournamentBySlug(tournamentSlug);
+  const tournament = await getPublicTournamentBySlug(tournamentSlug);
   const tournamentName = tournament?.name ?? "das Turnier";
 
   try {

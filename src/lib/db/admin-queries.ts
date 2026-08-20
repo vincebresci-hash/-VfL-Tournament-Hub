@@ -36,6 +36,7 @@ import type {
   TeamRow,
   TournamentRow,
 } from "@/lib/supabase/database";
+import { getTournamentSelect, toAdminTournamentRecord } from "@/lib/tournaments";
 
 function displayName(firstName: string | null, lastName: string | null) {
   return [firstName, lastName].filter(Boolean).join(" ").trim();
@@ -473,49 +474,56 @@ export async function listAdminTournaments(): Promise<AdminTournamentOption[]> {
   );
 }
 
-export async function listAdminTournamentRecords(): Promise<AdminTournamentRecord[]> {
+async function selectAdminTournaments(filter?: {
+  slug?: string;
+  id?: string;
+}) {
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .select("id, slug, name, age_group, date, location, status, max_teams, description")
-    .order("date", { ascending: true });
+  const run = async (full: boolean) => {
+    let query = supabase.from("tournaments").select(getTournamentSelect(full));
+    if (filter?.slug) {
+      query = query.eq("slug", filter.slug);
+    }
+    if (filter?.id) {
+      query = query.eq("id", filter.id);
+    }
+    return query.order("date", { ascending: true });
+  };
 
-  if (error || !data) {
+  const fullResult = await run(true);
+  if (!fullResult.error) {
+    return (fullResult.data ?? []) as unknown as TournamentRow[];
+  }
+
+  if (!isMissingRelationError(fullResult.error)) {
     return [];
   }
 
-  return (data as TournamentRow[]).map(toAdminTournamentRecord);
+  const basicResult = await run(false);
+  if (basicResult.error || !basicResult.data) {
+    return [];
+  }
+
+  return basicResult.data as unknown as TournamentRow[];
+}
+
+export async function listAdminTournamentRecords(): Promise<AdminTournamentRecord[]> {
+  const rows = await selectAdminTournaments();
+  return rows.map(toAdminTournamentRecord);
 }
 
 export async function getAdminTournamentBySlug(
   slug: string,
 ): Promise<AdminTournamentRecord | null> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("tournaments")
-    .select("id, slug, name, age_group, date, location, status, max_teams, description")
-    .eq("slug", slug)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
-  }
-
-  return toAdminTournamentRecord(data as TournamentRow);
+  const rows = await selectAdminTournaments({ slug });
+  return rows[0] ? toAdminTournamentRecord(rows[0]) : null;
 }
 
-function toAdminTournamentRecord(row: TournamentRow): AdminTournamentRecord {
-  return {
-    id: row.id,
-    slug: row.slug,
-    name: row.name,
-    ageGroup: row.age_group,
-    date: row.date,
-    location: row.location,
-    status: row.status,
-    maxTeams: row.max_teams,
-    description: row.description,
-  };
+export async function getAdminTournamentById(
+  id: string,
+): Promise<AdminTournamentRecord | null> {
+  const rows = await selectAdminTournaments({ id });
+  return rows[0] ? toAdminTournamentRecord(rows[0]) : null;
 }
 
 export async function listEmailTemplates(): Promise<{
@@ -659,7 +667,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
   );
 
   const tournaments: AdminDashboardTournament[] = tournamentRows
-    .filter((row) => row.status !== "completed")
+    .filter((row) => row.status !== "completed" && !row.archived_at)
     .map((row) => {
       const confirmedTeams = acceptedCounts.get(row.id) ?? 0;
       const availableSlots = getAvailableSlots(row.max_teams, confirmedTeams);

@@ -10,7 +10,7 @@ import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
 import { listClubApplications, listClubTeams, getClubApplication, isClubDatabaseReady } from "@/lib/db/queries";
-import { getFeaturedTournaments } from "@/lib/tournaments";
+import { getFeaturedTournaments } from "@/lib/db/tournament-queries";
 import type { AuthSession, ClubProfile, Team, UserProfile } from "@/types/auth";
 import type { TournamentApplication } from "@/types/application";
 import type { ClubApplicationView } from "@/types/club";
@@ -189,11 +189,12 @@ export async function loadClubApplicationById(applicationId: string) {
   return getClubApplication(clubId, applicationId);
 }
 
-export function getClubDashboardStats(workspace: ClubWorkspace) {
+export async function getClubDashboardStats(workspace: ClubWorkspace) {
   const applications = workspace.applications;
   const activeApplications = applications.filter(
     (application) => application.applicationStatus !== "rejected",
   );
+  const featured = await getFeaturedTournaments();
 
   return {
     activeApplications: activeApplications.length,
@@ -203,7 +204,7 @@ export function getClubDashboardStats(workspace: ClubWorkspace) {
     waitingList: applications.filter(
       (application) => application.applicationStatus === "waiting-list",
     ).length,
-    availableTournaments: getFeaturedTournaments().length,
+    availableTournaments: featured.length,
   };
 }
 

@@ -5,21 +5,18 @@ import { notFound } from "next/navigation";
 import { ApplicationForm } from "@/components/apply/ApplicationForm";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { canAccessClub } from "@/lib/auth/roles";
 import { getAuthSession } from "@/lib/auth/session";
 import { getApplicationPrefill, loadClubWorkspace } from "@/lib/club/workspace";
 import { getTournamentOccupancy } from "@/lib/db/queries";
+import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import { formatDateDe } from "@/lib/format";
 import {
   getPublicApplicationState,
 } from "@/lib/public-application-state";
 import { getAppSettings } from "@/lib/settings";
-import {
-  getPublicTournamentBySlug,
-  getPublicTournaments,
-} from "@/lib/tournaments";
 import type { PublicTournament } from "@/types/tournament";
 
 type ApplyPageProps = {
@@ -28,15 +25,11 @@ type ApplyPageProps = {
 
 export const dynamic = "force-dynamic";
 
-export function generateStaticParams() {
-  return getPublicTournaments().map((tournament) => ({ slug: tournament.slug }));
-}
-
 export async function generateMetadata({
   params,
 }: ApplyPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const tournament = getPublicTournamentBySlug(slug);
+  const tournament = await getPublicTournamentBySlug(slug);
 
   return {
     title: tournament ? `Bewerbung · ${tournament.name}` : "Bewerbung",
@@ -45,7 +38,7 @@ export async function generateMetadata({
 
 export default async function TournamentApplyPage({ params }: ApplyPageProps) {
   const { slug } = await params;
-  const tournament = getPublicTournamentBySlug(slug);
+  const tournament = await getPublicTournamentBySlug(slug);
 
   if (!tournament) {
     notFound();
@@ -64,9 +57,12 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
   const applicationState = getPublicApplicationState({
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
-    availableSlots: occupancy?.availableSlots ?? tournament.maxTeams,
-    waitlistEnabled: settings.waitlistEnabled,
-    isFull: occupancy?.isFull ?? false,
+    applicationsOpen: tournament.applicationsOpen,
+    availableSlots: occupancy?.availableSlots ?? tournament.availableSlots,
+    waitlistEnabled: settings.waitlistEnabled && tournament.waitlistEnabled,
+    isFull: occupancy?.isFull ?? tournament.isFull,
+    applicationStart: tournament.applicationStart,
+    applicationDeadline: tournament.applicationDeadline,
   });
 
   if (applicationState === "closed" || applicationState === "coming-soon") {
@@ -143,7 +139,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
 function ApplyShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full flex-col">
-      <Header variant="solid" />
+      <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-background">
         {children}
       </main>

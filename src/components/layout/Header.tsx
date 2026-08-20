@@ -5,17 +5,23 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/brand/Logo";
 import { IconClose, IconMenu } from "@/components/ui/icons";
+import { signOutAction } from "@/lib/auth/actions";
+import { canAccessAdmin, canAccessClub, homePathForRole } from "@/lib/auth/roles";
 import { CLUB_NAME, HUB_NAME } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { mainNavigation } from "@/lib/navigation";
+import { userRoleLabel } from "@/lib/admin";
+import type { AuthSession } from "@/types/auth";
 
 type HeaderProps = {
   variant?: "overlay" | "solid";
+  session?: AuthSession | null;
 };
 
-export function Header({ variant = "overlay" }: HeaderProps) {
+export function Header({ variant = "overlay", session = null }: HeaderProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -23,6 +29,7 @@ export function Header({ variant = "overlay" }: HeaderProps) {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setOpen(false);
+        setAccountOpen(false);
       }
     }
 
@@ -33,6 +40,8 @@ export function Header({ variant = "overlay" }: HeaderProps) {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [open]);
+
+  const account = getAccountLinks(session);
 
   return (
     <header
@@ -93,12 +102,41 @@ export function Header({ variant = "overlay" }: HeaderProps) {
         </nav>
 
         <div className="ml-auto hidden items-center gap-3 lg:flex">
-          <Link
-            href="/login"
-            className="inline-flex h-9 items-center border border-white/35 px-3.5 text-[12px] font-medium tracking-[0.1em] text-white uppercase transition-colors hover:border-white/70 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
-          >
-            Login
-          </Link>
+          {account ? (
+            <div className="relative">
+              <button
+                type="button"
+                aria-expanded={accountOpen}
+                aria-haspopup="menu"
+                onClick={() => setAccountOpen((current) => !current)}
+                className="inline-flex h-9 items-center border border-white/35 px-3.5 text-[12px] font-medium tracking-[0.1em] text-white uppercase transition-colors hover:border-white/70 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+              >
+                Mein Bereich
+              </button>
+              {accountOpen ? (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-56 border border-line bg-white py-2 shadow-[0_8px_24px_rgba(16,20,28,0.12)]"
+                >
+                  <p className="px-3 pb-2 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                    {userRoleLabel[session!.user.role]}
+                  </p>
+                  <AccountLinks
+                    dashboardHref={account.dashboardHref}
+                    profileHref={account.profileHref}
+                    onNavigate={() => setAccountOpen(false)}
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="inline-flex h-9 items-center border border-white/35 px-3.5 text-[12px] font-medium tracking-[0.1em] text-white uppercase transition-colors hover:border-white/70 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+            >
+              Login
+            </Link>
+          )}
           <Link
             href="/bewerben"
             className="inline-flex h-9 items-center bg-brand-yellow px-3.5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -167,13 +205,40 @@ export function Header({ variant = "overlay" }: HeaderProps) {
           </ul>
 
           <div className="mt-10 flex flex-col gap-3">
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="inline-flex h-11 items-center justify-center border border-white/35 text-sm font-medium tracking-[0.08em] text-white uppercase"
-            >
-              Login
-            </Link>
+            {account ? (
+              <>
+                <Link
+                  href={account.dashboardHref}
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-11 items-center justify-center border border-white/35 text-sm font-medium tracking-[0.08em] text-white uppercase"
+                >
+                  Mein Bereich
+                </Link>
+                <Link
+                  href={account.profileHref}
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-11 items-center justify-center border border-white/35 text-sm font-medium tracking-[0.08em] text-white uppercase"
+                >
+                  Profil
+                </Link>
+                <form action={signOutAction}>
+                  <button
+                    type="submit"
+                    className="inline-flex h-11 w-full items-center justify-center border border-white/35 text-sm font-medium tracking-[0.08em] text-white uppercase"
+                  >
+                    Abmelden
+                  </button>
+                </form>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="inline-flex h-11 items-center justify-center border border-white/35 text-sm font-medium tracking-[0.08em] text-white uppercase"
+              >
+                Login
+              </Link>
+            )}
             <Link
               href="/bewerben"
               onClick={() => setOpen(false)}
@@ -185,5 +250,62 @@ export function Header({ variant = "overlay" }: HeaderProps) {
         </nav>
       </div>
     </header>
+  );
+}
+
+function getAccountLinks(session: AuthSession | null) {
+  if (!session) {
+    return null;
+  }
+
+  if (canAccessAdmin(session.user.role)) {
+    return {
+      dashboardHref: homePathForRole(session.user.role),
+      profileHref: "/admin/profil",
+    };
+  }
+
+  if (canAccessClub(session.user.role)) {
+    return {
+      dashboardHref: homePathForRole(session.user.role),
+      profileHref: "/verein/profil",
+    };
+  }
+
+  return {
+    dashboardHref: "/",
+    profileHref: "/",
+  };
+}
+
+function AccountLinks({
+  dashboardHref,
+  profileHref,
+  onNavigate,
+}: {
+  dashboardHref: string;
+  profileHref: string;
+  onNavigate: () => void;
+}) {
+  const linkClassName =
+    "block px-3 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
+
+  return (
+    <>
+      <Link href={dashboardHref} className={linkClassName} onClick={onNavigate}>
+        Dashboard
+      </Link>
+      <Link href={profileHref} className={linkClassName} onClick={onNavigate}>
+        Profil
+      </Link>
+      <Link href="/" className={linkClassName} onClick={onNavigate}>
+        Öffentliche Website
+      </Link>
+      <form action={signOutAction}>
+        <button type="submit" className={`${linkClassName} w-full text-left`}>
+          Abmelden
+        </button>
+      </form>
+    </>
   );
 }

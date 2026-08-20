@@ -1,6 +1,6 @@
 import { CoverImage } from "@/components/brand/CoverImage";
 import { FeatureItem } from "@/components/home/FeatureItem";
-import { Header } from "@/components/layout/Header";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { media } from "@/lib/constants";
 import {
@@ -28,7 +28,7 @@ export function Hero() {
       <div className="pointer-events-none absolute inset-0 hidden bg-[linear-gradient(90deg,#070b12_0%,#070b12_36%,rgba(7,11,18,0.94)_44%,rgba(7,11,18,0.62)_54%,rgba(7,11,18,0.28)_68%,rgba(7,11,18,0.08)_82%,rgba(7,11,18,0)_100%)] lg:block" />
 
       <div className="relative">
-        <Header variant="overlay" />
+        <SiteHeader variant="overlay" />
 
         <Container className="py-10 lg:py-12 xl:py-14">
           <div className="max-w-xl xl:max-w-2xl">

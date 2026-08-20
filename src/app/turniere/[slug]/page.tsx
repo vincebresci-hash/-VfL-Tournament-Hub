@@ -4,21 +4,18 @@ import { notFound } from "next/navigation";
 import { CoverImage } from "@/components/brand/CoverImage";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
-import { formatDateDe } from "@/lib/format";
+import { formatDateDe, formatTimeDe } from "@/lib/format";
 import { getTournamentOccupancy } from "@/lib/db/queries";
+import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
   getPublicApplicationState,
   publicApplicationStateLabel,
 } from "@/lib/public-application-state";
 import { getAppSettings } from "@/lib/settings";
 import { tournamentStatusClassName } from "@/lib/tournament-status";
-import {
-  getPublicTournamentBySlug,
-  getPublicTournaments,
-} from "@/lib/tournaments";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -26,17 +23,11 @@ type TournamentDetailPageProps = {
 
 export const dynamic = "force-dynamic";
 
-export function generateStaticParams() {
-  return getPublicTournaments().map((tournament) => ({
-    slug: tournament.slug,
-  }));
-}
-
 export async function generateMetadata({
   params,
 }: TournamentDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const tournament = getPublicTournamentBySlug(slug);
+  const tournament = await getPublicTournamentBySlug(slug);
 
   return {
     title: tournament?.name ?? "Turnier",
@@ -47,7 +38,7 @@ export default async function TournamentDetailPage({
   params,
 }: TournamentDetailPageProps) {
   const { slug } = await params;
-  const tournament = getPublicTournamentBySlug(slug);
+  const tournament = await getPublicTournamentBySlug(slug);
 
   if (!tournament) {
     notFound();
@@ -57,24 +48,29 @@ export default async function TournamentDetailPage({
     getAppSettings(),
     getTournamentOccupancy(tournament.slug),
   ]);
-  const availableSlots = occupancy?.availableSlots ?? tournament.maxTeams;
-  const isFull = occupancy?.isFull ?? false;
+  const availableSlots = occupancy?.availableSlots ?? tournament.availableSlots;
+  const isFull = occupancy?.isFull ?? tournament.isFull;
   const applicationState = getPublicApplicationState({
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
+    applicationsOpen: tournament.applicationsOpen,
     availableSlots,
-    waitlistEnabled: settings.waitlistEnabled,
+    waitlistEnabled: settings.waitlistEnabled && tournament.waitlistEnabled,
     isFull,
+    applicationStart: tournament.applicationStart,
+    applicationDeadline: tournament.applicationDeadline,
   });
   const canApply = applicationState === "open" || applicationState === "waitlist";
   const ctaLabel =
     applicationState === "waitlist"
       ? "Für Warteliste bewerben →"
       : "Jetzt bewerben →";
+  const startTime = formatTimeDe(tournament.startTime);
+  const description = tournament.description || tournament.shortDescription || "";
 
   return (
     <div className="flex min-h-full flex-col">
-      <Header variant="solid" />
+      <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-background">
         <Container className="py-12 sm:py-16 lg:py-20">
           <Link
@@ -121,10 +117,12 @@ export default async function TournamentDetailPage({
               <p className="mt-4 inline-flex items-center gap-1.5 text-[15px] text-muted">
                 <IconCalendar className="h-4 w-4 text-brand-yellow" />
                 <time dateTime={tournament.date}>{formatDateDe(tournament.date)}</time>
+                {startTime ? ` · ${startTime}` : ""}
               </p>
               <p className="mt-2 inline-flex items-center gap-1.5 text-[15px] text-muted">
                 <IconPin className="h-4 w-4 text-brand-yellow" />
                 {tournament.location}
+                {tournament.address ? ` · ${tournament.address}` : ""}
               </p>
               <p className="mt-3 text-[11px] font-medium tracking-[0.08em] text-ink uppercase">
                 {tournament.maxTeams} Teams
@@ -136,7 +134,7 @@ export default async function TournamentDetailPage({
               ) : null}
 
               <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
-                {tournament.description}
+                {description}
               </p>
 
               <div className="mt-8">

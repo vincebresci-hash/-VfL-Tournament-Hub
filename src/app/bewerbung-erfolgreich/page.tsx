@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCheckCircle } from "@/components/ui/icons";
 
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function ApplicationSuccessPage() {
   return (
     <div className="flex min-h-full flex-col">
-      <Header variant="solid" />
+      <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-background">
         <Container className="flex flex-1 flex-col items-start py-16 sm:py-20 lg:py-24">
           <div className="mx-auto w-full max-w-xl text-center">

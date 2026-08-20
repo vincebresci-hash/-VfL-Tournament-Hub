@@ -3,7 +3,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthCard, AuthHeadline, AuthShell } from "@/components/auth/AuthShell";
 import { LoginForm } from "@/components/auth/LoginForm";
-import { canAccessClub } from "@/lib/auth/roles";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/messages";
 import { getPostLoginRedirect, readRedirectParam } from "@/lib/auth/redirects";
 import { getAuthSession } from "@/lib/auth/session";
@@ -20,8 +19,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const errorParam = readRedirectParam(params.error);
   const session = await getAuthSession();
 
-  if (session && canAccessClub(session.user.role)) {
-    redirect(getPostLoginRedirect("club", redirectTo));
+  if (session) {
+    redirect(getPostLoginRedirect(session.user.role, redirectTo));
   }
 
   return (

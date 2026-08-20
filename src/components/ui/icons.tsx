@@ -200,6 +200,15 @@ export function IconLogout(props: IconProps) {
   );
 }
 
+export function IconUser(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="8" r="3.2" {...stroke} />
+      <path d="M5.5 19.2c1.2-3.2 3.5-4.7 6.5-4.7s5.3 1.5 6.5 4.7" {...stroke} />
+    </IconBase>
+  );
+}
+
 export function IconSettings(props: IconProps) {
   return (
     <IconBase {...props}>

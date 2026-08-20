@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
 import { Logo } from "@/components/brand/Logo";
-import { AuthAlert } from "@/components/auth/AuthShell";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toLoginErrorMessage } from "@/lib/auth/messages";
 import { getPostLoginRedirect } from "@/lib/auth/redirects";
 import { canAccessAdmin, isUserRole } from "@/lib/auth/roles";
@@ -69,8 +69,8 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
         return;
       }
 
-      router.push(getPostLoginRedirect(profile.role, redirectTo));
       router.refresh();
+      window.location.assign(getPostLoginRedirect(profile.role, redirectTo));
     } catch {
       setFormError(AUTH_ERROR_MESSAGES.generic);
       setSubmitting(false);

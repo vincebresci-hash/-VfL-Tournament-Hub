@@ -76,6 +76,14 @@ export type TournamentRow = {
   application_start: string | null;
   application_deadline: string | null;
   description: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  address: string | null;
+  short_description: string | null;
+  birth_year: number | null;
+  waitlist_enabled: boolean;
+  applications_open: boolean;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };

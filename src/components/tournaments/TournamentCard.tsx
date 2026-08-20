@@ -2,9 +2,9 @@ import Link from "next/link";
 import { CoverImage } from "@/components/brand/CoverImage";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
+import { getPublicApplicationState } from "@/lib/public-application-state";
 import { formatDateDe } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { getTournamentHref, tournamentCtaLabel } from "@/lib/tournament-status";
 import type { PublicTournament } from "@/types/tournament";
 
 type TournamentCardProps = {
@@ -12,8 +12,28 @@ type TournamentCardProps = {
 };
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
-  const ctaLabel = tournamentCtaLabel[tournament.status];
-  const href = getTournamentHref(tournament.slug, tournament.status);
+  const applicationState = getPublicApplicationState({
+    status: tournament.status,
+    applicationsEnabled: true,
+    applicationsOpen: tournament.applicationsOpen,
+    availableSlots: tournament.availableSlots,
+    waitlistEnabled: tournament.waitlistEnabled,
+    isFull: tournament.isFull,
+    applicationStart: tournament.applicationStart,
+    applicationDeadline: tournament.applicationDeadline,
+  });
+  const canApply = applicationState === "open" || applicationState === "waitlist";
+  const href = canApply
+    ? `/turniere/${tournament.slug}/bewerben`
+    : `/turniere/${tournament.slug}`;
+  const ctaLabel =
+    applicationState === "coming-soon"
+      ? "Demnächst bewerben"
+      : applicationState === "waitlist"
+        ? "Warteliste →"
+        : canApply
+          ? "Jetzt bewerben →"
+          : "Turnier ansehen";
   const ctaClassName =
     "text-[12px] font-semibold tracking-[0.08em] uppercase focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow";
 
@@ -56,7 +76,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           <p className="text-[11px] font-medium tracking-[0.08em] text-ink uppercase">
             {tournament.maxTeams} Teams
           </p>
-          {tournament.status === "coming-soon" ? (
+          {applicationState === "coming-soon" ? (
             <span className={cn(ctaClassName, "text-muted")}>{ctaLabel}</span>
           ) : (
             <Link

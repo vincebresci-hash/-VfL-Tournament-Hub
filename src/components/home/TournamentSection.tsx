@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { Container } from "@/components/layout/Container";
-import { getFeaturedTournaments } from "@/lib/tournaments";
+import { getFeaturedTournaments } from "@/lib/db/tournament-queries";
 
-export function TournamentSection() {
-  const featuredTournaments = getFeaturedTournaments();
+export async function TournamentSection() {
+  const featuredTournaments = await getFeaturedTournaments();
 
   return (
     <section className="bg-background pt-12 pb-8 sm:pt-14 lg:pt-16 lg:pb-8" aria-labelledby="aktuelle-turniere">

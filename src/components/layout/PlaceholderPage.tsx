@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 
 type PlaceholderPageProps = {
@@ -11,7 +11,7 @@ type PlaceholderPageProps = {
 export function PlaceholderPage({ title, children }: PlaceholderPageProps) {
   return (
     <div className="flex min-h-full flex-col">
-      <Header variant="solid" />
+      <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-background">
         <Container className="py-20 sm:py-24">
           <h1 className="font-display text-4xl font-bold tracking-wide text-ink uppercase sm:text-5xl">

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ApplicationDetail } from "@/components/admin/ApplicationDetail";
 import { applications as seedApplications } from "@/data/applications";
 import { getAdminApplication, getTournamentOccupancy, isClubDatabaseReady } from "@/lib/db/queries";
-import { getTournamentById, getTournamentBySlug } from "@/lib/tournaments";
+import { getTournamentBySlugOrId } from "@/lib/db/tournament-queries";
 
 type ApplicationDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -38,9 +38,7 @@ export default async function AdminApplicationDetailPage({
     notFound();
   }
 
-  const tournament =
-    getTournamentBySlug(application.tournamentId) ??
-    getTournamentById(application.tournamentId);
+  const tournament = await getTournamentBySlugOrId(application.tournamentId);
 
   if (!tournament) {
     notFound();

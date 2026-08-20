@@ -5,6 +5,7 @@ import {
   IconMessage,
   IconSettings,
   IconTrophy,
+  IconUser,
   IconUsers,
 } from "@/components/ui/icons";
 
@@ -15,5 +16,6 @@ export const adminNavigation = [
   { href: "/admin/vereine", label: "Vereine", icon: IconClubs },
   { href: "/admin/teams", label: "Teams", icon: IconUsers },
   { href: "/admin/emails", label: "E-Mails", icon: IconMessage },
+  { href: "/admin/profil", label: "Profil", icon: IconUser },
   { href: "/admin/einstellungen", label: "Einstellungen", icon: IconSettings },
 ] as const;

@@ -69,6 +69,20 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
                     {tournament.availableSlots} Plätze frei · {tournament.waitlistCount}{" "}
                     Warteliste · {tournament.underReviewCount} in Prüfung
                   </p>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <Link
+                      href={`/admin/turniere/${tournament.id}/bearbeiten`}
+                      className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue"
+                    >
+                      Bearbeiten
+                    </Link>
+                    <Link
+                      href={`/admin/bewerbungen?turnier=${tournament.slug}`}
+                      className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue"
+                    >
+                      Bewerbungen
+                    </Link>
+                  </div>
                 </article>
               ))
             )}

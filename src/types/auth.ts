@@ -24,6 +24,7 @@ export type UserProfile = {
   clubId: string | null;
   contactRole?: ClubContactRole | null;
   createdAt: string;
+  lastSignInAt: string | null;
 };
 
 export type ClubProfile = {

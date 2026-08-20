@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
-import { AuthAlert } from "@/components/auth/AuthShell";
+import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toLoginErrorMessage } from "@/lib/auth/messages";
 import { getPostLoginRedirect } from "@/lib/auth/redirects";
+import { canAccessAdmin, isUserRole } from "@/lib/auth/roles";
 import { validateLoginForm, type LoginFormErrors } from "@/lib/auth/validation";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { createClient } from "@/lib/supabase/client";
@@ -17,7 +17,6 @@ type LoginFormProps = {
 };
 
 export function LoginForm({ redirectTo, initialError }: LoginFormProps) {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(false);
@@ -52,9 +51,19 @@ export function LoginForm({ redirectTo, initialError }: LoginFormProps) {
         return;
       }
 
-      await ensureClubForCurrentUser();
-      router.push(getPostLoginRedirect("club", redirectTo));
-      router.refresh();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { data: profile } = user
+        ? await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
+        : { data: null };
+      const role = isUserRole(profile?.role) ? profile.role : "club";
+
+      if (!canAccessAdmin(role)) {
+        await ensureClubForCurrentUser();
+      }
+
+      window.location.assign(getPostLoginRedirect(role, redirectTo));
     } catch {
       setFormError(AUTH_ERROR_MESSAGES.generic);
       setSubmitting(false);

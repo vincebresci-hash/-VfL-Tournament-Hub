@@ -14,13 +14,18 @@ import {
   type ApplicationFilters,
   type ApplicationSort,
 } from "@/lib/admin";
-import { getTournaments } from "@/lib/tournaments";
+import { toBoardTournament } from "@/lib/tournaments";
+import type { AdminTournamentRecord } from "@/types/admin";
 
-export function ApplicationsBoard() {
+type ApplicationsBoardProps = {
+  tournaments: AdminTournamentRecord[];
+};
+
+export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
   const searchParams = useSearchParams();
   const tournamentFromQuery = searchParams.get("turnier");
   const { applications } = useAdminData();
-  const tournaments = getTournaments();
+  const boardTournaments = tournaments.map(toBoardTournament);
   const [filters, setFilters] = useState<ApplicationFilters>(() => ({
     ...emptyApplicationFilters,
     tournamentId: tournamentFromQuery ?? "all",
@@ -61,14 +66,14 @@ export function ApplicationsBoard() {
         <ApplicationFiltersPanel
           filters={filters}
           sort={sort}
-          tournaments={tournaments}
+          tournaments={boardTournaments}
           onChange={setFilters}
           onSortChange={setSort}
         />
       </div>
 
       <div className="mt-6">
-        <ApplicationTable applications={visible} tournaments={tournaments} />
+        <ApplicationTable applications={visible} tournaments={boardTournaments} />
       </div>
     </div>
   );

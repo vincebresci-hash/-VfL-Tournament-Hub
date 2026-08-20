@@ -2,13 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import { formatDateDe } from "@/lib/format";
-import { getPublicTournaments, sortTournaments } from "@/lib/tournaments";
+import { listPublicTournaments } from "@/lib/db/tournament-queries";
+import { sortTournaments } from "@/lib/tournaments";
 import { getTournamentHref, tournamentCtaLabel } from "@/lib/tournament-status";
 
 export const metadata: Metadata = { title: "Turniere" };
 
-export default function ClubTournamentsPage() {
-  const tournaments = sortTournaments(getPublicTournaments());
+export default async function ClubTournamentsPage() {
+  const tournaments = sortTournaments(await listPublicTournaments());
 
   return (
     <div>

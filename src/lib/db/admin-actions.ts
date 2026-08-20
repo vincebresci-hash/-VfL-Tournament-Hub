@@ -13,9 +13,11 @@ import type {
   InternalCategory,
   TeamStrength,
 } from "@/types/application";
-import { EMAIL_TEMPLATE_TYPES, type AppSettings, type EmailTemplateInput } from "@/types/admin";
+import { EMAIL_TEMPLATE_TYPES, type AppSettings, type EmailTemplateInput, type AdminTournamentInput } from "@/types/admin";
 import { settingsToRows } from "@/lib/settings";
 import { sendApplicationStatusEmail } from "@/lib/email/status-mail";
+import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
+import { slugifyTournamentName } from "@/lib/tournaments";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -373,6 +375,333 @@ export async function saveAppSettingsAction(
 
   revalidateAdminAdminAreas();
   revalidatePath("/turniere", "layout");
+  return { error: null };
+}
+
+function revalidateTournamentPaths(slug?: string | null, id?: string | null) {
+  revalidatePath("/admin");
+  revalidatePath("/admin/turniere");
+  revalidatePath("/turniere");
+  revalidatePath("/", "layout");
+  if (slug) {
+    revalidatePath(`/admin/turniere/${slug}`);
+    revalidatePath(`/turniere/${slug}`);
+    revalidatePath(`/turniere/${slug}/bewerben`);
+  }
+  if (id) {
+    revalidatePath(`/admin/turniere/${id}`);
+    revalidatePath(`/admin/turniere/${id}/bearbeiten`);
+  }
+}
+
+function parseOptionalText(value: string) {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseOptionalTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (!/^\d{2}:\d{2}$/.test(trimmed)) {
+    return null;
+  }
+
+  return `${trimmed}:00`;
+}
+
+function parseOptionalDateTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return `${trimmed}T00:00:00`;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return `${trimmed}:00`;
+  }
+
+  return trimmed;
+}
+
+function parseTournamentInput(input: AdminTournamentInput): {
+  error: string | null;
+  value: {
+    name: string;
+    slug: string;
+    age_group: string;
+    birth_year: number | null;
+    date: string;
+    start_time: string | null;
+    end_time: string | null;
+    location: string | null;
+    address: string | null;
+    short_description: string | null;
+    description: string | null;
+    max_teams: number;
+    status: (typeof TOURNAMENT_STATUSES)[number];
+    applications_open: boolean;
+    waitlist_enabled: boolean;
+    application_start: string | null;
+    application_deadline: string | null;
+    image_url: string | null;
+  } | null;
+} {
+  const name = input.name.trim();
+  const slug = slugifyTournamentName(input.slug || input.name);
+  const date = input.date.trim();
+  const maxTeams = Number.parseInt(input.maxTeams, 10);
+  const birthYearRaw = input.birthYear.trim();
+  const birthYear = birthYearRaw ? Number.parseInt(birthYearRaw, 10) : null;
+
+  if (!name) {
+    return { error: "Bitte den Turniernamen angeben.", value: null };
+  }
+
+  if (!slug) {
+    return { error: "Bitte einen gültigen Slug angeben.", value: null };
+  }
+
+  if (!AGE_GROUPS.includes(input.ageGroup as (typeof AGE_GROUPS)[number])) {
+    return { error: "Bitte eine gültige Altersklasse wählen.", value: null };
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return { error: "Bitte ein gültiges Datum angeben.", value: null };
+  }
+
+  if (!Number.isInteger(maxTeams) || maxTeams < 1 || maxTeams > 256) {
+    return { error: "Bitte eine gültige Teilnehmerzahl zwischen 1 und 256 angeben.", value: null };
+  }
+
+  if (!TOURNAMENT_STATUSES.includes(input.status)) {
+    return { error: "Bitte einen gültigen Turnierstatus wählen.", value: null };
+  }
+
+  if (birthYear != null && (!Number.isInteger(birthYear) || birthYear < 1990 || birthYear > 2040)) {
+    return { error: "Bitte einen gültigen Jahrgang angeben.", value: null };
+  }
+
+  return {
+    error: null,
+    value: {
+      name,
+      slug,
+      age_group: input.ageGroup,
+      birth_year: birthYear,
+      date,
+      start_time: parseOptionalTime(input.startTime),
+      end_time: parseOptionalTime(input.endTime),
+      location: parseOptionalText(input.location),
+      address: parseOptionalText(input.address),
+      short_description: parseOptionalText(input.shortDescription),
+      description: parseOptionalText(input.description),
+      max_teams: maxTeams,
+      status: input.status,
+      applications_open: Boolean(input.applicationsOpen),
+      waitlist_enabled: Boolean(input.waitlistEnabled),
+      application_start: parseOptionalDateTime(input.applicationStart),
+      application_deadline: parseOptionalDateTime(input.applicationDeadline),
+      image_url: parseOptionalText(input.imageUrl),
+    },
+  };
+}
+
+export async function createTournamentAction(
+  input: AdminTournamentInput,
+): Promise<{ error: string | null; id?: string; slug?: string }> {
+  const access = await requireAdmin();
+  if (access.error || !access.session) {
+    return { error: access.error };
+  }
+
+  const parsed = parseTournamentInput(input);
+  if (parsed.error || !parsed.value) {
+    return { error: parsed.error };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .insert(parsed.value)
+    .select("id, slug")
+    .single();
+
+  if (error || !data) {
+    if (error?.code === "23505") {
+      return { error: "Dieser Slug ist bereits vergeben." };
+    }
+
+    return {
+      error: toUserFacingDbError("Das Turnier konnte nicht erstellt werden.", error),
+    };
+  }
+
+  revalidateTournamentPaths(data.slug, data.id);
+  return { error: null, id: data.id, slug: data.slug };
+}
+
+export async function updateTournamentAction(
+  id: string,
+  input: AdminTournamentInput,
+): Promise<{ error: string | null; slug?: string }> {
+  const access = await requireAdmin();
+  if (access.error || !access.session) {
+    return { error: access.error };
+  }
+
+  const parsed = parseTournamentInput(input);
+  if (parsed.error || !parsed.value) {
+    return { error: parsed.error };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .update(parsed.value)
+    .eq("id", id)
+    .select("id, slug")
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error?.code === "23505") {
+      return { error: "Dieser Slug ist bereits vergeben." };
+    }
+
+    return {
+      error: toUserFacingDbError("Das Turnier konnte nicht gespeichert werden.", error),
+    };
+  }
+
+  revalidateTournamentPaths(data.slug, data.id);
+  return { error: null, slug: data.slug };
+}
+
+export async function archiveTournamentAction(
+  id: string,
+): Promise<{ error: string | null }> {
+  const access = await requireAdmin();
+  if (access.error || !access.session) {
+    return { error: access.error };
+  }
+
+  const supabase = await createClient();
+  const { data: tournament, error: loadError } = await supabase
+    .from("tournaments")
+    .select("id, slug")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !tournament) {
+    return {
+      error: toUserFacingDbError("Das Turnier wurde nicht gefunden.", loadError),
+    };
+  }
+
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Das Turnier konnte nicht archiviert werden.", error),
+    };
+  }
+
+  revalidateTournamentPaths(tournament.slug, tournament.id);
+  return { error: null };
+}
+
+export async function restoreTournamentAction(
+  id: string,
+): Promise<{ error: string | null }> {
+  const access = await requireAdmin();
+  if (access.error || !access.session) {
+    return { error: access.error };
+  }
+
+  const supabase = await createClient();
+  const { data: tournament, error: loadError } = await supabase
+    .from("tournaments")
+    .select("id, slug")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !tournament) {
+    return {
+      error: toUserFacingDbError("Das Turnier wurde nicht gefunden.", loadError),
+    };
+  }
+
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ archived_at: null })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Das Turnier konnte nicht wiederhergestellt werden.", error),
+    };
+  }
+
+  revalidateTournamentPaths(tournament.slug, tournament.id);
+  return { error: null };
+}
+
+export async function deleteTournamentAction(
+  id: string,
+): Promise<{ error: string | null }> {
+  const access = await requireAdmin();
+  if (access.error || !access.session) {
+    return { error: access.error };
+  }
+
+  const supabase = await createClient();
+  const { data: tournament, error: loadError } = await supabase
+    .from("tournaments")
+    .select("id, slug")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !tournament) {
+    return {
+      error: toUserFacingDbError("Das Turnier wurde nicht gefunden.", loadError),
+    };
+  }
+
+  const { count, error: countError } = await supabase
+    .from("applications")
+    .select("id", { count: "exact", head: true })
+    .eq("tournament_id", id);
+
+  if (countError) {
+    return {
+      error: toUserFacingDbError("Die Bewerbungen konnten nicht geprüft werden.", countError),
+    };
+  }
+
+  if ((count ?? 0) > 0) {
+    return {
+      error:
+        "Dieses Turnier hat bereits Bewerbungen und kann nicht gelöscht werden. Bitte archivieren.",
+    };
+  }
+
+  const { error } = await supabase.from("tournaments").delete().eq("id", id);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Das Turnier konnte nicht gelöscht werden.", error),
+    };
+  }
+
+  revalidateTournamentPaths(tournament.slug, tournament.id);
   return { error: null };
 }
 

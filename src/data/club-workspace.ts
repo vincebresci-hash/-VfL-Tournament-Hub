@@ -22,6 +22,7 @@ export const demoClubUser: UserProfile = {
   clubId: DEMO_CLUB_ID,
   contactRole: "Jugendkoordinator",
   createdAt: "2026-03-12T09:00:00.000Z",
+  lastSignInAt: "2026-08-18T08:12:00.000Z",
 };
 
 export const demoClubTeams: Team[] = [

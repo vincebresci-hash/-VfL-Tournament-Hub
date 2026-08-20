@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Footer } from "@/components/layout/Footer";
-import { Header } from "@/components/layout/Header";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/cn";
 
@@ -12,7 +12,7 @@ type AuthShellProps = {
 export function AuthShell({ children, wide = false }: AuthShellProps) {
   return (
     <div className="flex min-h-full flex-col bg-navy">
-      <Header variant="solid" />
+      <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-navy">
         <Container
           className={cn(
@@ -69,26 +69,5 @@ export function AuthHeadline({
         </p>
       ) : null}
     </div>
-  );
-}
-
-export function AuthAlert({
-  children,
-  tone = "error",
-}: {
-  children: ReactNode;
-  tone?: "error" | "success";
-}) {
-  return (
-    <p
-      role="alert"
-      className={
-        tone === "success"
-          ? "text-[15px] leading-7 text-ink"
-          : "text-[13px] text-[#9a2b2b]"
-      }
-    >
-      {children}
-    </p>
   );
 }

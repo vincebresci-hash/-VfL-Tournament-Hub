@@ -27,6 +27,16 @@ export type Tournament = {
   waitlistCount: number;
   applicationStart: string | null;
   applicationDeadline: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  address: string | null;
+  shortDescription: string | null;
+  birthYear: number | null;
+  waitlistEnabled: boolean;
+  applicationsOpen: boolean;
+  archivedAt: string | null;
+  availableSlots: number;
+  isFull: boolean;
 };
 
 export type PublicTournament = Omit<

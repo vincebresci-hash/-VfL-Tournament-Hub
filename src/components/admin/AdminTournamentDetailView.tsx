@@ -55,7 +55,15 @@ export function AdminTournamentDetailView({
             {tournament.location ? ` · ${tournament.location}` : ""}
           </p>
         </div>
-        <StatusBadge status={tournament.status} />
+        <div className="flex flex-wrap items-center gap-3">
+          <StatusBadge status={tournament.status} />
+          <Link
+            href={`/admin/turniere/${tournament.id}/bearbeiten`}
+            className="inline-flex h-9 items-center bg-brand-yellow px-3 text-[11px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066]"
+          >
+            Bearbeiten
+          </Link>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

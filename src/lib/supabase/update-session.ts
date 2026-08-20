@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isUserRole } from "@/lib/auth/roles";
 import type { UserRole } from "@/types/auth";
 import { getSupabasePublicConfig } from "@/lib/supabase/env";
+import { supabaseAuthCookieOptions } from "@/lib/supabase/cookie-options";
 import type { Database } from "@/lib/supabase/database";
 
 export async function updateSession(request: NextRequest) {
@@ -13,6 +14,7 @@ export async function updateSession(request: NextRequest) {
   const { url, publishableKey } = getSupabasePublicConfig();
 
   const supabase = createServerClient<Database>(url, publishableKey, {
+    cookieOptions: supabaseAuthCookieOptions,
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -48,6 +50,13 @@ export async function updateSession(request: NextRequest) {
       .maybeSingle();
 
     role = isUserRole(profile?.role) ? profile.role : "club";
+  }
+
+  if (user) {
+    supabaseResponse.headers.set(
+      "Cache-Control",
+      "private, no-cache, no-store, max-age=0, must-revalidate",
+    );
   }
 
   return { supabaseResponse, user, role };

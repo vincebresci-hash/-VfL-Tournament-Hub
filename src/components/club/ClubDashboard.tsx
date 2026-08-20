@@ -8,8 +8,8 @@ type ClubDashboardProps = {
   workspace: ClubWorkspace;
 };
 
-export function ClubDashboard({ workspace }: ClubDashboardProps) {
-  const stats = getClubDashboardStats(workspace);
+export async function ClubDashboard({ workspace }: ClubDashboardProps) {
+  const stats = await getClubDashboardStats(workspace);
 
   return (
     <div>

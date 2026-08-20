@@ -53,6 +53,7 @@ export function toAuthSessionFromUser(user: User): AuthSession | null {
     clubId: null,
     contactRole: metadata.contactRole,
     createdAt,
+    lastSignInAt: user.last_sign_in_at ?? null,
   };
 
   const club: ClubProfile | null = metadata.clubName
@@ -97,6 +98,7 @@ export function toAuthSessionFromProfile(
       clubId: profile.club_id,
       contactRole: metadata.contactRole,
       createdAt: profile.created_at,
+      lastSignInAt: user.last_sign_in_at ?? null,
     },
     club: club ? toClubProfile(club) : null,
   };
