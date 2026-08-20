@@ -222,6 +222,11 @@ export type AdminTournamentRecord = {
   applicationStart: string | null;
   applicationDeadline: string | null;
   archivedAt: string | null;
+  matchDurationMinutes: number;
+  breakMinutes: number;
+  minimumRestMinutes: number;
+  lunchBreakStart: string | null;
+  lunchBreakEnd: string | null;
 };
 
 export type AdminTournamentInput = {

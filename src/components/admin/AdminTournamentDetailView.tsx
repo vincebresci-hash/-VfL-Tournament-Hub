@@ -1,21 +1,25 @@
 import Link from "next/link";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
 import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
+import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
-import { StatusBadge } from "@/components/tournaments/StatusBadge";
+import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
 import { applicationStatusLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
+import { acceptedParticipants } from "@/lib/schedule/admin";
 import { getTournamentCapacity } from "@/lib/tournament-capacity";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication, ApplicationStatus } from "@/types/application";
+import type { TournamentStageStatus } from "@/types/schedule";
 
 type AdminTournamentDetailViewProps = {
   tournament: AdminTournamentRecord;
   applications: AdminApplication[];
+  stageStatus: TournamentStageStatus;
+  current: "overview" | "participants";
 };
 
-const sections: Array<{ status: ApplicationStatus; title: string }> = [
-  { status: "accepted", title: "Bestätigte Teams" },
+const applicationSections: Array<{ status: ApplicationStatus; title: string }> = [
   { status: "waiting-list", title: "Warteliste" },
   { status: "under-review", title: "In Prüfung" },
   { status: "new", title: "Neue Bewerbungen" },
@@ -24,12 +28,15 @@ const sections: Array<{ status: ApplicationStatus; title: string }> = [
 export function AdminTournamentDetailView({
   tournament,
   applications,
+  stageStatus,
+  current,
 }: AdminTournamentDetailViewProps) {
   const related = applications.filter(
     (application) =>
       application.tournamentId === tournament.slug ||
       application.tournamentId === tournament.id,
   );
+  const participants = acceptedParticipants(applications, tournament);
   const capacity = getTournamentCapacity(
     tournament.maxTeams,
     related.map((application) => application.applicationStatus),
@@ -37,36 +44,12 @@ export function AdminTournamentDetailView({
   const maxLabel = tournament.maxTeams == null ? "—" : String(tournament.maxTeams);
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <Link
-        href="/admin/turniere"
-        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
-      >
-        ← Alle Turniere
-      </Link>
-
-      <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-            {tournament.name}
-          </h1>
-          <p className="mt-2 text-[15px] text-muted">
-            {formatDateDe(tournament.date)} · {tournament.ageGroup}
-            {tournament.location ? ` · ${tournament.location}` : ""}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusBadge status={tournament.status} />
-          <Link
-            href={`/admin/turniere/${tournament.id}/bearbeiten`}
-            className="inline-flex h-9 items-center bg-brand-yellow px-3 text-[11px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066]"
-          >
-            Bearbeiten
-          </Link>
-        </div>
-      </div>
-
-      <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <TournamentAdminChrome
+      tournament={tournament}
+      stageStatus={stageStatus}
+      current={current}
+    >
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <CapacityStat
           label="Teilnehmer"
           value={`${capacity.confirmedTeams} / ${maxLabel}`}
@@ -81,7 +64,11 @@ export function AdminTournamentDetailView({
           <TournamentCapacityForm slug={tournament.slug} maxTeams={tournament.maxTeams} />
         </AdminCard>
 
-        {sections.map((section) => {
+        <div id="teilnehmer">
+          <TournamentParticipantsPanel participants={participants} />
+        </div>
+
+        {applicationSections.map((section) => {
           const items = related.filter(
             (application) => application.applicationStatus === section.status,
           );
@@ -136,7 +123,7 @@ export function AdminTournamentDetailView({
           );
         })}
       </div>
-    </div>
+    </TournamentAdminChrome>
   );
 }
 

@@ -391,6 +391,9 @@ function revalidateTournamentPaths(slug?: string | null, id?: string | null) {
   if (id) {
     revalidatePath(`/admin/turniere/${id}`);
     revalidatePath(`/admin/turniere/${id}/bearbeiten`);
+    revalidatePath(`/admin/turniere/${id}/gruppen`);
+    revalidatePath(`/admin/turniere/${id}/spielplan`);
+    revalidatePath(`/admin/turniere/${id}/ergebnisse`);
   }
 }
 

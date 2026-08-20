@@ -84,8 +84,69 @@ export type TournamentRow = {
   waitlist_enabled: boolean;
   applications_open: boolean;
   archived_at: string | null;
+  match_duration_minutes?: number | null;
+  break_minutes?: number | null;
+  minimum_rest_minutes?: number | null;
+  lunch_break_start?: string | null;
+  lunch_break_end?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type MatchStatusRow = "scheduled" | "live" | "completed" | "cancelled";
+export type MatchPhaseRow = "group" | "knockout";
+
+export type TournamentGroupRow = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TournamentGroupMemberRow = {
+  id: string;
+  group_id: string;
+  application_id: string;
+  created_at: string;
+};
+
+export type TournamentFieldRow = {
+  id: string;
+  tournament_id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+};
+
+export type TournamentMatchRow = {
+  id: string;
+  tournament_id: string;
+  group_id: string | null;
+  field_id: string | null;
+  home_application_id: string;
+  away_application_id: string;
+  scheduled_at: string | null;
+  duration_minutes: number;
+  home_score: number | null;
+  away_score: number | null;
+  status: MatchStatusRow;
+  phase: MatchPhaseRow;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TournamentPublicRosterRow = {
+  application_id: string;
+  club_name: string | null;
+  team_name: string | null;
+  age_group: string | null;
+  birth_year: number | null;
+  group_id: string | null;
+  group_name: string | null;
+  group_sort_order: number | null;
 };
 
 export type ApplicationRow = {
@@ -310,6 +371,87 @@ export type Database = {
           },
         ]
       >;
+      tournament_groups: Table<
+        TournamentGroupRow,
+        Partial<TournamentGroupRow> & { tournament_id: string; name: string },
+        Partial<TournamentGroupRow>,
+        [
+          {
+            foreignKeyName: "tournament_groups_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      tournament_group_members: Table<
+        TournamentGroupMemberRow,
+        Partial<TournamentGroupMemberRow> & { group_id: string; application_id: string },
+        Partial<TournamentGroupMemberRow>,
+        [
+          {
+            foreignKeyName: "tournament_group_members_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "tournament_groups";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tournament_group_members_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: true;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      tournament_fields: Table<
+        TournamentFieldRow,
+        Partial<TournamentFieldRow> & { tournament_id: string; name: string },
+        Partial<TournamentFieldRow>,
+        [
+          {
+            foreignKeyName: "tournament_fields_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      tournament_matches: Table<
+        TournamentMatchRow,
+        Partial<TournamentMatchRow> & {
+          tournament_id: string;
+          home_application_id: string;
+          away_application_id: string;
+        },
+        Partial<TournamentMatchRow>,
+        [
+          {
+            foreignKeyName: "tournament_matches_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tournament_matches_group_id_fkey";
+            columns: ["group_id"];
+            isOneToOne: false;
+            referencedRelation: "tournament_groups";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tournament_matches_field_id_fkey";
+            columns: ["field_id"];
+            isOneToOne: false;
+            referencedRelation: "tournament_fields";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -324,6 +466,10 @@ export type Database = {
       tournament_occupancy: {
         Args: Record<string, never>;
         Returns: TournamentOccupancyRow[];
+      };
+      tournament_public_roster: {
+        Args: { p_slug: string };
+        Returns: TournamentPublicRosterRow[];
       };
     };
     Enums: {

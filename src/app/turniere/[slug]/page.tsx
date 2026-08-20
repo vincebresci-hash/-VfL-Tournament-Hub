@@ -7,8 +7,10 @@ import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
+import { TournamentPublicStage } from "@/components/tournaments/TournamentPublicStage";
 import { formatDateDe, formatTimeDe } from "@/lib/format";
 import { getTournamentOccupancy } from "@/lib/db/queries";
+import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
   getPublicApplicationState,
@@ -19,6 +21,7 @@ import { tournamentStatusClassName } from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ tab?: string | string[] }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -36,17 +39,21 @@ export async function generateMetadata({
 
 export default async function TournamentDetailPage({
   params,
+  searchParams,
 }: TournamentDetailPageProps) {
   const { slug } = await params;
+  const query = await searchParams;
+  const tab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
   const tournament = await getPublicTournamentBySlug(slug);
 
   if (!tournament) {
     notFound();
   }
 
-  const [settings, occupancy] = await Promise.all([
+  const [settings, occupancy, stage] = await Promise.all([
     getAppSettings(),
     getTournamentOccupancy(tournament.slug),
+    getPublicTournamentStage(tournament.slug, tournament.id),
   ]);
   const availableSlots = occupancy?.availableSlots ?? tournament.availableSlots;
   const isFull = occupancy?.isFull ?? tournament.isFull;
@@ -153,6 +160,29 @@ export default async function TournamentDetailPage({
               </div>
             </div>
           </div>
+
+          <TournamentPublicStage
+            slug={tournament.slug}
+            stage={stage}
+            tab={tab}
+            overview={
+              stage.roster.length > 0 ? (
+            <section>
+              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
+                Teilnehmende Teams
+              </h2>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                {stage.roster.map((entry) => (
+                  <li key={entry.applicationId} className="border border-line bg-white px-4 py-3 text-[15px] text-ink">
+                    {entry.clubName}
+                    {entry.teamName ? ` · ${entry.teamName}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </section>
+              ) : null
+            }
+          />
         </Container>
       </main>
       <Footer />

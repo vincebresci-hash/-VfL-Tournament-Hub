@@ -38,6 +38,11 @@ const TOURNAMENT_SELECT = [
   "waitlist_enabled",
   "applications_open",
   "archived_at",
+  "match_duration_minutes",
+  "break_minutes",
+  "minimum_rest_minutes",
+  "lunch_break_start",
+  "lunch_break_end",
 ].join(", ");
 
 const TOURNAMENT_SELECT_BASIC = [
@@ -108,6 +113,32 @@ export function normalizeTimeValue(value: string | null | undefined) {
 
 function asBoolean(value: boolean | null | undefined, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
+}
+
+function asPositiveInt(
+  value: number | null | undefined,
+  fallback: number,
+  allowZero = false,
+) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  if (allowZero ? value < 0 : value <= 0) {
+    return fallback;
+  }
+
+  return value;
+}
+
+export function applicationBelongsToTournament(
+  application: { tournamentId: string },
+  tournament: { id: string; slug: string },
+) {
+  return (
+    application.tournamentId === tournament.slug ||
+    application.tournamentId === tournament.id
+  );
 }
 
 export function toPublicTournament(tournament: Tournament): PublicTournament {
@@ -201,6 +232,11 @@ export function toAdminTournamentRecord(row: TournamentRow): AdminTournamentReco
     applicationStart: row.application_start,
     applicationDeadline: row.application_deadline,
     archivedAt: row.archived_at ?? null,
+    matchDurationMinutes: asPositiveInt(row.match_duration_minutes, 12),
+    breakMinutes: asPositiveInt(row.break_minutes, 3, true),
+    minimumRestMinutes: asPositiveInt(row.minimum_rest_minutes, 15, true),
+    lunchBreakStart: normalizeTimeValue(row.lunch_break_start),
+    lunchBreakEnd: normalizeTimeValue(row.lunch_break_end),
   };
 }
 

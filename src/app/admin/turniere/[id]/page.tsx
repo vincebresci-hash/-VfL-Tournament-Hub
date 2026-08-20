@@ -6,9 +6,12 @@ import {
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
 import { listAdminApplications } from "@/lib/db/queries";
+import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { stageStatusFor } from "@/lib/schedule/admin";
 
 type TournamentDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ bereich?: string | string[] }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -33,8 +36,11 @@ export async function generateMetadata({
 
 export default async function AdminTournamentDetailPage({
   params,
+  searchParams,
 }: TournamentDetailPageProps) {
   const { id } = await params;
+  const query = await searchParams;
+  const bereich = Array.isArray(query.bereich) ? query.bereich[0] : query.bereich;
   const [tournament, applicationsResult] = await Promise.all([
     loadTournament(id),
     listAdminApplications(),
@@ -44,10 +50,14 @@ export default async function AdminTournamentDetailPage({
     notFound();
   }
 
+  const stage = await getAdminTournamentStage(tournament.id);
+
   return (
     <AdminTournamentDetailView
       tournament={tournament}
       applications={applicationsResult.applications}
+      stageStatus={stageStatusFor(tournament, stage.groups.length, stage.matches)}
+      current={bereich === "teilnehmer" ? "participants" : "overview"}
     />
   );
 }
