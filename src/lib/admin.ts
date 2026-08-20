@@ -8,6 +8,7 @@ import type {
 import type { AgeGroup, Tournament } from "@/types/tournament";
 import type { ClubRecordStatus, EmailTemplateType } from "@/types/admin";
 import type { UserRole } from "@/types/auth";
+import { getTournamentCapacity } from "@/lib/tournament-capacity";
 
 export const applicationStatusLabel: Record<ApplicationStatus, string> = {
   new: "Neu",
@@ -148,14 +149,21 @@ export function getTournamentAdminSummary(
   applications: AdminApplication[],
 ) {
   const related = getApplicationsForTournament(applications, tournament.id);
-  const counts = countByStatus(related);
+  const capacity = getTournamentCapacity(
+    tournament.maxTeams,
+    related.map((item) => item.applicationStatus),
+  );
 
   return {
     tournament,
     applicationsCount: related.length,
-    confirmedTeams: counts.accepted,
-    waitlistCount: counts["waiting-list"],
-    openApplications: counts.new + counts["under-review"],
+    confirmedTeams: capacity.confirmedTeams,
+    waitlistCount: capacity.waitingListCount,
+    underReviewCount: capacity.underReviewCount,
+    newCount: capacity.newCount,
+    availableSlots: capacity.availableSlots,
+    isFull: capacity.isFull,
+    openApplications: capacity.newCount + capacity.underReviewCount,
     composition: getCategoryComposition(related),
   };
 }

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
 import { getAppSettings } from "@/lib/settings";
+import { getAvailableSlots, sumFiniteAvailableSlots } from "@/lib/tournament-capacity";
 import { AGE_GROUPS } from "@/types/tournament";
 import { APPLICATION_STATUSES } from "@/types/application";
 import { USER_ROLES, type UserRole } from "@/types/auth";
@@ -18,6 +19,7 @@ import type {
   AdminTeamDetail,
   AdminTeamListItem,
   AdminTournamentOption,
+  AdminTournamentRecord,
   ClubRecordStatus,
   EmailTemplate,
   EmailTemplateType,
@@ -471,6 +473,51 @@ export async function listAdminTournaments(): Promise<AdminTournamentOption[]> {
   );
 }
 
+export async function listAdminTournamentRecords(): Promise<AdminTournamentRecord[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("id, slug, name, age_group, date, location, status, max_teams, description")
+    .order("date", { ascending: true });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return (data as TournamentRow[]).map(toAdminTournamentRecord);
+}
+
+export async function getAdminTournamentBySlug(
+  slug: string,
+): Promise<AdminTournamentRecord | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("id, slug, name, age_group, date, location, status, max_teams, description")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return toAdminTournamentRecord(data as TournamentRow);
+}
+
+function toAdminTournamentRecord(row: TournamentRow): AdminTournamentRecord {
+  return {
+    id: row.id,
+    slug: row.slug,
+    name: row.name,
+    ageGroup: row.age_group,
+    date: row.date,
+    location: row.location,
+    status: row.status,
+    maxTeams: row.max_teams,
+    description: row.description,
+  };
+}
+
 export async function listEmailTemplates(): Promise<{
   templates: EmailTemplate[];
   ready: boolean;
@@ -547,6 +594,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       newApplications: 0,
       underReview: 0,
       confirmedTeams: 0,
+      availableSlots: 0,
+      waitlistCount: 0,
       activeTournaments: 0,
       registeredClubs: 0,
       registeredTeams: 0,
@@ -600,20 +649,36 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     applications.filter((row) => row.status === "accepted"),
     (row) => row.tournament_id,
   );
+  const waitlistCounts = countBy(
+    applications.filter((row) => row.status === "waiting-list"),
+    (row) => row.tournament_id,
+  );
+  const underReviewCounts = countBy(
+    applications.filter((row) => row.status === "under-review"),
+    (row) => row.tournament_id,
+  );
 
   const tournaments: AdminDashboardTournament[] = tournamentRows
     .filter((row) => row.status !== "completed")
-    .map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      name: row.name,
-      ageGroup: row.age_group,
-      date: row.date,
-      status: row.status,
-      maxTeams: row.max_teams,
-      confirmedTeams: acceptedCounts.get(row.id) ?? 0,
-      applicationsCount: applicationCounts.get(row.id) ?? 0,
-    }));
+    .map((row) => {
+      const confirmedTeams = acceptedCounts.get(row.id) ?? 0;
+      const availableSlots = getAvailableSlots(row.max_teams, confirmedTeams);
+
+      return {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        ageGroup: row.age_group,
+        date: row.date,
+        status: row.status,
+        maxTeams: row.max_teams,
+        confirmedTeams,
+        availableSlots: Number.isFinite(availableSlots) ? availableSlots : 0,
+        waitlistCount: waitlistCounts.get(row.id) ?? 0,
+        underReviewCount: underReviewCounts.get(row.id) ?? 0,
+        applicationsCount: applicationCounts.get(row.id) ?? 0,
+      };
+    });
 
   const latestApplications: AdminDashboardApplication[] = applications.slice(0, 6).map((row) => {
     const club = Array.isArray(row.clubs) ? row.clubs[0] : row.clubs;
@@ -637,6 +702,8 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
       newApplications: applications.filter((row) => row.status === "new").length,
       underReview: applications.filter((row) => row.status === "under-review").length,
       confirmedTeams: applications.filter((row) => row.status === "accepted").length,
+      availableSlots: sumFiniteAvailableSlots(tournaments),
+      waitlistCount: applications.filter((row) => row.status === "waiting-list").length,
       activeTournaments: tournamentRows.filter((row) => row.status === "active").length,
       registeredClubs: clubsCountResult.count ?? 0,
       registeredTeams: teamsCountResult.count ?? 0,

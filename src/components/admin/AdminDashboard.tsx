@@ -28,10 +28,12 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
         </AdminNotice>
       ) : null}
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard value={stats.newApplications} label="Neue Bewerbungen" />
+        <AdminStatCard value={stats.confirmedTeams} label="Bestätigte Teilnehmer" />
+        <AdminStatCard value={stats.availableSlots} label="Freie Turnierplätze" />
+        <AdminStatCard value={stats.waitlistCount} label="Wartelistenplätze" />
         <AdminStatCard value={stats.underReview} label="In Prüfung" />
-        <AdminStatCard value={stats.confirmedTeams} label="Bestätigte Teams" />
         <AdminStatCard value={stats.activeTournaments} label="Aktive Turniere" />
         <AdminStatCard value={stats.registeredClubs} label="Registrierte Vereine" />
         <AdminStatCard value={stats.registeredTeams} label="Registrierte Teams" />
@@ -61,10 +63,11 @@ export function AdminDashboard({ data }: AdminDashboardProps) {
                   </div>
                   <p className="mt-4 text-[14px] text-ink">
                     {tournament.confirmedTeams}
-                    {tournament.maxTeams ? ` / ${tournament.maxTeams}` : ""} Teams bestätigt
+                    {tournament.maxTeams ? ` / ${tournament.maxTeams}` : ""} bestätigt
                   </p>
                   <p className="mt-1 text-[13px] text-muted">
-                    {tournament.applicationsCount} Bewerbungen
+                    {tournament.availableSlots} Plätze frei · {tournament.waitlistCount}{" "}
+                    Warteliste · {tournament.underReviewCount} in Prüfung
                   </p>
                 </article>
               ))

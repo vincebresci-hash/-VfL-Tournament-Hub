@@ -8,11 +8,13 @@ import { Header } from "@/components/layout/Header";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { formatDateDe } from "@/lib/format";
+import { getTournamentOccupancy } from "@/lib/db/queries";
 import {
-  canApplyToTournament,
-  getTournamentHref,
-  tournamentCtaLabel,
-} from "@/lib/tournament-status";
+  getPublicApplicationState,
+  publicApplicationStateLabel,
+} from "@/lib/public-application-state";
+import { getAppSettings } from "@/lib/settings";
+import { tournamentStatusClassName } from "@/lib/tournament-status";
 import {
   getPublicTournamentBySlug,
   getPublicTournaments,
@@ -21,6 +23,8 @@ import {
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return getPublicTournaments().map((tournament) => ({
@@ -49,8 +53,24 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const ctaLabel = tournamentCtaLabel[tournament.status];
-  const canApply = canApplyToTournament(tournament.status);
+  const [settings, occupancy] = await Promise.all([
+    getAppSettings(),
+    getTournamentOccupancy(tournament.slug),
+  ]);
+  const availableSlots = occupancy?.availableSlots ?? tournament.maxTeams;
+  const isFull = occupancy?.isFull ?? false;
+  const applicationState = getPublicApplicationState({
+    status: tournament.status,
+    applicationsEnabled: settings.applicationsEnabled,
+    availableSlots,
+    waitlistEnabled: settings.waitlistEnabled,
+    isFull,
+  });
+  const canApply = applicationState === "open" || applicationState === "waitlist";
+  const ctaLabel =
+    applicationState === "waitlist"
+      ? "Für Warteliste bewerben →"
+      : "Jetzt bewerben →";
 
   return (
     <div className="flex min-h-full flex-col">
@@ -79,6 +99,19 @@ export default async function TournamentDetailPage({
                   {tournament.ageGroup}
                 </span>
                 <StatusBadge status={tournament.status} />
+                <span
+                  className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
+                    applicationState === "open"
+                      ? tournamentStatusClassName.active
+                      : applicationState === "waitlist"
+                        ? tournamentStatusClassName.full
+                        : applicationState === "coming-soon"
+                          ? tournamentStatusClassName["coming-soon"]
+                          : tournamentStatusClassName.completed
+                  }`}
+                >
+                  {publicApplicationStateLabel[applicationState]}
+                </span>
               </div>
 
               <h1 className="mt-4 font-display text-4xl font-bold tracking-wide text-ink uppercase sm:text-5xl">
@@ -96,19 +129,24 @@ export default async function TournamentDetailPage({
               <p className="mt-3 text-[11px] font-medium tracking-[0.08em] text-ink uppercase">
                 {tournament.maxTeams} Teams
               </p>
+              {applicationState === "waitlist" ? (
+                <p className="mt-3 text-[13px] font-semibold tracking-[0.08em] text-ink uppercase">
+                  Bewerbung für Warteliste möglich
+                </p>
+              ) : null}
 
               <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
                 {tournament.description}
               </p>
 
               <div className="mt-8">
-                {tournament.status === "coming-soon" ? (
+                {applicationState === "coming-soon" ? (
                   <span className="inline-flex h-11 items-center px-4 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
-                    {ctaLabel}
+                    Demnächst bewerben
                   </span>
                 ) : canApply ? (
                   <Link
-                    href={getTournamentHref(tournament.slug, tournament.status)}
+                    href={`/turniere/${tournament.slug}/bewerben`}
                     className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
                   >
                     {ctaLabel}

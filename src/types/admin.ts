@@ -161,6 +161,9 @@ export type AdminDashboardTournament = {
   status: "coming-soon" | "active" | "full" | "completed";
   maxTeams: number | null;
   confirmedTeams: number;
+  availableSlots: number;
+  waitlistCount: number;
+  underReviewCount: number;
   applicationsCount: number;
 };
 
@@ -179,6 +182,8 @@ export type AdminDashboardData = {
     newApplications: number;
     underReview: number;
     confirmedTeams: number;
+    availableSlots: number;
+    waitlistCount: number;
     activeTournaments: number;
     registeredClubs: number;
     registeredTeams: number;
@@ -194,4 +199,16 @@ export type AdminTournamentOption = {
   name: string;
   slug: string;
   ageGroup: string;
+};
+
+export type AdminTournamentRecord = {
+  id: string;
+  slug: string;
+  name: string;
+  ageGroup: string;
+  date: string;
+  location: string | null;
+  status: "coming-soon" | "active" | "full" | "completed";
+  maxTeams: number | null;
+  description: string | null;
 };

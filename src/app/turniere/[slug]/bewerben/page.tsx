@@ -10,8 +10,11 @@ import { Container } from "@/components/layout/Container";
 import { canAccessClub } from "@/lib/auth/roles";
 import { getAuthSession } from "@/lib/auth/session";
 import { getApplicationPrefill, loadClubWorkspace } from "@/lib/club/workspace";
+import { getTournamentOccupancy } from "@/lib/db/queries";
 import { formatDateDe } from "@/lib/format";
-import { canApplyToTournament } from "@/lib/tournament-status";
+import {
+  getPublicApplicationState,
+} from "@/lib/public-application-state";
 import { getAppSettings } from "@/lib/settings";
 import {
   getPublicTournamentBySlug,
@@ -22,6 +25,8 @@ import type { PublicTournament } from "@/types/tournament";
 type ApplyPageProps = {
   params: Promise<{ slug: string }>;
 };
+
+export const dynamic = "force-dynamic";
 
 export function generateStaticParams() {
   return getPublicTournaments().map((tournament) => ({ slug: tournament.slug }));
@@ -55,8 +60,16 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
     ? getApplicationPrefill(workspace, tournament.ageGroup)
     : undefined;
   const settings = await getAppSettings();
+  const occupancy = await getTournamentOccupancy(tournament.slug);
+  const applicationState = getPublicApplicationState({
+    status: tournament.status,
+    applicationsEnabled: settings.applicationsEnabled,
+    availableSlots: occupancy?.availableSlots ?? tournament.maxTeams,
+    waitlistEnabled: settings.waitlistEnabled,
+    isFull: occupancy?.isFull ?? false,
+  });
 
-  if (!canApplyToTournament(tournament.status) || !settings.applicationsEnabled) {
+  if (applicationState === "closed" || applicationState === "coming-soon") {
     return (
       <ApplyShell>
         <Container className="py-16 sm:py-20">

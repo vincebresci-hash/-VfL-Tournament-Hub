@@ -156,6 +156,15 @@ export type EmailLogRow = {
   created_at: string;
 };
 
+export type TournamentOccupancyRow = {
+  slug: string;
+  max_teams: number | null;
+  confirmed_teams: number;
+  waiting_list_count: number;
+  under_review_count: number;
+  new_count: number;
+};
+
 type ForeignKey = {
   foreignKeyName: string;
   columns: string[];
@@ -303,6 +312,10 @@ export type Database = {
       ensure_own_club: {
         Args: { p_name: string; p_city?: string | null; p_website?: string | null };
         Returns: string;
+      };
+      tournament_occupancy: {
+        Args: Record<string, never>;
+        Returns: TournamentOccupancyRow[];
       };
     };
     Enums: {

@@ -7,16 +7,20 @@ import type { Tournament } from "@/types/tournament";
 type TournamentAdminCardProps = {
   tournament: Tournament;
   confirmedTeams: number;
+  availableSlots: number;
   applicationsCount: number;
   waitlistCount: number;
+  underReviewCount: number;
   composition?: CategoryComposition;
 };
 
 export function TournamentAdminCard({
   tournament,
   confirmedTeams,
+  availableSlots,
   applicationsCount,
   waitlistCount,
+  underReviewCount,
   composition,
 }: TournamentAdminCardProps) {
   return (
@@ -36,14 +40,16 @@ export function TournamentAdminCard({
       <dl className="mt-5 grid grid-cols-2 gap-3 text-[13px] text-muted sm:grid-cols-4">
         <Stat label="Max Teams" value={String(tournament.maxTeams)} />
         <Stat label="Bestätigt" value={String(confirmedTeams)} />
-        <Stat label="Bewerbungen" value={String(applicationsCount)} />
+        <Stat label="Freie Plätze" value={String(availableSlots)} />
         <Stat label="Warteliste" value={String(waitlistCount)} />
       </dl>
 
       <p className="mt-4 text-[14px] text-ink">
         {confirmedTeams} / {tournament.maxTeams} Teams bestätigt
       </p>
-      <p className="mt-1 text-[13px] text-muted">{applicationsCount} Bewerbungen</p>
+      <p className="mt-1 text-[13px] text-muted">
+        {underReviewCount} in Prüfung · {applicationsCount} Bewerbungen
+      </p>
 
       {composition ? (
         <div className="mt-5 border-t border-line pt-4">

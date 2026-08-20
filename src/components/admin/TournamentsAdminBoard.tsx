@@ -3,11 +3,20 @@
 import { TournamentAdminCard } from "@/components/admin/TournamentAdminCard";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
 import { getTournamentAdminSummary } from "@/lib/admin";
-import { getTournaments, sortTournaments } from "@/lib/tournaments";
+import { sortTournaments } from "@/lib/tournaments";
+import { AGE_GROUPS } from "@/types/tournament";
+import type { AdminTournamentRecord } from "@/types/admin";
+import type { AgeGroup, Tournament } from "@/types/tournament";
 
-export function TournamentsAdminBoard() {
+type TournamentsAdminBoardProps = {
+  tournaments: AdminTournamentRecord[];
+};
+
+export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProps) {
   const { applications } = useAdminData();
-  const tournaments = sortTournaments(getTournaments());
+  const list = sortTournaments(
+    tournaments.map((tournament) => toBoardTournament(tournament)),
+  );
 
   return (
     <div>
@@ -19,16 +28,18 @@ export function TournamentsAdminBoard() {
       </p>
 
       <div className="mt-8 grid gap-4">
-        {tournaments.map((tournament) => {
+        {list.map((tournament) => {
           const summary = getTournamentAdminSummary(tournament, applications);
 
           return (
             <TournamentAdminCard
-              key={tournament.id}
+              key={tournament.slug}
               tournament={tournament}
               confirmedTeams={summary.confirmedTeams}
+              availableSlots={summary.availableSlots}
               applicationsCount={summary.applicationsCount}
               waitlistCount={summary.waitlistCount}
+              underReviewCount={summary.underReviewCount}
               composition={summary.composition}
             />
           );
@@ -36,4 +47,26 @@ export function TournamentsAdminBoard() {
       </div>
     </div>
   );
+}
+
+function toBoardTournament(record: AdminTournamentRecord): Tournament {
+  return {
+    id: record.slug,
+    slug: record.slug,
+    name: record.name,
+    ageGroup: AGE_GROUPS.includes(record.ageGroup as AgeGroup)
+      ? (record.ageGroup as AgeGroup)
+      : "U10",
+    date: record.date,
+    location: record.location ?? "",
+    image: "",
+    description: record.description ?? "",
+    status: record.status,
+    maxTeams: record.maxTeams ?? 0,
+    confirmedTeams: 0,
+    applicationsCount: 0,
+    waitlistCount: 0,
+    applicationStart: null,
+    applicationDeadline: null,
+  };
 }

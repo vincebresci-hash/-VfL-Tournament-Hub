@@ -47,6 +47,8 @@ export function ApplicationDetail({
   }
 
   const summary = getTournamentAdminSummary(tournament, applications);
+  const canAccept =
+    !summary.isFull || application.applicationStatus === "accepted";
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -160,22 +162,32 @@ export function ApplicationDetail({
             <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
               Entscheidung
             </h2>
+            {summary.isFull ? (
+              <p className="mt-3 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+                Turnier ausgebucht
+              </p>
+            ) : null}
             <div className="mt-4 grid gap-2">
-              {decisions.map((decision) => (
-                <button
-                  key={decision.status}
-                  type="button"
-                  disabled={saving}
-                  onClick={() => setPendingStatus(decision.status)}
-                  className={
-                    decision.status === "accepted"
-                      ? "inline-flex h-10 items-center justify-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
-                      : "inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
-                  }
-                >
-                  {decision.label}
-                </button>
-              ))}
+              {decisions.map((decision) => {
+                const disabled =
+                  saving || (decision.status === "accepted" && !canAccept);
+
+                return (
+                  <button
+                    key={decision.status}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setPendingStatus(decision.status)}
+                    className={
+                      decision.status === "accepted"
+                        ? "inline-flex h-10 items-center justify-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60"
+                        : "inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                    }
+                  >
+                    {decision.label}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -186,6 +198,7 @@ export function ApplicationDetail({
             <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
               <Info label="Max Teams" value={String(tournament.maxTeams)} />
               <Info label="Bestätigt" value={String(summary.confirmedTeams)} />
+              <Info label="Freie Plätze" value={String(summary.availableSlots)} />
               <Info
                 label="Offene Bewerbungen"
                 value={String(summary.openApplications)}

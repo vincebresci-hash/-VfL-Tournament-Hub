@@ -56,7 +56,7 @@ export async function updateApplicationStatusAction(
   const supabase = await createClient();
   const { data: current, error: currentError } = await supabase
     .from("applications")
-    .select("id, status")
+    .select("id, status, tournament_id")
     .eq("id", applicationId)
     .maybeSingle();
 
@@ -69,6 +69,26 @@ export async function updateApplicationStatusAction(
 
   const previousStatus = current.status as ApplicationStatus;
   const statusChanged = previousStatus !== status;
+
+  const { data: tournament } = await supabase
+    .from("tournaments")
+    .select("id, slug, max_teams")
+    .eq("id", current.tournament_id)
+    .maybeSingle();
+
+  if (status === "accepted" && previousStatus !== "accepted") {
+    if (tournament?.max_teams != null && tournament.max_teams >= 0) {
+      const { count } = await supabase
+        .from("applications")
+        .select("id", { count: "exact", head: true })
+        .eq("tournament_id", tournament.id)
+        .eq("status", "accepted");
+
+      if ((count ?? 0) >= tournament.max_teams) {
+        return { error: "TURNIER AUSGEBUCHT", notice: null };
+      }
+    }
+  }
 
   if (statusChanged) {
     const { error } = await supabase
@@ -89,6 +109,11 @@ export async function updateApplicationStatusAction(
   revalidatePath("/admin");
   revalidatePath("/admin/turniere");
   revalidatePath("/admin/emails");
+  revalidatePath("/turniere");
+  if (tournament?.slug) {
+    revalidatePath(`/admin/turniere/${tournament.slug}`);
+    revalidatePath(`/turniere/${tournament.slug}`);
+  }
 
   if (!statusChanged) {
     return { error: null, notice: "Status gespeichert." };
@@ -112,6 +137,39 @@ export async function updateApplicationStatusAction(
     error: null,
     notice: "Status gespeichert, E-Mail konnte jedoch nicht versendet werden.",
   };
+}
+
+export async function updateTournamentMaxTeamsAction(
+  slug: string,
+  maxTeams: number,
+): Promise<{ error: string | null }> {
+  const access = await requireAdmin();
+  if (access.error || !access.session) {
+    return { error: access.error };
+  }
+
+  if (!Number.isInteger(maxTeams) || maxTeams < 1 || maxTeams > 256) {
+    return { error: "Bitte eine gültige Teilnehmerzahl angeben." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({ max_teams: maxTeams })
+    .eq("slug", slug);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Die Teilnehmerzahl konnte nicht gespeichert werden.", error),
+    };
+  }
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/turniere");
+  revalidatePath(`/admin/turniere/${slug}`);
+  revalidatePath("/turniere");
+  revalidatePath(`/turniere/${slug}`);
+  return { error: null };
 }
 
 export async function upsertApplicationReviewAction(

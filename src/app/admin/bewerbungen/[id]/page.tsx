@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ApplicationDetail } from "@/components/admin/ApplicationDetail";
 import { applications as seedApplications } from "@/data/applications";
-import { getAdminApplication, isClubDatabaseReady } from "@/lib/db/queries";
+import { getAdminApplication, getTournamentOccupancy, isClubDatabaseReady } from "@/lib/db/queries";
 import { getTournamentById, getTournamentBySlug } from "@/lib/tournaments";
 
 type ApplicationDetailPageProps = {
@@ -46,5 +46,15 @@ export default async function AdminApplicationDetailPage({
     notFound();
   }
 
-  return <ApplicationDetail applicationId={id} tournament={tournament} />;
+  const occupancy = await getTournamentOccupancy(tournament.slug);
+  const tournamentWithCapacity = occupancy
+    ? {
+        ...tournament,
+        maxTeams: occupancy.maxTeams ?? tournament.maxTeams,
+        confirmedTeams: occupancy.confirmedTeams,
+        waitlistCount: occupancy.waitingListCount,
+      }
+    : tournament;
+
+  return <ApplicationDetail applicationId={id} tournament={tournamentWithCapacity} />;
 }

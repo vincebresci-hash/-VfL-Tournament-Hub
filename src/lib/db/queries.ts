@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
 import { toAdminApplication, toClubApplicationView, toClubTeam } from "@/lib/db/mappers";
-import type { ApplicationWithRelations, TeamRow } from "@/lib/supabase/database";
+import { getAvailableSlots, isTournamentFull, type TournamentOccupancy } from "@/lib/tournament-capacity";
+import type { ApplicationWithRelations, TeamRow, TournamentOccupancyRow } from "@/lib/supabase/database";
 import type { AdminApplication } from "@/types/application";
 import type { ClubApplicationView } from "@/types/club";
 import type { Team } from "@/types/auth";
@@ -123,6 +124,43 @@ export async function getTournamentIdBySlug(slug: string) {
   }
 
   return data.id;
+}
+
+export function mapTournamentOccupancy(
+  row: TournamentOccupancyRow,
+): TournamentOccupancy {
+  const confirmedTeams = row.confirmed_teams;
+  const availableSlots = getAvailableSlots(row.max_teams, confirmedTeams);
+
+  return {
+    slug: row.slug,
+    maxTeams: row.max_teams,
+    confirmedTeams,
+    waitingListCount: row.waiting_list_count,
+    underReviewCount: row.under_review_count,
+    newCount: row.new_count,
+    availableSlots: Number.isFinite(availableSlots) ? availableSlots : 0,
+    isFull: isTournamentFull(row.max_teams, confirmedTeams),
+  };
+}
+
+export async function listTournamentOccupancy(): Promise<TournamentOccupancy[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("tournament_occupancy");
+
+  if (error || !data) {
+    return [];
+  }
+
+  const rows = Array.isArray(data) ? data : [data];
+  return (rows as TournamentOccupancyRow[]).map(mapTournamentOccupancy);
+}
+
+export async function getTournamentOccupancy(
+  slug: string,
+): Promise<TournamentOccupancy | null> {
+  const list = await listTournamentOccupancy();
+  return list.find((item) => item.slug === slug) ?? null;
 }
 
 export async function isClubDatabaseReady() {
