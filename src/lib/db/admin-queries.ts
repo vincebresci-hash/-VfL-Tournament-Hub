@@ -283,7 +283,7 @@ export async function getAdminClub(clubId: string): Promise<AdminClubDetail | nu
 
     return {
       id: row.id,
-      teamId: row.team_id,
+      teamId: row.team_id ?? "",
       teamName: team?.name ?? "Mannschaft",
       tournamentId: tournament?.id ?? row.tournament_id,
       tournamentName: tournament?.name ?? "Turnier",

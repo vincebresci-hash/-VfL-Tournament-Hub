@@ -8,6 +8,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { Container } from "@/components/layout/Container";
 import { canAccessClub } from "@/lib/auth/roles";
+import { buildLoginHref } from "@/lib/auth/redirects";
 import { getAuthSession } from "@/lib/auth/session";
 import { getApplicationPrefill, loadClubWorkspace } from "@/lib/club/workspace";
 import { formatDateDe } from "@/lib/format";
@@ -47,6 +48,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
   }
 
   const session = await getAuthSession();
+  const isClubUser = Boolean(session && canAccessClub(session.user.role));
   const workspace =
     session && canAccessClub(session.user.role)
       ? await loadClubWorkspace(session)
@@ -55,6 +57,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
     ? getApplicationPrefill(workspace, tournament.ageGroup)
     : undefined;
   const settings = await getAppSettings();
+  const loginHref = buildLoginHref(`/turniere/${tournament.slug}/bewerben`);
 
   if (!canApplyToTournament(tournament.status) || !settings.applicationsEnabled) {
     return (
@@ -106,6 +109,21 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
             Bewirb deine Mannschaft für unser Turnier. Nach Eingang prüfen wir
             eure Bewerbung und melden uns anschließend bei euch.
           </p>
+
+          {!isClubUser ? (
+            <div className="mt-6 flex flex-col gap-3 border border-line bg-surface px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[14px] leading-6 text-ink">
+                Habt ihr bereits ein Vereinskonto? Einloggen und Daten
+                automatisch übernehmen.
+              </p>
+              <Link
+                href={loginHref}
+                className="inline-flex h-10 shrink-0 items-center justify-center border border-navy px-4 text-[12px] font-semibold tracking-[0.1em] text-navy uppercase transition-colors hover:bg-navy hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+              >
+                Einloggen
+              </Link>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-8 grid max-w-[1100px] items-start gap-8 lg:grid-cols-[minmax(0,1fr)_17.5rem]">

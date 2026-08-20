@@ -6,6 +6,8 @@ import { getAuthSession } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/auth/roles";
 import { listAdminApplications } from "@/lib/db/queries";
 import { toUserFacingDbError } from "@/lib/db/errors";
+import { sendApplicationStatusEmail } from "@/lib/email/applications";
+import { getPublicTournamentBySlug } from "@/lib/tournaments";
 import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS } from "@/types/application";
 import type {
   AdminApplication,
@@ -53,13 +55,42 @@ export async function updateApplicationStatusAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("applications")
     .update({ status })
-    .eq("id", applicationId);
+    .eq("id", applicationId)
+    .select(
+      "contact_email, club_name, team_name, tournament_id, tournaments (slug, name)",
+    )
+    .maybeSingle();
 
   if (error) {
     return { error: toUserFacingDbError("Der Status konnte nicht geändert werden.", error) };
+  }
+
+  // Statusmail IMMER an die angegebene Kontakt-E-Mail (Gast oder Verein).
+  // Ein fehlender Versand darf die Statusänderung nicht blockieren.
+  if (updated?.contact_email) {
+    try {
+      const tournamentRelation = Array.isArray(updated.tournaments)
+        ? updated.tournaments[0]
+        : updated.tournaments;
+      const tournamentName =
+        tournamentRelation?.name ??
+        (tournamentRelation?.slug
+          ? getPublicTournamentBySlug(tournamentRelation.slug)?.name
+          : undefined) ??
+        "unser Turnier";
+
+      await sendApplicationStatusEmail(status, {
+        contactEmail: updated.contact_email,
+        clubName: updated.club_name ?? "Verein",
+        teamName: updated.team_name ?? "eure Mannschaft",
+        tournamentName,
+      });
+    } catch {
+      // Versand still fehlschlagen lassen.
+    }
   }
 
   revalidatePath("/admin/bewerbungen");

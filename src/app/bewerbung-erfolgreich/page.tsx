@@ -21,18 +21,29 @@ export default function ApplicationSuccessPage() {
               Bewerbung eingegangen
             </h1>
             <p className="mt-6 text-base leading-7 text-muted">
-              Vielen Dank für eure Bewerbung.
-            </p>
-            <p className="mt-2 text-base leading-7 text-muted">
-              Wir prüfen eure Angaben und melden uns anschließend bei eurem
-              Ansprechpartner.
+              Vielen Dank für eure Bewerbung. Eine Bestätigung wurde an die
+              angegebene E-Mail-Adresse gesendet.
             </p>
             <p className="mt-6 text-[15px] leading-7 text-ink">
-              Wichtig: Die Bewerbung stellt noch keine Teilnahmebestätigung dar.
+              Die Bewerbung stellt noch keine Teilnahmebestätigung dar.
             </p>
+
+            <div className="mt-10 border border-line bg-surface px-5 py-6">
+              <p className="text-[15px] leading-7 text-ink">
+                Möchtet ihr eure Bewerbungen künftig zentral verwalten? Jetzt
+                kostenlos Vereinskonto erstellen.
+              </p>
+              <Link
+                href="/registrieren"
+                className="mt-4 inline-flex h-11 items-center justify-center border border-navy px-4 text-[12px] font-semibold tracking-[0.1em] text-navy uppercase transition-colors hover:bg-navy hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+              >
+                Vereinskonto erstellen
+              </Link>
+            </div>
+
             <Link
               href="/turniere"
-              className="mt-10 inline-flex h-12 items-center bg-brand-yellow px-5 text-[13px] font-semibold tracking-[0.1em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
+              className="mt-8 inline-flex h-12 items-center bg-brand-yellow px-5 text-[13px] font-semibold tracking-[0.1em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
             >
               Zurück zu den Turnieren
             </Link>
