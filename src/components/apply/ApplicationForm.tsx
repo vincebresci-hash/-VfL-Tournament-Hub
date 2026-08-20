@@ -56,6 +56,7 @@ export function ApplicationForm({
   const [errors, setErrors] = useState<ApplicationFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [honeypot, setHoneypot] = useState("");
 
   function update<K extends keyof ApplicationFormValues>(
     field: K,
@@ -91,6 +92,7 @@ export function ApplicationForm({
     const result = await submitTournamentApplicationAction({
       tournamentSlug,
       teamId: selectedTeamId || null,
+      honeypot,
       values: { ...values, ageGroup },
     });
 
@@ -115,6 +117,21 @@ export function ApplicationForm({
           {formError}
         </p>
       ) : null}
+
+      {/* Honeypot: für echte Nutzer unsichtbar. Bots füllen das Feld aus und
+          werden serverseitig abgewiesen. */}
+      <div aria-hidden="true" className="absolute left-[-9999px] h-0 w-0 overflow-hidden">
+        <label htmlFor="company">Firma (bitte leer lassen)</label>
+        <input
+          id="company"
+          name="company"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+        />
+      </div>
 
       <FormSection title="Verein" icon={<IconClubs className="h-4 w-4 text-brand-yellow" />}>
         <div className="grid gap-5 sm:grid-cols-2">
