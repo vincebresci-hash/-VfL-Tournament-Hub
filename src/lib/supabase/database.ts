@@ -95,6 +95,15 @@ export type TournamentRow = {
 
 export type MatchStatusRow = "scheduled" | "live" | "completed" | "cancelled";
 export type MatchPhaseRow = "group" | "knockout";
+export type KnockoutRoundRow =
+  | "quarterfinal"
+  | "semifinal"
+  | "third-place"
+  | "final"
+  | "placement-5"
+  | "placement-7";
+export type KnockoutSlotRow = "home" | "away";
+export type DecidedByRow = "regular" | "penalties";
 
 export type TournamentGroupRow = {
   id: string;
@@ -125,8 +134,8 @@ export type TournamentMatchRow = {
   tournament_id: string;
   group_id: string | null;
   field_id: string | null;
-  home_application_id: string;
-  away_application_id: string;
+  home_application_id: string | null;
+  away_application_id: string | null;
   scheduled_at: string | null;
   duration_minutes: number;
   home_score: number | null;
@@ -134,8 +143,22 @@ export type TournamentMatchRow = {
   status: MatchStatusRow;
   phase: MatchPhaseRow;
   sort_order: number;
+  round: KnockoutRoundRow | null;
+  next_match_id: string | null;
+  next_match_slot: KnockoutSlotRow | null;
+  loser_next_match_id: string | null;
+  loser_next_match_slot: KnockoutSlotRow | null;
+  decided_by: DecidedByRow;
+  home_penalties: number | null;
+  away_penalties: number | null;
   created_at: string;
   updated_at: string;
+};
+
+export type ActiveEmailTemplateRow = {
+  id: string;
+  subject: string;
+  body: string;
 };
 
 export type TournamentPublicRosterRow = {
@@ -424,8 +447,8 @@ export type Database = {
         TournamentMatchRow,
         Partial<TournamentMatchRow> & {
           tournament_id: string;
-          home_application_id: string;
-          away_application_id: string;
+          home_application_id?: string | null;
+          away_application_id?: string | null;
         },
         Partial<TournamentMatchRow>,
         [
@@ -470,6 +493,32 @@ export type Database = {
       tournament_public_roster: {
         Args: { p_slug: string };
         Returns: TournamentPublicRosterRow[];
+      };
+      guest_application_allowed: {
+        Args: { p_tournament_id: string };
+        Returns: boolean;
+      };
+      create_guest_application: {
+        Args: { p_payload: Json };
+        Returns: string;
+      };
+      active_email_template: {
+        Args: { p_type: EmailTemplateTypeRow };
+        Returns: ActiveEmailTemplateRow[];
+      };
+      log_application_received_email: {
+        Args: {
+          p_application_id: string;
+          p_to_email: string;
+          p_template_id: string | null;
+          p_subject: string | null;
+          p_body: string | null;
+          p_status: string;
+          p_error: string | null;
+          p_provider: string | null;
+          p_provider_message_id: string | null;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

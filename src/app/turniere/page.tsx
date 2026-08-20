@@ -4,6 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { listPublicTournaments } from "@/lib/db/tournament-queries";
+import { getAppSettings } from "@/lib/settings";
 
 export const metadata: Metadata = {
   title: "Turniere",
@@ -12,7 +13,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function TurnierePage() {
-  const tournaments = await listPublicTournaments();
+  const [tournaments, settings] = await Promise.all([
+    listPublicTournaments(),
+    getAppSettings(),
+  ]);
 
   return (
     <div className="flex min-h-full flex-col">
@@ -25,7 +29,11 @@ export default async function TurnierePage() {
           <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted">
             Unsere Jugendturniere im Überblick.
           </p>
-          <TournamentCatalog tournaments={tournaments} />
+          <TournamentCatalog
+            tournaments={tournaments}
+            applicationsEnabled={settings.applicationsEnabled}
+            waitlistEnabled={settings.waitlistEnabled}
+          />
         </Container>
       </main>
       <Footer />

@@ -8,6 +8,9 @@ import type {
   TournamentPublicRosterRow,
 } from "@/lib/supabase/database";
 import type {
+  DecidedBy,
+  KnockoutRound,
+  KnockoutSlot,
   MatchPhase,
   MatchStatus,
   PublicRosterEntry,
@@ -50,6 +53,29 @@ function asMatchPhase(value: string | null | undefined): MatchPhase {
   return value === "knockout" ? "knockout" : "group";
 }
 
+function asKnockoutRound(value: string | null | undefined): KnockoutRound | null {
+  if (
+    value === "quarterfinal" ||
+    value === "semifinal" ||
+    value === "third-place" ||
+    value === "final" ||
+    value === "placement-5" ||
+    value === "placement-7"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function asKnockoutSlot(value: string | null | undefined): KnockoutSlot | null {
+  return value === "home" || value === "away" ? value : null;
+}
+
+function asDecidedBy(value: string | null | undefined): DecidedBy {
+  return value === "penalties" ? "penalties" : "regular";
+}
+
 function mapGroup(row: TournamentGroupRow): TournamentGroupRecord {
   return {
     id: row.id,
@@ -83,6 +109,14 @@ function mapMatch(row: TournamentMatchRow): TournamentMatchRecord {
     status: asMatchStatus(row.status),
     phase: asMatchPhase(row.phase),
     sortOrder: row.sort_order,
+    round: asKnockoutRound(row.round),
+    nextMatchId: row.next_match_id ?? null,
+    nextMatchSlot: asKnockoutSlot(row.next_match_slot),
+    loserNextMatchId: row.loser_next_match_id ?? null,
+    loserNextMatchSlot: asKnockoutSlot(row.loser_next_match_slot),
+    decidedBy: asDecidedBy(row.decided_by),
+    homePenalties: row.home_penalties ?? null,
+    awayPenalties: row.away_penalties ?? null,
   };
 }
 
@@ -204,7 +238,6 @@ export async function getPublicTournamentStage(
       .from("tournament_matches")
       .select("*")
       .eq("tournament_id", tournamentId)
-      .eq("phase", "group")
       .order("sort_order", { ascending: true }),
   ]);
 

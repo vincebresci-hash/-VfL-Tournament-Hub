@@ -2,9 +2,17 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { StandingsTable } from "@/components/tournaments/StandingsTable";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
-import { publicTeamLabel } from "@/lib/schedule/names";
+import { publicTeamLabel, teamLabel } from "@/lib/schedule/names";
+import {
+  computeKnockoutPlacements,
+  knockoutRoundLabel,
+  resolveKnockoutOutcome,
+  type PlacementRow,
+} from "@/lib/schedule/knockout";
 import { computeGroupStandings } from "@/lib/schedule/standings";
 import type { PublicTournamentStage } from "@/lib/db/schedule-queries";
+import type { KnockoutRound, TournamentMatchRecord } from "@/types/schedule";
+import type { TournamentStatus } from "@/types/tournament";
 
 const tabs = [
   { id: "uebersicht", label: "Übersicht" },
@@ -12,6 +20,7 @@ const tabs = [
   { id: "gruppen", label: "Gruppen" },
   { id: "spielplan", label: "Spielplan" },
   { id: "tabelle", label: "Tabelle" },
+  { id: "ko-runde", label: "KO-Runde" },
 ] as const;
 
 type PublicTab = (typeof tabs)[number]["id"];
@@ -21,6 +30,7 @@ type TournamentPublicStageProps = {
   stage: PublicTournamentStage;
   tab?: string;
   overview: ReactNode | null;
+  tournamentStatus?: TournamentStatus;
 };
 
 function asTab(value: string | undefined): PublicTab {
@@ -36,9 +46,15 @@ export function TournamentPublicStage({
   stage,
   tab,
   overview,
+  tournamentStatus,
 }: TournamentPublicStageProps) {
+  const knockoutMatches = stage.matches.filter((match) => match.phase === "knockout");
+  const groupMatches = stage.matches.filter((match) => match.phase !== "knockout");
   const showTabs = stage.groups.length > 0 || stage.matches.length > 0;
-  const current = showTabs ? asTab(tab) : "uebersicht";
+  const visibleTabs = tabs.filter((item) => item.id !== "ko-runde" || knockoutMatches.length > 0);
+  const requested = showTabs ? asTab(tab) : "uebersicht";
+  const current =
+    requested === "ko-runde" && knockoutMatches.length === 0 ? "uebersicht" : requested;
   const teamLabels = Object.fromEntries(
     stage.roster.map((entry) => [
       entry.applicationId,
@@ -49,12 +65,19 @@ export function TournamentPublicStage({
     stage.fields.find((field) => field.id === id)?.name ?? "Feld";
   const groupName = (id: string | null) =>
     stage.groups.find((group) => group.id === id)?.name ?? "Gruppe";
+  const placements = computeKnockoutPlacements(knockoutMatches);
+  const publicRounds: KnockoutRound[][] = [
+    ["quarterfinal"],
+    ["semifinal"],
+    ["final", "third-place"],
+  ];
+  const publicPlacements: KnockoutRound[] = ["placement-5", "placement-7"];
 
   return (
     <div>
       {showTabs ? (
         <nav className="mt-10 flex flex-wrap gap-2" aria-label="Turnierbereiche">
-          {tabs.map((item) => (
+          {visibleTabs.map((item) => (
             <Link
               key={item.id}
               href={item.id === "uebersicht" ? `/turniere/${slug}` : `/turniere/${slug}?tab=${item.id}`}
@@ -70,8 +93,20 @@ export function TournamentPublicStage({
         </nav>
       ) : null}
 
+      {tournamentStatus === "completed" ? (
+        <p className={`${showTabs ? "mt-8" : "mt-10"} text-[13px] font-semibold tracking-[0.08em] text-ink uppercase`}>
+          Turnier abgeschlossen
+        </p>
+      ) : null}
+
       {current === "uebersicht" && overview ? (
-        <div className={showTabs ? "mt-8" : "mt-10"}>{overview}</div>
+        <div className={showTabs || tournamentStatus === "completed" ? "mt-8" : "mt-10"}>{overview}</div>
+      ) : null}
+
+      {current === "uebersicht" && placements.length > 0 ? (
+        <section className="mt-8">
+          <PublicPlacements placements={placements} teamLabels={teamLabels} />
+        </section>
       ) : null}
 
       {current === "teilnehmer" ? (
@@ -139,15 +174,21 @@ export function TournamentPublicStage({
               {stage.matches.map((match) => (
                 <li key={match.id} className="border border-line bg-white px-4 py-3">
                   <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-                    {groupName(match.groupId)} · {fieldName(match.fieldId)} · {formatBerlinClock(match.scheduledAt)}
+                    {match.phase === "knockout" && match.round
+                      ? knockoutRoundLabel[match.round]
+                      : groupName(match.groupId)}{" "}
+                    · {fieldName(match.fieldId)} · {formatBerlinClock(match.scheduledAt)}
                   </p>
                   <p className="mt-1 text-[15px] text-ink">
-                    {teamLabels[match.homeApplicationId] ?? "Heim"} vs{" "}
-                    {teamLabels[match.awayApplicationId] ?? "Gast"}
+                    {teamLabel(teamLabels, match.homeApplicationId)} vs{" "}
+                    {teamLabel(teamLabels, match.awayApplicationId)}
                   </p>
                   {match.status === "completed" && match.homeScore != null && match.awayScore != null ? (
                     <p className="mt-1 font-display text-lg font-bold text-ink">
                       {match.homeScore} : {match.awayScore}
+                      {match.decidedBy === "penalties"
+                        ? ` n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
+                        : ""}
                     </p>
                   ) : (
                     <p className="mt-1 text-[13px] text-muted">Ergebnis folgt</p>
@@ -167,7 +208,7 @@ export function TournamentPublicStage({
               .map((entry) => entry.applicationId);
             const standings = computeGroupStandings(
               memberIds,
-              stage.matches.filter((match) => match.groupId === group.id),
+              groupMatches.filter((match) => match.groupId === group.id),
             );
 
             return (
@@ -183,6 +224,143 @@ export function TournamentPublicStage({
           })}
         </section>
       ) : null}
+
+      {current === "ko-runde" ? (
+        <section className="mt-8 grid gap-5">
+          <div className="grid gap-5 lg:grid-cols-3">
+            {publicRounds.map((rounds) => {
+              const columnHasMatches = rounds.some((round) =>
+                knockoutMatches.some((match) => match.round === round),
+              );
+              if (!columnHasMatches) {
+                return null;
+              }
+
+              return (
+                <div key={rounds.join("-")} className="grid gap-5">
+                  {rounds.map((round) => {
+                    const roundMatches = knockoutMatches.filter((match) => match.round === round);
+                    if (roundMatches.length === 0) {
+                      return null;
+                    }
+
+                    return (
+                      <PublicRoundCard
+                        key={round}
+                        round={round}
+                        matches={roundMatches}
+                        teamLabels={teamLabels}
+                        fieldName={fieldName}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+          {publicPlacements.some((round) =>
+            knockoutMatches.some((match) => match.round === round),
+          ) ? (
+            <div className="grid gap-5 lg:grid-cols-2">
+              {publicPlacements.map((round) => {
+                const roundMatches = knockoutMatches.filter((match) => match.round === round);
+                if (roundMatches.length === 0) {
+                  return null;
+                }
+
+                return (
+                  <PublicRoundCard
+                    key={round}
+                    round={round}
+                    matches={roundMatches}
+                    teamLabels={teamLabels}
+                    fieldName={fieldName}
+                  />
+                );
+              })}
+            </div>
+          ) : null}
+          {placements.length > 0 ? (
+            <PublicPlacements placements={placements} teamLabels={teamLabels} />
+          ) : null}
+        </section>
+      ) : null}
     </div>
+  );
+}
+
+function PublicRoundCard({
+  round,
+  matches,
+  teamLabels,
+  fieldName,
+}: {
+  round: KnockoutRound;
+  matches: TournamentMatchRecord[];
+  teamLabels: Record<string, string>;
+  fieldName: (id: string | null) => string;
+}) {
+  return (
+    <article className="border border-line bg-white p-5">
+      <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
+        {knockoutRoundLabel[round]}
+      </h2>
+      <ul className="mt-4 grid gap-3">
+        {matches.map((match) => {
+          const outcome = resolveKnockoutOutcome(match);
+          return (
+            <li key={match.id} className="border border-line px-4 py-3">
+              <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                {fieldName(match.fieldId)} · {formatBerlinClock(match.scheduledAt)}
+              </p>
+              <p className="mt-1 text-[15px] text-ink">
+                {teamLabel(teamLabels, match.homeApplicationId)} vs{" "}
+                {teamLabel(teamLabels, match.awayApplicationId)}
+              </p>
+              {match.status === "completed" &&
+              match.homeScore != null &&
+              match.awayScore != null ? (
+                <p className="mt-1 font-display text-lg font-bold text-ink">
+                  {match.homeScore}:{match.awayScore}
+                  {match.decidedBy === "penalties"
+                    ? ` n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
+                    : ""}
+                </p>
+              ) : (
+                <p className="mt-1 text-[13px] text-muted">Ergebnis folgt</p>
+              )}
+              {outcome.winnerId ? (
+                <p className="mt-1 text-[13px] text-muted">
+                  Gewinner {teamLabel(teamLabels, outcome.winnerId)}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </article>
+  );
+}
+
+function PublicPlacements({
+  placements,
+  teamLabels,
+}: {
+  placements: PlacementRow[];
+  teamLabels: Record<string, string>;
+}) {
+  return (
+    <article className="border border-line bg-white p-5">
+      <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
+        Abschlussplatzierung
+      </h2>
+      <ol className="mt-4 grid gap-2">
+        {placements.map((row) => (
+          <li key={`${row.place}-${row.applicationId}`} className="text-[15px] text-ink">
+            {row.place}. {teamLabel(teamLabels, row.applicationId)}
+          </li>
+        ))}
+      </ol>
+    </article>
   );
 }

@@ -11,7 +11,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { applications as seedApplications } from "@/data/applications";
 import {
   loadAdminApplicationsAction,
   updateApplicationStatusAction,
@@ -38,7 +37,7 @@ type AdminDataContextValue = {
     status: ApplicationStatus,
   ) => Promise<{ error: string | null; notice: string | null }>;
   updateInternalRating: (id: string, update: InternalRatingUpdate) => void;
-  usingDemoData: boolean;
+  databaseReady: boolean;
 };
 
 const AdminDataContext = createContext<AdminDataContextValue | null>(null);
@@ -46,7 +45,7 @@ const AdminDataContext = createContext<AdminDataContextValue | null>(null);
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [applications, setApplications] = useState<AdminApplication[]>([]);
-  const [usingDemoData, setUsingDemoData] = useState(false);
+  const [databaseReady, setDatabaseReady] = useState(true);
   const noteTimers = useRef<Record<string, number>>({});
 
   useEffect(() => {
@@ -61,14 +60,8 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (!result.ready) {
-        setApplications(seedApplications);
-        setUsingDemoData(true);
-        return;
-      }
-
-      setApplications(result.applications);
-      setUsingDemoData(false);
+      setApplications(result.ready ? result.applications : []);
+      setDatabaseReady(result.ready);
     });
 
     return () => {
@@ -86,10 +79,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AdminDataContextValue>(
     () => ({
       applications,
-      usingDemoData,
+      databaseReady,
       getApplication: (id) =>
         applications.find((application) => application.id === id),
       updateStatus: async (id, status) => {
+        if (!databaseReady) {
+          return {
+            error: "Die Datenbank ist derzeit nicht erreichbar.",
+            notice: null,
+          };
+        }
+
         const previous = applications.find((application) => application.id === id);
         setApplications((current) =>
           current.map((application) =>
@@ -98,10 +98,6 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
               : application,
           ),
         );
-
-        if (usingDemoData) {
-          return { error: null, notice: "Status gespeichert." };
-        }
 
         const result = await updateApplicationStatusAction(id, status);
         if (result.error && previous) {
@@ -117,15 +113,15 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         return result;
       },
       updateInternalRating: (id, update) => {
+        if (!databaseReady) {
+          return;
+        }
+
         setApplications((current) =>
           current.map((application) =>
             application.id === id ? { ...application, ...update } : application,
           ),
         );
-
-        if (usingDemoData) {
-          return;
-        }
 
         if (update.internalNotes !== undefined) {
           window.clearTimeout(noteTimers.current[id]);
@@ -138,7 +134,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         persistRating(id, update);
       },
     }),
-    [applications, persistRating, usingDemoData],
+    [applications, persistRating, databaseReady],
   );
 
   return (

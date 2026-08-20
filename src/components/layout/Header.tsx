@@ -138,7 +138,7 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
             </Link>
           )}
           <Link
-            href="/bewerben"
+            href="/turniere"
             className="inline-flex h-9 items-center bg-brand-yellow px-3.5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             Turnier bewerben →
@@ -240,7 +240,7 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
               </Link>
             )}
             <Link
-              href="/bewerben"
+              href="/turniere"
               onClick={() => setOpen(false)}
               className="inline-flex h-11 items-center justify-center bg-brand-yellow text-sm font-semibold tracking-[0.08em] text-navy uppercase"
             >

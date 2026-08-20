@@ -12,7 +12,7 @@ type TournamentsAdminBoardProps = {
 };
 
 export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProps) {
-  const { applications } = useAdminData();
+  const { applications, databaseReady } = useAdminData();
   const list = sortTournaments(
     tournaments.map((tournament) => ({
       ...tournament,
@@ -39,6 +39,13 @@ export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProp
           + Neues Turnier
         </Link>
       </div>
+
+      {databaseReady ? null : (
+        <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-muted">
+          Bewerbungszahlen können nicht geladen werden. Es werden keine
+          Beispieldaten angezeigt.
+        </p>
+      )}
 
       <div className="mt-8 grid gap-4">
         {list.length === 0 ? (

@@ -108,8 +108,23 @@ export function ApplicationForm({
     <form
       noValidate
       onSubmit={handleSubmit}
-      className="rounded-[12px] border border-line bg-white p-5 shadow-[0_1px_2px_rgba(16,20,28,0.04)] sm:p-8"
+      className="relative rounded-[12px] border border-line bg-white p-5 shadow-[0_1px_2px_rgba(16,20,28,0.04)] sm:p-8"
     >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-[10000px] h-px w-px overflow-hidden opacity-0"
+      >
+        <label htmlFor="companyWebsite">Firmenwebseite</label>
+        <input
+          id="companyWebsite"
+          name="companyWebsite"
+          type="text"
+          tabIndex={-1}
+          autoComplete="off"
+          value={values.honeypot}
+          onChange={(event) => update("honeypot", event.target.value)}
+        />
+      </div>
       {formError ? (
         <p className="mb-6 border border-line bg-surface px-4 py-3 text-[13px] text-[#9a2b2b]" role="alert">
           {formError}

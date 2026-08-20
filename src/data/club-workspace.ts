@@ -1,6 +1,8 @@
 import type { ClubApplicationView } from "@/types/club";
 import type { ClubProfile, Team, UserProfile } from "@/types/auth";
 
+// Local fixture data only. Not imported by production pages or data loaders.
+
 export const DEMO_CLUB_ID = "club-stuttgarter-kickers";
 
 export const demoClubProfile: ClubProfile = {

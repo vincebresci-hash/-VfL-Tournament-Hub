@@ -19,9 +19,15 @@ const statusFilters: Array<{ id: StatusFilter; label: string }> = [
 
 type TournamentCatalogProps = {
   tournaments: PublicTournament[];
+  applicationsEnabled?: boolean;
+  waitlistEnabled?: boolean;
 };
 
-export function TournamentCatalog({ tournaments }: TournamentCatalogProps) {
+export function TournamentCatalog({
+  tournaments,
+  applicationsEnabled = true,
+  waitlistEnabled = true,
+}: TournamentCatalogProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [ageFilter, setAgeFilter] = useState<AgeGroup | "all">("all");
 
@@ -97,7 +103,12 @@ export function TournamentCatalog({ tournaments }: TournamentCatalogProps) {
       {visibleTournaments.length > 0 ? (
         <div className="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {visibleTournaments.map((tournament) => (
-            <TournamentCard key={tournament.id} tournament={tournament} />
+            <TournamentCard
+              key={tournament.id}
+              tournament={tournament}
+              applicationsEnabled={applicationsEnabled}
+              waitlistEnabled={waitlistEnabled}
+            />
           ))}
         </div>
       ) : (

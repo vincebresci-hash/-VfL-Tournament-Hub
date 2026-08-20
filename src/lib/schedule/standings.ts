@@ -68,6 +68,9 @@ export function computeGroupStandings(
     if (!isCompleted(match.status, match.homeScore, match.awayScore)) {
       continue;
     }
+    if (!match.homeApplicationId || !match.awayApplicationId) {
+      continue;
+    }
 
     const home = table.get(match.homeApplicationId);
     const away = table.get(match.awayApplicationId);

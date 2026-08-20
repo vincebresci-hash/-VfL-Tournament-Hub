@@ -42,6 +42,7 @@ export function TournamentScheduleBoard({
   teamLabels,
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
+  const groupMatches = matches.filter((match) => match.phase !== "knockout");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -185,12 +186,12 @@ export function TournamentScheduleBoard({
           <button
             type="button"
             disabled={pending}
-            onClick={() => (matches.length > 0 ? setConfirmGenerate(true) : void run(() => generateTournamentScheduleAction(tournament.id)))}
+            onClick={() => (groupMatches.length > 0 ? setConfirmGenerate(true) : void run(() => generateTournamentScheduleAction(tournament.id)))}
             className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase disabled:opacity-60"
           >
             Spielplan generieren
           </button>
-          {matches.length > 0 ? (
+          {groupMatches.length > 0 ? (
             <button
               type="button"
               disabled={pending}
@@ -207,11 +208,11 @@ export function TournamentScheduleBoard({
       </AdminCard>
 
       <AdminCard title="Spiele">
-        {matches.length === 0 ? (
+        {groupMatches.length === 0 ? (
           <p className="text-[14px] text-muted">Noch keine Spiele vorhanden.</p>
         ) : (
           <div className="grid gap-4">
-            {matches.map((match) => (
+            {groupMatches.map((match) => (
               <MatchEditor
                 key={match.id}
                 match={match}
@@ -305,8 +306,8 @@ function MatchEditor({
 }) {
   const [groupId, setGroupId] = useState(match.groupId ?? groups[0]?.id ?? "");
   const [fieldId, setFieldId] = useState(match.fieldId ?? fields[0]?.id ?? "");
-  const [homeId, setHomeId] = useState(match.homeApplicationId);
-  const [awayId, setAwayId] = useState(match.awayApplicationId);
+  const [homeId, setHomeId] = useState(match.homeApplicationId ?? "");
+  const [awayId, setAwayId] = useState(match.awayApplicationId ?? "");
   const [scheduledAt, setScheduledAt] = useState(isoToDatetimeLocal(match.scheduledAt));
   const [status, setStatus] = useState<MatchStatus>(match.status);
   const teams = memberIdsByGroupId[groupId] ?? [];

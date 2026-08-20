@@ -7,13 +7,13 @@ import { cn } from "@/lib/cn";
 
 type ClubShellProps = {
   clubName: string;
-  usingDemoData?: boolean;
+  databaseReady?: boolean;
   children: ReactNode;
 };
 
 export function ClubShell({
   clubName,
-  usingDemoData = false,
+  databaseReady = true,
   children,
 }: ClubShellProps) {
   const [open, setOpen] = useState(false);
@@ -68,12 +68,12 @@ export function ClubShell({
           onToggle={() => setOpen((current) => !current)}
         />
         <main id="inhalt" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {usingDemoData ? (
-            <p className="mb-6 border border-brand-yellow/50 bg-brand-yellow/18 px-4 py-3 text-[13px] leading-6 text-ink">
-              Bewerbungen und Teams sind noch Beispieldaten, bis die SQL-Migration
-              im Supabase SQL Editor ausgeführt wurde.
+          {databaseReady ? null : (
+            <p className="mb-6 border border-line bg-white px-4 py-3 text-[13px] leading-6 text-muted">
+              Die Vereinsdatenbank ist derzeit nicht erreichbar. Es werden keine
+              Beispieldaten angezeigt.
             </p>
-          ) : null}
+          )}
           {children}
         </main>
       </div>

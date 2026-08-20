@@ -61,6 +61,7 @@ export default async function TournamentDetailPage({
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
     applicationsOpen: tournament.applicationsOpen,
+    archivedAt: tournament.archivedAt,
     availableSlots,
     waitlistEnabled: settings.waitlistEnabled && tournament.waitlistEnabled,
     isFull,
@@ -165,6 +166,7 @@ export default async function TournamentDetailPage({
             slug={tournament.slug}
             stage={stage}
             tab={tab}
+            tournamentStatus={tournament.status}
             overview={
               stage.roster.length > 0 ? (
             <section>

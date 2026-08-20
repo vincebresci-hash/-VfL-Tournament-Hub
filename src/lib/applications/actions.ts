@@ -7,17 +7,22 @@ import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
 import { getAppSettings } from "@/lib/settings";
 import { toUserFacingDbError } from "@/lib/db/errors";
-import { getEmailProvider } from "@/lib/email/provider";
+import { sendApplicationReceivedEmail } from "@/lib/email/received-mail";
+import { getTournamentOccupancy } from "@/lib/db/queries";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
+  isHoneypotFilled,
   validateApplicationForm,
   type ApplicationFormValues,
 } from "@/lib/application";
+import { isPublicApplicationAllowed } from "@/lib/public-application-state";
 import { AGE_GROUPS } from "@/types/tournament";
 import type { AgeGroup } from "@/types/tournament";
+import type { Json } from "@/lib/supabase/database";
 
 export type SubmitApplicationResult = {
   error: string | null;
+  applicationId?: string | null;
 };
 
 export async function submitTournamentApplicationAction(input: {
@@ -25,6 +30,10 @@ export async function submitTournamentApplicationAction(input: {
   teamId?: string | null;
   values: ApplicationFormValues;
 }): Promise<SubmitApplicationResult> {
+  if (isHoneypotFilled(input.values)) {
+    return { error: "Die Bewerbung konnte nicht gespeichert werden." };
+  }
+
   const errors = validateApplicationForm(input.values);
   if (Object.keys(errors).length > 0) {
     return { error: "Bitte prüfe die markierten Felder." };
@@ -36,7 +45,23 @@ export async function submitTournamentApplicationAction(input: {
   }
 
   const tournament = await getPublicTournamentBySlug(input.tournamentSlug);
-  if (!tournament || !tournament.applicationsOpen) {
+  const occupancy = tournament
+    ? await getTournamentOccupancy(tournament.slug)
+    : null;
+  if (
+    !tournament ||
+    !isPublicApplicationAllowed({
+      status: tournament.status,
+      applicationsEnabled: settings.applicationsEnabled,
+      applicationsOpen: tournament.applicationsOpen,
+      archivedAt: tournament.archivedAt,
+      availableSlots: occupancy?.availableSlots ?? tournament.availableSlots,
+      waitlistEnabled: settings.waitlistEnabled && tournament.waitlistEnabled,
+      isFull: occupancy?.isFull ?? tournament.isFull,
+      applicationStart: tournament.applicationStart,
+      applicationDeadline: tournament.applicationDeadline,
+    })
+  ) {
     return { error: "Bewerbungen für dieses Turnier sind derzeit nicht möglich." };
   }
 
@@ -53,13 +78,15 @@ export async function submitTournamentApplicationAction(input: {
     return result;
   }
 
-  if (settings.applicationConfirmationEnabled) {
-    await notifyApplicant(
-      input.values.contactEmail,
-      input.values.clubName,
-      input.values.teamName,
-      input.tournamentSlug,
-    );
+  if (settings.applicationConfirmationEnabled && result.applicationId) {
+    await sendApplicationReceivedEmail({
+      applicationId: result.applicationId,
+      contactEmail: input.values.contactEmail,
+      contactFirstName: input.values.contactFirstName,
+      clubName: input.values.clubName,
+      teamName: input.values.teamName,
+      tournament,
+    });
   }
 
   revalidatePath("/verein/bewerbungen");
@@ -67,7 +94,7 @@ export async function submitTournamentApplicationAction(input: {
   revalidatePath("/verein/teams");
   revalidatePath("/admin/bewerbungen");
   revalidatePath("/admin");
-  return { error: null };
+  return { error: null, applicationId: result.applicationId };
 }
 
 async function submitClubApplication(
@@ -160,16 +187,20 @@ async function submitClubApplication(
       .eq("club_id", clubId);
   }
 
-  const { error } = await supabase.from("applications").insert({
-    tournament_id: tournamentId,
-    club_id: clubId,
-    team_id: teamId,
-    submitted_by: session.user.id,
-    status: "new",
-    ...snapshot,
-  });
+  const { data, error } = await supabase
+    .from("applications")
+    .insert({
+      tournament_id: tournamentId,
+      club_id: clubId,
+      team_id: teamId,
+      submitted_by: session.user.id,
+      status: "new",
+      ...snapshot,
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !data) {
     return {
       error: toUserFacingDbError("Die Bewerbung konnte nicht gespeichert werden.", error),
     };
@@ -182,7 +213,7 @@ async function submitClubApplication(
       .eq("id", clubId);
   }
 
-  return { error: null };
+  return { error: null, applicationId: data.id };
 }
 
 async function submitGuestApplication(
@@ -194,22 +225,26 @@ async function submitGuestApplication(
   tournamentId: string,
 ): Promise<SubmitApplicationResult> {
   const supabase = await createClient();
-  const { error } = await supabase.from("applications").insert({
+  const snapshot = applicationSnapshot(input.values);
+  const payload: Json = {
     tournament_id: tournamentId,
-    club_id: null,
-    team_id: null,
-    submitted_by: null,
-    status: "new",
-    ...applicationSnapshot(input.values),
+    ...snapshot,
+  };
+
+  const { data, error } = await supabase.rpc("create_guest_application", {
+    p_payload: payload,
   });
 
-  if (error) {
+  if (error || !data) {
     return {
-      error: toUserFacingDbError("Die Bewerbung konnte nicht gespeichert werden.", error),
+      error: toUserFacingDbError(
+        "Die Bewerbung konnte nicht gespeichert werden.",
+        error,
+      ),
     };
   }
 
-  return { error: null };
+  return { error: null, applicationId: data };
 }
 
 function applicationSnapshot(values: ApplicationFormValues) {
@@ -235,29 +270,4 @@ function applicationSnapshot(values: ApplicationFormValues) {
     staff_count: values.staffCount.trim() ? Number(values.staffCount) : null,
     notes: values.notes.trim() || null,
   };
-}
-
-async function notifyApplicant(
-  contactEmail: string,
-  clubName: string,
-  teamName: string,
-  tournamentSlug: string,
-) {
-  const to = contactEmail.trim();
-  if (!to) {
-    return;
-  }
-
-  const tournament = await getPublicTournamentBySlug(tournamentSlug);
-  const tournamentName = tournament?.name ?? "das Turnier";
-
-  try {
-    await getEmailProvider().send({
-      to,
-      subject: "Eure Bewerbung ist eingegangen",
-      text: `Hallo ${clubName.trim()},\n\nvielen Dank für die Bewerbung von ${teamName.trim()} für ${tournamentName}.\n`,
-    });
-  } catch {
-    // Saving the application must not depend on mail delivery.
-  }
 }

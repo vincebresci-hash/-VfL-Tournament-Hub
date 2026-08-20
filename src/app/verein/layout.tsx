@@ -27,7 +27,7 @@ export default async function ClubLayout({ children }: { children: ReactNode }) 
   return (
     <ClubShell
       clubName={workspace?.club.name ?? "Verein"}
-      usingDemoData={workspace?.usingDemoData}
+      databaseReady={workspace?.databaseReady !== false}
     >
       {children}
     </ClubShell>

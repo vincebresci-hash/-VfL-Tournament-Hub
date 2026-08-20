@@ -18,9 +18,21 @@ export function isMissingRelationError(error: { message?: string; code?: string 
   );
 }
 
+const USER_FACING_DB_MESSAGES = [
+  "Bewerbungen für dieses Turnier sind derzeit nicht möglich.",
+  "Gastbewerbungen sind nur ohne Anmeldung möglich.",
+];
+
 export function toUserFacingDbError(fallback: string, error?: { message?: string } | null) {
   if (isMissingRelationError(error ?? null)) {
     return "Die Datenbank ist noch nicht eingerichtet. Bitte die SQL-Migration im Supabase SQL Editor ausführen.";
+  }
+
+  const message = error?.message ?? "";
+  for (const known of USER_FACING_DB_MESSAGES) {
+    if (message.includes(known)) {
+      return known;
+    }
   }
 
   return fallback;

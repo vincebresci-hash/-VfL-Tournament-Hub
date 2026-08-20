@@ -43,6 +43,7 @@ export type ApplicationFormValues = {
   notes: string;
   dataAccurate: boolean;
   privacyAccepted: boolean;
+  honeypot: string;
 };
 
 export type ApplicationFormErrors = Partial<
@@ -94,7 +95,12 @@ export function createEmptyApplicationForm(
     notes: "",
     dataAccurate: false,
     privacyAccepted: false,
+    honeypot: "",
   };
+}
+
+export function isHoneypotFilled(values: Pick<ApplicationFormValues, "honeypot">) {
+  return values.honeypot.trim().length > 0;
 }
 
 function isFilled(value: string) {

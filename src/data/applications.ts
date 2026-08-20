@@ -7,6 +7,8 @@ import type {
 } from "@/types/application";
 import type { AgeGroup } from "@/types/tournament";
 
+// Local fixture data only. Not imported by production pages or data loaders.
+
 type ApplicationSeed = {
   id: string;
   tournamentId: string;

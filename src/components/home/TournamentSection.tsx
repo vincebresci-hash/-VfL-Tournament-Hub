@@ -2,9 +2,13 @@ import Link from "next/link";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { Container } from "@/components/layout/Container";
 import { getFeaturedTournaments } from "@/lib/db/tournament-queries";
+import { getAppSettings } from "@/lib/settings";
 
 export async function TournamentSection() {
-  const featuredTournaments = await getFeaturedTournaments();
+  const [featuredTournaments, settings] = await Promise.all([
+    getFeaturedTournaments(),
+    getAppSettings(),
+  ]);
 
   return (
     <section className="bg-background pt-12 pb-8 sm:pt-14 lg:pt-16 lg:pb-8" aria-labelledby="aktuelle-turniere">
@@ -26,7 +30,12 @@ export async function TournamentSection() {
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {featuredTournaments.map((tournament) => (
-            <TournamentCard key={tournament.id} tournament={tournament} />
+            <TournamentCard
+              key={tournament.id}
+              tournament={tournament}
+              applicationsEnabled={settings.applicationsEnabled}
+              waitlistEnabled={settings.waitlistEnabled}
+            />
           ))}
         </div>
       </Container>

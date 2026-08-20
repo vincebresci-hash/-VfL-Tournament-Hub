@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ApplicationDetail } from "@/components/admin/ApplicationDetail";
-import { applications as seedApplications } from "@/data/applications";
 import { getAdminApplication, getTournamentOccupancy, isClubDatabaseReady } from "@/lib/db/queries";
 import { getTournamentBySlugOrId } from "@/lib/db/tournament-queries";
 
@@ -16,9 +15,7 @@ export async function generateMetadata({
 }: ApplicationDetailPageProps): Promise<Metadata> {
   const { id } = await params;
   const ready = await isClubDatabaseReady();
-  const application = ready
-    ? await getAdminApplication(id)
-    : seedApplications.find((item) => item.id === id);
+  const application = ready ? await getAdminApplication(id) : null;
 
   return {
     title: application ? application.clubName : "Bewerbung",
@@ -30,9 +27,11 @@ export default async function AdminApplicationDetailPage({
 }: ApplicationDetailPageProps) {
   const { id } = await params;
   const ready = await isClubDatabaseReady();
-  const application = ready
-    ? await getAdminApplication(id)
-    : (seedApplications.find((item) => item.id === id) ?? null);
+  if (!ready) {
+    notFound();
+  }
+
+  const application = await getAdminApplication(id);
 
   if (!application) {
     notFound();

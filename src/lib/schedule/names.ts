@@ -17,3 +17,15 @@ export function publicTeamLabel(clubName: string, teamName: string) {
   const team = teamName.trim();
   return team ? `${club} · ${team}` : club;
 }
+
+export function teamLabel(
+  labels: Record<string, string>,
+  applicationId: string | null | undefined,
+  fallback = "steht noch nicht fest",
+) {
+  if (!applicationId) {
+    return fallback;
+  }
+
+  return labels[applicationId] ?? fallback;
+}

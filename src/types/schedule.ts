@@ -11,6 +11,25 @@ export const MATCH_PHASES = ["group", "knockout"] as const;
 
 export type MatchPhase = (typeof MATCH_PHASES)[number];
 
+export const KNOCKOUT_ROUNDS = [
+  "quarterfinal",
+  "semifinal",
+  "third-place",
+  "final",
+  "placement-5",
+  "placement-7",
+] as const;
+
+export type KnockoutRound = (typeof KNOCKOUT_ROUNDS)[number];
+
+export const KNOCKOUT_SLOTS = ["home", "away"] as const;
+
+export type KnockoutSlot = (typeof KNOCKOUT_SLOTS)[number];
+
+export const DECIDED_BY = ["regular", "penalties"] as const;
+
+export type DecidedBy = (typeof DECIDED_BY)[number];
+
 export const TOURNAMENT_STAGE_STATUSES = [
   "preparation",
   "groups-created",
@@ -48,8 +67,8 @@ export type TournamentMatchRecord = {
   tournamentId: string;
   groupId: string | null;
   fieldId: string | null;
-  homeApplicationId: string;
-  awayApplicationId: string;
+  homeApplicationId: string | null;
+  awayApplicationId: string | null;
   scheduledAt: string | null;
   durationMinutes: number;
   homeScore: number | null;
@@ -57,6 +76,14 @@ export type TournamentMatchRecord = {
   status: MatchStatus;
   phase: MatchPhase;
   sortOrder: number;
+  round: KnockoutRound | null;
+  nextMatchId: string | null;
+  nextMatchSlot: KnockoutSlot | null;
+  loserNextMatchId: string | null;
+  loserNextMatchSlot: KnockoutSlot | null;
+  decidedBy: DecidedBy;
+  homePenalties: number | null;
+  awayPenalties: number | null;
 };
 
 export type TournamentScheduleSettings = {

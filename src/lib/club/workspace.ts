@@ -1,10 +1,3 @@
-import {
-  DEMO_CLUB_ID,
-  demoClubApplications,
-  demoClubProfile,
-  demoClubTeams,
-  demoClubUser,
-} from "@/data/club-workspace";
 import type { ApplicationFormValues } from "@/lib/application";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { getAuthSession } from "@/lib/auth/session";
@@ -62,49 +55,21 @@ export type ClubWorkspace = {
   club: ClubProfile;
   teams: Team[];
   applications: ClubApplicationView[];
-  usingDemoData: boolean;
+  databaseReady: boolean;
 };
 
-function applicationsForClub(clubId: string) {
-  return demoClubApplications.filter((application) => application.clubId === clubId);
-}
-
-function teamsForClub(clubId: string) {
-  return demoClubTeams.filter((team) => team.clubId === clubId);
-}
-
-export function getClubWorkspace(session: AuthSession): ClubWorkspace | null {
-  if (session.user.role !== "club") {
-    return null;
-  }
-
-  const clubId = session.user.clubId ?? session.club?.id ?? DEMO_CLUB_ID;
-  const seedClub = demoClubProfile;
-  const seedUser = demoClubUser;
-
-  const club: ClubProfile = {
-    ...seedClub,
-    id: clubId,
-    name: session.club?.name || seedClub.name,
-    city: session.club?.city || seedClub.city,
-    website: session.club?.website ?? seedClub.website,
-    logo: session.club?.logo ?? seedClub.logo,
-    contactPhone: session.club?.contactPhone ?? seedClub.contactPhone,
-  };
-
-  const user: UserProfile = {
-    ...seedUser,
-    ...session.user,
-    clubId,
-  };
-
-  return {
-    user,
-    club,
-    teams: teamsForClub(DEMO_CLUB_ID),
-    applications: applicationsForClub(DEMO_CLUB_ID),
-    usingDemoData: true,
-  };
+function fallbackClub(session: AuthSession): ClubProfile {
+  return (
+    session.club ?? {
+      id: session.user.clubId ?? session.user.id,
+      name: "Verein",
+      city: "",
+      website: null,
+      logo: null,
+      contactPhone: null,
+      createdAt: session.user.createdAt,
+    }
+  );
 }
 
 export async function loadClubWorkspace(
@@ -116,7 +81,13 @@ export async function loadClubWorkspace(
 
   const ready = await isClubDatabaseReady();
   if (!ready) {
-    return getClubWorkspace(session);
+    return {
+      user: session.user,
+      club: fallbackClub(session),
+      teams: [],
+      applications: [],
+      databaseReady: false,
+    };
   }
 
   await ensureClubForCurrentUser();
@@ -131,18 +102,10 @@ export async function loadClubWorkspace(
   if (!clubId || !club) {
     return {
       user: freshSession.user,
-      club: club ?? {
-        id: freshSession.user.id,
-        name: "Verein",
-        city: "",
-        website: null,
-        logo: null,
-        contactPhone: null,
-        createdAt: freshSession.user.createdAt,
-      },
+      club: fallbackClub(freshSession),
       teams: [],
       applications: [],
-      usingDemoData: false,
+      databaseReady: true,
     };
   }
 
@@ -156,16 +119,8 @@ export async function loadClubWorkspace(
     club,
     teams,
     applications,
-    usingDemoData: false,
+    databaseReady: true,
   };
-}
-
-export function getClubApplicationById(
-  session: AuthSession,
-  id: string,
-): ClubApplicationView | undefined {
-  const workspace = getClubWorkspace(session);
-  return workspace?.applications.find((application) => application.id === id);
 }
 
 export async function loadClubApplicationById(applicationId: string) {
@@ -176,7 +131,7 @@ export async function loadClubApplicationById(applicationId: string) {
 
   const ready = await isClubDatabaseReady();
   if (!ready) {
-    return getClubApplicationById(session, applicationId) ?? null;
+    return null;
   }
 
   await ensureClubForCurrentUser();

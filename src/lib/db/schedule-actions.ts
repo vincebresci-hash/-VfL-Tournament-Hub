@@ -37,6 +37,7 @@ function revalidateStage(tournament: Pick<AdminTournamentRecord, "id" | "slug">)
   revalidatePath(`/admin/turniere/${tournament.id}/gruppen`);
   revalidatePath(`/admin/turniere/${tournament.id}/spielplan`);
   revalidatePath(`/admin/turniere/${tournament.id}/ergebnisse`);
+  revalidatePath(`/admin/turniere/${tournament.id}/ko-runde`);
   revalidatePath(`/admin/turniere/${tournament.id}/bearbeiten`);
   revalidatePath(`/turniere/${tournament.slug}`);
   revalidatePath("/turniere");
@@ -769,7 +770,8 @@ export async function saveMatchResultAction(
       status: "completed",
     })
     .eq("id", matchId)
-    .eq("tournament_id", tournamentId);
+    .eq("tournament_id", tournamentId)
+    .eq("phase", "group");
 
   if (error) {
     return { error: constraintMessage(error, "Das Ergebnis konnte nicht gespeichert werden.") };

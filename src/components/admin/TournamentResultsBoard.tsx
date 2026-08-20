@@ -6,8 +6,9 @@ import { AdminCard } from "@/components/admin/AdminPanel";
 import { TextInput } from "@/components/apply/FormControls";
 import { saveMatchResultAction } from "@/lib/db/schedule-actions";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
-import { StandingsTable } from "@/components/tournaments/StandingsTable";
 import { computeGroupStandings } from "@/lib/schedule/standings";
+import { StandingsTable } from "@/components/tournaments/StandingsTable";
+import { teamLabel } from "@/lib/schedule/names";
 import type { TournamentFieldRecord, TournamentGroupRecord, TournamentMatchRecord } from "@/types/schedule";
 
 type TournamentResultsBoardProps = {
@@ -30,6 +31,7 @@ export function TournamentResultsBoard({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const groupMatches = matches.filter((match) => match.phase !== "knockout");
 
   return (
     <div className="grid gap-5">
@@ -40,11 +42,11 @@ export function TournamentResultsBoard({
       ) : null}
 
       <AdminCard title="Ergebnisse">
-        {matches.length === 0 ? (
+        {groupMatches.length === 0 ? (
           <p className="text-[14px] text-muted">Noch keine Spiele vorhanden.</p>
         ) : (
           <div className="grid gap-3">
-            {matches.map((match) => (
+            {groupMatches.map((match) => (
               <ResultRow
                 key={match.id}
                 match={match}
@@ -72,7 +74,7 @@ export function TournamentResultsBoard({
       {groups.map((group) => {
         const standings = computeGroupStandings(
           memberIdsByGroupId[group.id] ?? [],
-          matches.filter((match) => match.groupId === group.id),
+          groupMatches.filter((match) => match.groupId === group.id),
         );
 
         return (
@@ -119,7 +121,7 @@ function ResultRow({
           {groupName} · {fieldName} · {formatBerlinClock(match.scheduledAt)}
         </p>
         <p className="mt-1 text-[15px] text-ink">
-          {teamLabels[match.homeApplicationId] ?? "Heim"} vs {teamLabels[match.awayApplicationId] ?? "Gast"}
+          {teamLabel(teamLabels, match.homeApplicationId, "Heim")} vs {teamLabel(teamLabels, match.awayApplicationId, "Gast")}
         </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">

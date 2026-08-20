@@ -9,15 +9,22 @@ import type { PublicTournament } from "@/types/tournament";
 
 type TournamentCardProps = {
   tournament: PublicTournament;
+  applicationsEnabled?: boolean;
+  waitlistEnabled?: boolean;
 };
 
-export function TournamentCard({ tournament }: TournamentCardProps) {
+export function TournamentCard({
+  tournament,
+  applicationsEnabled = true,
+  waitlistEnabled = true,
+}: TournamentCardProps) {
   const applicationState = getPublicApplicationState({
     status: tournament.status,
-    applicationsEnabled: true,
+    applicationsEnabled,
     applicationsOpen: tournament.applicationsOpen,
+    archivedAt: tournament.archivedAt,
     availableSlots: tournament.availableSlots,
-    waitlistEnabled: tournament.waitlistEnabled,
+    waitlistEnabled: waitlistEnabled && tournament.waitlistEnabled,
     isFull: tournament.isFull,
     applicationStart: tournament.applicationStart,
     applicationDeadline: tournament.applicationDeadline,

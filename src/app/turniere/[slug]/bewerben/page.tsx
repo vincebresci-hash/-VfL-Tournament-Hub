@@ -58,6 +58,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
     applicationsOpen: tournament.applicationsOpen,
+    archivedAt: tournament.archivedAt,
     availableSlots: occupancy?.availableSlots ?? tournament.availableSlots,
     waitlistEnabled: settings.waitlistEnabled && tournament.waitlistEnabled,
     isFull: occupancy?.isFull ?? tournament.isFull,

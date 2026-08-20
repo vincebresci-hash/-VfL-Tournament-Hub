@@ -5,7 +5,14 @@ import { tournamentStageStatusLabel, type TournamentStageStatus } from "@/types/
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { ReactNode } from "react";
 
-type NavKey = "overview" | "applications" | "participants" | "groups" | "schedule" | "results";
+type NavKey =
+  | "overview"
+  | "applications"
+  | "participants"
+  | "groups"
+  | "schedule"
+  | "results"
+  | "knockout";
 
 type TournamentAdminChromeProps = {
   tournament: AdminTournamentRecord;
@@ -81,6 +88,9 @@ export function TournamentAdminChrome({
         </Link>
         <Link href={`${base}/ergebnisse`} className={navClass(current === "results")}>
           Ergebnisse
+        </Link>
+        <Link href={`${base}/ko-runde`} className={navClass(current === "knockout")}>
+          KO-Runde
         </Link>
       </nav>
 

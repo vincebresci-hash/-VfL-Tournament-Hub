@@ -24,7 +24,7 @@ type ApplicationsBoardProps = {
 export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
   const searchParams = useSearchParams();
   const tournamentFromQuery = searchParams.get("turnier");
-  const { applications } = useAdminData();
+  const { applications, databaseReady } = useAdminData();
   const boardTournaments = tournaments.map(toBoardTournament);
   const [filters, setFilters] = useState<ApplicationFilters>(() => ({
     ...emptyApplicationFilters,
@@ -43,6 +43,13 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
       <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
         Bewerbungen
       </h1>
+
+      {databaseReady ? null : (
+        <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-muted">
+          Die Datenbank ist derzeit nicht erreichbar. Es werden keine
+          Beispielbewerbungen angezeigt.
+        </p>
+      )}
 
       <div className="mt-6 flex flex-wrap gap-2">
         {applicationStatusFilters.map((filter) => (
