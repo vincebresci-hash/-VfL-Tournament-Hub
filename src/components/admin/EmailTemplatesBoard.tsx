@@ -38,8 +38,9 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
     <div>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[14px] leading-6 text-muted">
-          Vorlagen können gespeichert und später über Resend oder einen anderen
-          Anbieter versendet werden. Es werden derzeit keine E-Mails verschickt.
+          Diese Vorlagen werden für den automatischen Versand über Resend genutzt.
+          Betreff und Text unterstützen Platzhalter wie {"{{club_name}}"} oder
+          {" {{tournament_name}}"}.
         </p>
         <Link
           href="/admin/emails/neu"
