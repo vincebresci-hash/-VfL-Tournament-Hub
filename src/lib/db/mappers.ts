@@ -1,8 +1,14 @@
 import { AGE_GROUPS } from "@/types/tournament";
-import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS } from "@/types/application";
+import {
+  APPLICATION_STATUSES,
+  CLUB_TYPES,
+  INTERNAL_CATEGORIES,
+  TEAM_STRENGTHS,
+} from "@/types/application";
 import type {
   AdminApplication,
   ApplicationStatus,
+  ClubType,
   InternalCategory,
   TeamStrength,
 } from "@/types/application";
@@ -41,6 +47,19 @@ function asInternalCategory(value: string | null | undefined): InternalCategory 
   }
 
   return null;
+}
+
+function asClubType(value: string | null | undefined): ClubType | null {
+  if (value && CLUB_TYPES.includes(value as ClubType)) {
+    return value as ClubType;
+  }
+
+  return null;
+}
+
+function nonEmpty(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 function firstReview(row: ApplicationWithRelations) {
@@ -85,29 +104,29 @@ function applicationBase(row: ApplicationWithRelations) {
 
   return {
     id: row.id,
-    clubId: row.club_id,
+    clubId: row.club_id ?? "",
     tournamentId: tournament?.slug ?? row.tournament_id,
     tournamentName: tournament?.name ?? "Turnier",
     tournamentSlug: tournament?.slug ?? "",
     tournamentDate: tournament?.date ?? row.created_at.slice(0, 10),
     tournamentLocation: tournament?.location ?? "",
-    clubName: club?.name ?? "Verein",
-    clubCity: club?.city ?? "",
-    website: club?.website ?? null,
-    teamName: team?.name ?? "Mannschaft",
-    ageGroup: asAgeGroup(team?.age_group ?? tournament?.age_group),
-    birthYear: team?.birth_year ?? new Date().getFullYear() - 10,
-    league: team?.league ?? "",
-    division: team?.division ?? null,
+    clubName: nonEmpty(row.club_name) ?? club?.name ?? "Verein",
+    clubCity: nonEmpty(row.club_city) ?? club?.city ?? "",
+    website: nonEmpty(row.website) ?? club?.website ?? null,
+    teamName: nonEmpty(row.team_name) ?? team?.name ?? "Mannschaft",
+    ageGroup: asAgeGroup(row.age_group ?? team?.age_group ?? tournament?.age_group),
+    birthYear: row.birth_year ?? team?.birth_year ?? new Date().getFullYear() - 10,
+    league: nonEmpty(row.league) ?? team?.league ?? "",
+    division: nonEmpty(row.division) ?? team?.division ?? null,
     selfRatedStrength: asStrength(row.self_rated_strength ?? team?.self_rated_strength),
     teamDescription: row.team_description,
-    clubType: null,
+    clubType: asClubType(row.club_type),
     contactFirstName: row.contact_first_name ?? "",
     contactLastName: row.contact_last_name ?? "",
     contactRole: row.contact_role ?? "",
     contactEmail: row.contact_email ?? "",
     contactPhone: row.contact_phone ?? "",
-    alternativePhone: null,
+    alternativePhone: nonEmpty(row.alternative_phone),
     staffCount: row.staff_count,
     notes: row.notes,
     applicationStatus: asStatus(row.status),
