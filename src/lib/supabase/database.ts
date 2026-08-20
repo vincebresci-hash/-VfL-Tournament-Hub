@@ -295,6 +295,20 @@ export type Database = {
         Args: { p_name: string; p_city?: string | null; p_website?: string | null };
         Returns: string;
       };
+      log_email: {
+        Args: {
+          p_recipient: string;
+          p_status: string;
+          p_application_id?: string | null;
+          p_template_id?: string | null;
+          p_subject?: string | null;
+          p_provider?: string | null;
+          p_provider_message_id?: string | null;
+          p_error_message?: string | null;
+          p_sent_at?: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       user_role: UserRoleRow;

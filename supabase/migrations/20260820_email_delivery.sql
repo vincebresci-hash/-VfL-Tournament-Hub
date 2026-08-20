@@ -12,14 +12,21 @@
 --   - Tabelle public.email_logs
 --   - Indexes
 --   - Row Level Security + Policies
+--   - Eine eng begrenzte SECURITY DEFINER Funktion public.log_email(...)
 --   - Grants
 --
--- SICHERHEIT:
---   - Nur admin / super-admin dürfen email_logs lesen (public.is_admin()).
---   - Normale Vereinsnutzer erhalten KEINEN Lesezugriff.
---   - Authentifizierte Nutzer dürfen ausschließlich Log-Zeilen einfügen
---     (nötig, damit die serverseitige Eingangsbestätigung protokolliert wird),
---     können aber niemals bestehende Zeilen lesen, ändern oder löschen.
+-- SICHERHEIT / ZUGRIFFSMODELL:
+--   - anon:               kein SELECT/INSERT/UPDATE/DELETE, kein EXECUTE.
+--   - club (Verein):      KEIN direktes SELECT/INSERT/UPDATE/DELETE.
+--   - admin/super-admin:  ausschließlich SELECT (Lesen des Protokolls).
+--   - Geschrieben wird das Protokoll AUSSCHLIESSLICH über die kontrollierte
+--     Funktion public.log_email(...) (SECURITY DEFINER). Es gibt bewusst
+--     keine INSERT-/UPDATE-/DELETE-Policy – so kann niemand über die API
+--     Log-Zeilen einfügen, verändern oder löschen.
+--   - Die Funktion validiert alle Eingaben, nutzt einen festen search_path,
+--     ändert keine Rollen und keine anderen Tabellen. Vereinsnutzer können
+--     darüber höchstens einen Log-Eintrag für eine EIGENE Bewerbung erzeugen;
+--     freie/fremde Einträge werden abgelehnt.
 --   - Es werden ausschließlich Metadaten gespeichert, niemals Provider-Keys.
 -- =============================================================================
 
@@ -66,28 +73,124 @@ CREATE INDEX IF NOT EXISTS email_logs_created_at_idx
 
 ALTER TABLE public.email_logs ENABLE ROW LEVEL SECURITY;
 
--- Admins / Super-Admins: voller Zugriff (lesen, schreiben, ändern, löschen).
+-- Frühere, zu weit gefasste Policies entfernen (idempotent / Re-Run-sicher).
 DROP POLICY IF EXISTS email_logs_admin_all ON public.email_logs;
-CREATE POLICY email_logs_admin_all
-  ON public.email_logs
-  FOR ALL
-  TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
-
--- Authentifizierte Nutzer dürfen NUR einfügen (Eingangsbestätigung).
--- Es gibt bewusst KEINE SELECT-Policy für Vereinsnutzer:
--- ohne passende SELECT-Policy liefert ein SELECT für sie keine Zeilen.
 DROP POLICY IF EXISTS email_logs_insert_authenticated ON public.email_logs;
-CREATE POLICY email_logs_insert_authenticated
+
+-- Nur admin / super-admin dürfen das Protokoll LESEN.
+DROP POLICY IF EXISTS email_logs_select_admin ON public.email_logs;
+CREATE POLICY email_logs_select_admin
   ON public.email_logs
-  FOR INSERT
+  FOR SELECT
   TO authenticated
-  WITH CHECK (true);
+  USING (public.is_admin());
+
+-- Bewusst KEINE INSERT/UPDATE/DELETE Policy:
+-- Schreibzugriff erfolgt ausschließlich über public.log_email(...).
+
+-- -----------------------------------------------------------------------------
+-- Kontrollierte Schreibfunktion (SECURITY DEFINER)
+--
+-- Schreibt ausschließlich die zulässigen Log-Felder in public.email_logs.
+-- Läuft mit den Rechten des Eigentümers (bypass RLS), validiert aber jede
+-- Eingabe und autorisiert den Aufrufer:
+--   - admin/super-admin dürfen für jede Bewerbung protokollieren,
+--   - Vereinsnutzer nur für eine Bewerbung des EIGENEN Vereins.
+-- Es werden keine Rollen geändert und keine anderen Tabellen verändert.
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.log_email(
+  p_recipient text,
+  p_status text,
+  p_application_id uuid DEFAULT NULL,
+  p_template_id uuid DEFAULT NULL,
+  p_subject text DEFAULT NULL,
+  p_provider text DEFAULT NULL,
+  p_provider_message_id text DEFAULT NULL,
+  p_error_message text DEFAULT NULL,
+  p_sent_at timestamptz DEFAULT NULL
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_recipient text := NULLIF(TRIM(COALESCE(p_recipient, '')), '');
+  v_status text := lower(NULLIF(TRIM(COALESCE(p_status, '')), ''));
+  v_app_club uuid;
+  v_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'not authenticated';
+  END IF;
+
+  -- Eingaben validieren.
+  IF v_recipient IS NULL THEN
+    RAISE EXCEPTION 'recipient is required';
+  END IF;
+
+  IF v_status IS NULL OR v_status NOT IN ('pending', 'sent', 'failed') THEN
+    RAISE EXCEPTION 'invalid status';
+  END IF;
+
+  -- Autorisierung: Nicht-Admins dürfen nur für eine EIGENE Bewerbung loggen.
+  IF NOT public.is_admin() THEN
+    IF p_application_id IS NULL THEN
+      RAISE EXCEPTION 'not allowed';
+    END IF;
+
+    SELECT club_id
+    INTO v_app_club
+    FROM public.applications
+    WHERE id = p_application_id;
+
+    IF v_app_club IS NULL
+       OR v_app_club IS DISTINCT FROM public.current_club_id() THEN
+      RAISE EXCEPTION 'not allowed';
+    END IF;
+  END IF;
+
+  INSERT INTO public.email_logs (
+    application_id,
+    template_id,
+    recipient,
+    subject,
+    provider,
+    provider_message_id,
+    status,
+    error_message,
+    sent_at
+  )
+  VALUES (
+    p_application_id,
+    p_template_id,
+    v_recipient,
+    NULLIF(TRIM(COALESCE(p_subject, '')), ''),
+    NULLIF(TRIM(COALESCE(p_provider, '')), ''),
+    NULLIF(TRIM(COALESCE(p_provider_message_id, '')), ''),
+    v_status,
+    NULLIF(TRIM(COALESCE(p_error_message, '')), ''),
+    COALESCE(p_sent_at, CASE WHEN v_status = 'sent' THEN now() ELSE NULL END)
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;
 
 -- -----------------------------------------------------------------------------
 -- Grants (RLS bleibt maßgeblich; anon erhält keinerlei Zugriff)
 -- -----------------------------------------------------------------------------
 
 REVOKE ALL ON TABLE public.email_logs FROM PUBLIC, anon;
-GRANT SELECT, INSERT ON TABLE public.email_logs TO authenticated;
+-- Nur SELECT für authenticated (per Policy weiter auf admins eingeschränkt).
+-- KEIN INSERT/UPDATE/DELETE für Vereins- oder anonyme Nutzer.
+GRANT SELECT ON TABLE public.email_logs TO authenticated;
+
+REVOKE ALL ON FUNCTION public.log_email(
+  text, text, uuid, uuid, text, text, text, text, timestamptz
+) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.log_email(
+  text, text, uuid, uuid, text, text, text, text, timestamptz
+) TO authenticated;

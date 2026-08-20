@@ -36,6 +36,11 @@ function asStatus(value: string | null | undefined): EmailLogStatus {
 /**
  * Persists a single email delivery attempt.
  *
+ * Writes exclusively through the controlled SECURITY DEFINER function
+ * public.log_email(...). There is intentionally no direct INSERT privilege on
+ * email_logs for club or anon users, so the delivery protocol cannot be
+ * manipulated via the API.
+ *
  * Never throws: a failure to write the log must not break the surrounding
  * business logic (application save / status change). Errors are reported via
  * the return value and logged server-side without any secrets.
@@ -45,16 +50,17 @@ export async function recordEmailLog(
 ): Promise<{ ok: boolean }> {
   try {
     const supabase = await createClient();
-    const { error } = await supabase.from("email_logs").insert({
-      application_id: input.applicationId ?? null,
-      template_id: input.templateId ?? null,
-      recipient: input.recipient,
-      subject: input.subject ?? null,
-      provider: input.provider ?? null,
-      provider_message_id: input.providerMessageId ?? null,
-      status: input.status,
-      error_message: input.errorMessage ?? null,
-      sent_at: input.sentAt ?? (input.status === "sent" ? new Date().toISOString() : null),
+    const { error } = await supabase.rpc("log_email", {
+      p_recipient: input.recipient,
+      p_status: input.status,
+      p_application_id: input.applicationId ?? null,
+      p_template_id: input.templateId ?? null,
+      p_subject: input.subject ?? null,
+      p_provider: input.provider ?? null,
+      p_provider_message_id: input.providerMessageId ?? null,
+      p_error_message: input.errorMessage ?? null,
+      p_sent_at:
+        input.sentAt ?? (input.status === "sent" ? new Date().toISOString() : null),
     });
 
     if (error) {
