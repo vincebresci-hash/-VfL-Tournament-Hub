@@ -4,8 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/auth/roles";
-import { listAdminApplications } from "@/lib/db/queries";
+import { getApplicationForEmail, listAdminApplications } from "@/lib/db/queries";
 import { toUserFacingDbError } from "@/lib/db/errors";
+import {
+  sendApplicationAcceptedEmail,
+  sendApplicationRejectedEmail,
+  sendApplicationUnderReviewEmail,
+  sendApplicationWaitingListEmail,
+} from "@/lib/email/send";
+import type { ClubApplicationView } from "@/types/club";
 import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS } from "@/types/application";
 import type {
   AdminApplication,
@@ -14,7 +21,7 @@ import type {
   TeamStrength,
 } from "@/types/application";
 import { EMAIL_TEMPLATE_TYPES, type AppSettings, type EmailTemplateInput } from "@/types/admin";
-import { settingsToRows } from "@/lib/settings";
+import { getAppSettings, settingsToRows } from "@/lib/settings";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -62,11 +69,64 @@ export async function updateApplicationStatusAction(
     return { error: toUserFacingDbError("Der Status konnte nicht geändert werden.", error) };
   }
 
+  // Status ist erfolgreich gespeichert. Der E-Mail-Versand ist best-effort:
+  // ein Mailfehler darf die Statusänderung niemals rückgängig machen.
+  await dispatchStatusChangeEmail(applicationId, status);
+
   revalidatePath("/admin/bewerbungen");
   revalidatePath(`/admin/bewerbungen/${applicationId}`);
   revalidatePath("/admin");
   revalidatePath("/admin/turniere");
   return { error: null };
+}
+
+async function dispatchStatusChangeEmail(
+  applicationId: string,
+  status: ApplicationStatus,
+): Promise<void> {
+  try {
+    if (status === "new") {
+      return;
+    }
+
+    if (status === "waiting-list") {
+      const settings = await getAppSettings();
+      if (!settings.waitlistEnabled) {
+        // Warteliste im System deaktiviert: bestehende Business-Logik bleibt
+        // unverändert, es wird lediglich keine Wartelistenmail versendet.
+        return;
+      }
+    }
+
+    const application = await getApplicationForEmail(applicationId);
+    if (!application) {
+      return;
+    }
+
+    await sendStatusEmail(status, application);
+  } catch {
+    console.error(
+      "[email] Statusbenachrichtigung konnte nicht versendet werden – Status bleibt gesetzt.",
+    );
+  }
+}
+
+function sendStatusEmail(
+  status: ApplicationStatus,
+  application: ClubApplicationView,
+) {
+  switch (status) {
+    case "under-review":
+      return sendApplicationUnderReviewEmail(application);
+    case "accepted":
+      return sendApplicationAcceptedEmail(application);
+    case "waiting-list":
+      return sendApplicationWaitingListEmail(application);
+    case "rejected":
+      return sendApplicationRejectedEmail(application);
+    default:
+      return Promise.resolve();
+  }
 }
 
 export async function upsertApplicationReviewAction(

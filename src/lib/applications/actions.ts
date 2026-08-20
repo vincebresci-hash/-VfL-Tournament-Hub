@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
-import { getTournamentIdBySlug } from "@/lib/db/queries";
+import { getApplicationForEmail, getTournamentIdBySlug } from "@/lib/db/queries";
+import { sendApplicationReceivedEmail } from "@/lib/email/send";
 import { getAppSettings } from "@/lib/settings";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
@@ -123,24 +124,28 @@ export async function submitTournamentApplicationAction(input: {
       .eq("club_id", clubId);
   }
 
-  const { error } = await supabase.from("applications").insert({
-    tournament_id: tournamentId,
-    club_id: clubId,
-    team_id: teamId,
-    submitted_by: session.user.id,
-    self_rated_strength: Number(values.selfRatedStrength),
-    team_description: values.teamDescription.trim() || null,
-    contact_first_name: values.contactFirstName.trim(),
-    contact_last_name: values.contactLastName.trim(),
-    contact_role: values.contactRole.trim(),
-    contact_email: values.contactEmail.trim(),
-    contact_phone: values.contactPhone.trim(),
-    staff_count: values.staffCount.trim() ? Number(values.staffCount) : null,
-    notes: values.notes.trim() || null,
-    status: "new",
-  });
+  const { data: insertedApplication, error } = await supabase
+    .from("applications")
+    .insert({
+      tournament_id: tournamentId,
+      club_id: clubId,
+      team_id: teamId,
+      submitted_by: session.user.id,
+      self_rated_strength: Number(values.selfRatedStrength),
+      team_description: values.teamDescription.trim() || null,
+      contact_first_name: values.contactFirstName.trim(),
+      contact_last_name: values.contactLastName.trim(),
+      contact_role: values.contactRole.trim(),
+      contact_email: values.contactEmail.trim(),
+      contact_phone: values.contactPhone.trim(),
+      staff_count: values.staffCount.trim() ? Number(values.staffCount) : null,
+      notes: values.notes.trim() || null,
+      status: "new",
+    })
+    .select("id")
+    .single();
 
-  if (error) {
+  if (error || !insertedApplication) {
     return {
       error: toUserFacingDbError("Die Bewerbung konnte nicht gespeichert werden.", error),
     };
@@ -151,6 +156,22 @@ export async function submitTournamentApplicationAction(input: {
       .from("clubs")
       .update({ contact_phone: values.contactPhone.trim() })
       .eq("id", clubId);
+  }
+
+  // Bewerbung ist gespeichert. Der E-Mail-Versand darf niemals dazu führen,
+  // dass die Bewerbung verloren geht oder der Nutzer nicht auf die
+  // Erfolgsseite gelangt – daher hier bewusst best-effort und ohne throw.
+  if (settings.applicationConfirmationEnabled) {
+    try {
+      const applicationView = await getApplicationForEmail(insertedApplication.id);
+      if (applicationView) {
+        await sendApplicationReceivedEmail(applicationView);
+      }
+    } catch {
+      console.error(
+        "[email] Eingangsbestätigung konnte nicht versendet werden – Bewerbung bleibt gespeichert.",
+      );
+    }
   }
 
   revalidatePath("/verein/bewerbungen");

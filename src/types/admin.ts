@@ -122,6 +122,26 @@ export type EmailTemplateInput = {
   active: boolean;
 };
 
+export const EMAIL_LOG_STATUSES = ["pending", "sent", "failed"] as const;
+
+export type EmailLogStatus = (typeof EMAIL_LOG_STATUSES)[number];
+
+export type EmailLogView = {
+  id: string;
+  createdAt: string;
+  sentAt: string | null;
+  recipient: string;
+  subject: string | null;
+  status: EmailLogStatus;
+  provider: string | null;
+  errorMessage: string | null;
+  templateName: string | null;
+  clubName: string | null;
+  teamName: string | null;
+  tournamentId: string | null;
+  tournamentName: string | null;
+};
+
 export type AppSettings = {
   platformName: string;
   organizerName: string;

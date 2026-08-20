@@ -110,6 +110,28 @@ export async function getAdminApplication(
   return toAdminApplication(data as unknown as ApplicationWithRelations);
 }
 
+/**
+ * Loads a single application (with the relations needed for email templates).
+ * RLS applies: club users only see their own application, admins see all.
+ * Used internally by the email pipeline.
+ */
+export async function getApplicationForEmail(
+  applicationId: string,
+): Promise<ClubApplicationView | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("applications")
+    .select(clubApplicationSelect)
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return toClubApplicationView(data as unknown as ApplicationWithRelations);
+}
+
 export async function getTournamentIdBySlug(slug: string) {
   const supabase = await createClient();
   const { data, error } = await supabase

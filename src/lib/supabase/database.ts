@@ -23,6 +23,7 @@ export type EmailTemplateTypeRow =
   | "application-rejected"
   | "follow-up"
   | "general";
+export type EmailLogStatusRow = "pending" | "sent" | "failed";
 
 export type ProfileRow = {
   id: string;
@@ -128,6 +129,20 @@ export type AppSettingRow = {
   description: string | null;
   updated_at: string;
   updated_by: string | null;
+};
+
+export type EmailLogRow = {
+  id: string;
+  application_id: string | null;
+  template_id: string | null;
+  recipient: string;
+  subject: string | null;
+  provider: string | null;
+  provider_message_id: string | null;
+  status: EmailLogStatusRow;
+  error_message: string | null;
+  sent_at: string | null;
+  created_at: string;
 };
 
 type ForeignKey = {
@@ -248,6 +263,27 @@ export type Database = {
         Partial<AppSettingRow> & { key: string },
         Partial<AppSettingRow>
       >;
+      email_logs: Table<
+        EmailLogRow,
+        Partial<EmailLogRow> & { recipient: string },
+        Partial<EmailLogRow>,
+        [
+          {
+            foreignKeyName: "email_logs_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "email_logs_template_id_fkey";
+            columns: ["template_id"];
+            isOneToOne: false;
+            referencedRelation: "email_templates";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
     };
     Views: Record<string, never>;
     Functions: {
@@ -259,6 +295,20 @@ export type Database = {
         Args: { p_name: string; p_city?: string | null; p_website?: string | null };
         Returns: string;
       };
+      log_email: {
+        Args: {
+          p_recipient: string;
+          p_status: string;
+          p_application_id?: string | null;
+          p_template_id?: string | null;
+          p_subject?: string | null;
+          p_provider?: string | null;
+          p_provider_message_id?: string | null;
+          p_error_message?: string | null;
+          p_sent_at?: string | null;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       user_role: UserRoleRow;
@@ -267,6 +317,7 @@ export type Database = {
       internal_category: InternalCategoryRow;
       club_status: ClubStatusRow;
       email_template_type: EmailTemplateTypeRow;
+      email_log_status: EmailLogStatusRow;
     };
     CompositeTypes: Record<string, never>;
   };
