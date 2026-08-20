@@ -82,9 +82,16 @@ export type TournamentRow = {
 export type ApplicationRow = {
   id: string;
   tournament_id: string;
-  club_id: string;
-  team_id: string;
+  club_id: string | null;
+  team_id: string | null;
   submitted_by: string | null;
+  club_name: string | null;
+  club_city: string | null;
+  team_name: string | null;
+  age_group: string | null;
+  birth_year: number | null;
+  league: string | null;
+  division: string | null;
   self_rated_strength: number | null;
   team_description: string | null;
   contact_first_name: string | null;
@@ -191,8 +198,6 @@ export type Database = {
         ApplicationRow,
         Partial<ApplicationRow> & {
           tournament_id: string;
-          club_id: string;
-          team_id: string;
         },
         Partial<ApplicationRow>,
         [

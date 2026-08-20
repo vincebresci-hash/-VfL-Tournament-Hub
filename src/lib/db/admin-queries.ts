@@ -230,7 +230,7 @@ export async function getAdminClub(clubId: string): Promise<AdminClubDetail | nu
       supabase
         .from("applications")
         .select(
-          "id, team_id, tournament_id, status, created_at, teams (id, name), tournaments (id, name, slug)",
+          "id, team_id, tournament_id, status, created_at, team_name, teams (id, name), tournaments (id, name, slug)",
         )
         .eq("club_id", clubId)
         .order("created_at", { ascending: false }),
@@ -239,7 +239,10 @@ export async function getAdminClub(clubId: string): Promise<AdminClubDetail | nu
   const profileRows = (profiles ?? []) as ProfileRow[];
   const teamRows = (teams ?? []) as TeamRow[];
   const applicationRows = (applications ?? []) as Array<
-    Pick<ApplicationRow, "id" | "team_id" | "tournament_id" | "status" | "created_at"> & {
+    Pick<
+      ApplicationRow,
+      "id" | "team_id" | "tournament_id" | "status" | "created_at" | "team_name"
+    > & {
       teams?: Pick<TeamRow, "id" | "name"> | Pick<TeamRow, "id" | "name">[] | null;
       tournaments?:
         | Pick<TournamentRow, "id" | "name" | "slug">
@@ -283,8 +286,8 @@ export async function getAdminClub(clubId: string): Promise<AdminClubDetail | nu
 
     return {
       id: row.id,
-      teamId: row.team_id,
-      teamName: team?.name ?? "Mannschaft",
+      teamId: row.team_id ?? "",
+      teamName: row.team_name?.trim() || team?.name || "Mannschaft",
       tournamentId: tournament?.id ?? row.tournament_id,
       tournamentName: tournament?.name ?? "Turnier",
       tournamentSlug: tournament?.slug ?? "",
@@ -519,7 +522,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     supabase
       .from("applications")
       .select(
-        "id, status, created_at, self_rated_strength, tournament_id, clubs (name), teams (name, age_group), tournaments (id, name)",
+        "id, status, created_at, self_rated_strength, tournament_id, club_name, team_name, age_group, clubs (name), teams (name, age_group), tournaments (id, name)",
       )
       .order("created_at", { ascending: false }),
     supabase.from("tournaments").select("*").order("date", { ascending: true }),
@@ -538,6 +541,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     created_at: string;
     self_rated_strength: number | null;
     tournament_id: string;
+    club_name: string | null;
+    team_name: string | null;
+    age_group: string | null;
     clubs?: { name: string } | { name: string }[] | null;
     teams?: { name: string; age_group: string | null } | { name: string; age_group: string | null }[] | null;
     tournaments?: { id: string; name: string } | { id: string; name: string }[] | null;
@@ -570,9 +576,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
     return {
       id: row.id,
-      clubName: club?.name ?? "Verein",
-      teamName: team?.name ?? "Mannschaft",
-      ageGroup: team?.age_group ?? "—",
+      clubName: row.club_name?.trim() || club?.name || "Verein",
+      teamName: row.team_name?.trim() || team?.name || "Mannschaft",
+      ageGroup: row.age_group?.trim() || team?.age_group || "—",
       selfRatedStrength: row.self_rated_strength ?? 0,
       status: asStatus(row.status),
       createdAt: row.created_at,

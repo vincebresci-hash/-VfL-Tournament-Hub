@@ -78,6 +78,17 @@ export function toClubTeam(row: TeamRow): Team {
   };
 }
 
+function firstText(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const trimmed = value?.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  return "";
+}
+
 function applicationBase(row: ApplicationWithRelations) {
   const club = row.clubs;
   const team = row.teams;
@@ -91,14 +102,16 @@ function applicationBase(row: ApplicationWithRelations) {
     tournamentSlug: tournament?.slug ?? "",
     tournamentDate: tournament?.date ?? row.created_at.slice(0, 10),
     tournamentLocation: tournament?.location ?? "",
-    clubName: club?.name ?? "Verein",
-    clubCity: club?.city ?? "",
+    clubName: firstText(row.club_name, club?.name) || "Verein",
+    clubCity: firstText(row.club_city, club?.city),
     website: club?.website ?? null,
-    teamName: team?.name ?? "Mannschaft",
-    ageGroup: asAgeGroup(team?.age_group ?? tournament?.age_group),
-    birthYear: team?.birth_year ?? new Date().getFullYear() - 10,
-    league: team?.league ?? "",
-    division: team?.division ?? null,
+    teamName: firstText(row.team_name, team?.name) || "Mannschaft",
+    ageGroup: asAgeGroup(
+      firstText(row.age_group, team?.age_group, tournament?.age_group) || undefined,
+    ),
+    birthYear: row.birth_year ?? team?.birth_year ?? new Date().getFullYear() - 10,
+    league: firstText(row.league, team?.league),
+    division: firstText(row.division, team?.division) || null,
     selfRatedStrength: asStrength(row.self_rated_strength ?? team?.self_rated_strength),
     teamDescription: row.team_description,
     clubType: null,
@@ -116,7 +129,11 @@ function applicationBase(row: ApplicationWithRelations) {
 }
 
 export function toClubApplicationView(row: ApplicationWithRelations): ClubApplicationView {
-  return applicationBase(row);
+  const base = applicationBase(row);
+  return {
+    ...base,
+    clubId: base.clubId ?? "",
+  };
 }
 
 export function toAdminApplication(row: ApplicationWithRelations): AdminApplication {
