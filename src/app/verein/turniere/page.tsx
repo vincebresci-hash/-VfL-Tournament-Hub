@@ -38,18 +38,12 @@ export default async function ClubTournamentsPage() {
                 <StatusBadge status={tournament.status} />
               </div>
             </div>
-            {tournament.status === "coming-soon" ? (
-              <span className="text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
-                {tournamentCtaLabel[tournament.status]}
-              </span>
-            ) : (
-              <Link
-                href={getTournamentHref(tournament.slug, tournament.status)}
-                className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
-              >
-                {tournamentCtaLabel[tournament.status]}
-              </Link>
-            )}
+            <Link
+              href={getTournamentHref(tournament.slug)}
+              className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+            >
+              {tournamentCtaLabel[tournament.status]}
+            </Link>
           </article>
         ))}
       </div>

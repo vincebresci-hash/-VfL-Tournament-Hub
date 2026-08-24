@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Barlow_Condensed, Geist } from "next/font/google";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
+import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
 
 export const dynamic = "force-dynamic";
@@ -17,12 +18,28 @@ const barlowCondensed = Barlow_Condensed({
   weight: ["500", "600", "700"],
 });
 
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: {
     default: APP_NAME,
     template: `%s | ${APP_NAME}`,
   },
   description: APP_DESCRIPTION,
+  openGraph: {
+    title: APP_NAME,
+    description: APP_DESCRIPTION,
+    locale: "de_DE",
+    type: "website",
+    images: [{ url: "/hero-vfl.jpg" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: APP_NAME,
+    description: APP_DESCRIPTION,
+    images: ["/hero-vfl.jpg"],
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

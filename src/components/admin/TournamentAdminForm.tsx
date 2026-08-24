@@ -41,6 +41,14 @@ const emptyValues: AdminTournamentInput = {
   applicationStart: "",
   applicationDeadline: "",
   imageUrl: ageGroupImageSrc.U10,
+  playFormat: "",
+  playingTime: "",
+  pitchFormat: "",
+  entryFee: "",
+  travelInfo: "",
+  changingRooms: "",
+  catering: "",
+  teamInfo: "",
 };
 
 function toDateTimeLocal(value: string | null | undefined) {
@@ -73,6 +81,14 @@ function recordToInput(tournament: AdminTournamentRecord): AdminTournamentInput 
     applicationStart: toDateTimeLocal(tournament.applicationStart),
     applicationDeadline: toDateTimeLocal(tournament.applicationDeadline),
     imageUrl: tournament.imageUrl ?? ageGroupImageSrc.U10,
+    playFormat: tournament.playFormat ?? "",
+    playingTime: tournament.playingTime ?? "",
+    pitchFormat: tournament.pitchFormat ?? "",
+    entryFee: tournament.entryFee ?? "",
+    travelInfo: tournament.travelInfo ?? "",
+    changingRooms: tournament.changingRooms ?? "",
+    catering: tournament.catering ?? "",
+    teamInfo: tournament.teamInfo ?? "",
   };
 }
 
@@ -392,6 +408,81 @@ export function TournamentAdminForm({
 
       <section className="border border-line bg-white p-5 sm:p-6">
         <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+          Öffentliche Turnierinformationen
+        </h2>
+        <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted">
+          Diese Felder erscheinen auf der Turnierseite nur, wenn sie ausgefüllt
+          sind. Leere Felder werden nicht angezeigt.
+        </p>
+        <div className="mt-5 grid gap-5">
+          <Field id="tournament-play-format" label="Spielmodus" optional>
+            <TextAreaInput
+              id="tournament-play-format"
+              rows={3}
+              value={values.playFormat}
+              onChange={(event) => update("playFormat", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-playing-time" label="Spielzeit" optional>
+            <TextAreaInput
+              id="tournament-playing-time"
+              rows={2}
+              value={values.playingTime}
+              onChange={(event) => update("playingTime", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-pitch" label="Feld- / Spielform" optional>
+            <TextAreaInput
+              id="tournament-pitch"
+              rows={2}
+              value={values.pitchFormat}
+              onChange={(event) => update("pitchFormat", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-fee" label="Startgebühr" optional>
+            <TextInput
+              id="tournament-fee"
+              value={values.entryFee}
+              onChange={(event) => update("entryFee", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-travel" label="Anreise / Parken" optional>
+            <TextAreaInput
+              id="tournament-travel"
+              rows={3}
+              value={values.travelInfo}
+              onChange={(event) => update("travelInfo", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-changing" label="Umkleiden" optional>
+            <TextAreaInput
+              id="tournament-changing"
+              rows={2}
+              value={values.changingRooms}
+              onChange={(event) => update("changingRooms", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-catering" label="Verpflegung" optional>
+            <TextAreaInput
+              id="tournament-catering"
+              rows={2}
+              value={values.catering}
+              onChange={(event) => update("catering", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-team-info" label="Hinweise für Mannschaften" optional>
+            <TextAreaInput
+              id="tournament-team-info"
+              rows={4}
+              value={values.teamInfo}
+              onChange={(event) => update("teamInfo", event.target.value)}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section className="border border-line bg-white p-5 sm:p-6">
+        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
           Hero-/Turnierbild
         </h2>
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
@@ -420,7 +511,7 @@ export function TournamentAdminForm({
           <Field
             id="tournament-image"
             label="Bild-URL"
-            hint="Lokale Dateien wie /u10.png oder eine öffentliche URL."
+            hint="Lokale Dateien wie /u10.webp oder eine öffentliche URL."
           >
             <TextInput
               id="tournament-image"

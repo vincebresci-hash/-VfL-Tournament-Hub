@@ -220,3 +220,31 @@ export function IconSettings(props: IconProps) {
     </IconBase>
   );
 }
+
+export function IconMail(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <rect x="3.5" y="6" width="17" height="12" rx="2" {...stroke} />
+      <path d="m5 8 7 5 7-5" {...stroke} />
+    </IconBase>
+  );
+}
+
+export function IconPhone(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path
+        d="M8.2 3.8h2.4l1.2 3-1.6 1a11 11 0 0 0 5 5l1-1.6 3 1.2v2.4A1.8 1.8 0 0 1 17.4 17 14.2 14.2 0 0 1 7 6.6a1.8 1.8 0 0 1 1.2-2.8Z"
+        {...stroke}
+      />
+    </IconBase>
+  );
+}
+
+export function IconChevron(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="m7 10 5 5 5-5" {...stroke} />
+    </IconBase>
+  );
+}

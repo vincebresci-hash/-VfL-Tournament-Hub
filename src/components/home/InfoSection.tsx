@@ -8,7 +8,6 @@ import {
   IconCheck,
   IconShield,
   IconStadium,
-  IconTrophy,
   IconUsers,
 } from "@/components/ui/icons";
 
@@ -28,22 +27,10 @@ const columns: InfoColumn[] = [
     linkLabel: "Mehr erfahren →",
     icon: IconUsers,
     items: [
-      "Einfache Online-Anmeldung",
-      "Mehrere Teams melden",
-      "Turnierinfos auf einen Blick",
-      "Schnelle Rückmeldung",
-    ],
-  },
-  {
-    title: "Für Veranstalter",
-    href: "/login",
-    linkLabel: "Mehr erfahren →",
-    icon: IconTrophy,
-    items: [
-      "Übersichtliches Dashboard",
-      "Bewerbungen verwalten",
-      "Automatische Kommunikation",
-      "Turniere optimal planen",
+      "Online bewerben, auch als Gast",
+      "Mehrere Mannschaften möglich",
+      "Status im Vereinskonto verfolgen",
+      "Spielplan und Ergebnisse im Hub",
     ],
   },
   {
@@ -52,10 +39,10 @@ const columns: InfoColumn[] = [
     linkLabel: "Mehr erfahren →",
     icon: IconShield,
     items: [
-      "Top organisierte Jugendturniere",
-      "Faire & ausgeglichene Spiele",
-      "Moderne Sportanlage",
-      "Leidenschaft für den Fußball",
+      "Jugendturniere im Tournament Hub",
+      "Klare Bewerbung ohne Automatik-Zusage",
+      "Sportpark Kirchheim als Spielort",
+      "Faire, transparente Organisation",
     ],
   },
   {
@@ -72,7 +59,7 @@ export function InfoSection() {
     <section className="bg-background pt-2 pb-12 sm:pt-3 lg:pb-14" aria-label="Informationen">
       <Container>
         <div className="overflow-hidden rounded-[12px] border border-line bg-white">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
             {columns.map((column, index) => {
               const Icon = column.icon;
 
@@ -82,10 +69,8 @@ export function InfoSection() {
                   className={cn(
                     "flex flex-col p-6 sm:p-7",
                     index > 0 && "border-t border-line",
-                    index <= 1 && "md:border-t-0",
-                    index > 1 && "md:border-t xl:border-t-0",
-                    index % 2 === 1 && "md:border-l",
-                    index >= 1 && "xl:border-l",
+                    index === 1 && "md:border-t-0 md:border-l",
+                    index === 2 && "xl:border-t-0 xl:border-l",
                   )}
                 >
                   <Icon className="h-7 w-7 text-brand-yellow" />

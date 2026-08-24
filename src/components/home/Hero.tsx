@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CoverImage } from "@/components/brand/CoverImage";
 import { FeatureItem } from "@/components/home/FeatureItem";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -21,7 +22,7 @@ export function Hero() {
           alt={heroImageAlt}
           className="h-full w-full"
           sizes="60vw"
-          priority
+          preload
           objectPosition="78% 46%"
         />
       </div>
@@ -41,6 +42,21 @@ export function Hero() {
               Der offizielle Tournament Hub des VfL Kirchheim.
               Einfach bewerben, schnell Rückmeldung erhalten.
             </p>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Link
+                href="/turniere"
+                className="inline-flex h-11 items-center justify-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Aktuelle Turniere
+              </Link>
+              <Link
+                href="/fuer-vereine"
+                className="inline-flex h-11 items-center justify-center border border-white/35 px-4 text-[12px] font-medium tracking-[0.1em] text-white uppercase transition-colors hover:border-white/70 hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+              >
+                Für Vereine
+              </Link>
+            </div>
 
             <div className="mt-8 grid gap-5 border-t border-white/10 pt-6 sm:grid-cols-3 sm:gap-6">
               <FeatureItem

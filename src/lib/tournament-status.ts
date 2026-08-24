@@ -8,7 +8,7 @@ export const tournamentStatusOrder: Record<TournamentStatus, number> = {
 };
 
 export const tournamentStatusLabel: Record<TournamentStatus, string> = {
-  "coming-soon": "Coming Soon",
+  "coming-soon": "Demnächst",
   active: "Bewerbung offen",
   full: "Teilnehmerfeld voll",
   completed: "Abgeschlossen",
@@ -22,8 +22,8 @@ export const tournamentStatusClassName: Record<TournamentStatus, string> = {
 };
 
 export const tournamentCtaLabel: Record<TournamentStatus, string> = {
-  "coming-soon": "Demnächst bewerben",
-  active: "Jetzt bewerben →",
+  "coming-soon": "Turnier ansehen",
+  active: "Turnier ansehen",
   full: "Turnier ansehen",
   completed: "Turnier ansehen",
 };
@@ -32,10 +32,6 @@ export function canApplyToTournament(status: TournamentStatus) {
   return status === "active";
 }
 
-export function getTournamentHref(slug: string, status: TournamentStatus) {
-  if (status === "active") {
-    return `/turniere/${slug}/bewerben`;
-  }
-
+export function getTournamentHref(slug: string) {
   return `/turniere/${slug}`;
 }

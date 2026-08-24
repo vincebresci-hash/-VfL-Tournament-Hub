@@ -64,6 +64,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
     isFull: occupancy?.isFull ?? tournament.isFull,
     applicationStart: tournament.applicationStart,
     applicationDeadline: tournament.applicationDeadline,
+    maxTeams: occupancy?.maxTeams ?? tournament.maxTeams,
   });
 
   if (applicationState === "closed" || applicationState === "coming-soon") {

@@ -1,11 +1,14 @@
 import { ageGroupImageSrc } from "@/data/tournaments";
 import { getAvailableSlots, isTournamentFull } from "@/lib/tournament-capacity";
+import { optimizePublicImageSrc } from "@/lib/public-images";
+import { nonempty } from "@/lib/text";
 import { tournamentStatusOrder } from "@/lib/tournament-status";
-import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
+import { AGE_GROUPS, TOURNAMENT_PUBLIC_INFO_FIELDS, TOURNAMENT_STATUSES } from "@/types/tournament";
 import type {
   AgeGroup,
   PublicTournament,
   Tournament,
+  TournamentPublicInfo,
   TournamentStatus,
 } from "@/types/tournament";
 import type { TournamentRow } from "@/lib/supabase/database";
@@ -16,6 +19,10 @@ export { ageGroupImageSrc } from "@/data/tournaments";
 export const FEATURED_TOURNAMENT_LIMIT = 4;
 
 const featuredStatuses: TournamentStatus[] = ["active", "coming-soon", "full"];
+
+export const TOURNAMENT_SELECT_TIERS = ["info", "full", "basic"] as const;
+
+export type TournamentSelectTier = (typeof TOURNAMENT_SELECT_TIERS)[number];
 
 const TOURNAMENT_SELECT = [
   "id",
@@ -60,8 +67,21 @@ const TOURNAMENT_SELECT_BASIC = [
   "description",
 ].join(", ");
 
-export function getTournamentSelect(full = true) {
-  return full ? TOURNAMENT_SELECT : TOURNAMENT_SELECT_BASIC;
+const TOURNAMENT_SELECT_INFO = [
+  TOURNAMENT_SELECT,
+  ...TOURNAMENT_PUBLIC_INFO_FIELDS.map((field) => field.column),
+].join(", ");
+
+export function getTournamentSelect(tier: TournamentSelectTier | boolean = "info") {
+  if (tier === true || tier === "info") {
+    return TOURNAMENT_SELECT_INFO;
+  }
+
+  if (tier === "full") {
+    return TOURNAMENT_SELECT;
+  }
+
+  return TOURNAMENT_SELECT_BASIC;
 }
 
 export function asAgeGroup(value: string | null | undefined, fallback: AgeGroup = "U10"): AgeGroup {
@@ -83,7 +103,7 @@ export function asTournamentStatus(value: string | null | undefined): Tournament
 export function fallbackTournamentImage(ageGroup: AgeGroup, imageUrl?: string | null) {
   const trimmed = imageUrl?.trim();
   if (trimmed) {
-    return trimmed;
+    return optimizePublicImageSrc(trimmed);
   }
 
   return ageGroupImageSrc[ageGroup];
@@ -141,31 +161,36 @@ export function applicationBelongsToTournament(
   );
 }
 
-export function toPublicTournament(tournament: Tournament): PublicTournament {
+export function emptyTournamentPublicInfo(): TournamentPublicInfo {
   return {
-    id: tournament.id,
-    slug: tournament.slug,
-    name: tournament.name,
-    ageGroup: tournament.ageGroup,
-    date: tournament.date,
-    location: tournament.location,
-    image: tournament.image,
-    description: tournament.description,
-    status: tournament.status,
-    maxTeams: tournament.maxTeams,
-    applicationStart: tournament.applicationStart,
-    applicationDeadline: tournament.applicationDeadline,
-    startTime: tournament.startTime,
-    endTime: tournament.endTime,
-    address: tournament.address,
-    shortDescription: tournament.shortDescription,
-    birthYear: tournament.birthYear,
-    waitlistEnabled: tournament.waitlistEnabled,
-    applicationsOpen: tournament.applicationsOpen,
-    archivedAt: tournament.archivedAt,
-    availableSlots: tournament.availableSlots,
-    isFull: tournament.isFull,
+    playFormat: null,
+    playingTime: null,
+    pitchFormat: null,
+    entryFee: null,
+    travelInfo: null,
+    changingRooms: null,
+    catering: null,
+    teamInfo: null,
   };
+}
+
+function publicInfoFromRow(row: TournamentRow): TournamentPublicInfo {
+  return {
+    playFormat: nonempty(row.play_format),
+    playingTime: nonempty(row.playing_time),
+    pitchFormat: nonempty(row.pitch_format),
+    entryFee: nonempty(row.entry_fee),
+    travelInfo: nonempty(row.travel_info),
+    changingRooms: nonempty(row.changing_rooms),
+    catering: nonempty(row.catering),
+    teamInfo: nonempty(row.team_info),
+  };
+}
+
+export function toPublicTournament(tournament: Tournament): PublicTournament {
+  const { applicationsCount, ...publicTournament } = tournament;
+  void applicationsCount;
+  return publicTournament;
 }
 
 export function toTournamentFromRow(
@@ -178,7 +203,7 @@ export function toTournamentFromRow(
 ): Tournament {
   const ageGroup = asAgeGroup(row.age_group);
   const confirmedTeams = occupancy?.confirmedTeams ?? 0;
-  const maxTeams = row.max_teams ?? 0;
+  const maxTeams = row.max_teams;
   const availableSlots = getAvailableSlots(row.max_teams, confirmedTeams);
 
   return {
@@ -207,6 +232,7 @@ export function toTournamentFromRow(
     archivedAt: row.archived_at ?? null,
     availableSlots: Number.isFinite(availableSlots) ? availableSlots : 0,
     isFull: isTournamentFull(row.max_teams, confirmedTeams),
+    ...publicInfoFromRow(row),
   };
 }
 
@@ -237,6 +263,14 @@ export function toAdminTournamentRecord(row: TournamentRow): AdminTournamentReco
     minimumRestMinutes: asPositiveInt(row.minimum_rest_minutes, 15, true),
     lunchBreakStart: normalizeTimeValue(row.lunch_break_start),
     lunchBreakEnd: normalizeTimeValue(row.lunch_break_end),
+    playFormat: nonempty(row.play_format),
+    playingTime: nonempty(row.playing_time),
+    pitchFormat: nonempty(row.pitch_format),
+    entryFee: nonempty(row.entry_fee),
+    travelInfo: nonempty(row.travel_info),
+    changingRooms: nonempty(row.changing_rooms),
+    catering: nonempty(row.catering),
+    teamInfo: nonempty(row.team_info),
   };
 }
 
@@ -253,7 +287,7 @@ export function toBoardTournament(record: AdminTournamentRecord): Tournament {
     image: fallbackTournamentImage(ageGroup, record.imageUrl),
     description: record.description ?? "",
     status: record.status,
-    maxTeams: record.maxTeams ?? 0,
+    maxTeams: record.maxTeams,
     confirmedTeams: 0,
     applicationsCount: 0,
     waitlistCount: 0,
@@ -269,6 +303,15 @@ export function toBoardTournament(record: AdminTournamentRecord): Tournament {
     archivedAt: record.archivedAt,
     availableSlots: 0,
     isFull: false,
+    ...emptyTournamentPublicInfo(),
+    playFormat: record.playFormat,
+    playingTime: record.playingTime,
+    pitchFormat: record.pitchFormat,
+    entryFee: record.entryFee,
+    travelInfo: record.travelInfo,
+    changingRooms: record.changingRooms,
+    catering: record.catering,
+    teamInfo: record.teamInfo,
   };
 }
 

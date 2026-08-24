@@ -12,6 +12,7 @@ export type PublicApplicationGateInput = {
   isFull: boolean;
   applicationStart?: string | null;
   applicationDeadline?: string | null;
+  maxTeams?: number | null;
   now?: Date;
 };
 
@@ -38,6 +39,10 @@ export function getPublicApplicationState(
 
   if (input.applicationDeadline && now > new Date(input.applicationDeadline)) {
     return "closed";
+  }
+
+  if (input.maxTeams === null) {
+    return "open";
   }
 
   if (!input.isFull && input.availableSlots > 0) {
@@ -142,6 +147,12 @@ export function runApplicationWindowSelfChecks() {
   assert(
     !isPublicApplicationAllowed(baseGate({ applicationsEnabled: false })),
     "applications_enabled=false muss blockiert sein",
+  );
+  assert(
+    getPublicApplicationState(
+      baseGate({ maxTeams: null, availableSlots: 0, isFull: false }),
+    ) === "open",
+    "ohne max_teams darf keine erfundene Kapazität die Bewerbung schließen",
   );
 
   return "ok";

@@ -89,6 +89,14 @@ export type TournamentRow = {
   minimum_rest_minutes?: number | null;
   lunch_break_start?: string | null;
   lunch_break_end?: string | null;
+  play_format?: string | null;
+  playing_time?: string | null;
+  pitch_format?: string | null;
+  entry_fee?: string | null;
+  travel_info?: string | null;
+  changing_rooms?: string | null;
+  catering?: string | null;
+  team_info?: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
-import { listTournamentOccupancy } from "@/lib/db/queries";
+import { listTournamentOccupancy, getTournamentOccupancy } from "@/lib/db/queries";
 import {
   FEATURED_TOURNAMENT_LIMIT,
   getFeaturedFromList,
   getTournamentSelect,
+  TOURNAMENT_SELECT_TIERS,
   toPublicTournament,
   toTournamentFromRow,
 } from "@/lib/tournaments";
@@ -17,8 +18,9 @@ async function fetchTournamentRows(options?: {
   includeArchived?: boolean;
 }) {
   const supabase = await createClient();
-  const run = async (full: boolean) => {
-    let query = supabase.from("tournaments").select(getTournamentSelect(full));
+
+  for (const tier of TOURNAMENT_SELECT_TIERS) {
+    let query = supabase.from("tournaments").select(getTournamentSelect(tier));
 
     if (options?.slug) {
       query = query.eq("slug", options.slug);
@@ -28,28 +30,21 @@ async function fetchTournamentRows(options?: {
       query = query.eq("id", options.id);
     }
 
-    if (!options?.includeArchived && full) {
+    if (!options?.includeArchived && tier !== "basic") {
       query = query.is("archived_at", null);
     }
 
-    return query.order("date", { ascending: true });
-  };
+    const result = await query.order("date", { ascending: true });
+    if (!result.error) {
+      return (result.data ?? []) as unknown as TournamentRow[];
+    }
 
-  const fullResult = await run(true);
-  if (!fullResult.error) {
-    return (fullResult.data ?? []) as unknown as TournamentRow[];
+    if (!isMissingRelationError(result.error)) {
+      return [];
+    }
   }
 
-  if (!isMissingRelationError(fullResult.error)) {
-    return [];
-  }
-
-  const basicResult = await run(false);
-  if (basicResult.error || !basicResult.data) {
-    return [];
-  }
-
-  return basicResult.data as unknown as TournamentRow[];
+  return [];
 }
 
 export async function listPublicTournaments(): Promise<PublicTournament[]> {
@@ -80,13 +75,28 @@ export async function listPublicTournaments(): Promise<PublicTournament[]> {
 export async function getPublicTournamentBySlug(
   slug: string,
 ): Promise<PublicTournament | null> {
-  const rows = await fetchTournamentRows({ slug, includeArchived: false });
+  const [rows, occupancy] = await Promise.all([
+    fetchTournamentRows({ slug, includeArchived: false }),
+    getTournamentOccupancy(slug),
+  ]);
   const row = rows[0];
   if (!row) {
     return null;
   }
 
-  return toPublicTournament(toTournamentFromRow(row));
+  return toPublicTournament(
+    toTournamentFromRow(row, {
+      confirmedTeams: occupancy?.confirmedTeams,
+      waitlistCount: occupancy?.waitingListCount,
+      applicationsCount:
+        occupancy == null
+          ? 0
+          : occupancy.confirmedTeams +
+            occupancy.waitingListCount +
+            occupancy.underReviewCount +
+            occupancy.newCount,
+    }),
+  );
 }
 
 export async function getTournamentBySlugOrId(

@@ -10,7 +10,7 @@ type CoverImageProps = {
   className?: string;
   imageClassName?: string;
   sizes?: string;
-  priority?: boolean;
+  preload?: boolean;
   objectPosition?: string;
 };
 
@@ -20,7 +20,7 @@ export function CoverImage({
   className,
   imageClassName,
   sizes,
-  priority = false,
+  preload = false,
   objectPosition,
 }: CoverImageProps) {
   const [failed, setFailed] = useState(false);
@@ -33,9 +33,10 @@ export function CoverImage({
           src={src as string}
           alt={alt}
           fill
-          priority={priority}
-          loading={priority ? "eager" : undefined}
+          preload={preload}
+          loading={preload ? "eager" : undefined}
           sizes={sizes ?? "100vw"}
+          quality={75}
           className={cn("object-cover", imageClassName)}
           style={objectPosition ? { objectPosition } : undefined}
           onError={() => setFailed(true)}

@@ -9,5 +9,5 @@ export const HUB_NAME = "Tournament Hub";
 export const media = {
   logo: "/vfl-logo-transparent.png",
   hero: "/hero-vfl.jpg",
-  facility: "/anlage.png",
+  facility: "/anlage.webp",
 } as const;

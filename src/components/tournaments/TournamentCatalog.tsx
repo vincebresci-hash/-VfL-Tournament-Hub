@@ -12,7 +12,7 @@ type StatusFilter = "all" | TournamentStatus;
 const statusFilters: Array<{ id: StatusFilter; label: string }> = [
   { id: "all", label: "Alle" },
   { id: "active", label: "Bewerbung offen" },
-  { id: "coming-soon", label: "Coming Soon" },
+  { id: "coming-soon", label: "Demnächst" },
   { id: "full", label: "Voll" },
   { id: "completed", label: "Abgeschlossen" },
 ];

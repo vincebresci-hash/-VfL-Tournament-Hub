@@ -11,6 +11,21 @@ export const TOURNAMENT_STATUSES = [
 
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
 
+export const TOURNAMENT_PUBLIC_INFO_FIELDS = [
+  { key: "playFormat", column: "play_format", label: "Spielmodus" },
+  { key: "playingTime", column: "playing_time", label: "Spielzeit" },
+  { key: "pitchFormat", column: "pitch_format", label: "Feld- / Spielform" },
+  { key: "entryFee", column: "entry_fee", label: "Startgebühr" },
+  { key: "travelInfo", column: "travel_info", label: "Anreise / Parken" },
+  { key: "changingRooms", column: "changing_rooms", label: "Umkleiden" },
+  { key: "catering", column: "catering", label: "Verpflegung" },
+  { key: "teamInfo", column: "team_info", label: "Hinweise für Mannschaften" },
+] as const;
+
+export type TournamentPublicInfoKey = (typeof TOURNAMENT_PUBLIC_INFO_FIELDS)[number]["key"];
+
+export type TournamentPublicInfo = Record<TournamentPublicInfoKey, string | null>;
+
 export type Tournament = {
   id: string;
   slug: string;
@@ -21,7 +36,7 @@ export type Tournament = {
   image: string;
   description: string;
   status: TournamentStatus;
-  maxTeams: number;
+  maxTeams: number | null;
   confirmedTeams: number;
   applicationsCount: number;
   waitlistCount: number;
@@ -37,9 +52,6 @@ export type Tournament = {
   archivedAt: string | null;
   availableSlots: number;
   isFull: boolean;
-};
+} & TournamentPublicInfo;
 
-export type PublicTournament = Omit<
-  Tournament,
-  "confirmedTeams" | "applicationsCount" | "waitlistCount"
->;
+export type PublicTournament = Omit<Tournament, "applicationsCount">;

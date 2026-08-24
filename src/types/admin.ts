@@ -227,6 +227,14 @@ export type AdminTournamentRecord = {
   minimumRestMinutes: number;
   lunchBreakStart: string | null;
   lunchBreakEnd: string | null;
+  playFormat: string | null;
+  playingTime: string | null;
+  pitchFormat: string | null;
+  entryFee: string | null;
+  travelInfo: string | null;
+  changingRooms: string | null;
+  catering: string | null;
+  teamInfo: string | null;
 };
 
 export type AdminTournamentInput = {
@@ -248,4 +256,12 @@ export type AdminTournamentInput = {
   applicationStart: string;
   applicationDeadline: string;
   imageUrl: string;
+  playFormat: string;
+  playingTime: string;
+  pitchFormat: string;
+  entryFee: string;
+  travelInfo: string;
+  changingRooms: string;
+  catering: string;
+  teamInfo: string;
 };

@@ -454,6 +454,14 @@ function parseTournamentInput(input: AdminTournamentInput): {
     application_start: string | null;
     application_deadline: string | null;
     image_url: string | null;
+    play_format: string | null;
+    playing_time: string | null;
+    pitch_format: string | null;
+    entry_fee: string | null;
+    travel_info: string | null;
+    changing_rooms: string | null;
+    catering: string | null;
+    team_info: string | null;
   } | null;
 } {
   const name = input.name.trim();
@@ -512,6 +520,14 @@ function parseTournamentInput(input: AdminTournamentInput): {
       application_start: parseOptionalDateTime(input.applicationStart),
       application_deadline: parseOptionalDateTime(input.applicationDeadline),
       image_url: parseOptionalText(input.imageUrl),
+      play_format: parseOptionalText(input.playFormat),
+      playing_time: parseOptionalText(input.playingTime),
+      pitch_format: parseOptionalText(input.pitchFormat),
+      entry_fee: parseOptionalText(input.entryFee),
+      travel_info: parseOptionalText(input.travelInfo),
+      changing_rooms: parseOptionalText(input.changingRooms),
+      catering: parseOptionalText(input.catering),
+      team_info: parseOptionalText(input.teamInfo),
     },
   };
 }

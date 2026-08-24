@@ -141,7 +141,7 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
             href="/turniere"
             className="inline-flex h-9 items-center bg-brand-yellow px-3.5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
-            Turnier bewerben →
+            Turniere
           </Link>
         </div>
 
@@ -244,7 +244,7 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
               onClick={() => setOpen(false)}
               className="inline-flex h-11 items-center justify-center bg-brand-yellow text-sm font-semibold tracking-[0.08em] text-navy uppercase"
             >
-              Turnier bewerben →
+              Turniere
             </Link>
           </div>
         </nav>

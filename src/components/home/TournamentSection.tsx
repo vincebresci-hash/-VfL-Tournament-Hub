@@ -38,6 +38,12 @@ export async function TournamentSection() {
             />
           ))}
         </div>
+        {featuredTournaments.length === 0 ? (
+          <p className="mt-6 max-w-xl text-sm leading-6 text-muted">
+            Aktuell sind keine Turniere zur Bewerbung veröffentlicht. Neue Termine
+            erscheinen hier, sobald sie freigeschaltet sind.
+          </p>
+        ) : null}
       </Container>
     </section>
   );

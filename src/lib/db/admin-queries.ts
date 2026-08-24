@@ -36,7 +36,7 @@ import type {
   TeamRow,
   TournamentRow,
 } from "@/lib/supabase/database";
-import { getTournamentSelect, toAdminTournamentRecord } from "@/lib/tournaments";
+import { getTournamentSelect, TOURNAMENT_SELECT_TIERS, toAdminTournamentRecord } from "@/lib/tournaments";
 
 function displayName(firstName: string | null, lastName: string | null) {
   return [firstName, lastName].filter(Boolean).join(" ").trim();
@@ -479,32 +479,27 @@ async function selectAdminTournaments(filter?: {
   id?: string;
 }) {
   const supabase = await createClient();
-  const run = async (full: boolean) => {
-    let query = supabase.from("tournaments").select(getTournamentSelect(full));
+
+  for (const tier of TOURNAMENT_SELECT_TIERS) {
+    let query = supabase.from("tournaments").select(getTournamentSelect(tier));
     if (filter?.slug) {
       query = query.eq("slug", filter.slug);
     }
     if (filter?.id) {
       query = query.eq("id", filter.id);
     }
-    return query.order("date", { ascending: true });
-  };
 
-  const fullResult = await run(true);
-  if (!fullResult.error) {
-    return (fullResult.data ?? []) as unknown as TournamentRow[];
+    const result = await query.order("date", { ascending: true });
+    if (!result.error) {
+      return (result.data ?? []) as unknown as TournamentRow[];
+    }
+
+    if (!isMissingRelationError(result.error)) {
+      return [];
+    }
   }
 
-  if (!isMissingRelationError(fullResult.error)) {
-    return [];
-  }
-
-  const basicResult = await run(false);
-  if (basicResult.error || !basicResult.data) {
-    return [];
-  }
-
-  return basicResult.data as unknown as TournamentRow[];
+  return [];
 }
 
 export async function listAdminTournamentRecords(): Promise<AdminTournamentRecord[]> {

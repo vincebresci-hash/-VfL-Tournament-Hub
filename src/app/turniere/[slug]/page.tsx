@@ -8,15 +8,16 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { TournamentPublicStage } from "@/components/tournaments/TournamentPublicStage";
-import { formatDateDe, formatTimeDe } from "@/lib/format";
-import { getTournamentOccupancy } from "@/lib/db/queries";
+import { formatDateDe, formatDateTimeDe, formatTimeDe } from "@/lib/format";
 import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
   getPublicApplicationState,
   publicApplicationStateLabel,
 } from "@/lib/public-application-state";
+import { filledPublicInfo, getDisplayCapacity } from "@/lib/public-tournament";
 import { getAppSettings } from "@/lib/settings";
+import { nonempty } from "@/lib/text";
 import { tournamentStatusClassName } from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
@@ -34,6 +35,7 @@ export async function generateMetadata({
 
   return {
     title: tournament?.name ?? "Turnier",
+    description: nonempty(tournament?.shortDescription) ?? nonempty(tournament?.description) ?? undefined,
   };
 }
 
@@ -50,23 +52,21 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const [settings, occupancy, stage] = await Promise.all([
+  const [settings, stage] = await Promise.all([
     getAppSettings(),
-    getTournamentOccupancy(tournament.slug),
     getPublicTournamentStage(tournament.slug, tournament.id),
   ]);
-  const availableSlots = occupancy?.availableSlots ?? tournament.availableSlots;
-  const isFull = occupancy?.isFull ?? tournament.isFull;
   const applicationState = getPublicApplicationState({
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
     applicationsOpen: tournament.applicationsOpen,
     archivedAt: tournament.archivedAt,
-    availableSlots,
+    availableSlots: tournament.availableSlots,
     waitlistEnabled: settings.waitlistEnabled && tournament.waitlistEnabled,
-    isFull,
+    isFull: tournament.isFull,
     applicationStart: tournament.applicationStart,
     applicationDeadline: tournament.applicationDeadline,
+    maxTeams: tournament.maxTeams,
   });
   const canApply = applicationState === "open" || applicationState === "waitlist";
   const ctaLabel =
@@ -74,7 +74,44 @@ export default async function TournamentDetailPage({
       ? "Für Warteliste bewerben →"
       : "Jetzt bewerben →";
   const startTime = formatTimeDe(tournament.startTime);
-  const description = tournament.description || tournament.shortDescription || "";
+  const endTime = formatTimeDe(tournament.endTime);
+  const shortDescription = nonempty(tournament.shortDescription);
+  const longDescription = nonempty(tournament.description);
+  const capacity = getDisplayCapacity(tournament);
+  const extraInfo = filledPublicInfo(tournament);
+  const facts = [
+    tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
+    tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
+    { label: "Datum", value: formatDateDe(tournament.date) },
+    startTime ? { label: "Startzeit", value: startTime } : null,
+    endTime ? { label: "Geplantes Ende", value: endTime } : null,
+    nonempty(tournament.location)
+      ? { label: "Veranstaltungsort", value: tournament.location }
+      : null,
+    nonempty(tournament.address) ? { label: "Adresse", value: tournament.address } : null,
+    tournament.applicationStart
+      ? { label: "Bewerbungsstart", value: formatDateTimeDe(tournament.applicationStart) }
+      : null,
+    tournament.applicationDeadline
+      ? { label: "Bewerbungsfrist", value: formatDateTimeDe(tournament.applicationDeadline) }
+      : null,
+    capacity ? { label: "Max. Teams", value: String(capacity.maxTeams) } : null,
+    tournament.confirmedTeams > 0 || capacity
+      ? { label: "Bestätigte Teams", value: String(tournament.confirmedTeams) }
+      : null,
+    capacity ? { label: "Freie Plätze", value: String(capacity.availableSlots) } : null,
+    tournament.waitlistEnabled || applicationState === "waitlist"
+      ? {
+          label: "Warteliste",
+          value:
+            applicationState === "waitlist"
+              ? "Aktiv – Bewerbung für die Warteliste möglich"
+              : tournament.waitlistEnabled
+                ? "Wird angeboten, wenn das Feld voll ist"
+                : null,
+        }
+      : null,
+  ].filter((item): item is { label: string; value: string } => Boolean(item?.value));
 
   return (
     <div className="flex min-h-full flex-col">
@@ -127,23 +164,19 @@ export default async function TournamentDetailPage({
                 <time dateTime={tournament.date}>{formatDateDe(tournament.date)}</time>
                 {startTime ? ` · ${startTime}` : ""}
               </p>
-              <p className="mt-2 inline-flex items-center gap-1.5 text-[15px] text-muted">
-                <IconPin className="h-4 w-4 text-brand-yellow" />
-                {tournament.location}
-                {tournament.address ? ` · ${tournament.address}` : ""}
-              </p>
-              <p className="mt-3 text-[11px] font-medium tracking-[0.08em] text-ink uppercase">
-                {tournament.maxTeams} Teams
-              </p>
-              {applicationState === "waitlist" ? (
-                <p className="mt-3 text-[13px] font-semibold tracking-[0.08em] text-ink uppercase">
-                  Bewerbung für Warteliste möglich
+              {nonempty(tournament.location) ? (
+                <p className="mt-2 inline-flex items-center gap-1.5 text-[15px] text-muted">
+                  <IconPin className="h-4 w-4 text-brand-yellow" />
+                  {tournament.location}
+                  {nonempty(tournament.address) ? ` · ${tournament.address}` : ""}
                 </p>
               ) : null}
 
-              <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
-                {description}
-              </p>
+              {shortDescription ? (
+                <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
+                  {shortDescription}
+                </p>
+              ) : null}
 
               <div className="mt-8">
                 {applicationState === "coming-soon" ? (
@@ -161,6 +194,45 @@ export default async function TournamentDetailPage({
               </div>
             </div>
           </div>
+
+          {facts.length > 0 ? (
+            <dl className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {facts.map((fact) => (
+                <div key={fact.label} className="border border-line bg-white px-4 py-3">
+                  <dt className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+                    {fact.label}
+                  </dt>
+                  <dd className="mt-1 text-[15px] text-ink">{fact.value}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
+          {longDescription && longDescription !== shortDescription ? (
+            <section className="mt-10 max-w-3xl">
+              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
+                Beschreibung
+              </h2>
+              <p className="mt-4 whitespace-pre-line text-base leading-7 text-muted">
+                {longDescription}
+              </p>
+            </section>
+          ) : null}
+
+          {extraInfo.length > 0 ? (
+            <section className="mt-10 grid gap-4 md:grid-cols-2">
+              {extraInfo.map((item) => (
+                <article key={item.key} className="border border-line bg-white p-5">
+                  <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                    {item.label}
+                  </h2>
+                  <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-muted">
+                    {item.value}
+                  </p>
+                </article>
+              ))}
+            </section>
+          ) : null}
 
           <TournamentPublicStage
             slug={tournament.slug}
