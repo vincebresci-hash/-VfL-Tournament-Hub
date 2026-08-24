@@ -467,6 +467,12 @@ function parseTournamentInput(input: AdminTournamentInput): {
     mein_turnierplan_enabled: boolean;
     mein_turnierplan_label: string | null;
     mein_turnierplan_embed_url: string | null;
+    live_data_source: string;
+    mein_turnierplan_tournament_id: string | null;
+    mein_turnierplan_matches_widget_url: string | null;
+    mein_turnierplan_table_widget_url: string | null;
+    public_schedule_note: string | null;
+    public_live_note: string | null;
   } | null;
 } {
   const name = input.name.trim();
@@ -507,6 +513,10 @@ function parseTournamentInput(input: AdminTournamentInput): {
   const meinTurnierplan = validateMeinTurnierplanInput({
     enabled: Boolean(input.meinTurnierplanEnabled),
     url: input.meinTurnierplanUrl,
+    liveDataSource: input.liveDataSource,
+    tournamentId: input.meinTurnierplanTournamentId,
+    matchesWidgetUrl: input.meinTurnierplanMatchesWidgetUrl,
+    tableWidgetUrl: input.meinTurnierplanTableWidgetUrl,
   });
 
   if (meinTurnierplan.error) {
@@ -546,6 +556,12 @@ function parseTournamentInput(input: AdminTournamentInput): {
       mein_turnierplan_enabled: Boolean(input.meinTurnierplanEnabled),
       mein_turnierplan_label: parseOptionalText(input.meinTurnierplanLabel),
       mein_turnierplan_embed_url: null,
+      live_data_source: meinTurnierplan.liveDataSource,
+      mein_turnierplan_tournament_id: meinTurnierplan.tournamentId,
+      mein_turnierplan_matches_widget_url: meinTurnierplan.matchesWidgetUrl,
+      mein_turnierplan_table_widget_url: meinTurnierplan.tableWidgetUrl,
+      public_schedule_note: parseOptionalText(input.publicScheduleNote),
+      public_live_note: parseOptionalText(input.publicLiveNote),
     },
   };
 }

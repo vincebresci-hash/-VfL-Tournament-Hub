@@ -6,7 +6,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { ageGroupImageSrc, slugifyTournamentName } from "@/lib/tournaments";
-import { MEIN_TURNIERPLAN_DEFAULT_LABEL } from "@/lib/mein-turnierplan";
+import { MEIN_TURNIERPLAN_DEFAULT_LABEL, extractMeinTurnierplanTournamentIdFromUrl } from "@/lib/mein-turnierplan";
 import {
   archiveTournamentAction,
   createTournamentAction,
@@ -53,6 +53,12 @@ const emptyValues: AdminTournamentInput = {
   meinTurnierplanEnabled: false,
   meinTurnierplanUrl: "",
   meinTurnierplanLabel: "",
+  liveDataSource: "hub",
+  meinTurnierplanTournamentId: "",
+  meinTurnierplanMatchesWidgetUrl: "",
+  meinTurnierplanTableWidgetUrl: "",
+  publicScheduleNote: "",
+  publicLiveNote: "",
 };
 
 function toDateTimeLocal(value: string | null | undefined) {
@@ -96,6 +102,12 @@ function recordToInput(tournament: AdminTournamentRecord): AdminTournamentInput 
     meinTurnierplanEnabled: tournament.meinTurnierplanEnabled,
     meinTurnierplanUrl: tournament.meinTurnierplanUrl ?? "",
     meinTurnierplanLabel: tournament.meinTurnierplanLabel ?? "",
+    liveDataSource: tournament.liveDataSource,
+    meinTurnierplanTournamentId: tournament.meinTurnierplanTournamentId ?? "",
+    meinTurnierplanMatchesWidgetUrl: tournament.meinTurnierplanMatchesWidgetUrl ?? "",
+    meinTurnierplanTableWidgetUrl: tournament.meinTurnierplanTableWidgetUrl ?? "",
+    publicScheduleNote: tournament.publicScheduleNote ?? "",
+    publicLiveNote: tournament.publicLiveNote ?? "",
   };
 }
 
@@ -133,6 +145,16 @@ export function TournamentAdminForm({
       }
       if (key === "ageGroup" && imageOptions.some((option) => option.value === current.imageUrl)) {
         next.imageUrl = ageGroupImageSrc[value as (typeof AGE_GROUPS)[number]] ?? current.imageUrl;
+      }
+      if (
+        key === "meinTurnierplanUrl" &&
+        typeof value === "string" &&
+        !next.meinTurnierplanTournamentId.trim()
+      ) {
+        const extracted = extractMeinTurnierplanTournamentIdFromUrl(value);
+        if (extracted) {
+          next.meinTurnierplanTournamentId = extracted;
+        }
       }
       return next;
     });
@@ -512,16 +534,75 @@ export function TournamentAdminForm({
               className="h-4 w-4 accent-brand-yellow"
             />
           </label>
+          <Field id="tournament-mtp-source" label="Datenquelle">
+            <SelectInput
+              id="tournament-mtp-source"
+              value={values.liveDataSource}
+              onChange={(event) =>
+                update(
+                  "liveDataSource",
+                  event.target.value as AdminTournamentInput["liveDataSource"],
+                )
+              }
+            >
+              <option value="hub">Eigener Hub</option>
+              <option value="mein-turnierplan">MeinTurnierplan</option>
+              <option value="hybrid">Hybrid</option>
+            </SelectInput>
+          </Field>
           <Field
             id="tournament-mtp-url"
-            label="MeinTurnierplan-Link"
-            hint="Nur http:// oder https://. Beispiel: https://meinturnierplan.de/…"
+            label="MeinTurnierplan Präsentations-Link"
+            hint="Nur http:// oder https://. Bekannte Links mit showit.php?id=… können die Turnier-ID automatisch übernehmen."
           >
             <TextInput
               id="tournament-mtp-url"
               inputMode="url"
               value={values.meinTurnierplanUrl}
               onChange={(event) => update("meinTurnierplanUrl", event.target.value)}
+            />
+          </Field>
+          <Field
+            id="tournament-mtp-tournament-id"
+            label="MeinTurnierplan Turnier-ID"
+            hint="Numerische ID aus MeinTurnierplan, z. B. aus showit.php?id=…"
+          >
+            <TextInput
+              id="tournament-mtp-tournament-id"
+              value={values.meinTurnierplanTournamentId}
+              onChange={(event) =>
+                update("meinTurnierplanTournamentId", event.target.value)
+              }
+            />
+          </Field>
+          <Field
+            id="tournament-mtp-matches-widget"
+            label="Widget-URL Spielplan"
+            optional
+            hint="Offizielle URL von displayMatches.php auf meinturnierplan.de"
+          >
+            <TextInput
+              id="tournament-mtp-matches-widget"
+              inputMode="url"
+              value={values.meinTurnierplanMatchesWidgetUrl}
+              onChange={(event) =>
+                update("meinTurnierplanMatchesWidgetUrl", event.target.value)
+              }
+            />
+          </Field>
+          <Field
+            id="tournament-mtp-table-widget"
+            label="Widget-URL Tabelle"
+            optional
+            hint="Offizielle URL von displayTable.php auf meinturnierplan.de"
+          >
+            <TextInput
+              id="tournament-mtp-table-widget"
+              inputMode="url"
+              value={values.meinTurnierplanTableWidgetUrl}
+              onChange={(event) =>
+                update("meinTurnierplanTableWidgetUrl", event.target.value)
+              }
             />
           </Field>
           <Field
@@ -535,6 +616,26 @@ export function TournamentAdminForm({
               value={values.meinTurnierplanLabel}
               placeholder={MEIN_TURNIERPLAN_DEFAULT_LABEL}
               onChange={(event) => update("meinTurnierplanLabel", event.target.value)}
+            />
+          </Field>
+          <Field
+            id="tournament-public-schedule-note"
+            label="Öffentlicher Spielplan-Hinweis"
+            optional
+          >
+            <TextAreaInput
+              id="tournament-public-schedule-note"
+              rows={3}
+              value={values.publicScheduleNote}
+              onChange={(event) => update("publicScheduleNote", event.target.value)}
+            />
+          </Field>
+          <Field id="tournament-public-live-note" label="Öffentlicher Live-Hinweis" optional>
+            <TextAreaInput
+              id="tournament-public-live-note"
+              rows={3}
+              value={values.publicLiveNote}
+              onChange={(event) => update("publicLiveNote", event.target.value)}
             />
           </Field>
         </div>

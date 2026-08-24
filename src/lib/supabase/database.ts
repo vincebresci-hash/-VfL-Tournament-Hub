@@ -101,6 +101,12 @@ export type TournamentRow = {
   mein_turnierplan_enabled?: boolean;
   mein_turnierplan_label?: string | null;
   mein_turnierplan_embed_url?: string | null;
+  live_data_source?: string | null;
+  mein_turnierplan_tournament_id?: string | null;
+  mein_turnierplan_matches_widget_url?: string | null;
+  mein_turnierplan_table_widget_url?: string | null;
+  public_schedule_note?: string | null;
+  public_live_note?: string | null;
   created_at: string;
   updated_at: string;
 };

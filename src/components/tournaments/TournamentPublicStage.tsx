@@ -12,9 +12,11 @@ import {
 import { computeGroupStandings } from "@/lib/schedule/standings";
 import type { PublicTournamentStage } from "@/lib/db/schedule-queries";
 import type { KnockoutRound, TournamentMatchRecord } from "@/types/schedule";
+import { MeinTurnierplanLiveSection } from "@/components/tournaments/MeinTurnierplanLiveSection";
+
 import type { TournamentStatus } from "@/types/tournament";
 
-const tabs = [
+const baseTabs = [
   { id: "uebersicht", label: "Übersicht" },
   { id: "teilnehmer", label: "Teilnehmer" },
   { id: "gruppen", label: "Gruppen" },
@@ -23,18 +25,36 @@ const tabs = [
   { id: "ko-runde", label: "KO-Runde" },
 ] as const;
 
-type PublicTab = (typeof tabs)[number]["id"];
+const liveTab = { id: "live", label: "Live" } as const;
+
+type BaseTab = (typeof baseTabs)[number]["id"];
+type PublicTab = BaseTab | typeof liveTab.id;
 
 type TournamentPublicStageProps = {
   slug: string;
   stage: PublicTournamentStage;
   tab?: string;
+  liveSection?: string;
   overview: ReactNode | null;
   tournamentStatus?: TournamentStatus;
   meinTurnierplanActive?: boolean;
+  showLiveTab?: boolean;
+  meinTurnierplanPrimary?: boolean;
+  meinTurnierplanHybrid?: boolean;
+  publicScheduleNote?: string | null;
+  livePresentation?: {
+    tournamentName: string;
+    tournamentDate: string;
+    tournamentStatus: TournamentStatus;
+    presentationUrl: string;
+    customLabel?: string | null;
+    matchesWidgetUrl?: string | null;
+    tableWidgetUrl?: string | null;
+    publicLiveNote?: string | null;
+  } | null;
 };
 
-function asTab(value: string | undefined): PublicTab {
+function asTab(value: string | undefined, tabs: Array<{ id: string }>): PublicTab {
   if (tabs.some((tab) => tab.id === value)) {
     return value as PublicTab;
   }
@@ -46,17 +66,25 @@ export function TournamentPublicStage({
   slug,
   stage,
   tab,
+  liveSection,
   overview,
   tournamentStatus,
   meinTurnierplanActive = false,
+  showLiveTab = false,
+  meinTurnierplanPrimary = false,
+  meinTurnierplanHybrid = false,
+  publicScheduleNote,
+  livePresentation = null,
 }: TournamentPublicStageProps) {
   const knockoutMatches = stage.matches.filter((match) => match.phase === "knockout");
   const groupMatches = stage.matches.filter((match) => match.phase !== "knockout");
-  const showTabs = stage.groups.length > 0 || stage.matches.length > 0;
+  const showTabs = stage.groups.length > 0 || stage.matches.length > 0 || showLiveTab;
+  const tabs = showLiveTab ? [...baseTabs, liveTab] : [...baseTabs];
   const visibleTabs = tabs.filter((item) => item.id !== "ko-runde" || knockoutMatches.length > 0);
-  const requested = showTabs ? asTab(tab) : "uebersicht";
+  const requested = showTabs ? asTab(tab, visibleTabs) : "uebersicht";
   const current =
     requested === "ko-runde" && knockoutMatches.length === 0 ? "uebersicht" : requested;
+  const liveView = liveSection === "tabelle" ? "tabelle" : "spielplan";
   const teamLabels = Object.fromEntries(
     stage.roster.map((entry) => [
       entry.applicationId,
@@ -77,11 +105,24 @@ export function TournamentPublicStage({
 
   return (
     <div>
-      {meinTurnierplanActive ? (
+      {meinTurnierplanPrimary ? (
         <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-          Für den Live-Spieltag ist MeinTurnierplan der primäre Spielplan. Die
-          Bereiche unten zeigen zusätzlich die im Tournament Hub hinterlegten
-          Gruppen, den internen Spielplan und Ergebnisse.
+          Live-Spielplan und Ergebnisse werden über MeinTurnierplan bereitgestellt.
+          Die Bereiche unten zeigen zusätzlich die im Tournament Hub hinterlegten
+          organisatorischen Informationen.
+        </p>
+      ) : meinTurnierplanHybrid ? (
+        <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+          Live-Spielplan und Ergebnisse werden über MeinTurnierplan bereitgestellt.
+          Gruppen, Spielplan, Tabellen und KO-Runde unten zeigen die im Hub
+          hinterlegten Daten und sind nicht automatisch mit MeinTurnierplan
+          synchronisiert.
+        </p>
+      ) : meinTurnierplanActive ? (
+        <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+          Für den Live-Spieltag ist MeinTurnierplan als externer Link verfügbar.
+          Die Bereiche unten zeigen die im Tournament Hub hinterlegten Gruppen,
+          den internen Spielplan und Ergebnisse.
         </p>
       ) : null}
 
@@ -177,6 +218,11 @@ export function TournamentPublicStage({
           <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
             Spielplan
           </h2>
+          {publicScheduleNote ? (
+            <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+              {publicScheduleNote}
+            </p>
+          ) : null}
           {stage.matches.length === 0 ? (
             <p className="mt-4 text-[15px] text-muted">Der Spielplan wird noch veröffentlicht.</p>
           ) : (
@@ -294,6 +340,20 @@ export function TournamentPublicStage({
             <PublicPlacements placements={placements} teamLabels={teamLabels} />
           ) : null}
         </section>
+      ) : null}
+      {current === "live" && livePresentation ? (
+        <MeinTurnierplanLiveSection
+          slug={slug}
+          section={liveView}
+          tournamentName={livePresentation.tournamentName}
+          tournamentDate={livePresentation.tournamentDate}
+          tournamentStatus={livePresentation.tournamentStatus}
+          presentationUrl={livePresentation.presentationUrl}
+          customLabel={livePresentation.customLabel}
+          matchesWidgetUrl={livePresentation.matchesWidgetUrl}
+          tableWidgetUrl={livePresentation.tableWidgetUrl}
+          publicLiveNote={livePresentation.publicLiveNote}
+        />
       ) : null}
     </div>
   );

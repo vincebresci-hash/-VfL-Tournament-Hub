@@ -126,6 +126,21 @@ export default function DatenschutzPage() {
 
         <section className="border border-line bg-white p-6 sm:p-8">
           <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+            MeinTurnierplan Live-Widgets
+          </h2>
+          <p className="mt-4 text-[15px] leading-7 text-muted">
+            Wenn für ein Turnier der MeinTurnierplan-Modus oder Hybrid-Modus
+            aktiv ist, können Live-Spielplan und Tabellen über offizielle
+            MeinTurnierplan-Widgets eingebunden werden. Dabei werden Inhalte
+            erst nach einer Nutzerinteraktion direkt von MeinTurnierplan
+            geladen. Welche Daten MeinTurnierplan dabei verarbeitet, ob dabei
+            Cookies gesetzt werden und welche Rechtsgrundlage für diese
+            Einbindung gilt, ist rechtlich/datenschutzrechtlich final zu prüfen.
+          </p>
+        </section>
+
+        <section className="border border-line bg-white p-6 sm:p-8">
+          <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
             Session- und Auth-Cookies
           </h2>
           <p className="mt-4 text-[15px] leading-7 text-muted">

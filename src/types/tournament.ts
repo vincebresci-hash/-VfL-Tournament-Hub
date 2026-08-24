@@ -11,6 +11,10 @@ export const TOURNAMENT_STATUSES = [
 
 export type TournamentStatus = (typeof TOURNAMENT_STATUSES)[number];
 
+export const LIVE_DATA_SOURCES = ["hub", "mein-turnierplan", "hybrid"] as const;
+
+export type LiveDataSource = (typeof LIVE_DATA_SOURCES)[number];
+
 export const TOURNAMENT_PUBLIC_INFO_FIELDS = [
   { key: "playFormat", column: "play_format", label: "Spielmodus" },
   { key: "playingTime", column: "playing_time", label: "Spielzeit" },
@@ -56,6 +60,12 @@ export type Tournament = {
   meinTurnierplanEnabled: boolean;
   meinTurnierplanLabel: string | null;
   meinTurnierplanEmbedUrl: string | null;
+  liveDataSource: LiveDataSource;
+  meinTurnierplanTournamentId: string | null;
+  meinTurnierplanMatchesWidgetUrl: string | null;
+  meinTurnierplanTableWidgetUrl: string | null;
+  publicScheduleNote: string | null;
+  publicLiveNote: string | null;
 } & TournamentPublicInfo;
 
 export type PublicTournament = Omit<Tournament, "applicationsCount">;

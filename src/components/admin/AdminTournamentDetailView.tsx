@@ -65,7 +65,7 @@ export function AdminTournamentDetailView({
           <TournamentCapacityForm slug={tournament.slug} maxTeams={tournament.maxTeams} />
         </AdminCard>
 
-        <MeinTurnierplanAdminPanel tournament={tournament} />
+        <MeinTurnierplanAdminPanel tournament={tournament} applications={applications} />
 
         <div id="teilnehmer">
           <TournamentParticipantsPanel participants={participants} />

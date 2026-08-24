@@ -19,12 +19,17 @@ import { filledPublicInfo, getDisplayCapacity } from "@/lib/public-tournament";
 import { getAppSettings } from "@/lib/settings";
 import { nonempty } from "@/lib/text";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
-import { isMeinTurnierplanPublic } from "@/lib/mein-turnierplan";
+import {
+  isHybridLiveDataSource,
+  isMeinTurnierplanPublic,
+  showsMeinTurnierplanLiveTab,
+  usesMeinTurnierplanAsPrimaryLive,
+} from "@/lib/mein-turnierplan";
 import { tournamentStatusClassName } from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; live?: string | string[] }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -48,6 +53,7 @@ export default async function TournamentDetailPage({
   const { slug } = await params;
   const query = await searchParams;
   const tab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
+  const liveSection = Array.isArray(query.live) ? query.live[0] : query.live;
   const tournament = await getPublicTournamentBySlug(slug);
 
   if (!tournament) {
@@ -82,6 +88,11 @@ export default async function TournamentDetailPage({
   const capacity = getDisplayCapacity(tournament);
   const extraInfo = filledPublicInfo(tournament);
   const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
+  const showLiveTab = showsMeinTurnierplanLiveTab(tournament);
+  const meinTurnierplanPrimary = usesMeinTurnierplanAsPrimaryLive(tournament);
+  const meinTurnierplanHybrid = isHybridLiveDataSource(tournament);
+  const showTopMeinTurnierplanButton =
+    showMeinTurnierplan && !showLiveTab;
   const facts = [
     tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
     tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
@@ -198,7 +209,7 @@ export default async function TournamentDetailPage({
             </div>
           </div>
 
-          {showMeinTurnierplan ? (
+          {showTopMeinTurnierplanButton ? (
             <MeinTurnierplanPublicButton
               tournamentName={tournament.name}
               tournamentDate={tournament.date}
@@ -251,8 +262,27 @@ export default async function TournamentDetailPage({
             slug={tournament.slug}
             stage={stage}
             tab={tab}
+            liveSection={liveSection}
             tournamentStatus={tournament.status}
             meinTurnierplanActive={showMeinTurnierplan}
+            showLiveTab={showLiveTab}
+            meinTurnierplanPrimary={meinTurnierplanPrimary}
+            meinTurnierplanHybrid={meinTurnierplanHybrid}
+            publicScheduleNote={tournament.publicScheduleNote}
+            livePresentation={
+              showLiveTab && tournament.meinTurnierplanUrl
+                ? {
+                    tournamentName: tournament.name,
+                    tournamentDate: tournament.date,
+                    tournamentStatus: tournament.status,
+                    presentationUrl: tournament.meinTurnierplanUrl,
+                    customLabel: tournament.meinTurnierplanLabel,
+                    matchesWidgetUrl: tournament.meinTurnierplanMatchesWidgetUrl,
+                    tableWidgetUrl: tournament.meinTurnierplanTableWidgetUrl,
+                    publicLiveNote: tournament.publicLiveNote,
+                  }
+                : null
+            }
             overview={
               stage.roster.length > 0 ? (
             <section>
