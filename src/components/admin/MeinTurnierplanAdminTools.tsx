@@ -6,6 +6,7 @@ import {
   importMeinTurnierplanGroupsAction,
   loadMeinTurnierplanPreviewForTournamentAction,
 } from "@/lib/db/mein-turnierplan-actions";
+import { isNumericMeinTurnierplanTournamentId } from "@/lib/mein-turnierplan";
 import { hubTeamLabel } from "@/lib/mein-turnierplan-import";
 import type { MeinTurnierplanImportGroup } from "@/lib/mein-turnierplan-import";
 import type { MeinTurnierplanPreview } from "@/lib/mein-turnierplan-api";
@@ -20,13 +21,18 @@ type MeinTurnierplanAdminToolsProps = {
   tournamentId: string;
   tournamentIdValue: string;
   acceptedTeams: AcceptedTeamOption[];
+  hasWidgetUrl?: boolean;
   onImportComplete?: () => void;
 };
+
+const NUMERIC_ID_REQUIRED_HINT =
+  "Für diese Funktion wird zusätzlich die numerische MeinTurnierplan Turnier-ID benötigt.";
 
 export function MeinTurnierplanAdminTools({
   tournamentId,
   tournamentIdValue,
   acceptedTeams,
+  hasWidgetUrl = false,
   onImportComplete,
 }: MeinTurnierplanAdminToolsProps) {
   const [checking, setChecking] = useState(false);
@@ -42,7 +48,7 @@ export function MeinTurnierplanAdminTools({
   const [showImport, setShowImport] = useState(false);
 
   const trimmedId = tournamentIdValue.trim();
-  const canRun = trimmedId.length > 0;
+  const hasNumericId = isNumericMeinTurnierplanTournamentId(trimmedId);
 
   const acceptedOptions = useMemo(
     () =>
@@ -54,8 +60,8 @@ export function MeinTurnierplanAdminTools({
   );
 
   async function handleCheckConnection() {
-    if (!canRun) {
-      setError("Bitte zuerst eine MeinTurnierplan-Turnier-ID angeben.");
+    if (!hasNumericId) {
+      setError(NUMERIC_ID_REQUIRED_HINT);
       return;
     }
 
@@ -78,8 +84,8 @@ export function MeinTurnierplanAdminTools({
   }
 
   async function handleLoadPreview() {
-    if (!canRun) {
-      setError("Bitte zuerst eine MeinTurnierplan-Turnier-ID angeben.");
+    if (!hasNumericId) {
+      setError(NUMERIC_ID_REQUIRED_HINT);
       return;
     }
 
@@ -150,10 +156,17 @@ export function MeinTurnierplanAdminTools({
 
   return (
     <div className="mt-5 grid gap-4">
+      {hasWidgetUrl && !hasNumericId ? (
+        <p className="border border-line bg-white px-4 py-3 text-[13px] leading-6 text-muted">
+          Live-Widgets funktionieren mit den hinterlegten Widget-URLs.{" "}
+          {NUMERIC_ID_REQUIRED_HINT}
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          disabled={!canRun || checking}
+          disabled={checking}
           onClick={handleCheckConnection}
           className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -161,7 +174,7 @@ export function MeinTurnierplanAdminTools({
         </button>
         <button
           type="button"
-          disabled={!canRun || loadingPreview}
+          disabled={loadingPreview}
           onClick={handleLoadPreview}
           className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:cursor-not-allowed disabled:opacity-50"
         >

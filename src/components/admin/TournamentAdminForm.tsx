@@ -6,7 +6,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { ageGroupImageSrc, slugifyTournamentName } from "@/lib/tournaments";
-import { MEIN_TURNIERPLAN_DEFAULT_LABEL, extractMeinTurnierplanTournamentIdFromUrl } from "@/lib/mein-turnierplan";
+import { MEIN_TURNIERPLAN_DEFAULT_LABEL, extractNumericMeinTurnierplanTournamentIdFromUrl } from "@/lib/mein-turnierplan";
 import {
   archiveTournamentAction,
   createTournamentAction,
@@ -151,7 +151,7 @@ export function TournamentAdminForm({
         typeof value === "string" &&
         !next.meinTurnierplanTournamentId.trim()
       ) {
-        const extracted = extractMeinTurnierplanTournamentIdFromUrl(value);
+        const extracted = extractNumericMeinTurnierplanTournamentIdFromUrl(value);
         if (extracted) {
           next.meinTurnierplanTournamentId = extracted;
         }
@@ -553,7 +553,7 @@ export function TournamentAdminForm({
           <Field
             id="tournament-mtp-url"
             label="MeinTurnierplan Präsentations-Link"
-            hint="Nur http:// oder https://. Bekannte Links mit showit.php?id=… können die Turnier-ID automatisch übernehmen."
+            hint="Öffentlicher Link zu deinem Turnier bei MeinTurnierplan. Die darin enthaltene öffentliche ID kann von der numerischen Turnier-ID abweichen. Enthält der Link einen rein numerischen id-Parameter (z. B. showit.php?id=1234567890), wird er optional ins Turnier-ID-Feld übernommen."
           >
             <TextInput
               id="tournament-mtp-url"
@@ -565,13 +565,18 @@ export function TournamentAdminForm({
           <Field
             id="tournament-mtp-tournament-id"
             label="MeinTurnierplan Turnier-ID"
-            hint="Numerische ID aus MeinTurnierplan, z. B. aus showit.php?id=…"
+            hint="Numerische Turnier-ID aus dem eingeloggten MeinTurnierplan-Administrationsbereich. Sie wird für Verbindung prüfen sowie Gruppen & Teams laden verwendet."
           >
             <TextInput
               id="tournament-mtp-tournament-id"
+              inputMode="numeric"
+              pattern="[0-9]*"
               value={values.meinTurnierplanTournamentId}
               onChange={(event) =>
-                update("meinTurnierplanTournamentId", event.target.value)
+                update(
+                  "meinTurnierplanTournamentId",
+                  event.target.value.replace(/\D/g, "").slice(0, 20),
+                )
               }
             />
           </Field>
@@ -579,7 +584,7 @@ export function TournamentAdminForm({
             id="tournament-mtp-matches-widget"
             label="Widget-URL Spielplan"
             optional
-            hint="Offizielle URL von displayMatches.php auf meinturnierplan.de"
+            hint="Offizielle URL von displayMatches.php auf meinturnierplan.de. Der id-Parameter kann alphanumerisch sein und ist getrennt von der numerischen Turnier-ID."
           >
             <TextInput
               id="tournament-mtp-matches-widget"
@@ -594,7 +599,7 @@ export function TournamentAdminForm({
             id="tournament-mtp-table-widget"
             label="Widget-URL Tabelle"
             optional
-            hint="Offizielle URL von displayTable.php auf meinturnierplan.de"
+            hint="Offizielle URL von displayTable.php auf meinturnierplan.de. Der id-Parameter kann alphanumerisch sein und ist getrennt von der numerischen Turnier-ID."
           >
             <TextInput
               id="tournament-mtp-table-widget"

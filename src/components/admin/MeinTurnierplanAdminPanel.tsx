@@ -73,6 +73,10 @@ export function MeinTurnierplanAdminPanel({
       <MeinTurnierplanAdminTools
         tournamentId={tournament.id}
         tournamentIdValue={tournament.meinTurnierplanTournamentId ?? ""}
+        hasWidgetUrl={Boolean(
+          tournament.meinTurnierplanMatchesWidgetUrl?.trim() ||
+            tournament.meinTurnierplanTableWidgetUrl?.trim(),
+        )}
         acceptedTeams={acceptedTeams}
         onImportComplete={() => router.refresh()}
       />

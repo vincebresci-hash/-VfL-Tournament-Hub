@@ -74,7 +74,9 @@ export async function checkMeinTurnierplanConnectionAction(
     return { error: access.error, ok: false };
   }
 
-  const idValidation = validateMeinTurnierplanTournamentId(mtpTournamentId);
+  const idValidation = validateMeinTurnierplanTournamentId(mtpTournamentId, {
+    required: true,
+  });
   if (idValidation.error || !idValidation.value) {
     return { error: idValidation.error, ok: false };
   }
@@ -99,7 +101,9 @@ export async function loadMeinTurnierplanPreviewAction(
     return { error: access.error, preview: null, mappingGroups: null };
   }
 
-  const idValidation = validateMeinTurnierplanTournamentId(mtpTournamentId);
+  const idValidation = validateMeinTurnierplanTournamentId(mtpTournamentId, {
+    required: true,
+  });
   if (idValidation.error || !idValidation.value) {
     return { error: idValidation.error, preview: null, mappingGroups: null };
   }

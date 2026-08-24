@@ -47,6 +47,10 @@ const WIDGET_PATHS: Record<"table" | "matches", string> = {
   matches: "/displaymatches.php",
 };
 
+export const MEIN_TURNIERPLAN_NUMERIC_ID_MAX_LENGTH = 20;
+
+const NUMERIC_TOURNAMENT_ID_PATTERN = /^\d{1,20}$/;
+
 export function isSafeHttpUrl(value: string) {
   const trimmed = value.trim();
   if (!trimmed || BLOCKED_URL_PATTERN.test(trimmed)) {
@@ -128,15 +132,37 @@ export function asLiveDataSource(value: string | null | undefined): LiveDataSour
   return "hub";
 }
 
-export function validateMeinTurnierplanTournamentId(value: string) {
+export function isNumericMeinTurnierplanTournamentId(value: string) {
+  const trimmed = value.trim();
+  return NUMERIC_TOURNAMENT_ID_PATTERN.test(trimmed);
+}
+
+export function validateMeinTurnierplanTournamentId(
+  value: string,
+  options?: { required?: boolean },
+) {
   const trimmed = value.trim();
   if (!trimmed) {
-    return { error: "Bitte die MeinTurnierplan-Turnier-ID angeben.", value: null };
+    if (options?.required) {
+      return {
+        error: "Bitte die numerische MeinTurnierplan-Turnier-ID angeben.",
+        value: null,
+      };
+    }
+    return { error: null as string | null, value: null as string | null };
   }
 
-  if (!/^\d{4,20}$/.test(trimmed)) {
+  if (/\s/.test(value)) {
     return {
-      error: "Die Turnier-ID muss eine numerische MeinTurnierplan-ID sein.",
+      error: "Die Turnier-ID darf keine Leerzeichen enthalten.",
+      value: null,
+    };
+  }
+
+  if (!NUMERIC_TOURNAMENT_ID_PATTERN.test(trimmed)) {
+    return {
+      error:
+        "Die Turnier-ID darf nur Ziffern (0–9) enthalten und ist getrennt von öffentlichen Widget-IDs.",
       value: null,
     };
   }
@@ -144,8 +170,8 @@ export function validateMeinTurnierplanTournamentId(value: string) {
   return { error: null, value: trimmed };
 }
 
-export function extractMeinTurnierplanTournamentIdFromUrl(value: string) {
-  if (!isAllowedMeinTurnierplanUrl(value)) {
+export function extractNumericMeinTurnierplanTournamentIdFromUrl(value: string) {
+  if (!isSafeHttpUrl(value)) {
     return null;
   }
 
@@ -156,12 +182,20 @@ export function extractMeinTurnierplanTournamentIdFromUrl(value: string) {
       return null;
     }
 
-    const id = url.searchParams.get("id")?.trim() ?? "";
-    const validated = validateMeinTurnierplanTournamentId(id);
-    return validated.value;
+    const id = url.searchParams.get("id") ?? "";
+    if (!id || /\s/.test(id) || !NUMERIC_TOURNAMENT_ID_PATTERN.test(id)) {
+      return null;
+    }
+
+    return id;
   } catch {
     return null;
   }
+}
+
+/** @deprecated Use extractNumericMeinTurnierplanTournamentIdFromUrl */
+export function extractMeinTurnierplanTournamentIdFromUrl(value: string) {
+  return extractNumericMeinTurnierplanTournamentIdFromUrl(value);
 }
 
 export function validateMeinTurnierplanInput(input: {
@@ -174,9 +208,6 @@ export function validateMeinTurnierplanInput(input: {
 }) {
   const trimmedUrl = input.url.trim();
   const liveDataSource = asLiveDataSource(input.liveDataSource);
-  const usesMeinTurnierplanLive =
-    input.enabled &&
-    (liveDataSource === "mein-turnierplan" || liveDataSource === "hybrid");
 
   if (trimmedUrl && !isSafeHttpUrl(trimmedUrl)) {
     return {
@@ -217,22 +248,6 @@ export function validateMeinTurnierplanInput(input: {
       };
     }
     tournamentId = validated.value;
-  } else if (usesMeinTurnierplanLive) {
-    const extracted = trimmedUrl
-      ? extractMeinTurnierplanTournamentIdFromUrl(trimmedUrl)
-      : null;
-    if (!extracted) {
-      return {
-        error:
-          "Für MeinTurnierplan- oder Hybrid-Modus ist eine Turnier-ID erforderlich (manuell oder aus einem bekannten MeinTurnierplan-Link).",
-        url: trimmedUrl || null,
-        liveDataSource,
-        tournamentId: null,
-        matchesWidgetUrl: null,
-        tableWidgetUrl: null,
-      };
-    }
-    tournamentId = extracted;
   }
 
   const matchesWidget = validateMeinTurnierplanWidgetUrl(
@@ -411,16 +426,52 @@ export function runMeinTurnierplanSelfChecks() {
     "falscher Widget-Pfad muss blockiert sein",
   );
   assert(
-    extractMeinTurnierplanTournamentIdFromUrl(
-      "https://www.meinturnierplan.de/showit.php?id=1753883027",
-    ) === "1753883027",
-    "showit.php?id muss extrahierbar sein",
+    validateMeinTurnierplanWidgetUrl(
+      "https://www.meinturnierplan.de/displayTable.php?id=2jrb0hvxvdabc",
+      "table",
+    ).error === null,
+    "alphanumerische Widget-ID muss akzeptiert werden",
   );
   assert(
-    extractMeinTurnierplanTournamentIdFromUrl(
+    validateMeinTurnierplanWidgetUrl(
+      "https://www.meinturnierplan.de/displayMatches.php?id=2jrb0hvxvdabc",
+      "matches",
+    ).error === null,
+    "alphanumerische Spielplan-Widget-ID muss akzeptiert werden",
+  );
+  assert(
+    extractNumericMeinTurnierplanTournamentIdFromUrl(
+      "https://www.meinturnierplan.de/showit.php?id=1753883027",
+    ) === "1753883027",
+    "numerische showit.php?id muss extrahierbar sein",
+  );
+  assert(
+    extractNumericMeinTurnierplanTournamentIdFromUrl(
+      "https://www.meinturnierplan.de/showit.php?id=2jrb0hvxvdabc",
+    ) === null,
+    "alphanumerische showit-ID darf nicht ins Turnier-ID-Feld übernommen werden",
+  );
+  assert(
+    extractNumericMeinTurnierplanTournamentIdFromUrl(
       "https://www.meinturnierplan.de/t/abc",
     ) === null,
     "unbekannter Pfad darf keine ID liefern",
+  );
+  assert(
+    !isNumericMeinTurnierplanTournamentId("2jrb0hvxvdabc"),
+    "alphanumerische ID darf nicht als numerische Turnier-ID gelten",
+  );
+  assert(
+    validateMeinTurnierplanTournamentId("1753883027").error === null,
+    "numerische Turnier-ID muss gültig sein",
+  );
+  assert(
+    validateMeinTurnierplanTournamentId("2jrb0hvxvdabc").error !== null,
+    "alphanumerische Turnier-ID muss abgelehnt werden",
+  );
+  assert(
+    validateMeinTurnierplanTournamentId("1753 883027").error !== null,
+    "Turnier-ID mit Leerzeichen muss abgelehnt werden",
   );
   assert(asLiveDataSource("hybrid") === "hybrid", "hybrid muss gültig sein");
   assert(asLiveDataSource("invalid") === "hub", "ungültige Quelle fällt auf hub zurück");
@@ -454,10 +505,21 @@ export function runMeinTurnierplanSelfChecks() {
   assert(
     validateMeinTurnierplanInput({
       enabled: true,
+      url: "https://www.meinturnierplan.de/showit.php?id=2jrb0hvxvdabc",
+      liveDataSource: "hybrid",
+      matchesWidgetUrl:
+        "https://www.meinturnierplan.de/displayMatches.php?id=2jrb0hvxvdabc",
+    }).error === null,
+    "hybrid mit Widget-URL ohne numerische Turnier-ID muss speicherbar sein",
+  );
+  assert(
+    validateMeinTurnierplanInput({
+      enabled: true,
       url: "https://www.meinturnierplan.de/showit.php?id=1753883027",
       liveDataSource: "hybrid",
+      tournamentId: "1753883027",
     }).error === null,
-    "hybrid mit extrahierbarer ID muss ok sein",
+    "hybrid mit numerischer Turnier-ID muss ok sein",
   );
 
   assert(
