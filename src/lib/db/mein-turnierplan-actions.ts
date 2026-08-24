@@ -18,7 +18,10 @@ import {
   type MeinTurnierplanImportGroup,
 } from "@/lib/mein-turnierplan-import";
 import { applicationBelongsToTournament } from "@/lib/tournaments";
-import { validateMeinTurnierplanTournamentId } from "@/lib/mein-turnierplan";
+import {
+  resolveMeinTurnierplanJsonQueryId,
+  validateMeinTurnierplanTournamentId,
+} from "@/lib/mein-turnierplan";
 import type { AdminTournamentRecord } from "@/types/admin";
 
 async function requireAdmin() {
@@ -34,7 +37,9 @@ async function loadTournament(tournamentId: string) {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("id, slug")
+    .select(
+      "id, slug, mein_turnierplan_tournament_id, mein_turnierplan_matches_widget_url, mein_turnierplan_table_widget_url",
+    )
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -43,6 +48,37 @@ async function loadTournament(tournamentId: string) {
   }
 
   return { tournament: data, error: null };
+}
+
+function resolveJsonQueryId(input: {
+  mtpTournamentId?: string;
+  matchesWidgetUrl?: string | null;
+  tableWidgetUrl?: string | null;
+}) {
+  const trimmed = input.mtpTournamentId?.trim() ?? "";
+  if (trimmed) {
+    const validated = validateMeinTurnierplanTournamentId(trimmed, { required: true });
+    if (validated.error || !validated.value) {
+      return { error: validated.error, queryId: null, source: null as string | null };
+    }
+
+    return {
+      error: null,
+      queryId: validated.value,
+      source: "tournament-id" as const,
+    };
+  }
+
+  const resolved = resolveMeinTurnierplanJsonQueryId({
+    matchesWidgetUrl: input.matchesWidgetUrl,
+    tableWidgetUrl: input.tableWidgetUrl,
+  });
+
+  return {
+    error: resolved.error,
+    queryId: resolved.queryId,
+    source: resolved.source,
+  };
 }
 
 function revalidateTournament(slug: string) {
@@ -68,22 +104,33 @@ async function acceptedTeamsForTournament(tournament: Pick<AdminTournamentRecord
 
 export async function checkMeinTurnierplanConnectionAction(
   mtpTournamentId: string,
+  options?: {
+    matchesWidgetUrl?: string | null;
+    tableWidgetUrl?: string | null;
+  },
 ): Promise<{ error: string | null; ok: boolean }> {
   const access = await requireAdmin();
   if (access.error) {
     return { error: access.error, ok: false };
   }
 
-  const idValidation = validateMeinTurnierplanTournamentId(mtpTournamentId, {
-    required: true,
+  const resolved = resolveJsonQueryId({
+    mtpTournamentId,
+    matchesWidgetUrl: options?.matchesWidgetUrl,
+    tableWidgetUrl: options?.tableWidgetUrl,
   });
-  if (idValidation.error || !idValidation.value) {
-    return { error: idValidation.error, ok: false };
+  if (resolved.error || !resolved.queryId) {
+    return { error: resolved.error, ok: false };
   }
 
-  const result = await fetchMeinTurnierplanJson(idValidation.value);
+  const result = await fetchMeinTurnierplanJson(resolved.queryId);
   if (!result.ok) {
     return { error: meinTurnierplanConnectionMessage(result.error), ok: false };
+  }
+
+  const parsed = parseMeinTurnierplanPreview(result.data);
+  if (!parsed.ok) {
+    return { error: parsed.message, ok: false };
   }
 
   return { error: null, ok: true };
@@ -91,37 +138,55 @@ export async function checkMeinTurnierplanConnectionAction(
 
 export async function loadMeinTurnierplanPreviewAction(
   mtpTournamentId: string,
+  options?: {
+    matchesWidgetUrl?: string | null;
+    tableWidgetUrl?: string | null;
+  },
 ): Promise<{
   error: string | null;
   preview: MeinTurnierplanPreview | null;
   mappingGroups: MeinTurnierplanImportGroup[] | null;
+  meta: MeinTurnierplanPreview["meta"] | null;
 }> {
   const access = await requireAdmin();
   if (access.error) {
-    return { error: access.error, preview: null, mappingGroups: null };
+    return { error: access.error, preview: null, mappingGroups: null, meta: null };
   }
 
-  const idValidation = validateMeinTurnierplanTournamentId(mtpTournamentId, {
-    required: true,
+  const resolved = resolveJsonQueryId({
+    mtpTournamentId,
+    matchesWidgetUrl: options?.matchesWidgetUrl,
+    tableWidgetUrl: options?.tableWidgetUrl,
   });
-  if (idValidation.error || !idValidation.value) {
-    return { error: idValidation.error, preview: null, mappingGroups: null };
+  if (resolved.error || !resolved.queryId) {
+    return { error: resolved.error, preview: null, mappingGroups: null, meta: null };
   }
 
-  const result = await fetchMeinTurnierplanJson(idValidation.value);
+  const result = await fetchMeinTurnierplanJson(resolved.queryId);
   if (!result.ok) {
     return {
       error: meinTurnierplanConnectionMessage(result.error),
       preview: null,
       mappingGroups: null,
+      meta: null,
     };
   }
 
-  const preview = parseMeinTurnierplanPreview(result.data);
+  const parsed = parseMeinTurnierplanPreview(result.data);
+  if (!parsed.ok) {
+    return {
+      error: parsed.message,
+      preview: null,
+      mappingGroups: null,
+      meta: parsed.meta,
+    };
+  }
+
   return {
     error: null,
-    preview,
+    preview: parsed.preview,
     mappingGroups: null,
+    meta: parsed.meta,
   };
 }
 
@@ -132,20 +197,29 @@ export async function loadMeinTurnierplanPreviewForTournamentAction(
   error: string | null;
   preview: MeinTurnierplanPreview | null;
   mappingGroups: MeinTurnierplanImportGroup[] | null;
+  meta: MeinTurnierplanPreview["meta"] | null;
 }> {
   const access = await requireAdmin();
   if (access.error) {
-    return { error: access.error, preview: null, mappingGroups: null };
+    return { error: access.error, preview: null, mappingGroups: null, meta: null };
   }
 
   const loaded = await loadTournament(tournamentId);
   if (!loaded.tournament) {
-    return { error: loaded.error, preview: null, mappingGroups: null };
+    return { error: loaded.error, preview: null, mappingGroups: null, meta: null };
   }
 
-  const previewResult = await loadMeinTurnierplanPreviewAction(mtpTournamentId);
+  const previewResult = await loadMeinTurnierplanPreviewAction(mtpTournamentId, {
+    matchesWidgetUrl: loaded.tournament.mein_turnierplan_matches_widget_url,
+    tableWidgetUrl: loaded.tournament.mein_turnierplan_table_widget_url,
+  });
   if (previewResult.error || !previewResult.preview) {
-    return previewResult;
+    return {
+      error: previewResult.error,
+      preview: previewResult.preview,
+      mappingGroups: null,
+      meta: previewResult.meta,
+    };
   }
 
   const acceptedTeams = await acceptedTeamsForTournament(loaded.tournament);
@@ -158,6 +232,7 @@ export async function loadMeinTurnierplanPreviewForTournamentAction(
     error: null,
     preview: previewResult.preview,
     mappingGroups,
+    meta: previewResult.meta,
   };
 }
 

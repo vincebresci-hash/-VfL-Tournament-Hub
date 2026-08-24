@@ -1,140 +1,73 @@
-import { groupDisplayName } from "@/lib/schedule/names";
+import {
+  extractMeinTurnierplanSchemaVersion,
+  meinTurnierplanNormalizeMessage,
+  normalizeMeinTurnierplanResponse,
+  type MeinTurnierplanNormalizeError,
+  type MeinTurnierplanRawMeta,
+  type NormalizedMeinTurnierplanResponse,
+} from "@/lib/mein-turnierplan-normalize";
 
 export const MEIN_TURNIERPLAN_JSON_API =
   "https://www.meinturnierplan.de/json/json.php";
 
 export const MEIN_TURNIERPLAN_REQUEST_TIMEOUT_MS = 10_000;
 
-export type MeinTurnierplanConnectionError = "unreachable" | "no-data" | "invalid-id";
+export type MeinTurnierplanConnectionError =
+  | "unreachable"
+  | "no-data"
+  | "invalid-id"
+  | "id-not-found"
+  | MeinTurnierplanNormalizeError;
+
+export type MeinTurnierplanPreviewTeam = {
+  id: string;
+  name: string;
+};
 
 export type MeinTurnierplanPreviewGroup = {
+  id: string;
   name: string;
-  teams: string[];
+  teams: MeinTurnierplanPreviewTeam[];
 };
 
 export type MeinTurnierplanPreview = {
   tournamentName: string | null;
   groups: MeinTurnierplanPreviewGroup[];
+  meta: MeinTurnierplanRawMeta;
 };
 
 export type MeinTurnierplanJsonResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; error: MeinTurnierplanConnectionError };
 
-type JsonParticipant = {
-  id?: number | string;
-  name?: string;
-  displayId?: string;
-};
-
-function participantLabel(participant: JsonParticipant) {
-  const name = participant.name?.trim();
-  if (name) {
-    return name;
-  }
-
-  if (participant.displayId?.trim()) {
-    return `Teilnehmer ${participant.displayId.trim()}`;
-  }
-
-  if (participant.id != null) {
-    return `Teilnehmer ${participant.id}`;
-  }
-
-  return "Unbenanntes Team";
+function toPreview(normalized: NormalizedMeinTurnierplanResponse): MeinTurnierplanPreview {
+  return {
+    tournamentName: normalized.tournamentName,
+    meta: normalized.meta,
+    groups: normalized.groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      teams: group.teams.map((team) => ({ id: team.id, name: team.name })),
+    })),
+  };
 }
 
-function participantsMap(data: Record<string, unknown>) {
-  const raw = data.participants;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    return new Map<string, string>();
-  }
-
-  const map = new Map<string, string>();
-  for (const [key, value] of Object.entries(raw)) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      continue;
-    }
-
-    map.set(String(key), participantLabel(value as JsonParticipant));
-  }
-
-  return map;
-}
-
-function groupsFromOfficialGroupsArray(
-  data: Record<string, unknown>,
-  participants: Map<string, string>,
-) {
-  const rawGroups = data.groups;
-  if (!Array.isArray(rawGroups) || rawGroups.length === 0) {
-    return [] as MeinTurnierplanPreviewGroup[];
-  }
-
-  const groupParticipants = Array.isArray(data.groupParticipants)
-    ? data.groupParticipants
-    : [];
-
-  return rawGroups.map((group, index) => {
-    const record =
-      group && typeof group === "object" && !Array.isArray(group)
-        ? (group as Record<string, unknown>)
-        : {};
-    const displayId =
-      typeof record.displayId === "string" && record.displayId.trim()
-        ? record.displayId.trim()
-        : typeof record.name === "string" && record.name.trim()
-          ? record.name.trim()
-          : groupDisplayName(index);
-    const memberIds = Array.isArray(groupParticipants[index])
-      ? (groupParticipants[index] as unknown[]).map(String)
-      : [];
-
+export function parseMeinTurnierplanPreview(data: Record<string, unknown>) {
+  const normalized = normalizeMeinTurnierplanResponse(data);
+  if (!normalized.ok) {
     return {
-      name: displayId.match(/^[A-Z]$/) ? `Gruppe ${displayId}` : `Gruppe ${displayId}`,
-      teams: memberIds
-        .map((id) => participants.get(id))
-        .filter((name): name is string => Boolean(name)),
+      ok: false as const,
+      error: normalized.error,
+      message: normalized.message,
+      meta: normalized.meta,
+      preview: null,
     };
-  });
-}
-
-function groupsFromGroupParticipants(
-  data: Record<string, unknown>,
-  participants: Map<string, string>,
-) {
-  const groupParticipants = data.groupParticipants;
-  if (!Array.isArray(groupParticipants) || groupParticipants.length === 0) {
-    return [] as MeinTurnierplanPreviewGroup[];
   }
-
-  return groupParticipants.map((members, index) => {
-    const memberIds = Array.isArray(members) ? members.map(String) : [];
-    return {
-      name: groupDisplayName(index),
-      teams: memberIds
-        .map((id) => participants.get(id))
-        .filter((name): name is string => Boolean(name)),
-    };
-  });
-}
-
-export function parseMeinTurnierplanPreview(
-  data: Record<string, unknown>,
-): MeinTurnierplanPreview {
-  const participants = participantsMap(data);
-  const officialGroups = groupsFromOfficialGroupsArray(data, participants);
-  const groups =
-    officialGroups.length > 0
-      ? officialGroups
-      : groupsFromGroupParticipants(data, participants);
-
-  const tournamentName =
-    typeof data.name === "string" && data.name.trim() ? data.name.trim() : null;
 
   return {
-    tournamentName,
-    groups,
+    ok: true as const,
+    preview: toPreview(normalized.normalized),
+    meta: normalized.normalized.meta,
   };
 }
 
@@ -144,10 +77,11 @@ export function hasMeinTurnierplanStructure(data: Record<string, unknown>) {
   const groupParticipants = data.groupParticipants;
 
   const hasParticipants =
-    participants &&
-    typeof participants === "object" &&
-    !Array.isArray(participants) &&
-    Object.keys(participants).length > 0;
+    (Array.isArray(participants) && participants.length > 0) ||
+    (participants &&
+      typeof participants === "object" &&
+      !Array.isArray(participants) &&
+      Object.keys(participants).length > 0);
   const hasGroups = Array.isArray(groups) && groups.length > 0;
   const hasGroupParticipants =
     Array.isArray(groupParticipants) && groupParticipants.length > 0;
@@ -179,6 +113,25 @@ export async function fetchMeinTurnierplanJson(
     });
 
     if (!response.ok) {
+      try {
+        const errorData = (await response.json()) as unknown;
+        if (
+          errorData &&
+          typeof errorData === "object" &&
+          !Array.isArray(errorData) &&
+          typeof (errorData as Record<string, unknown>).error === "string"
+        ) {
+          const message = ((errorData as Record<string, unknown>).error as string)
+            .trim()
+            .toLowerCase();
+          if (message.includes("not found")) {
+            return { ok: false, error: "id-not-found" };
+          }
+        }
+      } catch {
+        // fall through to unreachable
+      }
+
       return { ok: false, error: "unreachable" };
     }
 
@@ -188,6 +141,15 @@ export async function fetchMeinTurnierplanJson(
     }
 
     const record = data as Record<string, unknown>;
+    if (typeof record.error === "string" && record.error.trim()) {
+      const message = record.error.trim().toLowerCase();
+      if (message.includes("not found")) {
+        return { ok: false, error: "id-not-found" };
+      }
+
+      return { ok: false, error: "no-data" };
+    }
+
     if (!hasMeinTurnierplanStructure(record)) {
       return { ok: false, error: "no-data" };
     }
@@ -200,16 +162,24 @@ export async function fetchMeinTurnierplanJson(
   }
 }
 
-export function meinTurnierplanConnectionMessage(
-  error: MeinTurnierplanConnectionError,
-) {
+export function meinTurnierplanConnectionMessage(error: MeinTurnierplanConnectionError) {
   if (error === "unreachable") {
     return "MeinTurnierplan konnte nicht erreicht werden.";
   }
 
   if (error === "invalid-id") {
-    return "Bitte eine gültige MeinTurnierplan-Turnier-ID angeben.";
+    return "Bitte eine gültige numerische MeinTurnierplan-Turnier-ID angeben.";
   }
 
-  return "Für diese Turnier-ID konnten keine Turnierdaten geladen werden.";
+  if (error === "id-not-found") {
+    return "Für diese Turnier-ID wurden keine Turnierdaten gefunden. MeinTurnierplan json.php erwartet die öffentliche Turnierkennung (z. B. aus showit.php?id=… oder dem id-Parameter der Widget-URL), nicht die interne ID aus der JSON-Antwort.";
+  }
+
+  if (error === "no-data") {
+    return "Für diese numerische Turnier-ID konnten keine Turnierdaten geladen werden.";
+  }
+
+  return meinTurnierplanNormalizeMessage(error);
 }
+
+export { extractMeinTurnierplanSchemaVersion };

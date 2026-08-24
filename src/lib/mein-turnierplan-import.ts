@@ -48,18 +48,24 @@ export function suggestMeinTurnierplanMappings(
 }
 
 export function buildImportGroupsFromPreview(
-  previewGroups: Array<{ name: string; teams: string[] }>,
+  previewGroups: Array<{ name: string; teams: Array<string | { name: string }> }>,
   acceptedTeams: HubAcceptedTeam[],
 ): MeinTurnierplanImportGroup[] {
-  return previewGroups.map((group) => ({
-    name: group.name,
-    assignments: suggestMeinTurnierplanMappings(group.teams, acceptedTeams).map(
-      (item) => ({
-        mtpTeamName: item.mtpTeamName,
-        applicationId: item.suggestedApplicationId,
-      }),
-    ),
-  }));
+  return previewGroups.map((group) => {
+    const teamNames = group.teams.map((team) =>
+      typeof team === "string" ? team : team.name,
+    );
+
+    return {
+      name: group.name,
+      assignments: suggestMeinTurnierplanMappings(teamNames, acceptedTeams).map(
+        (item) => ({
+          mtpTeamName: item.mtpTeamName,
+          applicationId: item.suggestedApplicationId,
+        }),
+      ),
+    };
+  });
 }
 
 function assert(condition: unknown, message: string) {

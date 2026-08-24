@@ -20,6 +20,7 @@ import { getAppSettings } from "@/lib/settings";
 import { nonempty } from "@/lib/text";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import {
+  hasMeinTurnierplanLivePresentation,
   isHybridLiveDataSource,
   isMeinTurnierplanPublic,
   showsMeinTurnierplanLiveTab,
@@ -270,7 +271,7 @@ export default async function TournamentDetailPage({
             meinTurnierplanHybrid={meinTurnierplanHybrid}
             publicScheduleNote={tournament.publicScheduleNote}
             livePresentation={
-              showLiveTab && tournament.meinTurnierplanUrl
+              showLiveTab && hasMeinTurnierplanLivePresentation(tournament)
                 ? {
                     tournamentName: tournament.name,
                     tournamentDate: tournament.date,

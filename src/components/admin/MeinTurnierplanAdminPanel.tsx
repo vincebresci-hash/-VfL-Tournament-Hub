@@ -73,6 +73,8 @@ export function MeinTurnierplanAdminPanel({
       <MeinTurnierplanAdminTools
         tournamentId={tournament.id}
         tournamentIdValue={tournament.meinTurnierplanTournamentId ?? ""}
+        matchesWidgetUrl={tournament.meinTurnierplanMatchesWidgetUrl}
+        tableWidgetUrl={tournament.meinTurnierplanTableWidgetUrl}
         hasWidgetUrl={Boolean(
           tournament.meinTurnierplanMatchesWidgetUrl?.trim() ||
             tournament.meinTurnierplanTableWidgetUrl?.trim(),

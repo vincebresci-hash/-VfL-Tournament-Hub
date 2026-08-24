@@ -10,6 +10,7 @@ import { isNumericMeinTurnierplanTournamentId } from "@/lib/mein-turnierplan";
 import { hubTeamLabel } from "@/lib/mein-turnierplan-import";
 import type { MeinTurnierplanImportGroup } from "@/lib/mein-turnierplan-import";
 import type { MeinTurnierplanPreview } from "@/lib/mein-turnierplan-api";
+import type { MeinTurnierplanRawMeta } from "@/lib/mein-turnierplan-normalize";
 import type { AdminApplication } from "@/types/application";
 
 type AcceptedTeamOption = {
@@ -20,17 +21,21 @@ type AcceptedTeamOption = {
 type MeinTurnierplanAdminToolsProps = {
   tournamentId: string;
   tournamentIdValue: string;
+  matchesWidgetUrl?: string | null;
+  tableWidgetUrl?: string | null;
   acceptedTeams: AcceptedTeamOption[];
   hasWidgetUrl?: boolean;
   onImportComplete?: () => void;
 };
 
 const NUMERIC_ID_REQUIRED_HINT =
-  "Für diese Funktion wird zusätzlich die numerische MeinTurnierplan Turnier-ID benötigt.";
+  "Für diese Funktion wird die numerische MeinTurnierplan Turnier-ID oder eine hinterlegte Widget-URL benötigt.";
 
 export function MeinTurnierplanAdminTools({
   tournamentId,
   tournamentIdValue,
+  matchesWidgetUrl,
+  tableWidgetUrl,
   acceptedTeams,
   hasWidgetUrl = false,
   onImportComplete,
@@ -42,6 +47,7 @@ export function MeinTurnierplanAdminTools({
   const [notice, setNotice] = useState<string | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
   const [preview, setPreview] = useState<MeinTurnierplanPreview | null>(null);
+  const [previewMeta, setPreviewMeta] = useState<MeinTurnierplanRawMeta | null>(null);
   const [mappingGroups, setMappingGroups] = useState<MeinTurnierplanImportGroup[]>(
     [],
   );
@@ -49,6 +55,11 @@ export function MeinTurnierplanAdminTools({
 
   const trimmedId = tournamentIdValue.trim();
   const hasNumericId = isNumericMeinTurnierplanTournamentId(trimmedId);
+  const canQueryJson = hasNumericId || hasWidgetUrl;
+  const widgetOptions = {
+    matchesWidgetUrl,
+    tableWidgetUrl,
+  };
 
   const acceptedOptions = useMemo(
     () =>
@@ -60,7 +71,7 @@ export function MeinTurnierplanAdminTools({
   );
 
   async function handleCheckConnection() {
-    if (!hasNumericId) {
+    if (!canQueryJson) {
       setError(NUMERIC_ID_REQUIRED_HINT);
       return;
     }
@@ -70,7 +81,7 @@ export function MeinTurnierplanAdminTools({
     setNotice(null);
     setConnectionOk(null);
 
-    const result = await checkMeinTurnierplanConnectionAction(trimmedId);
+    const result = await checkMeinTurnierplanConnectionAction(trimmedId, widgetOptions);
     setChecking(false);
 
     if (result.error) {
@@ -84,7 +95,7 @@ export function MeinTurnierplanAdminTools({
   }
 
   async function handleLoadPreview() {
-    if (!hasNumericId) {
+    if (!canQueryJson) {
       setError(NUMERIC_ID_REQUIRED_HINT);
       return;
     }
@@ -93,6 +104,7 @@ export function MeinTurnierplanAdminTools({
     setError(null);
     setNotice(null);
     setPreview(null);
+    setPreviewMeta(null);
     setMappingGroups([]);
     setShowImport(false);
 
@@ -108,6 +120,7 @@ export function MeinTurnierplanAdminTools({
     }
 
     setPreview(result.preview);
+    setPreviewMeta(result.meta);
     setMappingGroups(result.mappingGroups ?? []);
     setNotice("Gruppen- und Team-Vorschau geladen. Es wurde nichts gespeichert.");
   }
@@ -158,8 +171,9 @@ export function MeinTurnierplanAdminTools({
     <div className="mt-5 grid gap-4">
       {hasWidgetUrl && !hasNumericId ? (
         <p className="border border-line bg-white px-4 py-3 text-[13px] leading-6 text-muted">
-          Live-Widgets funktionieren mit den hinterlegten Widget-URLs.{" "}
-          {NUMERIC_ID_REQUIRED_HINT}
+          Live-Widgets funktionieren mit den hinterlegten Widget-URLs. Für Gruppen &
+          Teams wird die numerische Turnier-ID oder der id-Parameter der Widget-URL
+          verwendet.
         </p>
       ) : null}
 
@@ -201,10 +215,33 @@ export function MeinTurnierplanAdminTools({
       {preview ? (
         <section className="border border-line bg-white p-5">
           <h3 className="font-display text-base font-bold tracking-wide text-ink uppercase">
-            MeinTurnierplan
+            MeinTurnierplan Rohdaten erkannt
           </h3>
-          <p className="mt-3 text-[14px] text-ink">
+          {previewMeta ? (
+            <dl className="mt-3 grid gap-2 text-[13px] text-muted sm:grid-cols-2">
+              <div>
+                <dt className="font-semibold text-ink">Schema/Version</dt>
+                <dd>{previewMeta.schemaVersion ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-ink">Gruppen</dt>
+                <dd>{previewMeta.groupCount}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-ink">Teams gesamt</dt>
+                <dd>{previewMeta.teamCount}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-ink">Teilnehmer erkannt</dt>
+                <dd>{previewMeta.participantCount}</dd>
+              </div>
+            </dl>
+          ) : null}
+          <p className="mt-4 text-[14px] text-ink">
             Turnier: {preview.tournamentName?.trim() ? preview.tournamentName : "—"}
+          </p>
+          <p className="mt-4 text-[13px] font-semibold tracking-[0.08em] text-ink uppercase">
+            Normalisierte Vorschau
           </p>
 
           {preview.groups.length === 0 ? (
@@ -223,8 +260,8 @@ export function MeinTurnierplanAdminTools({
                   ) : (
                     <ul className="mt-2 grid gap-1">
                       {group.teams.map((team) => (
-                        <li key={`${group.name}-${team}`} className="text-[14px] text-ink">
-                          {team}
+                        <li key={`${group.name}-${team.id}`} className="text-[14px] text-ink">
+                          {team.name}
                         </li>
                       ))}
                     </ul>

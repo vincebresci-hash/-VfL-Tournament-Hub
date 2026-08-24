@@ -137,6 +137,64 @@ export function isNumericMeinTurnierplanTournamentId(value: string) {
   return NUMERIC_TOURNAMENT_ID_PATTERN.test(trimmed);
 }
 
+export function extractMeinTurnierplanWidgetIdFromUrl(value: string) {
+  for (const kind of ["matches", "table"] as const) {
+    const validated = validateMeinTurnierplanWidgetUrl(value, kind);
+    if (!validated.url) {
+      continue;
+    }
+
+    try {
+      const id = new URL(validated.url).searchParams.get("id")?.trim() ?? "";
+      if (id) {
+        return id;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+export function resolveMeinTurnierplanJsonQueryId(input: {
+  tournamentId?: string | null;
+  matchesWidgetUrl?: string | null;
+  tableWidgetUrl?: string | null;
+}) {
+  const trimmedId = input.tournamentId?.trim() ?? "";
+  if (trimmedId) {
+    if (isNumericMeinTurnierplanTournamentId(trimmedId)) {
+      return { queryId: trimmedId, source: "tournament-id" as const, error: null };
+    }
+
+    return {
+      queryId: null,
+      source: null,
+      error:
+        "Die Turnier-ID darf nur Ziffern (0–9) enthalten und ist getrennt von öffentlichen Widget-IDs.",
+    };
+  }
+
+  const widgetId =
+    (input.matchesWidgetUrl
+      ? extractMeinTurnierplanWidgetIdFromUrl(input.matchesWidgetUrl)
+      : null) ??
+    (input.tableWidgetUrl
+      ? extractMeinTurnierplanWidgetIdFromUrl(input.tableWidgetUrl)
+      : null);
+
+  if (widgetId) {
+    return { queryId: widgetId, source: "widget-url" as const, error: null };
+  }
+
+  return {
+    queryId: null,
+    source: null,
+    error: "Bitte die numerische MeinTurnierplan-Turnier-ID oder eine Widget-URL angeben.",
+  };
+}
+
 export function validateMeinTurnierplanTournamentId(
   value: string,
   options?: { required?: boolean },
@@ -222,15 +280,33 @@ export function validateMeinTurnierplanInput(input: {
   }
 
   if (input.enabled && !trimmedUrl) {
-    return {
-      error:
-        "Wenn MeinTurnierplan aktiv ist, ist ein gültiger MeinTurnierplan-Link erforderlich.",
-      url: null,
-      liveDataSource,
-      tournamentId: null,
-      matchesWidgetUrl: null,
-      tableWidgetUrl: null,
-    };
+    const matchesWidgetDraft = validateMeinTurnierplanWidgetUrl(
+      input.matchesWidgetUrl ?? "",
+      "matches",
+    );
+    const tableWidgetDraft = validateMeinTurnierplanWidgetUrl(
+      input.tableWidgetUrl ?? "",
+      "table",
+    );
+    const usesLiveModes =
+      liveDataSource === "mein-turnierplan" || liveDataSource === "hybrid";
+    const hasWidget = Boolean(matchesWidgetDraft.url || tableWidgetDraft.url);
+
+    if (usesLiveModes && hasWidget) {
+      // Widget-only configuration is valid for live/hybrid modes.
+    } else {
+      return {
+        error:
+          liveDataSource === "hub"
+            ? "Wenn MeinTurnierplan aktiv ist, ist ein gültiger MeinTurnierplan-Link erforderlich."
+            : "Wenn MeinTurnierplan aktiv ist, ist mindestens ein Präsentations-Link oder eine Widget-URL erforderlich.",
+        url: null,
+        liveDataSource,
+        tournamentId: null,
+        matchesWidgetUrl: null,
+        tableWidgetUrl: null,
+      };
+    }
   }
 
   let tournamentId: string | null = null;
@@ -374,6 +450,22 @@ export function isHybridLiveDataSource(tournament: MeinTurnierplanFields) {
   );
 }
 
+export function hasMeinTurnierplanWidgetUrl(tournament: MeinTurnierplanFields) {
+  return Boolean(
+    tournament.meinTurnierplanMatchesWidgetUrl?.trim() ||
+      tournament.meinTurnierplanTableWidgetUrl?.trim(),
+  );
+}
+
+export function hasMeinTurnierplanLivePresentation(tournament: MeinTurnierplanFields) {
+  return (
+    isSafeHttpUrl(tournament.meinTurnierplanUrl ?? "") || hasMeinTurnierplanWidgetUrl(tournament)
+  );
+}
+
+export const MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL =
+  "https://www.meinturnierplan.de/displayMatches.php?id=2jrb0hvxvd&s[size]=9&s[sizeheader]=10&s[color]=000000&s[maincolor]=173f75&s[padding]=2&s[innerpadding]=5&s[bgcolor]=00000000&s[bcolor]=bbbbbb&s[bsizeh]=1&s[bsizev]=1&s[bsizeoh]=1&s[bsizeov]=1&s[bbcolor]=bbbbbb&s[bbsize]=2&s[bgeven]=f0f8ffb0&s[bgodd]=ffffffb0&s[bgover]=eeeeffb0&s[bghead]=eeeeffff&s[ehrsize]=10&s[ehrtop]=9&s[ehrbottom]=3&s[wrap]=false";
+
 export function meinTurnierplanAriaLabel(
   tournamentName: string,
   buttonLabel: string,
@@ -503,14 +595,57 @@ export function runMeinTurnierplanSelfChecks() {
     "ungültige URL muss fehlschlagen",
   );
   assert(
+    validateMeinTurnierplanWidgetUrl(MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL, "matches")
+      .error === null,
+    "echte displayMatches-Widget-URL muss gültig sein",
+  );
+  const realWidget = validateMeinTurnierplanWidgetUrl(
+    MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL,
+    "matches",
+  ).url;
+  assert(Boolean(realWidget?.includes("id=2jrb0hvxvd")), "Widget-ID muss erhalten bleiben");
+  assert(Boolean(realWidget?.includes("s[size]=9")), "s[size] muss erhalten bleiben");
+  assert(Boolean(realWidget?.includes("s[maincolor]=173f75")), "s[maincolor] muss erhalten bleiben");
+  assert(Boolean(realWidget?.includes("s[wrap]=false")), "s[wrap] muss erhalten bleiben");
+  assert(
     validateMeinTurnierplanInput({
       enabled: true,
-      url: "https://www.meinturnierplan.de/showit.php?id=2jrb0hvxvdabc",
-      liveDataSource: "hybrid",
-      matchesWidgetUrl:
-        "https://www.meinturnierplan.de/displayMatches.php?id=2jrb0hvxvdabc",
+      url: "",
+      liveDataSource: "mein-turnierplan",
+      matchesWidgetUrl: MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL,
     }).error === null,
-    "hybrid mit Widget-URL ohne numerische Turnier-ID muss speicherbar sein",
+    "Test A: Widget-only speichern muss möglich sein",
+  );
+  assert(
+    validateMeinTurnierplanInput({
+      enabled: true,
+      url: "",
+      liveDataSource: "hybrid",
+      matchesWidgetUrl: MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL,
+      tableWidgetUrl: "",
+    }).error === null,
+    "Test C: leeres Tabellen-Widget darf keinen Fehler erzeugen",
+  );
+  assert(
+    hasMeinTurnierplanLivePresentation({
+      meinTurnierplanEnabled: true,
+      meinTurnierplanUrl: null,
+      meinTurnierplanMatchesWidgetUrl: MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL,
+    }),
+    "Widget-only muss Live-Darstellung ermöglichen",
+  );
+  const widgetJsonId = resolveMeinTurnierplanJsonQueryId({
+    matchesWidgetUrl: MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL,
+  });
+  assert(widgetJsonId.queryId === "2jrb0hvxvd", "Widget-id muss für JSON-Fallback extrahierbar sein");
+  assert(
+    resolveMeinTurnierplanJsonQueryId({ tournamentId: "634249" }).queryId === "634249",
+    "numerische Turnier-ID muss direkt verwendet werden",
+  );
+  assert(
+    extractMeinTurnierplanWidgetIdFromUrl(MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL) ===
+      "2jrb0hvxvd",
+    "Widget-ID aus URL muss extrahierbar sein",
   );
   assert(
     validateMeinTurnierplanInput({

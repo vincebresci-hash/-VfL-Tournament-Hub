@@ -11,7 +11,7 @@ type MeinTurnierplanLiveSectionProps = {
   tournamentName: string;
   tournamentDate: string;
   tournamentStatus: TournamentStatus;
-  presentationUrl: string;
+  presentationUrl?: string | null;
   customLabel?: string | null;
   matchesWidgetUrl?: string | null;
   tableWidgetUrl?: string | null;
@@ -77,7 +77,7 @@ export function MeinTurnierplanLiveSection({
             }
           />
         </div>
-      ) : (
+      ) : presentationUrl ? (
         <div className="mt-5">
           <MeinTurnierplanPublicButton
             tournamentName={tournamentName}
@@ -87,6 +87,10 @@ export function MeinTurnierplanLiveSection({
             customLabel={customLabel}
           />
         </div>
+      ) : (
+        <p className="mt-5 border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+          Für diesen Bereich ist noch keine MeinTurnierplan-Widget-URL hinterlegt.
+        </p>
       )}
     </section>
   );

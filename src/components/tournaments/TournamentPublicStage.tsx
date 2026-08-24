@@ -46,7 +46,7 @@ type TournamentPublicStageProps = {
     tournamentName: string;
     tournamentDate: string;
     tournamentStatus: TournamentStatus;
-    presentationUrl: string;
+    presentationUrl?: string | null;
     customLabel?: string | null;
     matchesWidgetUrl?: string | null;
     tableWidgetUrl?: string | null;

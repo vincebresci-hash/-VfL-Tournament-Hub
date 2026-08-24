@@ -7,6 +7,7 @@ type MeinTurnierplanWidgetProps = {
   title: string;
   loadLabel: string;
   privacyHint?: string;
+  minHeight?: number;
 };
 
 export function MeinTurnierplanWidget({
@@ -14,6 +15,7 @@ export function MeinTurnierplanWidget({
   title,
   loadLabel,
   privacyHint,
+  minHeight = 750,
 }: MeinTurnierplanWidgetProps) {
   const [loaded, setLoaded] = useState(false);
 
@@ -37,13 +39,14 @@ export function MeinTurnierplanWidget({
 
   return (
     <div className="overflow-hidden border border-line bg-white">
-      <div className="relative aspect-[4/3] w-full min-h-[420px] sm:aspect-[16/10]">
+      <div className="w-full" style={{ minHeight: `${minHeight}px` }}>
         <iframe
           src={url}
           title={title}
           loading="lazy"
           referrerPolicy="strict-origin-when-cross-origin"
-          className="absolute inset-0 h-full w-full border-0"
+          className="block h-full w-full border-0"
+          style={{ minHeight: `${minHeight}px`, width: "100%" }}
         />
       </div>
     </div>
