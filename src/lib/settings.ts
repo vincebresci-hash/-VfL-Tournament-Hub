@@ -20,6 +20,7 @@ export const APP_SETTING_KEYS = {
 export const defaultAppSettings: AppSettings = {
   platformName: APP_NAME,
   organizerName: CLUB_NAME,
+  // Leer lassen: öffentliche Anzeige nutzt die Fallbacks aus src/data/club.ts
   contactEmail: "",
   contactPhone: "",
   applicationsEnabled: true,

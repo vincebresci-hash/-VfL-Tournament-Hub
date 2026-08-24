@@ -10,8 +10,7 @@ import {
   IconShield,
 } from "@/components/ui/icons";
 
-const heroImageAlt =
-  "Jugendmannschaft des VfL Kirchheim mit Vereinsfahne im Sportpark Kirchheim";
+const heroImageAlt = "Jugendmannschaft des VfL Kirchheim/Teck";
 
 export function Hero() {
   return (
@@ -39,7 +38,7 @@ export function Hero() {
               <span className="block text-brand-yellow">Zukunft.</span>
             </h1>
             <p className="mt-5 max-w-md text-[15px] leading-7 text-white/74 sm:text-base">
-              Der offizielle Tournament Hub des VfL Kirchheim.
+              Der Tournament Hub des VfL Kirchheim/Teck.
               Einfach bewerben, schnell Rückmeldung erhalten.
             </p>
 
@@ -72,7 +71,7 @@ export function Hero() {
               <FeatureItem
                 icon={<IconShield className="h-5 w-5" />}
                 title="Fair & Transparent"
-                description="Klare Auswahl nach sportlichen Kriterien"
+                description="Bewerbung, Status und Rückmeldung im Hub"
               />
             </div>
           </div>
