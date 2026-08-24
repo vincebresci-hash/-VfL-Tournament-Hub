@@ -20,7 +20,6 @@ import { getAppSettings } from "@/lib/settings";
 import { nonempty } from "@/lib/text";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import {
-  hasMeinTurnierplanLivePresentation,
   isHybridLiveDataSource,
   isMeinTurnierplanPublic,
   showsMeinTurnierplanLiveTab,
@@ -271,7 +270,7 @@ export default async function TournamentDetailPage({
             meinTurnierplanHybrid={meinTurnierplanHybrid}
             publicScheduleNote={tournament.publicScheduleNote}
             livePresentation={
-              showLiveTab && hasMeinTurnierplanLivePresentation(tournament)
+              showLiveTab
                 ? {
                     tournamentName: tournament.name,
                     tournamentDate: tournament.date,
@@ -281,6 +280,7 @@ export default async function TournamentDetailPage({
                     matchesWidgetUrl: tournament.meinTurnierplanMatchesWidgetUrl,
                     tableWidgetUrl: tournament.meinTurnierplanTableWidgetUrl,
                     publicLiveNote: tournament.publicLiveNote,
+                    meinTurnierplanEmbedUrl: tournament.meinTurnierplanEmbedUrl,
                   }
                 : null
             }

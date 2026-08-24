@@ -51,6 +51,7 @@ type TournamentPublicStageProps = {
     matchesWidgetUrl?: string | null;
     tableWidgetUrl?: string | null;
     publicLiveNote?: string | null;
+    meinTurnierplanEmbedUrl?: string | null;
   } | null;
 };
 
@@ -341,7 +342,7 @@ export function TournamentPublicStage({
           ) : null}
         </section>
       ) : null}
-      {current === "live" && livePresentation ? (
+      {current === "live" && showLiveTab && livePresentation ? (
         <MeinTurnierplanLiveSection
           slug={slug}
           section={liveView}
@@ -353,6 +354,7 @@ export function TournamentPublicStage({
           matchesWidgetUrl={livePresentation.matchesWidgetUrl}
           tableWidgetUrl={livePresentation.tableWidgetUrl}
           publicLiveNote={livePresentation.publicLiveNote}
+          meinTurnierplanEmbedUrl={livePresentation.meinTurnierplanEmbedUrl}
         />
       ) : null}
     </div>
