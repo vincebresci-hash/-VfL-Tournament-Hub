@@ -18,6 +18,7 @@ import { settingsToRows } from "@/lib/settings";
 import { sendApplicationStatusEmail } from "@/lib/email/status-mail";
 import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
 import { slugifyTournamentName } from "@/lib/tournaments";
+import { validateMeinTurnierplanInput } from "@/lib/mein-turnierplan";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -462,6 +463,10 @@ function parseTournamentInput(input: AdminTournamentInput): {
     changing_rooms: string | null;
     catering: string | null;
     team_info: string | null;
+    mein_turnierplan_url: string | null;
+    mein_turnierplan_enabled: boolean;
+    mein_turnierplan_label: string | null;
+    mein_turnierplan_embed_url: string | null;
   } | null;
 } {
   const name = input.name.trim();
@@ -499,6 +504,15 @@ function parseTournamentInput(input: AdminTournamentInput): {
     return { error: "Bitte einen gültigen Jahrgang angeben.", value: null };
   }
 
+  const meinTurnierplan = validateMeinTurnierplanInput({
+    enabled: Boolean(input.meinTurnierplanEnabled),
+    url: input.meinTurnierplanUrl,
+  });
+
+  if (meinTurnierplan.error) {
+    return { error: meinTurnierplan.error, value: null };
+  }
+
   return {
     error: null,
     value: {
@@ -528,6 +542,10 @@ function parseTournamentInput(input: AdminTournamentInput): {
       changing_rooms: parseOptionalText(input.changingRooms),
       catering: parseOptionalText(input.catering),
       team_info: parseOptionalText(input.teamInfo),
+      mein_turnierplan_url: meinTurnierplan.url,
+      mein_turnierplan_enabled: Boolean(input.meinTurnierplanEnabled),
+      mein_turnierplan_label: parseOptionalText(input.meinTurnierplanLabel),
+      mein_turnierplan_embed_url: null,
     },
   };
 }

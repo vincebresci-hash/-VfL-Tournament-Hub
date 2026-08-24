@@ -235,6 +235,10 @@ export type AdminTournamentRecord = {
   changingRooms: string | null;
   catering: string | null;
   teamInfo: string | null;
+  meinTurnierplanUrl: string | null;
+  meinTurnierplanEnabled: boolean;
+  meinTurnierplanLabel: string | null;
+  meinTurnierplanEmbedUrl: string | null;
 };
 
 export type AdminTournamentInput = {
@@ -264,4 +268,7 @@ export type AdminTournamentInput = {
   changingRooms: string;
   catering: string;
   teamInfo: string;
+  meinTurnierplanEnabled: boolean;
+  meinTurnierplanUrl: string;
+  meinTurnierplanLabel: string;
 };

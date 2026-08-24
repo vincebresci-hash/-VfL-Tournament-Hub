@@ -9,6 +9,8 @@ import {
 import { getDisplayCapacity } from "@/lib/public-tournament";
 import { formatDateDe, formatDateTimeDe } from "@/lib/format";
 import { tournamentStatusClassName } from "@/lib/tournament-status";
+import { MeinTurnierplanBadge } from "@/components/tournaments/MeinTurnierplanPublicButton";
+import { isMeinTurnierplanPublic } from "@/lib/mein-turnierplan";
 import { cn } from "@/lib/cn";
 import type { PublicTournament } from "@/types/tournament";
 
@@ -37,6 +39,7 @@ export function TournamentCard({
   });
   const capacity = getDisplayCapacity(tournament);
   const href = `/turniere/${tournament.slug}`;
+  const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-[12px] border border-line bg-white shadow-[0_1px_2px_rgba(16,20,28,0.04)] transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-1 hover:border-navy/12 hover:shadow-[0_8px_20px_rgba(16,20,28,0.06)]">
@@ -77,6 +80,14 @@ export function TournamentCard({
 
           <div className="mt-3 flex flex-wrap gap-2">
             <StatusBadge status={tournament.status} />
+            {showMeinTurnierplan ? (
+              <MeinTurnierplanBadge
+                date={tournament.date}
+                status={tournament.status}
+                meinTurnierplanEnabled={tournament.meinTurnierplanEnabled}
+                meinTurnierplanUrl={tournament.meinTurnierplanUrl}
+              />
+            ) : null}
             <span
               className={cn(
                 "inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase",

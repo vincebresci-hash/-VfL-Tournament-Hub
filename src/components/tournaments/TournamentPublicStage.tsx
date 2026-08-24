@@ -31,6 +31,7 @@ type TournamentPublicStageProps = {
   tab?: string;
   overview: ReactNode | null;
   tournamentStatus?: TournamentStatus;
+  meinTurnierplanActive?: boolean;
 };
 
 function asTab(value: string | undefined): PublicTab {
@@ -47,6 +48,7 @@ export function TournamentPublicStage({
   tab,
   overview,
   tournamentStatus,
+  meinTurnierplanActive = false,
 }: TournamentPublicStageProps) {
   const knockoutMatches = stage.matches.filter((match) => match.phase === "knockout");
   const groupMatches = stage.matches.filter((match) => match.phase !== "knockout");
@@ -75,6 +77,14 @@ export function TournamentPublicStage({
 
   return (
     <div>
+      {meinTurnierplanActive ? (
+        <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+          Für den Live-Spieltag ist MeinTurnierplan der primäre Spielplan. Die
+          Bereiche unten zeigen zusätzlich die im Tournament Hub hinterlegten
+          Gruppen, den internen Spielplan und Ergebnisse.
+        </p>
+      ) : null}
+
       {showTabs ? (
         <nav className="mt-10 flex flex-wrap gap-2" aria-label="Turnierbereiche">
           {visibleTabs.map((item) => (

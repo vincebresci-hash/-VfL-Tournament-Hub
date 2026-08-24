@@ -3,6 +3,7 @@ import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadg
 import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
 import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
+import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
 import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
 import { applicationStatusLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
@@ -63,6 +64,8 @@ export function AdminTournamentDetailView({
         <AdminCard title="Kapazität">
           <TournamentCapacityForm slug={tournament.slug} maxTeams={tournament.maxTeams} />
         </AdminCard>
+
+        <MeinTurnierplanAdminPanel tournament={tournament} />
 
         <div id="teilnehmer">
           <TournamentParticipantsPanel participants={participants} />

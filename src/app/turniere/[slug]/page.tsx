@@ -18,6 +18,8 @@ import {
 import { filledPublicInfo, getDisplayCapacity } from "@/lib/public-tournament";
 import { getAppSettings } from "@/lib/settings";
 import { nonempty } from "@/lib/text";
+import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
+import { isMeinTurnierplanPublic } from "@/lib/mein-turnierplan";
 import { tournamentStatusClassName } from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
@@ -79,6 +81,7 @@ export default async function TournamentDetailPage({
   const longDescription = nonempty(tournament.description);
   const capacity = getDisplayCapacity(tournament);
   const extraInfo = filledPublicInfo(tournament);
+  const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
   const facts = [
     tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
     tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
@@ -195,6 +198,16 @@ export default async function TournamentDetailPage({
             </div>
           </div>
 
+          {showMeinTurnierplan ? (
+            <MeinTurnierplanPublicButton
+              tournamentName={tournament.name}
+              tournamentDate={tournament.date}
+              tournamentStatus={tournament.status}
+              url={tournament.meinTurnierplanUrl}
+              customLabel={tournament.meinTurnierplanLabel}
+            />
+          ) : null}
+
           {facts.length > 0 ? (
             <dl className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {facts.map((fact) => (
@@ -239,6 +252,7 @@ export default async function TournamentDetailPage({
             stage={stage}
             tab={tab}
             tournamentStatus={tournament.status}
+            meinTurnierplanActive={showMeinTurnierplan}
             overview={
               stage.roster.length > 0 ? (
             <section>

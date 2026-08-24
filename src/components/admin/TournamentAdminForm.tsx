@@ -6,6 +6,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { ageGroupImageSrc, slugifyTournamentName } from "@/lib/tournaments";
+import { MEIN_TURNIERPLAN_DEFAULT_LABEL } from "@/lib/mein-turnierplan";
 import {
   archiveTournamentAction,
   createTournamentAction,
@@ -49,6 +50,9 @@ const emptyValues: AdminTournamentInput = {
   changingRooms: "",
   catering: "",
   teamInfo: "",
+  meinTurnierplanEnabled: false,
+  meinTurnierplanUrl: "",
+  meinTurnierplanLabel: "",
 };
 
 function toDateTimeLocal(value: string | null | undefined) {
@@ -89,6 +93,9 @@ function recordToInput(tournament: AdminTournamentRecord): AdminTournamentInput 
     changingRooms: tournament.changingRooms ?? "",
     catering: tournament.catering ?? "",
     teamInfo: tournament.teamInfo ?? "",
+    meinTurnierplanEnabled: tournament.meinTurnierplanEnabled,
+    meinTurnierplanUrl: tournament.meinTurnierplanUrl ?? "",
+    meinTurnierplanLabel: tournament.meinTurnierplanLabel ?? "",
   };
 }
 
@@ -476,6 +483,58 @@ export function TournamentAdminForm({
               rows={4}
               value={values.teamInfo}
               onChange={(event) => update("teamInfo", event.target.value)}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section className="border border-line bg-white p-5 sm:p-6">
+        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+          MeinTurnierplan
+        </h2>
+        <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted">
+          Optionaler externer Live-Spielplan für den Spieltag. Es findet keine
+          automatische Synchronisation mit dem internen Spielplan statt.
+        </p>
+        <div className="mt-5 grid gap-5">
+          <label
+            htmlFor="tournament-mtp-enabled"
+            className="flex items-center justify-between gap-4 border border-line px-4 py-3"
+          >
+            <span className="text-[14px] text-ink">MeinTurnierplan verwenden</span>
+            <input
+              id="tournament-mtp-enabled"
+              type="checkbox"
+              checked={values.meinTurnierplanEnabled}
+              onChange={(event) =>
+                update("meinTurnierplanEnabled", event.target.checked)
+              }
+              className="h-4 w-4 accent-brand-yellow"
+            />
+          </label>
+          <Field
+            id="tournament-mtp-url"
+            label="MeinTurnierplan-Link"
+            hint="Nur http:// oder https://. Beispiel: https://meinturnierplan.de/…"
+          >
+            <TextInput
+              id="tournament-mtp-url"
+              inputMode="url"
+              value={values.meinTurnierplanUrl}
+              onChange={(event) => update("meinTurnierplanUrl", event.target.value)}
+            />
+          </Field>
+          <Field
+            id="tournament-mtp-label"
+            label="Button-Beschriftung"
+            optional
+            hint={`Standard bei leerem Feld: ${MEIN_TURNIERPLAN_DEFAULT_LABEL} bzw. phasenabhängige Texte auf der Turnierseite.`}
+          >
+            <TextInput
+              id="tournament-mtp-label"
+              value={values.meinTurnierplanLabel}
+              placeholder={MEIN_TURNIERPLAN_DEFAULT_LABEL}
+              onChange={(event) => update("meinTurnierplanLabel", event.target.value)}
             />
           </Field>
         </div>

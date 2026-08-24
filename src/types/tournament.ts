@@ -52,6 +52,10 @@ export type Tournament = {
   archivedAt: string | null;
   availableSlots: number;
   isFull: boolean;
+  meinTurnierplanUrl: string | null;
+  meinTurnierplanEnabled: boolean;
+  meinTurnierplanLabel: string | null;
+  meinTurnierplanEmbedUrl: string | null;
 } & TournamentPublicInfo;
 
 export type PublicTournament = Omit<Tournament, "applicationsCount">;

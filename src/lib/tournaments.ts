@@ -50,6 +50,10 @@ const TOURNAMENT_SELECT = [
   "minimum_rest_minutes",
   "lunch_break_start",
   "lunch_break_end",
+  "mein_turnierplan_url",
+  "mein_turnierplan_enabled",
+  "mein_turnierplan_label",
+  "mein_turnierplan_embed_url",
 ].join(", ");
 
 const TOURNAMENT_SELECT_BASIC = [
@@ -232,6 +236,10 @@ export function toTournamentFromRow(
     archivedAt: row.archived_at ?? null,
     availableSlots: Number.isFinite(availableSlots) ? availableSlots : 0,
     isFull: isTournamentFull(row.max_teams, confirmedTeams),
+    meinTurnierplanUrl: nonempty(row.mein_turnierplan_url),
+    meinTurnierplanEnabled: asBoolean(row.mein_turnierplan_enabled, false),
+    meinTurnierplanLabel: nonempty(row.mein_turnierplan_label),
+    meinTurnierplanEmbedUrl: nonempty(row.mein_turnierplan_embed_url),
     ...publicInfoFromRow(row),
   };
 }
@@ -271,6 +279,10 @@ export function toAdminTournamentRecord(row: TournamentRow): AdminTournamentReco
     changingRooms: nonempty(row.changing_rooms),
     catering: nonempty(row.catering),
     teamInfo: nonempty(row.team_info),
+    meinTurnierplanUrl: nonempty(row.mein_turnierplan_url),
+    meinTurnierplanEnabled: asBoolean(row.mein_turnierplan_enabled, false),
+    meinTurnierplanLabel: nonempty(row.mein_turnierplan_label),
+    meinTurnierplanEmbedUrl: nonempty(row.mein_turnierplan_embed_url),
   };
 }
 
@@ -312,6 +324,10 @@ export function toBoardTournament(record: AdminTournamentRecord): Tournament {
     changingRooms: record.changingRooms,
     catering: record.catering,
     teamInfo: record.teamInfo,
+    meinTurnierplanUrl: record.meinTurnierplanUrl,
+    meinTurnierplanEnabled: record.meinTurnierplanEnabled,
+    meinTurnierplanLabel: record.meinTurnierplanLabel,
+    meinTurnierplanEmbedUrl: record.meinTurnierplanEmbedUrl,
   };
 }
 

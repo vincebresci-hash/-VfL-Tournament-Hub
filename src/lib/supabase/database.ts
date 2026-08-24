@@ -97,6 +97,10 @@ export type TournamentRow = {
   changing_rooms?: string | null;
   catering?: string | null;
   team_info?: string | null;
+  mein_turnierplan_url?: string | null;
+  mein_turnierplan_enabled?: boolean;
+  mein_turnierplan_label?: string | null;
+  mein_turnierplan_embed_url?: string | null;
   created_at: string;
   updated_at: string;
 };
