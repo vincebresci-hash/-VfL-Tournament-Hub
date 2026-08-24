@@ -1,8 +1,14 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { CoverImage } from "@/components/brand/CoverImage";
+import {
+  CLUB_CITY_LONG,
+  CLUB_NAME,
+  TOURNAMENT_VENUE_INDOOR_GENERIC,
+  TOURNAMENT_VENUE_OUTDOOR,
+} from "@/data/club";
 import { media } from "@/lib/constants";
-import Link from "next/link";
 
 export const metadata: Metadata = { title: "Unsere Anlage" };
 
@@ -10,11 +16,11 @@ export default function AnlagePage() {
   return (
     <ContentPage
       title="Unsere Anlage"
-      description="Jugendturniere des VfL Kirchheim finden im Sportpark Kirchheim statt. Konkrete Hinweise zu Anfahrt, Parken und Abläufen stehen in den jeweiligen Turnierdetails, sobald sie hinterlegt sind."
+      description={`Die Nachwuchsturniere von ${CLUB_NAME} finden an der ${TOURNAMENT_VENUE_OUTDOOR} in ${CLUB_CITY_LONG} statt – und teilweise in den ${TOURNAMENT_VENUE_INDOOR_GENERIC}. Die Sportanlagen sind ein wichtiger Bestandteil dieser Turniere.`}
     >
       <CoverImage
         src={media.facility}
-        alt="Sportpark Kirchheim bei Flutlicht"
+        alt={`Sportanlage von ${CLUB_NAME} in ${CLUB_CITY_LONG}`}
         className="aspect-[16/9] w-full rounded-[12px]"
         sizes="(min-width: 1024px) 1100px, 100vw"
         preload
@@ -24,11 +30,16 @@ export default function AnlagePage() {
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         <section className="border border-line bg-white p-6">
           <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-            Anlage
+            Standort
           </h2>
           <p className="mt-3 text-[15px] leading-7 text-muted">
-            Spielort der veröffentlichten Jugendturniere ist der Sportpark
-            Kirchheim, sofern auf der Turnierseite kein anderer Ort angegeben ist.
+            {CLUB_NAME} richtet Nachwuchsturniere an der {TOURNAMENT_VENUE_OUTDOOR}{" "}
+            in {CLUB_CITY_LONG} aus. Einzelne Turniere finden in den{" "}
+            {TOURNAMENT_VENUE_INDOOR_GENERIC} statt.
+          </p>
+          <p className="mt-3 text-[15px] leading-7 text-muted">
+            Welche Sportstätte für ein konkretes Turnier gilt, steht in den
+            jeweiligen Turnierdetails.
           </p>
         </section>
         <section className="border border-line bg-white p-6">
@@ -36,8 +47,9 @@ export default function AnlagePage() {
             Turnierdetails
           </h2>
           <p className="mt-3 text-[15px] leading-7 text-muted">
-            Anfahrt, Parken, Spielflächen, Umkleiden und Verpflegung werden je
-            Turnier veröffentlicht – nur wenn der Veranstalter sie hinterlegt hat.
+            Weitere Hinweise zum Ablauf – etwa Anfahrt oder organisatorische
+            Informationen – veröffentlicht der Veranstalter je Turnier, sobald
+            sie hinterlegt sind.
           </p>
           <Link
             href="/turniere"

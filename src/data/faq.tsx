@@ -10,7 +10,7 @@ export type FaqItem = {
 };
 
 export function getFaqItems(settings?: AppSettings): FaqItem[] {
-  const email = settings ? publicContactEmail(settings) : null;
+  const email = publicContactEmail(settings);
 
   return [
     {
@@ -148,25 +148,21 @@ export function getFaqItems(settings?: AppSettings): FaqItem[] {
       answer: (
         <>
           Für Fragen zu Turnieren und Bewerbungen ist der Bereich Jugendturniere /
-          Tournament Hub des VfL Kirchheim zuständig. Nutzt die{" "}
+          Tournament Hub des VfL Kirchheim/Teck zuständig. Nutzt die{" "}
           <Link
             href="/kontakt"
             className="font-semibold text-ink underline decoration-brand-yellow underline-offset-2 hover:text-brand-blue"
           >
             Kontaktseite
           </Link>
-          {email ? (
-            <>
-              {" "}
-              oder schreibt an{" "}
-              <a
-                href={`mailto:${email}`}
-                className="font-semibold text-ink underline decoration-brand-yellow underline-offset-2 hover:text-brand-blue"
-              >
-                {email}
-              </a>
-            </>
-          ) : null}
+          {" "}
+          oder schreibt an{" "}
+          <a
+            href={`mailto:${email}`}
+            className="font-semibold text-ink underline decoration-brand-yellow underline-offset-2 hover:text-brand-blue"
+          >
+            {email}
+          </a>
           .
         </>
       ),

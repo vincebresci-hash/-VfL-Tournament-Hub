@@ -2,25 +2,26 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { IconCheck } from "@/components/ui/icons";
+import { CLUB_NAME } from "@/data/club";
 
 export const metadata: Metadata = { title: "Für Vereine" };
 
 const steps = [
   {
     title: "Turnier auswählen",
-    text: "Unter Turniere findet ihr offene, kommende und abgeschlossene Jugendturniere mit Altersklasse, Datum und Ort.",
+    text: "Unter Turniere findet ihr offene, kommende und abgeschlossene Nachwuchsturniere mit Altersklasse, Datum und Ort.",
   },
   {
     title: "Mannschaft bewerben",
-    text: "Über die Turnierseite sendet ihr eine Bewerbung – als Gast oder mit Vereinskonto. Eine Bewerbung ist keine automatische Zusage.",
+    text: "Über die Turnierseite sendet ihr eine Bewerbung – als Gast oder mit Vereinskonto. Eine Bewerbung ist noch keine automatische Zusage.",
   },
   {
-    title: "Bewerbung wird geprüft",
-    text: "Neue Bewerbungen gehen zuerst ein und können den Status „In Prüfung“ erhalten. Der VfL sichtet die sportlichen Angaben.",
+    title: "Teilnehmerfeld wird zusammengestellt",
+    text: "Neue Bewerbungen gehen zuerst ein und können den Status „In Prüfung“ erhalten. Die Turnierorganisation sichtet die Angaben und stellt das Teilnehmerfeld zusammen.",
   },
   {
-    title: "Zusage, Warteliste oder Absage",
-    text: "Danach setzt der Veranstalter den Status. Eine Zusage bestätigt die Teilnahme. Warteliste ist eine Vormerkung, keine Zusage.",
+    title: "Rückmeldung zum Status",
+    text: "Anschließend erhaltet ihr eine Rückmeldung. Eine Zusage bestätigt die Teilnahme. Warteliste ist eine Vormerkung, keine Zusage.",
   },
   {
     title: "Nach Zusage Turnierinformationen",
@@ -47,7 +48,7 @@ const criteria = [
   },
   {
     title: "Selbsteinschätzung / Spielstärke",
-    text: "Die Skala von 1 bis 5 dient der ausgewogenen Zusammenstellung. Sie begründet für sich genommen keine Zusage.",
+    text: "Die Skala von 1 bis 5 dient der Zusammenstellung. Sie begründet für sich genommen keine Zusage.",
   },
 ];
 
@@ -55,15 +56,21 @@ export default function FuerVereinePage() {
   return (
     <ContentPage
       title="Für Vereine"
-      description="So funktioniert die Bewerbung für Jugendturniere des VfL Kirchheim im Tournament Hub."
+      description={`${CLUB_NAME} möchte attraktive Nachwuchsturniere mit einem vielfältigen Teilnehmerfeld veranstalten. Mannschaften können sich über den Tournament Hub bewerben.`}
     >
-      <div className="border border-navy bg-navy p-6 text-white sm:p-8">
+      <p className="max-w-3xl text-[15px] leading-7 text-muted">
+        Eine Bewerbung ist noch keine automatische Zusage. Die
+        Turnierorganisation stellt das Teilnehmerfeld zusammen. Vereine erhalten
+        anschließend eine Rückmeldung.
+      </p>
+
+      <div className="mt-8 border border-navy bg-navy p-6 text-white sm:p-8">
         <p className="font-display text-xl font-bold tracking-wide uppercase">
           Bewerbung ist keine automatische Zusage
         </p>
         <p className="mt-3 max-w-2xl text-[15px] leading-7 text-white/75">
-          Erst wenn der Status auf „Angenommen“ steht, ist eure Mannschaft für das
-          Turnier gesetzt. Bis dahin prüft der Veranstalter die Angaben.
+          Erst wenn der Status auf „Angenommen“ steht, ist eure Mannschaft für
+          das Turnier gesetzt. Bis dahin prüft der Veranstalter die Angaben.
         </p>
       </div>
 
@@ -93,8 +100,9 @@ export default function FuerVereinePage() {
           </h2>
           <p className="mt-3 text-[15px] leading-7 text-muted">
             Ein Vereinskonto ist nicht nötig. Ihr könnt das Formular auf der
-            Turnierseite direkt absenden. Die Kontaktperson erhält die Rückmeldung
-            über die angegebene E-Mail, sofern Nachrichten aktiv sind.
+            Turnierseite direkt absenden. Die Kontaktperson erhält die
+            Rückmeldung über die angegebene E-Mail, sofern Nachrichten aktiv
+            sind.
           </p>
         </div>
         <div className="border border-line bg-white p-6 sm:p-7">
@@ -114,8 +122,8 @@ export default function FuerVereinePage() {
           Sportliche Angaben
         </h2>
         <p className="mt-3 max-w-2xl text-[15px] leading-7 text-muted">
-          Die folgenden Felder helfen, das Teilnehmerfeld sportlich sinnvoll
-          zusammenzustellen. Keines dieser Kriterien garantiert eine Auswahl.
+          Die folgenden Felder stehen im Bewerbungsformular. Keines dieser
+          Felder garantiert eine Auswahl.
         </p>
         <ul className="mt-6 grid gap-4 md:grid-cols-2">
           {criteria.map((item) => (

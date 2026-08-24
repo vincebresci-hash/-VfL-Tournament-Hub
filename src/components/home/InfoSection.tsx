@@ -39,10 +39,10 @@ const columns: InfoColumn[] = [
     linkLabel: "Mehr erfahren →",
     icon: IconShield,
     items: [
-      "Jugendturniere im Tournament Hub",
-      "Klare Bewerbung ohne Automatik-Zusage",
-      "Sportpark Kirchheim als Spielort",
-      "Faire, transparente Organisation",
+      "Nachwuchsturniere mit Tradition",
+      "Bewerbung ohne automatische Zusage",
+      "Jesinger Allee in Kirchheim unter Teck",
+      "Fußball aus Leidenschaft",
     ],
   },
   {
@@ -92,7 +92,7 @@ export function InfoSection() {
                   {column.image ? (
                     <CoverImage
                       src={media.facility}
-                      alt="Sportpark Kirchheim bei Flutlicht"
+                      alt="Sportanlage des VfL Kirchheim/Teck"
                       className="mt-4 aspect-[16/10] w-full rounded-[10px]"
                       sizes="(min-width: 1280px) 300px, (min-width: 768px) 50vw, 100vw"
                       objectPosition="50% 45%"
