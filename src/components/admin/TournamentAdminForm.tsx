@@ -30,7 +30,7 @@ const emptyValues: AdminTournamentInput = {
   date: "",
   startTime: "",
   endTime: "",
-  location: "Sportpark Kirchheim",
+  location: "Jesinger Allee, Kirchheim unter Teck",
   address: "",
   shortDescription: "",
   description: "",

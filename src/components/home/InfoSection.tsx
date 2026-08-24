@@ -34,7 +34,7 @@ const columns: InfoColumn[] = [
     ],
   },
   {
-    title: "Warum VfL Kirchheim?",
+    title: "Warum VfL Kirchheim/Teck?",
     href: "/ueber-uns",
     linkLabel: "Mehr erfahren →",
     icon: IconShield,

@@ -42,8 +42,8 @@ export function getFaqItems(settings?: AppSettings): FaqItem[] {
       answer: (
         <>
           „In Prüfung“ heißt: Die Bewerbung ist eingegangen und wird vom VfL
-          Kirchheim gesichtet. Es liegt noch keine Zusage, Wartelistenplatzierung
-          oder Absage vor.
+          Kirchheim/Teck gesichtet. Es liegt noch keine Zusage,
+          Wartelistenplatzierung oder Absage vor.
         </>
       ),
     },
