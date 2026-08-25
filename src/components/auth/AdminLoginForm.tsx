@@ -9,7 +9,10 @@ import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toLoginErrorMessage } from "@/lib/auth/messages";
 import { getPostLoginRedirect } from "@/lib/auth/redirects";
 import { canAccessAdmin, isUserRole } from "@/lib/auth/roles";
-import { validateAdminLoginForm, type AdminLoginErrors } from "@/lib/auth/validation";
+import {
+  validateAdminLoginForm,
+  type AdminLoginErrors,
+} from "@/lib/auth/validation";
 import { CLUB_NAME, HUB_NAME } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/client";
 

@@ -12,6 +12,7 @@ import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-p
 import { runLivePageSelfChecks } from "@/lib/live/live-page-checks";
 import { runTournamentStatusCapacityChecks } from "@/lib/tournament-status-checks";
 import { runSiteUrlAndCspChecks } from "@/lib/site-checks";
+import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
   runMeinTurnierplanExistingManualGroupsCheck,
@@ -41,6 +42,7 @@ try {
   const livePageChecks = runLivePageSelfChecks();
   const tournamentStatusCapacityChecks = runTournamentStatusCapacityChecks();
   const siteUrlAndCspChecks = runSiteUrlAndCspChecks();
+  const authLoginValidationChecks = runAuthLoginValidationChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -61,6 +63,7 @@ try {
   console.log(`live-page-checks: ${livePageChecks}`);
   console.log(`tournament-status-capacity-checks: ${tournamentStatusCapacityChecks}`);
   console.log(`site-url-csp-checks: ${siteUrlAndCspChecks}`);
+  console.log(`auth-login-validation-checks: ${authLoginValidationChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

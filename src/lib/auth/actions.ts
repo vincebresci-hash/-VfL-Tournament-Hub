@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { readUserMetadata } from "@/lib/auth/user";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/messages";
+import { validateNewPassword } from "@/lib/auth/validation";
 import { isMissingRelationError, toUserFacingDbError } from "@/lib/db/errors";
 
 export async function signOutAction() {
@@ -70,8 +71,14 @@ export async function updatePasswordAction(input: {
     return { error: "Bitte zuerst anmelden." };
   }
 
-  if (input.nextPassword.length < 8) {
-    return { error: "Das neue Passwort muss mindestens 8 Zeichen haben." };
+  const passwordError = validateNewPassword(input.nextPassword);
+  if (passwordError) {
+    return {
+      error:
+        passwordError === "Bitte ein Passwort angeben."
+          ? "Bitte ein neues Passwort angeben."
+          : "Das neue Passwort muss mindestens 8 Zeichen haben.",
+    };
   }
 
   if (input.nextPassword !== input.nextPasswordConfirm) {

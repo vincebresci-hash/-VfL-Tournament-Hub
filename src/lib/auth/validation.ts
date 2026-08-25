@@ -1,5 +1,7 @@
 import { CLUB_CONTACT_ROLES } from "@/types/auth";
 
+export const NEW_PASSWORD_MIN_LENGTH = 8;
+
 export function isFilled(value: string) {
   return value.trim().length > 0;
 }
@@ -24,6 +26,22 @@ export function isValidOptionalUrl(value: string) {
   }
 }
 
+/**
+ * Rules for setting a new password (register / reset / change).
+ * Not used for login of existing accounts.
+ */
+export function validateNewPassword(password: string): string | null {
+  if (!isFilled(password)) {
+    return "Bitte ein Passwort angeben.";
+  }
+
+  if (password.length < NEW_PASSWORD_MIN_LENGTH) {
+    return "Das Passwort muss mindestens 8 Zeichen haben.";
+  }
+
+  return null;
+}
+
 export type LoginFormValues = {
   email: string;
   password: string;
@@ -32,7 +50,15 @@ export type LoginFormValues = {
 
 export type LoginFormErrors = Partial<Record<"email" | "password", string>>;
 
-export function validateLoginForm(values: LoginFormValues): LoginFormErrors {
+/**
+ * Login credentials only: email syntax + non-empty password.
+ * Length/complexity are enforced by Supabase Auth for existing accounts,
+ * and by validateNewPassword when creating or changing a password.
+ */
+export function validateLoginCredentials(values: {
+  email: string;
+  password: string;
+}): LoginFormErrors {
   const errors: LoginFormErrors = {};
 
   if (!isFilled(values.email)) {
@@ -42,12 +68,15 @@ export function validateLoginForm(values: LoginFormValues): LoginFormErrors {
   }
 
   if (!isFilled(values.password)) {
-    errors.password = "Bitte das Passwort angeben.";
-  } else if (values.password.length < 8) {
-    errors.password = "Das Passwort muss mindestens 8 Zeichen haben.";
+    errors.password = "Bitte Passwort eingeben.";
   }
 
   return errors;
+}
+
+/** LoginForm entry point — same rules as validateLoginCredentials. */
+export function validateLoginForm(values: LoginFormValues): LoginFormErrors {
+  return validateLoginCredentials(values);
 }
 
 export type RegisterFormValues = {
@@ -119,10 +148,9 @@ export function validateRegisterForm(
     errors.email = "Bitte eine gültige E-Mail-Adresse angeben.";
   }
 
-  if (!isFilled(values.password)) {
-    errors.password = "Bitte ein Passwort angeben.";
-  } else if (values.password.length < 8) {
-    errors.password = "Das Passwort muss mindestens 8 Zeichen haben.";
+  const passwordError = validateNewPassword(values.password);
+  if (passwordError) {
+    errors.password = passwordError;
   }
 
   if (!isFilled(values.passwordConfirm)) {
@@ -175,5 +203,5 @@ export type AdminLoginErrors = Partial<Record<"email" | "password", string>>;
 export function validateAdminLoginForm(
   values: AdminLoginValues,
 ): AdminLoginErrors {
-  return validateLoginForm({ ...values, remember: false });
+  return validateLoginCredentials(values);
 }
