@@ -162,6 +162,46 @@ function formatSyncNotice(
   return `Synchronisation abgeschlossen: ${preview.counts.teamsFound} Teams, ${preview.counts.groupsFound} Gruppen, ${preview.counts.matchesFound} Spiele (${preview.counts.resultsPresent} Ergebnisse). Neu: ${result.matchesInserted}, aktualisiert: ${result.matchesUpdated}${protectedPart}.`;
 }
 
+/**
+ * Persist MeinTurnierplan logo URLs onto external teams without touching
+ * rows that have logo_manual_override = true.
+ */
+export async function applyMeinTurnierplanTeamLogosAfterSync(input: {
+  tournamentId: string;
+  teams: Array<{ externalId: string; logoUrl: string | null }>;
+}) {
+  const supabase = await createClient();
+  const teamsWithLogos = input.teams.filter((team) => Boolean(team.logoUrl?.trim()));
+  if (teamsWithLogos.length === 0) {
+    return;
+  }
+
+  const { data: existing } = await supabase
+    .from("tournament_external_teams")
+    .select("id, external_id, logo_manual_override")
+    .eq("tournament_id", input.tournamentId)
+    .eq("external_source", "mein-turnierplan");
+
+  const byExternalId = new Map(
+    (existing ?? []).map((row) => [String(row.external_id), row]),
+  );
+
+  for (const team of teamsWithLogos) {
+    const row = byExternalId.get(team.externalId);
+    if (!row || row.logo_manual_override) {
+      continue;
+    }
+
+    await supabase
+      .from("tournament_external_teams")
+      .update({
+        logo_url: team.logoUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", row.id);
+  }
+}
+
 export async function previewMeinTurnierplanSyncAction(
   tournamentId: string,
   options?: {
@@ -269,6 +309,13 @@ export async function confirmMeinTurnierplanSyncAction(input: {
       notice: null,
     };
   }
+
+  // Apply MTP logos after RPC. The sync RPC does not write logo_url, so manual
+  // logos (logo_manual_override=true) are never overwritten by the RPC itself.
+  await applyMeinTurnierplanTeamLogosAfterSync({
+    tournamentId: loaded.tournament.id,
+    teams: rpcPayload.teams,
+  });
 
   revalidateTournament(loaded.tournament.slug, loaded.tournament.id);
 

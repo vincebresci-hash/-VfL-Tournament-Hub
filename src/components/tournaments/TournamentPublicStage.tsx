@@ -16,6 +16,7 @@ import { MeinTurnierplanLiveSection } from "@/components/tournaments/MeinTurnier
 import { MeinTurnierplanWidget } from "@/components/tournaments/MeinTurnierplanWidget";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { MeinTurnierplanSourceHint } from "@/components/tournaments/MeinTurnierplanSourceHint";
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import {
   resolveGruppenTab,
@@ -248,15 +249,20 @@ export function TournamentPublicStage({
             <ul className="mt-4 grid gap-3">
               {stage.roster.map((entry) => (
                 <li key={entry.applicationId} className="border border-line bg-white px-4 py-3">
-                  <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                    {entry.clubName}
-                  </p>
-                  <p className="mt-1 text-[14px] text-ink">{entry.teamName}</p>
-                  <p className="mt-2 text-[13px] text-muted">
-                    {entry.ageGroup ?? "Altersklasse"}
-                    {entry.birthYear ? ` · Jahrgang ${entry.birthYear}` : ""}
-                    {entry.groupName ? ` · ${entry.groupName}` : ""}
-                  </p>
+                  <div className="flex items-start gap-3">
+                    <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} />
+                    <div className="min-w-0">
+                      <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                        {entry.clubName}
+                      </p>
+                      <p className="mt-1 text-[14px] text-ink">{entry.teamName}</p>
+                      <p className="mt-2 text-[13px] text-muted">
+                        {entry.ageGroup ?? "Altersklasse"}
+                        {entry.birthYear ? ` · Jahrgang ${entry.birthYear}` : ""}
+                        {entry.groupName ? ` · ${entry.groupName}` : ""}
+                      </p>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>

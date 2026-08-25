@@ -116,6 +116,7 @@ export type PublicRosterEntry = {
   groupSortOrder: number | null;
   source?: "hub" | "application" | "mein-turnierplan" | "manual";
   externalTeamId?: string | null;
+  logoUrl?: string | null;
 };
 
 export type StandingRow = {

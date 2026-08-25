@@ -149,6 +149,9 @@ export type TournamentExternalTeamRow = {
   team_name?: string | null;
   age_group?: string | null;
   birth_year?: number | null;
+  logo_url?: string | null;
+  club_id?: string | null;
+  logo_manual_override?: boolean;
   application_id: string | null;
   manual_override: boolean;
   participation_status?: "detected" | "confirmed" | "rejected";
@@ -228,6 +231,8 @@ export type TournamentPublicRosterRow = {
   group_id: string | null;
   group_name: string | null;
   group_sort_order: number | null;
+  club_id?: string | null;
+  logo_url?: string | null;
 };
 
 export type ApplicationRow = {
@@ -587,6 +592,10 @@ export type Database = {
       tournament_public_roster: {
         Args: { p_slug: string };
         Returns: TournamentPublicRosterRow[];
+      };
+      club_logo_urls: {
+        Args: { p_club_ids: string[] };
+        Returns: Array<{ id: string; logo_url: string | null }>;
       };
       guest_application_allowed: {
         Args: { p_tournament_id: string };

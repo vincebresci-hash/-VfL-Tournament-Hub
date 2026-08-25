@@ -9,6 +9,7 @@ export type MeinTurnierplanSyncRpcPayload = {
     externalId: string;
     name: string;
     applicationId: string | null;
+    logoUrl: string | null;
   }>;
   groups: Array<{
     externalId: string;
@@ -76,6 +77,7 @@ export function buildMeinTurnierplanSyncRpcPayload(input: {
       externalId: team.id,
       name: team.name,
       applicationId: mappingByExternalId.get(team.id) ?? null,
+      logoUrl: team.logoUrl ?? null,
     })),
     groups: input.payload.groups.map((group, index) => ({
       externalId: group.id,

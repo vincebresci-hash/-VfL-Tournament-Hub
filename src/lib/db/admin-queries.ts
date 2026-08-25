@@ -205,6 +205,7 @@ export async function listAdminClubs(): Promise<{
         name: club.name,
         city: club.city ?? "",
         website: club.website,
+        logoUrl: club.logo_url,
         contactName: contact.name,
         contactEmail: contact.email,
         contactPhone: club.contact_phone,

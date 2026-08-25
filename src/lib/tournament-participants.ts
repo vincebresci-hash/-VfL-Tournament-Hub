@@ -8,10 +8,15 @@ export type TournamentParticipant = {
   source: TournamentParticipantSource;
   applicationId: string | null;
   externalTeamId: string | null;
+  clubId: string | null;
   groupId: string | null;
   groupName: string | null;
   ageGroup: string | null;
   birthYear: number | null;
+  /** Resolved display logo (Hub preferred). */
+  logoUrl: string | null;
+  /** Stored custom/imported logo before Hub preference (for edit forms). */
+  customLogoUrl: string | null;
   confirmed: true;
 };
 
@@ -23,6 +28,9 @@ export type ApplicationParticipantInput = {
   birthYear: number | null;
   groupId?: string | null;
   groupName?: string | null;
+  clubId?: string | null;
+  /** Hub club logo for the application's club_id */
+  clubLogoUrl?: string | null;
 };
 
 export type ExternalParticipantInput = {
@@ -38,6 +46,11 @@ export type ExternalParticipantInput = {
   birthYear: number | null;
   groupId?: string | null;
   groupName?: string | null;
+  clubId?: string | null;
+  /** Stored logo on the external/manual team row (MTP or custom) */
+  logoUrl?: string | null;
+  /** Hub club logo when club_id is set — preferred over stored logoUrl */
+  hubClubLogoUrl?: string | null;
 };
 
 function participantDisplayName(clubName: string, teamName: string) {
@@ -47,6 +60,20 @@ function participantDisplayName(clubName: string, teamName: string) {
     return `${club} · ${team}`;
   }
   return club || team || "Team";
+}
+
+/** Prefer Hub club logo over stored/imported logo. */
+export function resolveParticipantLogoUrl(input: {
+  hubClubLogoUrl?: string | null;
+  storedLogoUrl?: string | null;
+}): string | null {
+  const hub = input.hubClubLogoUrl?.trim() || null;
+  if (hub) {
+    return hub;
+  }
+
+  const stored = input.storedLogoUrl?.trim() || null;
+  return stored;
 }
 
 export function mergeTournamentParticipants(input: {
@@ -62,10 +89,16 @@ export function mergeTournamentParticipants(input: {
     source: "application",
     applicationId: application.id,
     externalTeamId: null,
+    clubId: application.clubId ?? null,
     groupId: application.groupId ?? null,
     groupName: application.groupName ?? null,
     ageGroup: application.ageGroup,
     birthYear: application.birthYear,
+    logoUrl: resolveParticipantLogoUrl({
+      hubClubLogoUrl: application.clubLogoUrl,
+      storedLogoUrl: null,
+    }),
+    customLogoUrl: null,
     confirmed: true,
   }));
 
@@ -82,6 +115,7 @@ export function mergeTournamentParticipants(input: {
     const teamName = team.teamName?.trim() || team.name.trim();
     const source: TournamentParticipantSource =
       team.externalSource === "manual" ? "manual" : "mein-turnierplan";
+    const storedLogo = team.logoUrl?.trim() || null;
 
     participants.push({
       id: `external:${team.id}`,
@@ -91,10 +125,16 @@ export function mergeTournamentParticipants(input: {
       source,
       applicationId: team.applicationId,
       externalTeamId: team.id,
+      clubId: team.clubId ?? null,
       groupId: team.groupId ?? null,
       groupName: team.groupName ?? null,
       ageGroup: team.ageGroup,
       birthYear: team.birthYear,
+      logoUrl: resolveParticipantLogoUrl({
+        hubClubLogoUrl: team.hubClubLogoUrl,
+        storedLogoUrl: storedLogo,
+      }),
+      customLogoUrl: storedLogo,
       confirmed: true,
     });
   }
@@ -117,6 +157,7 @@ export function tournamentParticipantsToPublicRoster(
   groupSortOrder: number | null;
   source: "application" | "mein-turnierplan" | "manual";
   externalTeamId: string | null;
+  logoUrl: string | null;
 }> {
   return participants.map((participant) => ({
     applicationId: participant.applicationId ?? participant.externalTeamId ?? participant.id,
@@ -129,6 +170,7 @@ export function tournamentParticipantsToPublicRoster(
     groupSortOrder: null,
     source: participant.source,
     externalTeamId: participant.externalTeamId,
+    logoUrl: participant.logoUrl,
   }));
 }
 

@@ -23,6 +23,7 @@ type AdminTournamentDetailViewProps = {
   externalTeams: ExternalTeamAdminRow[];
   participants: TournamentParticipant[];
   groups: Array<{ id: string; name: string }>;
+  clubs: Array<{ id: string; name: string; logoUrl: string | null }>;
   stageStatus: TournamentStageStatus;
   current: "overview" | "participants";
 };
@@ -39,6 +40,7 @@ export function AdminTournamentDetailView({
   externalTeams,
   participants,
   groups,
+  clubs,
   stageStatus,
   current,
 }: AdminTournamentDetailViewProps) {
@@ -105,6 +107,7 @@ export function AdminTournamentDetailView({
             tournamentId={tournament.id}
             participants={participants}
             groups={groups}
+            clubs={clubs}
           />
         </div>
 

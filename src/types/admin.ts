@@ -23,6 +23,7 @@ export type AdminClubListItem = {
   name: string;
   city: string;
   website: string | null;
+  logoUrl: string | null;
   contactName: string;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -64,7 +65,6 @@ export type AdminClubApplication = {
 };
 
 export type AdminClubDetail = AdminClubListItem & {
-  logoUrl: string | null;
   members: AdminClubMember[];
   teams: AdminClubTeam[];
   applications: AdminClubApplication[];

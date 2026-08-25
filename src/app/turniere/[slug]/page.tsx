@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { TournamentPublicStage } from "@/components/tournaments/TournamentPublicStage";
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { formatDateDe, formatDateTimeDe, formatTimeDe } from "@/lib/format";
 import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
@@ -299,9 +300,15 @@ export default async function TournamentDetailPage({
               </h2>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {stage.roster.map((entry) => (
-                  <li key={entry.applicationId} className="border border-line bg-white px-4 py-3 text-[15px] text-ink">
-                    {entry.clubName}
-                    {entry.teamName ? ` · ${entry.teamName}` : ""}
+                  <li
+                    key={entry.applicationId}
+                    className="flex items-center gap-3 border border-line bg-white px-4 py-3 text-[15px] text-ink"
+                  >
+                    <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} />
+                    <span>
+                      {entry.clubName}
+                      {entry.teamName ? ` · ${entry.teamName}` : ""}
+                    </span>
                   </li>
                 ))}
               </ul>

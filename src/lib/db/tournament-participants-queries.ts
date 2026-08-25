@@ -5,6 +5,36 @@ import {
 } from "@/lib/tournament-participants";
 import type { TournamentPublicRosterRow } from "@/lib/supabase/database";
 
+async function loadClubLogoMap(clubIds: string[]) {
+  const unique = [...new Set(clubIds.filter(Boolean))];
+  if (unique.length === 0) {
+    return new Map<string, string | null>();
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("club_logo_urls", {
+    p_club_ids: unique,
+  });
+
+  if (!error && data) {
+    return new Map(
+      (data as Array<{ id: string; logo_url: string | null }>).map((row) => [
+        String(row.id),
+        row.logo_url ? String(row.logo_url) : null,
+      ]),
+    );
+  }
+
+  // Fallback for environments where the helper RPC is not yet applied (admin can read clubs).
+  const clubsResult = await supabase.from("clubs").select("id, logo_url").in("id", unique);
+  return new Map(
+    (clubsResult.data ?? []).map((row) => [
+      String(row.id),
+      row.logo_url ? String(row.logo_url) : null,
+    ]),
+  );
+}
+
 export async function getTournamentParticipants(
   tournamentId: string,
 ): Promise<TournamentParticipant[]> {
@@ -13,13 +43,13 @@ export async function getTournamentParticipants(
   const [applicationsResult, externalResult, groupsResult] = await Promise.all([
     supabase
       .from("applications")
-      .select("id, club_name, team_name, age_group, birth_year, status")
+      .select("id, club_name, team_name, age_group, birth_year, status, club_id")
       .eq("tournament_id", tournamentId)
       .eq("status", "accepted"),
     supabase
       .from("tournament_external_teams")
       .select(
-        "id, external_source, external_id, name, club_name, team_name, application_id, participation_status, external_active, age_group, birth_year",
+        "id, external_source, external_id, name, club_name, team_name, application_id, participation_status, external_active, age_group, birth_year, logo_url, club_id",
       )
       .eq("tournament_id", tournamentId),
     supabase
@@ -54,9 +84,19 @@ export async function getTournamentParticipants(
     }
   }
 
+  const clubIds = [
+    ...(applicationsResult.data ?? []).map((row) =>
+      row.club_id ? String(row.club_id) : "",
+    ),
+    ...(externalResult.data ?? []).map((row) => (row.club_id ? String(row.club_id) : "")),
+  ].filter(Boolean);
+
+  const clubLogos = await loadClubLogoMap(clubIds);
+
   return mergeTournamentParticipants({
     applications: (applicationsResult.data ?? []).map((row) => {
       const group = groupByApplicationId.get(String(row.id));
+      const clubId = row.club_id ? String(row.club_id) : null;
       return {
         id: String(row.id),
         clubName: String(row.club_name ?? "Verein"),
@@ -65,10 +105,13 @@ export async function getTournamentParticipants(
         birthYear: row.birth_year ?? null,
         groupId: group?.groupId ?? null,
         groupName: group?.groupName ?? null,
+        clubLogoUrl: clubId ? (clubLogos.get(clubId) ?? null) : null,
+        clubId,
       };
     }),
     externalTeams: (externalResult.data ?? []).map((row) => {
       const group = groupByExternalTeamId.get(String(row.id));
+      const clubId = row.club_id ? String(row.club_id) : null;
       return {
         id: String(row.id),
         externalSource: String(row.external_source ?? "mein-turnierplan"),
@@ -82,6 +125,9 @@ export async function getTournamentParticipants(
         birthYear: row.birth_year ?? null,
         groupId: group?.groupId ?? null,
         groupName: group?.groupName ?? null,
+        clubId,
+        logoUrl: row.logo_url ? String(row.logo_url) : null,
+        hubClubLogoUrl: clubId ? (clubLogos.get(clubId) ?? null) : null,
       };
     }),
   });
@@ -98,7 +144,7 @@ export async function getTournamentParticipantsFromRoster(
   const externalResult = await supabase
     .from("tournament_external_teams")
     .select(
-      "id, external_source, external_id, name, club_name, team_name, application_id, participation_status, external_active, age_group, birth_year",
+      "id, external_source, external_id, name, club_name, team_name, application_id, participation_status, external_active, age_group, birth_year, logo_url, club_id",
     )
     .eq("tournament_id", tournamentId);
 
@@ -130,6 +176,11 @@ export async function getTournamentParticipantsFromRoster(
     }
   }
 
+  const externalClubIds = (externalResult.data ?? [])
+    .map((row) => (row.club_id ? String(row.club_id) : ""))
+    .filter(Boolean);
+  const clubLogos = await loadClubLogoMap(externalClubIds);
+
   return mergeTournamentParticipants({
     applications: roster.map((row) => ({
       id: String(row.application_id),
@@ -139,9 +190,12 @@ export async function getTournamentParticipantsFromRoster(
       birthYear: row.birth_year ?? null,
       groupId: row.group_id ? String(row.group_id) : null,
       groupName: row.group_name ? String(row.group_name) : null,
+      clubId: row.club_id ? String(row.club_id) : null,
+      clubLogoUrl: row.logo_url ? String(row.logo_url) : null,
     })),
     externalTeams: (externalResult.data ?? []).map((row) => {
       const group = groupByExternalTeamId.get(String(row.id));
+      const clubId = row.club_id ? String(row.club_id) : null;
       return {
         id: String(row.id),
         externalSource: String(row.external_source ?? "mein-turnierplan"),
@@ -155,6 +209,9 @@ export async function getTournamentParticipantsFromRoster(
         birthYear: row.birth_year ?? null,
         groupId: group?.groupId ?? null,
         groupName: group?.groupName ?? null,
+        clubId,
+        logoUrl: row.logo_url ? String(row.logo_url) : null,
+        hubClubLogoUrl: clubId ? (clubLogos.get(clubId) ?? null) : null,
       };
     }),
   });

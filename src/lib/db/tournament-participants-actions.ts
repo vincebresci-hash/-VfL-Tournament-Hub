@@ -146,6 +146,8 @@ export async function addManualTournamentParticipantAction(input: {
   ageGroup?: string | null;
   birthYear?: number | null;
   groupId?: string | null;
+  clubId?: string | null;
+  logoUrl?: string | null;
 }): Promise<{ error: string | null; notice: string | null }> {
   const access = await requireAdmin();
   if (access.error) {
@@ -157,7 +159,7 @@ export async function addManualTournamentParticipantAction(input: {
     return { error: loaded.error, notice: null };
   }
 
-  const clubName = input.clubName.trim();
+  let clubName = input.clubName.trim();
   const teamName = input.teamName.trim();
   if (!clubName || !teamName) {
     return { error: "Vereinsname und Teamname sind erforderlich.", notice: null };
@@ -172,6 +174,29 @@ export async function addManualTournamentParticipantAction(input: {
   }
 
   const supabase = await createClient();
+  const clubId = input.clubId?.trim() || null;
+  const logoUrl = input.logoUrl?.trim() || null;
+
+  if (clubId) {
+    const { data: club } = await supabase
+      .from("clubs")
+      .select("id, name, logo_url")
+      .eq("id", clubId)
+      .maybeSingle();
+
+    if (!club) {
+      return { error: "Der gewählte Hub-Verein wurde nicht gefunden.", notice: null };
+    }
+
+    if (!input.clubName.trim()) {
+      clubName = String(club.name);
+    }
+  }
+
+  if (logoUrl && !(logoUrl.startsWith("https://") || logoUrl.startsWith("http://") || logoUrl.startsWith("/"))) {
+    return { error: "Die Logo-URL ist ungültig.", notice: null };
+  }
+
   const externalId = randomUUID();
   const displayName = `${clubName} · ${teamName}`;
 
@@ -186,6 +211,9 @@ export async function addManualTournamentParticipantAction(input: {
       team_name: teamName,
       age_group: input.ageGroup?.trim() || null,
       birth_year: input.birthYear ?? null,
+      club_id: clubId,
+      logo_url: logoUrl,
+      logo_manual_override: Boolean(logoUrl),
       participation_status: "confirmed",
       external_active: true,
     })
@@ -217,6 +245,8 @@ export async function updateManualTournamentParticipantAction(input: {
   ageGroup?: string | null;
   birthYear?: number | null;
   groupId?: string | null;
+  clubId?: string | null;
+  logoUrl?: string | null;
 }): Promise<{ error: string | null; notice: string | null }> {
   const access = await requireAdmin();
   if (access.error) {
@@ -246,6 +276,24 @@ export async function updateManualTournamentParticipantAction(input: {
     return { error: "Nur manuelle Teilnehmer können hier bearbeitet werden.", notice: null };
   }
 
+  const clubId = input.clubId?.trim() || null;
+  const logoUrl = input.logoUrl?.trim() || null;
+
+  if (clubId) {
+    const { data: club } = await supabase
+      .from("clubs")
+      .select("id")
+      .eq("id", clubId)
+      .maybeSingle();
+    if (!club) {
+      return { error: "Der gewählte Hub-Verein wurde nicht gefunden.", notice: null };
+    }
+  }
+
+  if (logoUrl && !(logoUrl.startsWith("https://") || logoUrl.startsWith("http://") || logoUrl.startsWith("/"))) {
+    return { error: "Die Logo-URL ist ungültig.", notice: null };
+  }
+
   const { error } = await supabase
     .from("tournament_external_teams")
     .update({
@@ -254,6 +302,9 @@ export async function updateManualTournamentParticipantAction(input: {
       name: `${clubName} · ${teamName}`,
       age_group: input.ageGroup?.trim() || null,
       birth_year: input.birthYear ?? null,
+      club_id: clubId,
+      logo_url: logoUrl,
+      logo_manual_override: Boolean(logoUrl),
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.externalTeamId);

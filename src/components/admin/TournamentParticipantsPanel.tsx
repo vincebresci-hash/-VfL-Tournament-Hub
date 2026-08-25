@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
   addManualTournamentParticipantAction,
   deactivateManualTournamentParticipantAction,
@@ -20,16 +21,24 @@ type GroupOption = {
   name: string;
 };
 
+type ClubOption = {
+  id: string;
+  name: string;
+  logoUrl: string | null;
+};
+
 type TournamentParticipantsPanelProps = {
   tournamentId: string;
   participants: TournamentParticipant[];
   groups: GroupOption[];
+  clubs: ClubOption[];
 };
 
 export function TournamentParticipantsPanel({
   tournamentId,
   participants,
   groups,
+  clubs,
 }: TournamentParticipantsPanelProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -42,6 +51,8 @@ export function TournamentParticipantsPanel({
   const [ageGroup, setAgeGroup] = useState("");
   const [birthYear, setBirthYear] = useState("");
   const [groupId, setGroupId] = useState("");
+  const [clubId, setClubId] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
 
   const sortedParticipants = useMemo(
     () => [...participants].sort((a, b) => a.displayName.localeCompare(b.displayName, "de")),
@@ -54,6 +65,8 @@ export function TournamentParticipantsPanel({
     setAgeGroup("");
     setBirthYear("");
     setGroupId("");
+    setClubId("");
+    setLogoUrl("");
     setEditing(null);
     setShowForm(false);
   }
@@ -66,6 +79,8 @@ export function TournamentParticipantsPanel({
     setAgeGroup(participant.ageGroup ?? "");
     setBirthYear(participant.birthYear != null ? String(participant.birthYear) : "");
     setGroupId(participant.groupId ?? "");
+    setClubId(participant.clubId ?? "");
+    setLogoUrl(participant.customLogoUrl ?? "");
   }
 
   function runAction(action: () => Promise<{ error: string | null; notice: string | null }>) {
@@ -116,6 +131,8 @@ export function TournamentParticipantsPanel({
               ageGroup: ageGroup.trim() || null,
               birthYear: birthYear.trim() ? Number.parseInt(birthYear, 10) : null,
               groupId: groupId || null,
+              clubId: clubId || null,
+              logoUrl: logoUrl.trim() || null,
             };
 
             if (editing?.externalTeamId) {
@@ -131,6 +148,28 @@ export function TournamentParticipantsPanel({
             runAction(() => addManualTournamentParticipantAction(payload));
           }}
         >
+          <label className="grid gap-1 text-[13px] text-ink">
+            <span className="font-semibold uppercase tracking-[0.08em]">Hub-Verein</span>
+            <select
+              value={clubId}
+              onChange={(event) => {
+                const nextId = event.target.value;
+                setClubId(nextId);
+                const club = clubs.find((entry) => entry.id === nextId);
+                if (club) {
+                  setClubName(club.name);
+                }
+              }}
+              className="h-10 border border-line bg-white px-3"
+            >
+              <option value="">Kein Hub-Verein</option>
+              {clubs.map((club) => (
+                <option key={club.id} value={club.id}>
+                  {club.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="grid gap-1 text-[13px] text-ink">
             <span className="font-semibold uppercase tracking-[0.08em]">Vereinsname</span>
             <input
@@ -183,6 +222,21 @@ export function TournamentParticipantsPanel({
               ))}
             </select>
           </label>
+          <label className="grid gap-1 text-[13px] text-ink">
+            <span className="font-semibold uppercase tracking-[0.08em]">
+              Logo-URL <span className="font-medium normal-case tracking-normal text-muted">(optional)</span>
+            </span>
+            <input
+              value={logoUrl}
+              onChange={(event) => setLogoUrl(event.target.value)}
+              className="h-10 border border-line px-3"
+              placeholder="https://…"
+              inputMode="url"
+            />
+            <span className="text-[12px] text-muted">
+              Bei gewähltem Hub-Verein wird bevorzugt dessen Vereinslogo angezeigt.
+            </span>
+          </label>
           <div className="flex flex-wrap gap-2">
             <button
               type="submit"
@@ -219,11 +273,17 @@ export function TournamentParticipantsPanel({
           {sortedParticipants.map((participant) => (
             <article key={participant.id} className="border border-line bg-white p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                    {participant.clubName}
-                  </p>
-                  <p className="mt-1 text-[14px] text-ink">{participant.teamName}</p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <ParticipantClubLogo
+                    logoUrl={participant.logoUrl}
+                    clubName={participant.clubName}
+                  />
+                  <div className="min-w-0">
+                    <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                      {participant.clubName}
+                    </p>
+                    <p className="mt-1 text-[14px] text-ink">{participant.teamName}</p>
+                  </div>
                 </div>
                 <span className="border border-line px-2 py-1 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase">
                   {participantSourceBadge(participant.source)}
