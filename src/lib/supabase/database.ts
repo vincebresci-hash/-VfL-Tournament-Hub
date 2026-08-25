@@ -145,6 +145,10 @@ export type TournamentExternalTeamRow = {
   external_source: string;
   external_id: string;
   name: string;
+  club_name?: string | null;
+  team_name?: string | null;
+  age_group?: string | null;
+  birth_year?: number | null;
   application_id: string | null;
   manual_override: boolean;
   participation_status?: "detected" | "confirmed" | "rejected";

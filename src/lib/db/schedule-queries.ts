@@ -1,11 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { getTournamentParticipantsFromRoster } from "@/lib/db/tournament-participants-queries";
+import { tournamentParticipantsToPublicRoster } from "@/lib/tournament-participants";
 import { isMissingRelationError } from "@/lib/db/errors";
 import type {
   TournamentFieldRow,
   TournamentGroupMemberRow,
   TournamentGroupRow,
   TournamentMatchRow,
-  TournamentPublicRosterRow,
 } from "@/lib/supabase/database";
 import type {
   DecidedBy,
@@ -131,18 +132,6 @@ function mapMatch(row: TournamentMatchRow): TournamentMatchRecord {
   };
 }
 
-function mapRoster(row: TournamentPublicRosterRow): PublicRosterEntry {
-  return {
-    applicationId: row.application_id,
-    clubName: row.club_name?.trim() || "Verein",
-    teamName: row.team_name?.trim() || "Mannschaft",
-    ageGroup: row.age_group,
-    birthYear: row.birth_year,
-    groupId: row.group_id,
-    groupName: row.group_name,
-    groupSortOrder: row.group_sort_order,
-  };
-}
 
 function emptyStage(ready: boolean): AdminTournamentStage {
   return {
@@ -238,32 +227,26 @@ export async function getPublicTournamentStage(
   tournamentId: string,
 ): Promise<PublicTournamentStage> {
   const supabase = await createClient();
-  const [rosterResult, groupsResult, fieldsResult, matchesResult, externalTeamsResult] =
-    await Promise.all([
-      supabase.rpc("tournament_public_roster", { p_slug: slug }),
-      supabase
-        .from("tournament_groups")
-        .select("*")
-        .eq("tournament_id", tournamentId)
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("tournament_fields")
-        .select("*")
-        .eq("tournament_id", tournamentId)
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("tournament_matches")
-        .select("*")
-        .eq("tournament_id", tournamentId)
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("tournament_external_teams")
-        .select("id, name, application_id, participation_status, external_active")
-        .eq("tournament_id", tournamentId),
-    ]);
+  const [groupsResult, fieldsResult, matchesResult, participants] = await Promise.all([
+    supabase
+      .from("tournament_groups")
+      .select("*")
+      .eq("tournament_id", tournamentId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("tournament_fields")
+      .select("*")
+      .eq("tournament_id", tournamentId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("tournament_matches")
+      .select("*")
+      .eq("tournament_id", tournamentId)
+      .order("sort_order", { ascending: true }),
+    getTournamentParticipantsFromRoster(slug, tournamentId),
+  ]);
 
   const missing =
-    (rosterResult.error && isMissingRelationError(rosterResult.error)) ||
     (groupsResult.error && isMissingRelationError(groupsResult.error));
 
   if (missing) {
@@ -277,57 +260,15 @@ export async function getPublicTournamentStage(
   }
 
   const groups = ((groupsResult.data ?? []) as TournamentGroupRow[]).map(mapGroup);
-  const applicationRoster = ((rosterResult.data ?? []) as TournamentPublicRosterRow[]).map(
-    mapRoster,
-  );
-  const applicationIds = new Set(applicationRoster.map((entry) => entry.applicationId));
-
-  const groupIds = groups.map((group) => group.id);
-  const membersResult =
-    groupIds.length === 0
-      ? { data: [] as TournamentGroupMemberRow[], error: null }
-      : await supabase.from("tournament_group_members").select("*").in("group_id", groupIds);
-  const members = (membersResult.data ?? []) as TournamentGroupMemberRow[];
-  const groupByExternalTeamId = new Map<string, TournamentGroupRecord>();
-  for (const member of members) {
-    if (!member.external_team_id) {
-      continue;
-    }
-    const group = groups.find((entry) => entry.id === member.group_id);
-    if (group) {
-      groupByExternalTeamId.set(member.external_team_id, group);
-    }
-  }
-
-  const externalRoster: PublicRosterEntry[] = ((externalTeamsResult.data ?? []) as Array<{
-    id: string;
-    name: string;
-    application_id: string | null;
-    participation_status?: string | null;
-    external_active?: boolean | null;
-  }>)
-    .filter((team) => team.external_active !== false)
-    .filter((team) => (team.participation_status ?? "detected") === "confirmed")
-    .filter((team) => !team.application_id || !applicationIds.has(team.application_id))
-    .map((team) => {
-      const group = groupByExternalTeamId.get(team.id) ?? null;
-      return {
-        applicationId: team.application_id ?? team.id,
-        clubName: team.name,
-        teamName: team.name,
-        ageGroup: null,
-        birthYear: null,
-        groupId: group?.id ?? null,
-        groupName: group?.name ?? null,
-        groupSortOrder: group?.sortOrder ?? null,
-        source: "mein-turnierplan" as const,
-        externalTeamId: team.id,
-      };
-    });
+  const groupSortById = new Map(groups.map((group) => [group.id, group.sortOrder]));
 
   return {
-    ready: !rosterResult.error,
-    roster: [...applicationRoster, ...externalRoster],
+    ready: !groupsResult.error,
+    roster: tournamentParticipantsToPublicRoster(participants).map((entry) => ({
+      ...entry,
+      groupSortOrder:
+        entry.groupId != null ? (groupSortById.get(entry.groupId) ?? null) : null,
+    })),
     groups,
     fields: ((fieldsResult.data ?? []) as TournamentFieldRow[]).map(mapField),
     matches: ((matchesResult.data ?? []) as TournamentMatchRow[]).map(mapMatch),

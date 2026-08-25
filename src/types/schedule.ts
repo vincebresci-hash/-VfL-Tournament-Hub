@@ -114,7 +114,7 @@ export type PublicRosterEntry = {
   groupId: string | null;
   groupName: string | null;
   groupSortOrder: number | null;
-  source?: "hub" | "mein-turnierplan";
+  source?: "hub" | "application" | "mein-turnierplan" | "manual";
   externalTeamId?: string | null;
 };
 

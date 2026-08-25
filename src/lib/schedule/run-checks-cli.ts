@@ -7,6 +7,7 @@ import { runMeinTurnierplanLiveRenderSelfChecks } from "@/lib/mein-turnierplan-l
 import { runMeinTurnierplanPublicSourceSelfChecks } from "@/lib/mein-turnierplan-public-source";
 import { runMeinTurnierplanSyncSelfChecks } from "@/lib/mein-turnierplan-sync";
 import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan-participants-checks";
+import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
   runMeinTurnierplanExistingManualGroupsCheck,
@@ -30,6 +31,7 @@ try {
   const manualOverrideCheck = runMeinTurnierplanManualOverrideCheck();
   const existingManualGroupsCheck = runMeinTurnierplanExistingManualGroupsCheck();
   const participantCountChecks = runMeinTurnierplanParticipantCountChecks();
+  const combinedParticipantListChecks = runTournamentParticipantsListChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -44,6 +46,7 @@ try {
   console.log(`manual-override-check: ${manualOverrideCheck}`);
   console.log(`existing-manual-groups-check: ${existingManualGroupsCheck}`);
   console.log(`mein-turnierplan-participant-count-checks: ${participantCountChecks}`);
+  console.log(`combined-participant-list-checks: ${combinedParticipantListChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

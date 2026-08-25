@@ -12,6 +12,7 @@ import { formatDateDe } from "@/lib/format";
 import { acceptedParticipants } from "@/lib/schedule/admin";
 import { getTournamentCapacityWithExternal } from "@/lib/mein-turnierplan-participants";
 import type { ExternalTeamAdminRow } from "@/lib/db/mein-turnierplan-participants-actions";
+import type { TournamentParticipant } from "@/lib/tournament-participants";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication, ApplicationStatus } from "@/types/application";
 import type { TournamentStageStatus } from "@/types/schedule";
@@ -20,6 +21,8 @@ type AdminTournamentDetailViewProps = {
   tournament: AdminTournamentRecord;
   applications: AdminApplication[];
   externalTeams: ExternalTeamAdminRow[];
+  participants: TournamentParticipant[];
+  groups: Array<{ id: string; name: string }>;
   stageStatus: TournamentStageStatus;
   current: "overview" | "participants";
 };
@@ -34,6 +37,8 @@ export function AdminTournamentDetailView({
   tournament,
   applications,
   externalTeams,
+  participants,
+  groups,
   stageStatus,
   current,
 }: AdminTournamentDetailViewProps) {
@@ -42,11 +47,11 @@ export function AdminTournamentDetailView({
       application.tournamentId === tournament.slug ||
       application.tournamentId === tournament.id,
   );
-  const participants = acceptedParticipants(applications, tournament);
+  const acceptedApplications = acceptedParticipants(applications, tournament);
   const capacity = getTournamentCapacityWithExternal({
     maxTeams: tournament.maxTeams,
     applicationStatuses: related.map((application) => application.applicationStatus),
-    acceptedApplicationIds: participants.map((application) => application.id),
+    acceptedApplicationIds: acceptedApplications.map((application) => application.id),
     externalTeams: externalTeams.map((team) => ({
       participationStatus: team.participationStatus,
       externalActive: team.externalActive,
@@ -96,7 +101,11 @@ export function AdminTournamentDetailView({
         />
 
         <div id="teilnehmer">
-          <TournamentParticipantsPanel participants={participants} />
+          <TournamentParticipantsPanel
+            tournamentId={tournament.id}
+            participants={participants}
+            groups={groups}
+          />
         </div>
 
         {applicationSections.map((section) => {
