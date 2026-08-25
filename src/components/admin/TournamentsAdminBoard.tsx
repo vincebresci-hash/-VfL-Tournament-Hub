@@ -12,7 +12,7 @@ type TournamentsAdminBoardProps = {
 };
 
 export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProps) {
-  const { applications, databaseReady } = useAdminData();
+  const { applications, externalTeams, databaseReady } = useAdminData();
   const list = sortTournaments(
     tournaments.map((tournament) => ({
       ...tournament,
@@ -57,6 +57,7 @@ export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProp
             const summary = getTournamentAdminSummary(
               toBoardTournament(tournament),
               applications,
+              externalTeams.filter((team) => team.tournamentId === tournament.id),
             );
 
             return (

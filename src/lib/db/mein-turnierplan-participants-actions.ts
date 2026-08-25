@@ -244,6 +244,40 @@ export async function rejectExternalTeamsAction(input: {
   });
 }
 
+export async function listAllExternalTeamsForAdminAction(): Promise<{
+  ready: boolean;
+  teams: Array<{
+    tournamentId: string;
+    applicationId: string | null;
+    participationStatus: string;
+    externalActive: boolean;
+  }>;
+}> {
+  const access = await requireAdmin();
+  if (access.error) {
+    return { ready: false, teams: [] };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_external_teams")
+    .select("tournament_id, application_id, participation_status, external_active");
+
+  if (error) {
+    return { ready: false, teams: [] };
+  }
+
+  return {
+    ready: true,
+    teams: (data ?? []).map((row) => ({
+      tournamentId: String(row.tournament_id),
+      applicationId: row.application_id ? String(row.application_id) : null,
+      participationStatus: String(row.participation_status ?? "detected"),
+      externalActive: row.external_active !== false,
+    })),
+  };
+}
+
 export async function confirmAllDetectedExternalTeamsAction(tournamentId: string) {
   const access = await requireAdmin();
   if (access.error) {
