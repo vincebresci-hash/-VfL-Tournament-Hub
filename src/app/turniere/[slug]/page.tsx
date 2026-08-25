@@ -25,6 +25,7 @@ import {
   showsMeinTurnierplanLiveTab,
   usesMeinTurnierplanAsPrimaryLive,
 } from "@/lib/mein-turnierplan";
+import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import { tournamentStatusClassName } from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
@@ -53,16 +54,16 @@ export default async function TournamentDetailPage({
   const { slug } = await params;
   const query = await searchParams;
   const tab = Array.isArray(query.tab) ? query.tab[0] : query.tab;
-  const liveSection = Array.isArray(query.live) ? query.live[0] : query.live;
   const tournament = await getPublicTournamentBySlug(slug);
 
   if (!tournament) {
     notFound();
   }
 
-  const [settings, stage] = await Promise.all([
+  const [settings, stage, meinTurnierplanPublic] = await Promise.all([
     getAppSettings(),
     getPublicTournamentStage(tournament.slug, tournament.id),
+    getPublicMeinTurnierplanData(tournament),
   ]);
   const applicationState = getPublicApplicationState({
     status: tournament.status,
@@ -262,13 +263,17 @@ export default async function TournamentDetailPage({
             slug={tournament.slug}
             stage={stage}
             tab={tab}
-            liveSection={liveSection}
             tournamentStatus={tournament.status}
             meinTurnierplanActive={showMeinTurnierplan}
             showLiveTab={showLiveTab}
             meinTurnierplanPrimary={meinTurnierplanPrimary}
             meinTurnierplanHybrid={meinTurnierplanHybrid}
             publicScheduleNote={tournament.publicScheduleNote}
+            meinTurnierplanPublic={meinTurnierplanPublic}
+            preferSyncedHubData={Boolean(
+              tournament.meinTurnierplanLastSyncedAt &&
+                (stage.matches.length > 0 || stage.groups.length > 0),
+            )}
             livePresentation={
               showLiveTab
                 ? {

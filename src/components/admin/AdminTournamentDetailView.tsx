@@ -4,6 +4,7 @@ import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPane
 import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
 import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
+import { TournamentSyncAdminPanel } from "@/components/admin/TournamentSyncAdminPanel";
 import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
 import { applicationStatusLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
@@ -66,6 +67,8 @@ export function AdminTournamentDetailView({
         </AdminCard>
 
         <MeinTurnierplanAdminPanel tournament={tournament} applications={applications} />
+
+        <TournamentSyncAdminPanel tournament={tournament} applications={applications} />
 
         <div id="teilnehmer">
           <TournamentParticipantsPanel participants={participants} />

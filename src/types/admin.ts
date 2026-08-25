@@ -245,6 +245,8 @@ export type AdminTournamentRecord = {
   meinTurnierplanTableWidgetUrl: string | null;
   publicScheduleNote: string | null;
   publicLiveNote: string | null;
+  meinTurnierplanLastSyncedAt?: string | null;
+  meinTurnierplanSyncMeta?: Record<string, unknown> | null;
 };
 
 export type AdminTournamentInput = {

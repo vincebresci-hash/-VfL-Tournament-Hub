@@ -53,6 +53,9 @@ export type TournamentGroupRecord = {
   tournamentId: string;
   name: string;
   sortOrder: number;
+  externalSource?: string | null;
+  externalId?: string | null;
+  manualOverride?: boolean;
 };
 
 export type TournamentFieldRecord = {
@@ -60,6 +63,9 @@ export type TournamentFieldRecord = {
   tournamentId: string;
   name: string;
   sortOrder: number;
+  externalSource?: string | null;
+  externalId?: string | null;
+  manualOverride?: boolean;
 };
 
 export type TournamentMatchRecord = {
@@ -69,6 +75,8 @@ export type TournamentMatchRecord = {
   fieldId: string | null;
   homeApplicationId: string | null;
   awayApplicationId: string | null;
+  homeExternalTeamId?: string | null;
+  awayExternalTeamId?: string | null;
   scheduledAt: string | null;
   durationMinutes: number;
   homeScore: number | null;
@@ -84,6 +92,9 @@ export type TournamentMatchRecord = {
   decidedBy: DecidedBy;
   homePenalties: number | null;
   awayPenalties: number | null;
+  externalSource?: string | null;
+  externalId?: string | null;
+  manualOverride?: boolean;
 };
 
 export type TournamentScheduleSettings = {
@@ -103,6 +114,8 @@ export type PublicRosterEntry = {
   groupId: string | null;
   groupName: string | null;
   groupSortOrder: number | null;
+  source?: "hub" | "mein-turnierplan";
+  externalTeamId?: string | null;
 };
 
 export type StandingRow = {

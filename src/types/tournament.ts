@@ -66,6 +66,7 @@ export type Tournament = {
   meinTurnierplanTableWidgetUrl: string | null;
   publicScheduleNote: string | null;
   publicLiveNote: string | null;
+  meinTurnierplanLastSyncedAt?: string | null;
 } & TournamentPublicInfo;
 
 export type PublicTournament = Omit<Tournament, "applicationsCount">;

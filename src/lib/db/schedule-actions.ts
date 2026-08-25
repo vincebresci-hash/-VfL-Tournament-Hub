@@ -768,6 +768,7 @@ export async function saveMatchResultAction(
       home_score: home,
       away_score: away,
       status: "completed",
+      manual_override: true,
     })
     .eq("id", matchId)
     .eq("tournament_id", tournamentId)

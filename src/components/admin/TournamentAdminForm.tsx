@@ -6,7 +6,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { ageGroupImageSrc, slugifyTournamentName } from "@/lib/tournaments";
-import { MEIN_TURNIERPLAN_DEFAULT_LABEL, extractNumericMeinTurnierplanTournamentIdFromUrl } from "@/lib/mein-turnierplan";
+import { MEIN_TURNIERPLAN_DEFAULT_LABEL, extractNumericMeinTurnierplanTournamentIdFromUrl, suggestTableWidgetUrlFromMatches } from "@/lib/mein-turnierplan";
 import {
   archiveTournamentAction,
   createTournamentAction,
@@ -609,6 +609,23 @@ export function TournamentAdminForm({
                 update("meinTurnierplanTableWidgetUrl", event.target.value)
               }
             />
+            {values.meinTurnierplanMatchesWidgetUrl.trim() &&
+            !values.meinTurnierplanTableWidgetUrl.trim() ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const suggested = suggestTableWidgetUrlFromMatches(
+                    values.meinTurnierplanMatchesWidgetUrl,
+                  );
+                  if (suggested) {
+                    update("meinTurnierplanTableWidgetUrl", suggested);
+                  }
+                }}
+                className="mt-3 inline-flex h-10 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+              >
+                Tabellen-Widget vorschlagen
+              </button>
+            ) : null}
           </Field>
           <Field
             id="tournament-mtp-label"

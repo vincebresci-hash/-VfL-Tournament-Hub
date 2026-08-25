@@ -19,6 +19,7 @@ export type MeinTurnierplanFields = {
   meinTurnierplanTableWidgetUrl?: string | null;
   publicScheduleNote?: string | null;
   publicLiveNote?: string | null;
+  meinTurnierplanLastSyncedAt?: string | null;
 };
 
 export type MeinTurnierplanScheduleInput = {
@@ -193,6 +194,42 @@ export function resolveMeinTurnierplanJsonQueryId(input: {
     source: null,
     error: "Bitte die numerische MeinTurnierplan-Turnier-ID oder eine Widget-URL angeben.",
   };
+}
+
+export function resolvePublicMeinTurnierplanJsonQueryId(tournament: MeinTurnierplanFields) {
+  const widgetId =
+    (tournament.meinTurnierplanMatchesWidgetUrl
+      ? extractMeinTurnierplanWidgetIdFromUrl(tournament.meinTurnierplanMatchesWidgetUrl)
+      : null) ??
+    (tournament.meinTurnierplanTableWidgetUrl
+      ? extractMeinTurnierplanWidgetIdFromUrl(tournament.meinTurnierplanTableWidgetUrl)
+      : null);
+
+  if (widgetId) {
+    return widgetId;
+  }
+
+  const trimmedId = tournament.meinTurnierplanTournamentId?.trim() ?? "";
+  if (trimmedId && isNumericMeinTurnierplanTournamentId(trimmedId)) {
+    return trimmedId;
+  }
+
+  return null;
+}
+
+export function suggestTableWidgetUrlFromMatches(matchesWidgetUrl: string) {
+  const validated = validateMeinTurnierplanWidgetUrl(matchesWidgetUrl, "matches");
+  if (!validated.url) {
+    return null;
+  }
+
+  try {
+    const url = new URL(validated.url);
+    url.pathname = WIDGET_PATHS.table;
+    return validateMeinTurnierplanWidgetUrl(url.toString(), "table").url;
+  } catch {
+    return null;
+  }
 }
 
 export function validateMeinTurnierplanTournamentId(
@@ -647,6 +684,9 @@ export function runMeinTurnierplanSelfChecks() {
       "2jrb0hvxvd",
     "Widget-ID aus URL muss extrahierbar sein",
   );
+  const suggestedTable = suggestTableWidgetUrlFromMatches(MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL);
+  assert(Boolean(suggestedTable?.toLowerCase().includes("displaytable.php")), "Tabellen-Vorschlag muss displayTable.php sein");
+  assert(Boolean(suggestedTable?.includes("id=2jrb0hvxvd")), "Tabellen-Vorschlag muss Widget-ID übernehmen");
   assert(
     validateMeinTurnierplanInput({
       enabled: true,

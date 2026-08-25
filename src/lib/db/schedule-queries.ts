@@ -82,6 +82,9 @@ function mapGroup(row: TournamentGroupRow): TournamentGroupRecord {
     tournamentId: row.tournament_id,
     name: row.name,
     sortOrder: row.sort_order,
+    externalSource: row.external_source ?? null,
+    externalId: row.external_id ?? null,
+    manualOverride: Boolean(row.manual_override),
   };
 }
 
@@ -91,6 +94,9 @@ function mapField(row: TournamentFieldRow): TournamentFieldRecord {
     tournamentId: row.tournament_id,
     name: row.name,
     sortOrder: row.sort_order,
+    externalSource: row.external_source ?? null,
+    externalId: row.external_id ?? null,
+    manualOverride: Boolean(row.manual_override),
   };
 }
 
@@ -102,6 +108,8 @@ function mapMatch(row: TournamentMatchRow): TournamentMatchRecord {
     fieldId: row.field_id,
     homeApplicationId: row.home_application_id,
     awayApplicationId: row.away_application_id,
+    homeExternalTeamId: row.home_external_team_id ?? null,
+    awayExternalTeamId: row.away_external_team_id ?? null,
     scheduledAt: row.scheduled_at,
     durationMinutes: row.duration_minutes,
     homeScore: row.home_score,
@@ -117,6 +125,9 @@ function mapMatch(row: TournamentMatchRow): TournamentMatchRecord {
     decidedBy: asDecidedBy(row.decided_by),
     homePenalties: row.home_penalties ?? null,
     awayPenalties: row.away_penalties ?? null,
+    externalSource: row.external_source ?? null,
+    externalId: row.external_id ?? null,
+    manualOverride: Boolean(row.manual_override),
   };
 }
 
@@ -200,11 +211,16 @@ export async function getAdminTournamentStage(
   }
 
   for (const member of members) {
+    const participantId = member.application_id ?? member.external_team_id;
+    if (!participantId) {
+      continue;
+    }
+
     memberIdsByGroupId[member.group_id] = [
       ...(memberIdsByGroupId[member.group_id] ?? []),
-      member.application_id,
+      participantId,
     ];
-    groupIdByApplicationId[member.application_id] = member.group_id;
+    groupIdByApplicationId[participantId] = member.group_id;
   }
 
   return {
@@ -222,24 +238,29 @@ export async function getPublicTournamentStage(
   tournamentId: string,
 ): Promise<PublicTournamentStage> {
   const supabase = await createClient();
-  const [rosterResult, groupsResult, fieldsResult, matchesResult] = await Promise.all([
-    supabase.rpc("tournament_public_roster", { p_slug: slug }),
-    supabase
-      .from("tournament_groups")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("tournament_fields")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .order("sort_order", { ascending: true }),
-    supabase
-      .from("tournament_matches")
-      .select("*")
-      .eq("tournament_id", tournamentId)
-      .order("sort_order", { ascending: true }),
-  ]);
+  const [rosterResult, groupsResult, fieldsResult, matchesResult, externalTeamsResult] =
+    await Promise.all([
+      supabase.rpc("tournament_public_roster", { p_slug: slug }),
+      supabase
+        .from("tournament_groups")
+        .select("*")
+        .eq("tournament_id", tournamentId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("tournament_fields")
+        .select("*")
+        .eq("tournament_id", tournamentId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("tournament_matches")
+        .select("*")
+        .eq("tournament_id", tournamentId)
+        .order("sort_order", { ascending: true }),
+      supabase
+        .from("tournament_external_teams")
+        .select("id, name, application_id")
+        .eq("tournament_id", tournamentId),
+    ]);
 
   const missing =
     (rosterResult.error && isMissingRelationError(rosterResult.error)) ||
@@ -255,10 +276,55 @@ export async function getPublicTournamentStage(
     };
   }
 
+  const groups = ((groupsResult.data ?? []) as TournamentGroupRow[]).map(mapGroup);
+  const applicationRoster = ((rosterResult.data ?? []) as TournamentPublicRosterRow[]).map(
+    mapRoster,
+  );
+  const applicationIds = new Set(applicationRoster.map((entry) => entry.applicationId));
+
+  const groupIds = groups.map((group) => group.id);
+  const membersResult =
+    groupIds.length === 0
+      ? { data: [] as TournamentGroupMemberRow[], error: null }
+      : await supabase.from("tournament_group_members").select("*").in("group_id", groupIds);
+  const members = (membersResult.data ?? []) as TournamentGroupMemberRow[];
+  const groupByExternalTeamId = new Map<string, TournamentGroupRecord>();
+  for (const member of members) {
+    if (!member.external_team_id) {
+      continue;
+    }
+    const group = groups.find((entry) => entry.id === member.group_id);
+    if (group) {
+      groupByExternalTeamId.set(member.external_team_id, group);
+    }
+  }
+
+  const externalRoster: PublicRosterEntry[] = ((externalTeamsResult.data ?? []) as Array<{
+    id: string;
+    name: string;
+    application_id: string | null;
+  }>)
+    .filter((team) => !team.application_id || !applicationIds.has(team.application_id))
+    .map((team) => {
+      const group = groupByExternalTeamId.get(team.id) ?? null;
+      return {
+        applicationId: team.application_id ?? team.id,
+        clubName: team.name,
+        teamName: team.name,
+        ageGroup: null,
+        birthYear: null,
+        groupId: group?.id ?? null,
+        groupName: group?.name ?? null,
+        groupSortOrder: group?.sortOrder ?? null,
+        source: "mein-turnierplan" as const,
+        externalTeamId: team.id,
+      };
+    });
+
   return {
     ready: !rosterResult.error,
-    roster: ((rosterResult.data ?? []) as TournamentPublicRosterRow[]).map(mapRoster),
-    groups: ((groupsResult.data ?? []) as TournamentGroupRow[]).map(mapGroup),
+    roster: [...applicationRoster, ...externalRoster],
+    groups,
     fields: ((fieldsResult.data ?? []) as TournamentFieldRow[]).map(mapField),
     matches: ((matchesResult.data ?? []) as TournamentMatchRow[]).map(mapMatch),
   };

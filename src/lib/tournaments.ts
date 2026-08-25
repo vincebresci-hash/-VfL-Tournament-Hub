@@ -61,6 +61,8 @@ const TOURNAMENT_SELECT = [
   "mein_turnierplan_table_widget_url",
   "public_schedule_note",
   "public_live_note",
+  "mein_turnierplan_last_synced_at",
+  "mein_turnierplan_sync_meta",
 ].join(", ");
 
 const TOURNAMENT_SELECT_BASIC = [
@@ -174,6 +176,11 @@ function meinTurnierplanFieldsFromRow(row: TournamentRow) {
     meinTurnierplanTableWidgetUrl: nonempty(row.mein_turnierplan_table_widget_url),
     publicScheduleNote: nonempty(row.public_schedule_note),
     publicLiveNote: nonempty(row.public_live_note),
+    meinTurnierplanLastSyncedAt: nonempty(row.mein_turnierplan_last_synced_at),
+    meinTurnierplanSyncMeta:
+      row.mein_turnierplan_sync_meta && typeof row.mein_turnierplan_sync_meta === "object"
+        ? row.mein_turnierplan_sync_meta
+        : null,
   };
 }
 
@@ -350,6 +357,7 @@ export function toBoardTournament(record: AdminTournamentRecord): Tournament {
     meinTurnierplanTableWidgetUrl: record.meinTurnierplanTableWidgetUrl,
     publicScheduleNote: record.publicScheduleNote,
     publicLiveNote: record.publicLiveNote,
+    meinTurnierplanLastSyncedAt: record.meinTurnierplanLastSyncedAt ?? null,
   };
 }
 

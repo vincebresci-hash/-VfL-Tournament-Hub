@@ -107,6 +107,8 @@ export type TournamentRow = {
   mein_turnierplan_table_widget_url?: string | null;
   public_schedule_note?: string | null;
   public_live_note?: string | null;
+  mein_turnierplan_last_synced_at?: string | null;
+  mein_turnierplan_sync_meta?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 };
@@ -128,6 +130,26 @@ export type TournamentGroupRow = {
   tournament_id: string;
   name: string;
   sort_order: number;
+  external_source?: string | null;
+  external_id?: string | null;
+  manual_override?: boolean;
+  external_active?: boolean;
+  last_synced_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TournamentExternalTeamRow = {
+  id: string;
+  tournament_id: string;
+  external_source: string;
+  external_id: string;
+  name: string;
+  application_id: string | null;
+  manual_override: boolean;
+  external_active?: boolean;
+  external_updated_at?: string | null;
+  last_synced_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -135,7 +157,8 @@ export type TournamentGroupRow = {
 export type TournamentGroupMemberRow = {
   id: string;
   group_id: string;
-  application_id: string;
+  application_id: string | null;
+  external_team_id?: string | null;
   created_at: string;
 };
 
@@ -144,6 +167,11 @@ export type TournamentFieldRow = {
   tournament_id: string;
   name: string;
   sort_order: number;
+  external_source?: string | null;
+  external_id?: string | null;
+  manual_override?: boolean;
+  external_active?: boolean;
+  last_synced_at?: string | null;
   created_at: string;
 };
 
@@ -154,6 +182,8 @@ export type TournamentMatchRow = {
   field_id: string | null;
   home_application_id: string | null;
   away_application_id: string | null;
+  home_external_team_id?: string | null;
+  away_external_team_id?: string | null;
   scheduled_at: string | null;
   duration_minutes: number;
   home_score: number | null;
@@ -169,6 +199,11 @@ export type TournamentMatchRow = {
   decided_by: DecidedByRow;
   home_penalties: number | null;
   away_penalties: number | null;
+  external_source?: string | null;
+  external_id?: string | null;
+  manual_override?: boolean;
+  external_active?: boolean;
+  last_synced_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -428,7 +463,11 @@ export type Database = {
       >;
       tournament_group_members: Table<
         TournamentGroupMemberRow,
-        Partial<TournamentGroupMemberRow> & { group_id: string; application_id: string },
+        Partial<TournamentGroupMemberRow> & {
+          group_id: string;
+          application_id?: string | null;
+          external_team_id?: string | null;
+        },
         Partial<TournamentGroupMemberRow>,
         [
           {
@@ -442,6 +481,38 @@ export type Database = {
             foreignKeyName: "tournament_group_members_application_id_fkey";
             columns: ["application_id"];
             isOneToOne: true;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tournament_group_members_external_team_id_fkey";
+            columns: ["external_team_id"];
+            isOneToOne: true;
+            referencedRelation: "tournament_external_teams";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      tournament_external_teams: Table<
+        TournamentExternalTeamRow,
+        Partial<TournamentExternalTeamRow> & {
+          tournament_id: string;
+          external_id: string;
+          name: string;
+        },
+        Partial<TournamentExternalTeamRow>,
+        [
+          {
+            foreignKeyName: "tournament_external_teams_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tournament_external_teams_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
             referencedRelation: "applications";
             referencedColumns: ["id"];
           },
@@ -537,6 +608,14 @@ export type Database = {
           p_provider_message_id: string | null;
         };
         Returns: undefined;
+      };
+      sync_mein_turnierplan_tournament: {
+        Args: {
+          p_tournament_id: string;
+          p_payload: Json;
+          p_overwrite_manual?: boolean;
+        };
+        Returns: Json;
       };
     };
     Enums: {

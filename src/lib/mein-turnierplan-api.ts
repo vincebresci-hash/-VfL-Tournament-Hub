@@ -89,8 +89,15 @@ export function hasMeinTurnierplanStructure(data: Record<string, unknown>) {
   return hasParticipants || hasGroups || hasGroupParticipants;
 }
 
+export async function fetchMeinTurnierplanJsonPublic(
+  tournamentId: string,
+): Promise<MeinTurnierplanJsonResult> {
+  return fetchMeinTurnierplanJson(tournamentId, { revalidateSeconds: 60 });
+}
+
 export async function fetchMeinTurnierplanJson(
   tournamentId: string,
+  options?: { revalidateSeconds?: number },
 ): Promise<MeinTurnierplanJsonResult> {
   const trimmed = tournamentId.trim();
   if (!trimmed) {
@@ -109,7 +116,10 @@ export async function fetchMeinTurnierplanJson(
       method: "GET",
       headers: { Accept: "application/json" },
       signal: controller.signal,
-      cache: "no-store",
+      cache: options?.revalidateSeconds ? "force-cache" : "no-store",
+      next: options?.revalidateSeconds
+        ? { revalidate: options.revalidateSeconds }
+        : undefined,
     });
 
     if (!response.ok) {
