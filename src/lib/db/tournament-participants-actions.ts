@@ -20,7 +20,8 @@ import {
 import {
   buildExternalTeamLogoObjectPath,
   deleteManagedClubLogoIfOwned,
-  isAllowedClubLogoMimeType,
+  getFormDataUploadFile,
+  resolveClubLogoMimeType,
   uploadClubLogoFile,
 } from "@/lib/storage/club-logos";
 
@@ -54,6 +55,7 @@ function revalidateTournamentPaths(slug: string, tournamentId: string) {
   revalidatePath(`/admin/turniere/${tournamentId}/gruppen`);
   revalidatePath(`/turniere/${slug}`);
   revalidatePath("/turniere");
+  revalidatePath("/live");
 }
 
 async function assertCapacityForNewManualTeam(tournamentId: string, maxTeams: number | null) {
@@ -477,22 +479,37 @@ export async function updateExternalTeamLogoAction(input: {
     notice = "Hub-Verein verknüpft.";
   } else if (input.mode === "upload") {
     const logoFile = input.logoFile;
-    if (!logoFile || !(logoFile instanceof File) || logoFile.size <= 0) {
+    if (!logoFile || typeof logoFile !== "object" || typeof logoFile.arrayBuffer !== "function" || logoFile.size <= 0) {
       return { error: "Bitte eine Bilddatei auswählen.", notice: null };
     }
 
-    if (!isAllowedClubLogoMimeType(logoFile.type)) {
+    const mimeType = resolveClubLogoMimeType(logoFile);
+    if (!mimeType) {
       return { error: "Erlaubt sind PNG, JPEG oder WebP.", notice: null };
     }
+
+    // Confirm the cookie-bound client still has a user JWT (Storage RLS uses it).
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) {
+      return {
+        error: "Keine gültige Admin-Session für den Upload. Bitte erneut anmelden.",
+        notice: null,
+      };
+    }
+
+    const objectPath = buildExternalTeamLogoObjectPath({
+      tournamentId: input.tournamentId,
+      externalTeamId: input.externalTeamId,
+      mimeType,
+    });
 
     const uploaded = await uploadClubLogoFile({
       supabase,
       file: logoFile,
-      objectPath: buildExternalTeamLogoObjectPath({
-        tournamentId: input.tournamentId,
-        externalTeamId: input.externalTeamId,
-        mimeType: logoFile.type,
-      }),
+      objectPath,
+      mimeType,
     });
 
     if (uploaded.error || !uploaded.publicUrl) {
@@ -504,7 +521,7 @@ export async function updateExternalTeamLogoAction(input: {
       ...patch,
       logo_url: uploaded.publicUrl,
     };
-    notice = "Logo wurde hochgeladen.";
+    notice = "Logo gespeichert";
   } else {
     const logoUrl = input.logoUrl?.trim() || null;
     if (!logoUrl) {
@@ -528,7 +545,20 @@ export async function updateExternalTeamLogoAction(input: {
     .eq("tournament_id", input.tournamentId);
 
   if (error) {
-    return { error: "Das Logo konnte nicht gespeichert werden.", notice: null };
+    // If storage upload already succeeded, remove the orphaned object.
+    if (input.mode === "upload" && patch.logo_url) {
+      await deleteManagedClubLogoIfOwned({ supabase, logoUrl: patch.logo_url });
+    }
+    console.error("[club-logos] db update failed", {
+      externalTeamId: input.externalTeamId,
+      tournamentId: input.tournamentId,
+      message: error.message,
+      code: error.code,
+    });
+    return {
+      error: `Logo konnte nicht gespeichert werden: ${error.message.slice(0, 180)}`,
+      notice: null,
+    };
   }
 
   if (
@@ -544,7 +574,7 @@ export async function updateExternalTeamLogoAction(input: {
 }
 
 /**
- * Reliable file upload via FormData (File arguments are flaky across clients).
+ * Reliable file upload via FormData (native form action / multipart).
  * Does not require or set club_id.
  */
 export async function uploadExternalTeamLogoFormAction(
@@ -552,14 +582,30 @@ export async function uploadExternalTeamLogoFormAction(
 ): Promise<{ error: string | null; notice: string | null }> {
   const tournamentId = String(formData.get("tournamentId") ?? "").trim();
   const externalTeamId = String(formData.get("externalTeamId") ?? "").trim();
-  const logoFile = formData.get("logoFile");
+  const { file: logoFile, meta } = getFormDataUploadFile(formData, "logoFile");
+
+  if (process.env.NODE_ENV !== "production") {
+    console.info("[club-logos] form upload received", {
+      tournamentId: tournamentId || null,
+      externalTeamId: externalTeamId || null,
+      fileReceived: meta.received,
+      filename: meta.filename,
+      mime: meta.mime,
+      size: meta.size,
+    });
+  }
 
   if (!tournamentId || !externalTeamId) {
     return { error: "Turnier oder Team fehlt.", notice: null };
   }
 
-  if (!(logoFile instanceof File)) {
-    return { error: "Bitte eine Bilddatei auswählen.", notice: null };
+  if (!logoFile) {
+    return {
+      error: meta.received
+        ? "Die hochgeladene Datei ist leer oder ungültig."
+        : "Bitte eine Bilddatei auswählen.",
+      notice: null,
+    };
   }
 
   return updateExternalTeamLogoAction({

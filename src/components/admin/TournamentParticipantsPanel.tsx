@@ -251,8 +251,8 @@ export function TournamentParticipantsPanel({
               inputMode="url"
             />
             <span className="text-[12px] text-muted">
-              Bei gewähltem Hub-Verein wird bevorzugt dessen Vereinslogo angezeigt. Für Upload bitte
-              „Logo bearbeiten“ am Eintrag nutzen.
+              Optional. Hub-Verein ist nicht nötig — Logo-URL greift direkt. Für Datei-Upload
+              „Logo bearbeiten“ am Eintrag nutzen (PNG/JPEG/WebP, max. 2 MB).
             </span>
           </label>
           <div className="flex flex-wrap gap-2">

@@ -35,6 +35,7 @@ try {
   const participantCountChecks = runMeinTurnierplanParticipantCountChecks();
   const combinedParticipantListChecks = runTournamentParticipantsListChecks();
   const participantLogoManagementChecks = runTournamentParticipantLogoManagementChecks();
+  const clubLogoStorageUploadChecks = runTournamentParticipantLogoManagementChecks();
   const livePageChecks = runLivePageSelfChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
@@ -52,6 +53,7 @@ try {
   console.log(`mein-turnierplan-participant-count-checks: ${participantCountChecks}`);
   console.log(`combined-participant-list-checks: ${combinedParticipantListChecks}`);
   console.log(`participant-logo-management-checks: ${participantLogoManagementChecks}`);
+  console.log(`club-logo-storage-upload-checks: ${clubLogoStorageUploadChecks}`);
   console.log(`live-page-checks: ${livePageChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

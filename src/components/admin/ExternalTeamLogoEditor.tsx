@@ -37,10 +37,13 @@ export function ExternalTeamLogoEditor({
   const [pending, startTransition] = useTransition();
   const [clubId, setClubId] = useState(participant.clubId ?? "");
   const [logoUrl, setLogoUrl] = useState(participant.customLogoUrl ?? "");
-  const [file, setFile] = useState<File | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [localNotice, setLocalNotice] = useState<string | null>(null);
   const [showApply, setShowApply] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [previewOverrideUrl, setPreviewOverrideUrl] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -51,13 +54,15 @@ export function ExternalTeamLogoEditor({
   }, [filePreviewUrl]);
 
   function onFileSelected(next: File | null) {
+    setLocalError(null);
+    setLocalNotice(null);
+    setFileName(next?.name ?? null);
     setFilePreviewUrl((current) => {
       if (current) {
         URL.revokeObjectURL(current);
       }
       return next ? URL.createObjectURL(next) : null;
     });
-    setFile(next);
   }
 
   const candidates = useMemo(
@@ -88,13 +93,37 @@ export function ExternalTeamLogoEditor({
   const linkedHubHasLogo = Boolean(previewClub?.logoUrl?.trim());
   const displayPreview = resolveParticipantLogoUrl({
     hubClubLogoUrl: previewClub?.logoUrl ?? null,
-    storedLogoUrl: filePreviewUrl || logoUrl.trim() || participant.customLogoUrl,
+    storedLogoUrl:
+      previewOverrideUrl ||
+      filePreviewUrl ||
+      logoUrl.trim() ||
+      participant.customLogoUrl,
   });
 
   function run(action: () => Promise<{ error: string | null; notice: string | null }>) {
+    setLocalError(null);
+    setLocalNotice(null);
     startTransition(async () => {
-      const result = await action();
-      onDone(result);
+      try {
+        const result = await action();
+        if (result.error) {
+          setLocalError(result.error);
+          onDone(result);
+          return;
+        }
+        setLocalNotice(result.notice);
+        if (result.notice?.toLowerCase().includes("logo")) {
+          // Keep panel open briefly with success; parent refreshes preview data.
+        }
+        onDone(result);
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? `Logo konnte nicht hochgeladen werden: ${error.message.slice(0, 180)}`
+            : "Logo konnte nicht hochgeladen werden: Unerwarteter Fehler.";
+        setLocalError(message);
+        onDone({ error: message, notice: null });
+      }
     });
   }
 
@@ -109,18 +138,6 @@ export function ExternalTeamLogoEditor({
     );
   }
 
-  function uploadSelectedFile() {
-    if (!file || !participant.externalTeamId) {
-      return;
-    }
-
-    const formData = new FormData();
-    formData.set("tournamentId", tournamentId);
-    formData.set("externalTeamId", participant.externalTeamId);
-    formData.set("logoFile", file);
-    run(() => uploadExternalTeamLogoFormAction(formData));
-  }
-
   return (
     <div className="mt-4 border border-line bg-surface p-4">
       <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
@@ -131,12 +148,21 @@ export function ExternalTeamLogoEditor({
         direkt ein eigenes Logo zuweisen.
       </p>
 
+      {localError ? (
+        <p className="mt-3 border border-[#d9b0b0] bg-[#fff5f5] px-3 py-2 text-[13px] text-[#9a2b2b]">
+          {localError}
+        </p>
+      ) : null}
+      {localNotice ? (
+        <p className="mt-3 border border-line bg-white px-3 py-2 text-[13px] text-ink">{localNotice}</p>
+      ) : null}
+
       <div className="mt-4 flex items-center gap-3">
         <ParticipantClubLogo logoUrl={displayPreview} clubName={participant.clubName} />
         <div className="text-[13px] text-muted">
           <p className="font-medium text-ink">Aktuelle Vorschau</p>
           <p className="mt-1">Priorität: Hub-Verein → eigenes Logo → Placeholder</p>
-          {linkedHubHasLogo && participant.customLogoUrl ? (
+          {linkedHubHasLogo && (previewOverrideUrl || participant.customLogoUrl) ? (
             <p className="mt-1 text-ink">
               Hinweis: Ein Hub-Vereinslogo hat Vorrang vor dem eigenen Logo.
             </p>
@@ -212,24 +238,45 @@ export function ExternalTeamLogoEditor({
           Funktioniert auch ohne Hub-Verein. Speichert direkt auf dem Turnierteam.
         </p>
 
-        <label className="mt-3 grid gap-1 text-[13px] text-ink">
-          <span className="font-semibold uppercase tracking-[0.08em]">Datei auswählen</span>
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={pending}
-            onChange={(event) => onFileSelected(event.target.files?.[0] ?? null)}
-            className="block w-full text-[13px]"
-          />
-        </label>
-        <button
-          type="button"
-          disabled={pending || !file}
-          onClick={uploadSelectedFile}
-          className="mt-3 inline-flex h-9 items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+        <form
+          className="mt-3 grid gap-3"
+          action={(formData) => {
+            run(async () => {
+              const result = await uploadExternalTeamLogoFormAction(formData);
+              if (!result.error) {
+                setPreviewOverrideUrl(filePreviewUrl);
+                setFileName(null);
+              }
+              return {
+                error: result.error,
+                notice: result.error ? null : (result.notice ?? "Logo gespeichert"),
+              };
+            });
+          }}
         >
-          Logo hochladen
-        </button>
+          <input type="hidden" name="tournamentId" value={tournamentId} />
+          <input type="hidden" name="externalTeamId" value={participant.externalTeamId ?? ""} />
+          <label className="grid gap-1 text-[13px] text-ink">
+            <span className="font-semibold uppercase tracking-[0.08em]">Datei auswählen</span>
+            <input
+              type="file"
+              name="logoFile"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={pending}
+              required
+              onChange={(event) => onFileSelected(event.target.files?.[0] ?? null)}
+              className="block w-full text-[13px]"
+            />
+            {fileName ? <span className="text-[12px] text-muted">{fileName}</span> : null}
+          </label>
+          <button
+            type="submit"
+            disabled={pending || !fileName}
+            className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+          >
+            {pending ? "Lade hoch…" : "Logo hochladen"}
+          </button>
+        </form>
 
         <label className="mt-4 grid gap-1 text-[13px] text-ink">
           <span className="font-semibold uppercase tracking-[0.08em]">Oder Logo-URL</span>
@@ -245,14 +292,18 @@ export function ExternalTeamLogoEditor({
           type="button"
           disabled={pending || !logoUrl.trim()}
           onClick={() =>
-            run(() =>
-              updateExternalTeamLogoAction({
+            run(async () => {
+              const result = await updateExternalTeamLogoAction({
                 tournamentId,
                 externalTeamId: participant.externalTeamId!,
                 mode: "url",
                 logoUrl,
-              }),
-            )
+              });
+              if (!result.error) {
+                setPreviewOverrideUrl(logoUrl.trim());
+              }
+              return result;
+            })
           }
           className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
         >
@@ -265,13 +316,18 @@ export function ExternalTeamLogoEditor({
           type="button"
           disabled={pending}
           onClick={() =>
-            run(() =>
-              updateExternalTeamLogoAction({
+            run(async () => {
+              const result = await updateExternalTeamLogoAction({
                 tournamentId,
                 externalTeamId: participant.externalTeamId!,
                 mode: "remove",
-              }),
-            )
+              });
+              if (!result.error) {
+                setPreviewOverrideUrl(null);
+                setLogoUrl("");
+              }
+              return result;
+            })
           }
           className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
         >
