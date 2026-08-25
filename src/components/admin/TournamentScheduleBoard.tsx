@@ -14,6 +14,7 @@ import {
 } from "@/lib/db/schedule-actions";
 import { isoToDatetimeLocal } from "@/lib/schedule/datetime";
 import { fieldDisplayName } from "@/lib/schedule/names";
+import { matchSideParticipantId } from "@/lib/schedule/admin";
 import { MATCH_STATUSES, type MatchStatus, type TournamentFieldRecord, type TournamentGroupRecord, type TournamentMatchRecord } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -306,11 +307,13 @@ function MatchEditor({
 }) {
   const [groupId, setGroupId] = useState(match.groupId ?? groups[0]?.id ?? "");
   const [fieldId, setFieldId] = useState(match.fieldId ?? fields[0]?.id ?? "");
-  const [homeId, setHomeId] = useState(match.homeApplicationId ?? "");
-  const [awayId, setAwayId] = useState(match.awayApplicationId ?? "");
+  const [homeId, setHomeId] = useState(matchSideParticipantId(match, "home") ?? "");
+  const [awayId, setAwayId] = useState(matchSideParticipantId(match, "away") ?? "");
   const [scheduledAt, setScheduledAt] = useState(isoToDatetimeLocal(match.scheduledAt));
   const [status, setStatus] = useState<MatchStatus>(match.status);
-  const teams = memberIdsByGroupId[groupId] ?? [];
+  const teams = Array.from(
+    new Set([...(memberIdsByGroupId[groupId] ?? []), homeId, awayId].filter(Boolean)),
+  );
 
   return (
     <form

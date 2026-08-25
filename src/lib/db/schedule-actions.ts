@@ -5,9 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/auth/roles";
 import { toUserFacingDbError } from "@/lib/db/errors";
-import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
-import { categoryRank, distributeTeams } from "@/lib/schedule/distribute";
+import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import {
+  resolveScheduleParticipantRef,
+  scheduleParticipantId,
+} from "@/lib/schedule/admin";
+import { distributeTeams } from "@/lib/schedule/distribute";
 import { fieldDisplayName, groupDisplayName } from "@/lib/schedule/names";
 import {
   expectedGroupMatchCount,
@@ -17,7 +21,6 @@ import {
 } from "@/lib/schedule/round-robin";
 import { buildTimetable } from "@/lib/schedule/timetable";
 import { berlinWallTimeToIso, datetimeLocalToIso, normalizeClock, wallTimeOnDate } from "@/lib/schedule/datetime";
-import { applicationBelongsToTournament } from "@/lib/tournaments";
 import { MATCH_STATUSES, type MatchStatus } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -97,19 +100,34 @@ function constraintMessage(error: { message?: string; code?: string } | null, fa
   if (message.includes("tournament_group_members_application_idx")) {
     return "Dieses Team ist bereits einer Gruppe zugeordnet.";
   }
+  if (message.includes("tournament_group_members_external_team_idx")) {
+    return "Dieses Team ist bereits einer Gruppe zugeordnet.";
+  }
   if (error?.code === "23503") {
     return "Die Gruppe kann nicht gelöscht werden, solange Spiele davon abhängen.";
   }
   return toUserFacingDbError(fallback, error);
 }
 
-async function acceptedParticipants(tournament: Pick<AdminTournamentRecord, "id" | "slug">) {
-  const result = await listAdminApplications();
-  return result.applications.filter(
-    (application) =>
-      applicationBelongsToTournament(application, tournament) &&
-      application.applicationStatus === "accepted",
-  );
+async function loadConfirmedScheduleParticipants(tournamentId: string) {
+  return getTournamentParticipants(tournamentId);
+}
+
+function matchSideColumns(
+  side: "home" | "away",
+  ref: { applicationId: string | null; externalTeamId: string | null },
+) {
+  if (side === "home") {
+    return {
+      home_application_id: ref.applicationId,
+      home_external_team_id: ref.externalTeamId,
+    };
+  }
+
+  return {
+    away_application_id: ref.applicationId,
+    away_external_team_id: ref.externalTeamId,
+  };
 }
 
 export async function createTournamentGroupAction(
@@ -224,7 +242,7 @@ export async function deleteTournamentGroupAction(
 
 export async function assignTeamToGroupAction(
   tournamentId: string,
-  applicationId: string,
+  participantId: string,
   groupId: string | null,
 ): Promise<{ error: string | null }> {
   const access = await requireAdmin();
@@ -245,16 +263,17 @@ export async function assignTeamToGroupAction(
     };
   }
 
-  const participants = await acceptedParticipants(loaded.tournament);
-  if (!participants.some((application) => application.id === applicationId)) {
+  const participants = await loadConfirmedScheduleParticipants(tournamentId);
+  const ref = resolveScheduleParticipantRef(participantId, participants);
+  if (!ref) {
     return { error: "Nur bestätigte Teilnehmer können einer Gruppe zugeordnet werden." };
   }
 
   const supabase = await createClient();
-  const { error: deleteError } = await supabase
-    .from("tournament_group_members")
-    .delete()
-    .eq("application_id", applicationId);
+  const deleteQuery = supabase.from("tournament_group_members").delete();
+  const { error: deleteError } = ref.applicationId
+    ? await deleteQuery.eq("application_id", ref.applicationId)
+    : await deleteQuery.eq("external_team_id", ref.externalTeamId!);
 
   if (deleteError) {
     return { error: constraintMessage(deleteError, "Die Zuordnung konnte nicht geändert werden.") };
@@ -263,7 +282,8 @@ export async function assignTeamToGroupAction(
   if (groupId) {
     const { error } = await supabase.from("tournament_group_members").insert({
       group_id: groupId,
-      application_id: applicationId,
+      application_id: ref.applicationId,
+      external_team_id: ref.externalTeamId,
     });
 
     if (error) {
@@ -302,7 +322,7 @@ export async function autoDistributeTeamsAction(
     };
   }
 
-  const participants = await acceptedParticipants(loaded.tournament);
+  const participants = await loadConfirmedScheduleParticipants(tournamentId);
   if (participants.length < 2) {
     return { error: "Es werden mindestens zwei bestätigte Teilnehmer benötigt.", notice: null };
   }
@@ -359,27 +379,44 @@ export async function autoDistributeTeamsAction(
     groups.splice(groupCount);
   }
 
-  const buckets = distributeTeams(
-    participants.map((application) => ({
-      applicationId: application.id,
-      categoryRank: categoryRank(application.internalCategory),
-      internalStrength: application.internalStrength ?? 0,
-      selfRatedStrength: application.selfRatedStrength,
-    })),
-    groupCount,
-    { balanceStrength },
-  );
+  const distributable = participants.flatMap((participant) => {
+    const id = scheduleParticipantId(participant);
+    if (!id) {
+      return [];
+    }
 
-  const rows = buckets.flatMap((applicationIds, index) => {
+    return [
+      {
+        applicationId: id,
+        categoryRank: 0,
+        internalStrength: 0,
+        selfRatedStrength: 3,
+      },
+    ];
+  });
+
+  const buckets = distributeTeams(distributable, groupCount, { balanceStrength });
+
+  const rows = buckets.flatMap((participantIds, index) => {
     const group = groups[index];
     if (!group) {
       return [];
     }
 
-    return applicationIds.map((applicationId) => ({
-      group_id: group.id,
-      application_id: applicationId,
-    }));
+    return participantIds.flatMap((participantId) => {
+      const ref = resolveScheduleParticipantRef(participantId, participants);
+      if (!ref) {
+        return [];
+      }
+
+      return [
+        {
+          group_id: group.id,
+          application_id: ref.applicationId,
+          external_team_id: ref.externalTeamId,
+        },
+      ];
+    });
   });
 
   if (rows.length > 0) {
@@ -589,20 +626,33 @@ export async function generateTournamentScheduleAction(
     return { error: constraintMessage(deleteError, "Der bestehende Spielplan konnte nicht ersetzt werden."), notice: null };
   }
 
-  const { error: insertError } = await supabase.from("tournament_matches").insert(
-    timetable.matches.map((match) => ({
+  const participants = await loadConfirmedScheduleParticipants(tournamentId);
+  const rows = [];
+  for (const match of timetable.matches) {
+    const homeRef = resolveScheduleParticipantRef(match.homeId, participants);
+    const awayRef = resolveScheduleParticipantRef(match.awayId, participants);
+    if (!homeRef || !awayRef) {
+      return {
+        error: "Ein Spielplan-Team konnte keinem bestätigten Teilnehmer zugeordnet werden.",
+        notice: null,
+      };
+    }
+
+    rows.push({
       tournament_id: tournamentId,
       group_id: match.groupId,
       field_id: match.fieldId,
-      home_application_id: match.homeId,
-      away_application_id: match.awayId,
+      ...matchSideColumns("home", homeRef),
+      ...matchSideColumns("away", awayRef),
       scheduled_at: match.scheduledAt.toISOString(),
       duration_minutes: match.durationMinutes,
       status: "scheduled" as const,
       phase: "group" as const,
       sort_order: match.sortOrder,
-    })),
-  );
+    });
+  }
+
+  const { error: insertError } = await supabase.from("tournament_matches").insert(rows);
 
   if (insertError) {
     return { error: constraintMessage(insertError, "Der Spielplan konnte nicht gespeichert werden."), notice: null };
@@ -638,7 +688,16 @@ export async function saveTournamentMatchAction(
     return { error: loaded.error };
   }
 
-  if (input.homeApplicationId === input.awayApplicationId) {
+  // homeApplicationId / awayApplicationId are schedule participant IDs
+  // (application UUID or external-team UUID).
+  const homeParticipantId = input.homeApplicationId.trim();
+  const awayParticipantId = input.awayApplicationId.trim();
+
+  if (!homeParticipantId || !awayParticipantId) {
+    return { error: "Bitte beide Teams auswählen." };
+  }
+
+  if (homeParticipantId === awayParticipantId) {
     return { error: "Ein Team kann nicht gegen sich selbst spielen." };
   }
 
@@ -648,10 +707,17 @@ export async function saveTournamentMatchAction(
 
   const scheduledAt = datetimeLocalToIso(input.scheduledAt);
   const stage = await getAdminTournamentStage(tournamentId);
-  const homeGroup = stage.groupIdByApplicationId[input.homeApplicationId];
-  const awayGroup = stage.groupIdByApplicationId[input.awayApplicationId];
+  const homeGroup = stage.groupIdByApplicationId[homeParticipantId];
+  const awayGroup = stage.groupIdByApplicationId[awayParticipantId];
   if (!homeGroup || !awayGroup || homeGroup !== input.groupId || awayGroup !== input.groupId) {
     return { error: "Beide Teams müssen derselben Gruppe angehören." };
+  }
+
+  const participants = await loadConfirmedScheduleParticipants(tournamentId);
+  const homeRef = resolveScheduleParticipantRef(homeParticipantId, participants);
+  const awayRef = resolveScheduleParticipantRef(awayParticipantId, participants);
+  if (!homeRef || !awayRef) {
+    return { error: "Nur bestätigte Teilnehmer können einem Spiel zugeordnet werden." };
   }
 
   const supabase = await createClient();
@@ -659,8 +725,8 @@ export async function saveTournamentMatchAction(
     tournament_id: tournamentId,
     group_id: input.groupId,
     field_id: input.fieldId || null,
-    home_application_id: input.homeApplicationId,
-    away_application_id: input.awayApplicationId,
+    ...matchSideColumns("home", homeRef),
+    ...matchSideColumns("away", awayRef),
     scheduled_at: scheduledAt,
     duration_minutes: loaded.tournament.match_duration_minutes ?? 12,
     status: input.status,
