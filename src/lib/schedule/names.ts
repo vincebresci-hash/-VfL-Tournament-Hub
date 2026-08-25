@@ -12,10 +12,42 @@ export function fieldDisplayName(index: number) {
   return `Feld ${index + 1}`;
 }
 
-export function publicTeamLabel(clubName: string, teamName: string) {
-  const club = clubName.trim() || "Verein";
-  const team = teamName.trim();
-  return team ? `${club} · ${team}` : club;
+function normalizeLabelPart(value: string | null | undefined) {
+  return value?.trim() ?? "";
+}
+
+/**
+ * Public club/team display label.
+ * Identical club and team names (trim + case-insensitive) are shown once.
+ */
+export function publicTeamLabel(
+  clubName: string | null | undefined,
+  teamName: string | null | undefined,
+) {
+  const club = normalizeLabelPart(clubName);
+  const team = normalizeLabelPart(teamName);
+
+  if (club && team) {
+    if (club.toLowerCase() === team.toLowerCase()) {
+      return club;
+    }
+    return `${club} · ${team}`;
+  }
+
+  return club || team || "Team";
+}
+
+/** True when club and team should be shown as two distinct lines/parts. */
+export function hasDistinctTeamName(
+  clubName: string | null | undefined,
+  teamName: string | null | undefined,
+) {
+  const club = normalizeLabelPart(clubName);
+  const team = normalizeLabelPart(teamName);
+  if (!club || !team) {
+    return Boolean(team);
+  }
+  return club.toLowerCase() !== team.toLowerCase();
 }
 
 export function teamLabel(

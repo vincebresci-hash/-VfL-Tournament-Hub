@@ -10,6 +10,10 @@ import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan
 import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
 import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-participant-logos-checks";
 import { runLivePageSelfChecks } from "@/lib/live/live-page-checks";
+import {
+  runLiveMatchLayoutChecks,
+  runPublicTeamLabelChecks,
+} from "@/lib/schedule/names-checks";
 import { runTournamentStatusCapacityChecks } from "@/lib/tournament-status-checks";
 import { runSiteUrlAndCspChecks } from "@/lib/site-checks";
 import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-checks";
@@ -41,6 +45,8 @@ try {
   const participantLogoManagementChecks = runTournamentParticipantLogoManagementChecks();
   const clubLogoStorageUploadChecks = runTournamentParticipantLogoManagementChecks();
   const livePageChecks = runLivePageSelfChecks();
+  const publicTeamLabelChecks = runPublicTeamLabelChecks();
+  const liveMatchLayoutChecks = runLiveMatchLayoutChecks();
   const tournamentStatusCapacityChecks = runTournamentStatusCapacityChecks();
   const siteUrlAndCspChecks = runSiteUrlAndCspChecks();
   const authLoginValidationChecks = runAuthLoginValidationChecks();
@@ -63,6 +69,8 @@ try {
   console.log(`participant-logo-management-checks: ${participantLogoManagementChecks}`);
   console.log(`club-logo-storage-upload-checks: ${clubLogoStorageUploadChecks}`);
   console.log(`live-page-checks: ${livePageChecks}`);
+  console.log(`public-team-label-checks: ${publicTeamLabelChecks}`);
+  console.log(`live-match-layout-checks: ${liveMatchLayoutChecks}`);
   console.log(`tournament-status-capacity-checks: ${tournamentStatusCapacityChecks}`);
   console.log(`site-url-csp-checks: ${siteUrlAndCspChecks}`);
   console.log(`auth-login-validation-checks: ${authLoginValidationChecks}`);

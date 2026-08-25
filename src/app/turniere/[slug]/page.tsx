@@ -31,6 +31,7 @@ import {
   getEffectiveTournamentStatus,
   tournamentStatusClassName,
 } from "@/lib/tournament-status";
+import { publicTeamLabel } from "@/lib/schedule/names";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -314,10 +315,7 @@ export default async function TournamentDetailPage({
                     className="flex items-center gap-3 border border-line bg-white px-4 py-3 text-[15px] text-ink"
                   >
                     <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} />
-                    <span>
-                      {entry.clubName}
-                      {entry.teamName ? ` · ${entry.teamName}` : ""}
-                    </span>
+                    <span>{publicTeamLabel(entry.clubName, entry.teamName)}</span>
                   </li>
                 ))}
               </ul>

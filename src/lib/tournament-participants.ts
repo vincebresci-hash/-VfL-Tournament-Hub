@@ -1,3 +1,5 @@
+import { publicTeamLabel } from "@/lib/schedule/names";
+
 export type TournamentParticipantSource = "application" | "mein-turnierplan" | "manual";
 
 export type TournamentParticipant = {
@@ -54,12 +56,7 @@ export type ExternalParticipantInput = {
 };
 
 function participantDisplayName(clubName: string, teamName: string) {
-  const club = clubName.trim();
-  const team = teamName.trim();
-  if (club && team && club.toLowerCase() !== team.toLowerCase()) {
-    return `${club} · ${team}`;
-  }
-  return club || team || "Team";
+  return publicTeamLabel(clubName, teamName);
 }
 
 /** Prefer Hub club logo over stored/imported logo. */
