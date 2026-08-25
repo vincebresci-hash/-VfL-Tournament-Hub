@@ -5,11 +5,13 @@ import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome"
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
 import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
 import { TournamentSyncAdminPanel } from "@/components/admin/TournamentSyncAdminPanel";
+import { ExternalTeamsParticipationPanel } from "@/components/admin/ExternalTeamsParticipationPanel";
 import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
 import { applicationStatusLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
 import { acceptedParticipants } from "@/lib/schedule/admin";
-import { getTournamentCapacity } from "@/lib/tournament-capacity";
+import { getTournamentCapacityWithExternal } from "@/lib/mein-turnierplan-participants";
+import type { ExternalTeamAdminRow } from "@/lib/db/mein-turnierplan-participants-actions";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication, ApplicationStatus } from "@/types/application";
 import type { TournamentStageStatus } from "@/types/schedule";
@@ -17,6 +19,7 @@ import type { TournamentStageStatus } from "@/types/schedule";
 type AdminTournamentDetailViewProps = {
   tournament: AdminTournamentRecord;
   applications: AdminApplication[];
+  externalTeams: ExternalTeamAdminRow[];
   stageStatus: TournamentStageStatus;
   current: "overview" | "participants";
 };
@@ -30,6 +33,7 @@ const applicationSections: Array<{ status: ApplicationStatus; title: string }> =
 export function AdminTournamentDetailView({
   tournament,
   applications,
+  externalTeams,
   stageStatus,
   current,
 }: AdminTournamentDetailViewProps) {
@@ -39,10 +43,16 @@ export function AdminTournamentDetailView({
       application.tournamentId === tournament.id,
   );
   const participants = acceptedParticipants(applications, tournament);
-  const capacity = getTournamentCapacity(
-    tournament.maxTeams,
-    related.map((application) => application.applicationStatus),
-  );
+  const capacity = getTournamentCapacityWithExternal({
+    maxTeams: tournament.maxTeams,
+    applicationStatuses: related.map((application) => application.applicationStatus),
+    acceptedApplicationIds: participants.map((application) => application.id),
+    externalTeams: externalTeams.map((team) => ({
+      participationStatus: team.participationStatus,
+      externalActive: team.externalActive,
+      applicationId: team.applicationId,
+    })),
+  });
   const maxLabel = tournament.maxTeams == null ? "—" : String(tournament.maxTeams);
 
   return (
@@ -68,7 +78,22 @@ export function AdminTournamentDetailView({
 
         <MeinTurnierplanAdminPanel tournament={tournament} applications={applications} />
 
-        <TournamentSyncAdminPanel tournament={tournament} applications={applications} />
+        <TournamentSyncAdminPanel
+          tournament={tournament}
+          applications={applications}
+          detectedExternalTeamCount={
+            externalTeams.filter(
+              (team) => team.externalActive && team.participationStatus === "detected",
+            ).length
+          }
+        />
+
+        <ExternalTeamsParticipationPanel
+          tournamentId={tournament.id}
+          teams={externalTeams}
+          confirmedParticipantCount={capacity.confirmedTeams}
+          maxTeams={tournament.maxTeams}
+        />
 
         <div id="teilnehmer">
           <TournamentParticipantsPanel participants={participants} />

@@ -272,7 +272,9 @@ export default async function TournamentDetailPage({
             meinTurnierplanPublic={meinTurnierplanPublic}
             preferSyncedHubData={Boolean(
               tournament.meinTurnierplanLastSyncedAt &&
-                (stage.matches.length > 0 || stage.groups.length > 0),
+                (stage.matches.length > 0 ||
+                  stage.groups.length > 0 ||
+                  stage.roster.length > 0),
             )}
             livePresentation={
               showLiveTab

@@ -11,6 +11,7 @@ import {
   confirmMeinTurnierplanSyncAction,
   previewMeinTurnierplanSyncAction,
 } from "@/lib/db/mein-turnierplan-sync-actions";
+import { confirmAllDetectedExternalTeamsAction } from "@/lib/db/mein-turnierplan-participants-actions";
 import { isNumericMeinTurnierplanTournamentId } from "@/lib/mein-turnierplan";
 import { hubTeamLabel } from "@/lib/mein-turnierplan-import";
 import type { MeinTurnierplanSyncPreview, SyncOverridePolicy, SyncTeamMapping } from "@/lib/mein-turnierplan-sync";
@@ -25,6 +26,7 @@ type AcceptedTeamOption = {
 type TournamentSyncAdminPanelProps = {
   tournament: AdminTournamentRecord;
   applications?: AdminApplication[];
+  detectedExternalTeamCount?: number;
 };
 
 function formatSyncedAt(value: string | null | undefined) {
@@ -46,6 +48,7 @@ function formatSyncedAt(value: string | null | undefined) {
 export function TournamentSyncAdminPanel({
   tournament,
   applications = [],
+  detectedExternalTeamCount = 0,
 }: TournamentSyncAdminPanelProps) {
   const router = useRouter();
   const [checking, setChecking] = useState(false);
@@ -258,6 +261,35 @@ export function TournamentSyncAdminPanel({
           Jetzt synchronisieren
         </button>
       </div>
+
+      {detectedExternalTeamCount > 0 ? (
+        <div className="mt-5 border border-line bg-white px-4 py-4">
+          <p className="text-[14px] text-ink">
+            {detectedExternalTeamCount} Teams erkannt · {detectedExternalTeamCount} noch nicht
+            als Teilnehmer bestätigt
+          </p>
+          <button
+            type="button"
+            disabled={syncing}
+            onClick={async () => {
+              setSyncing(true);
+              setError(null);
+              setNotice(null);
+              const result = await confirmAllDetectedExternalTeamsAction(tournament.id);
+              setSyncing(false);
+              if (result.error) {
+                setError(result.error);
+                return;
+              }
+              setNotice(result.notice);
+              router.refresh();
+            }}
+            className="mt-3 inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+          >
+            Alle als Teilnehmer bestätigen
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-5 border border-dashed border-line bg-white px-4 py-3">
         <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">

@@ -6,6 +6,7 @@ import { runMeinTurnierplanNormalizeSelfChecks } from "@/lib/mein-turnierplan-no
 import { runMeinTurnierplanLiveRenderSelfChecks } from "@/lib/mein-turnierplan-live-render";
 import { runMeinTurnierplanPublicSourceSelfChecks } from "@/lib/mein-turnierplan-public-source";
 import { runMeinTurnierplanSyncSelfChecks } from "@/lib/mein-turnierplan-sync";
+import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan-participants-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
   runMeinTurnierplanExistingManualGroupsCheck,
@@ -28,6 +29,7 @@ try {
   const idempotencyCheck = runMeinTurnierplanIdempotencyCheck();
   const manualOverrideCheck = runMeinTurnierplanManualOverrideCheck();
   const existingManualGroupsCheck = runMeinTurnierplanExistingManualGroupsCheck();
+  const participantCountChecks = runMeinTurnierplanParticipantCountChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -41,6 +43,7 @@ try {
   console.log(`idempotency-check: ${idempotencyCheck}`);
   console.log(`manual-override-check: ${manualOverrideCheck}`);
   console.log(`existing-manual-groups-check: ${existingManualGroupsCheck}`);
+  console.log(`mein-turnierplan-participant-count-checks: ${participantCountChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

@@ -7,6 +7,7 @@ import {
 } from "@/lib/db/admin-queries";
 import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { listExternalTeamsForTournamentAction } from "@/lib/db/mein-turnierplan-participants-actions";
 import { stageStatusFor } from "@/lib/schedule/admin";
 
 type TournamentDetailPageProps = {
@@ -50,12 +51,16 @@ export default async function AdminTournamentDetailPage({
     notFound();
   }
 
-  const stage = await getAdminTournamentStage(tournament.id);
+  const [stage, externalTeamsResult] = await Promise.all([
+    getAdminTournamentStage(tournament.id),
+    listExternalTeamsForTournamentAction(tournament.id),
+  ]);
 
   return (
     <AdminTournamentDetailView
       tournament={tournament}
       applications={applicationsResult.applications}
+      externalTeams={externalTeamsResult.teams}
       stageStatus={stageStatusFor(tournament, stage.groups.length, stage.matches)}
       current={bereich === "teilnehmer" ? "participants" : "overview"}
     />

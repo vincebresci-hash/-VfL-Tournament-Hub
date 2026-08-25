@@ -258,7 +258,7 @@ export async function getPublicTournamentStage(
         .order("sort_order", { ascending: true }),
       supabase
         .from("tournament_external_teams")
-        .select("id, name, application_id")
+        .select("id, name, application_id, participation_status, external_active")
         .eq("tournament_id", tournamentId),
     ]);
 
@@ -303,7 +303,11 @@ export async function getPublicTournamentStage(
     id: string;
     name: string;
     application_id: string | null;
+    participation_status?: string | null;
+    external_active?: boolean | null;
   }>)
+    .filter((team) => team.external_active !== false)
+    .filter((team) => (team.participation_status ?? "detected") === "confirmed")
     .filter((team) => !team.application_id || !applicationIds.has(team.application_id))
     .map((team) => {
       const group = groupByExternalTeamId.get(team.id) ?? null;

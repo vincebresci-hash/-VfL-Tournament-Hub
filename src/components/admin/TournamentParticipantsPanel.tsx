@@ -14,8 +14,8 @@ export function TournamentParticipantsPanel({
     <AdminCard title="Teilnehmerfeld">
       {participants.length === 0 ? (
         <p className="text-[14px] text-muted">
-          Noch keine angenommenen Bewerbungen. Angenommene Teams gelten automatisch als
-          Teilnehmer.
+          Noch keine angenommenen Bewerbungen. Externe MeinTurnierplan-Teams können
+          unter „MeinTurnierplan-Teilnehmer“ bestätigt werden und zählen dann ebenfalls.
         </p>
       ) : (
         <div className="grid gap-3">

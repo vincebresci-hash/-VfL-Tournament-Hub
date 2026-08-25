@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
 import { getAppSettings } from "@/lib/settings";
 import { getAvailableSlots, sumFiniteAvailableSlots } from "@/lib/tournament-capacity";
+import { countConfirmedParticipants } from "@/lib/mein-turnierplan-participants";
 import { AGE_GROUPS } from "@/types/tournament";
 import { APPLICATION_STATUSES } from "@/types/application";
 import { USER_ROLES, type UserRole } from "@/types/auth";
@@ -615,6 +616,7 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     clubsCountResult,
     teamsCountResult,
     settings,
+    externalTeamsResult,
   ] = await Promise.all([
     supabase
       .from("applications")
@@ -626,6 +628,9 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     supabase.from("clubs").select("id", { count: "exact", head: true }),
     supabase.from("teams").select("id", { count: "exact", head: true }),
     getAppSettings(),
+    supabase
+      .from("tournament_external_teams")
+      .select("id, tournament_id, application_id, participation_status, external_active"),
   ]);
 
   if (applicationsResult.error && isMissingRelationError(applicationsResult.error)) {
@@ -648,10 +653,15 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
 
   const tournamentRows = (tournamentsResult.data ?? []) as TournamentRow[];
   const applicationCounts = countBy(applications, (row) => row.tournament_id);
-  const acceptedCounts = countBy(
-    applications.filter((row) => row.status === "accepted"),
-    (row) => row.tournament_id,
-  );
+  const acceptedByTournament = new Map<string, string[]>();
+  for (const row of applications) {
+    if (row.status !== "accepted") {
+      continue;
+    }
+    const current = acceptedByTournament.get(row.tournament_id) ?? [];
+    current.push(row.id);
+    acceptedByTournament.set(row.tournament_id, current);
+  }
   const waitlistCounts = countBy(
     applications.filter((row) => row.status === "waiting-list"),
     (row) => row.tournament_id,
@@ -661,10 +671,38 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     (row) => row.tournament_id,
   );
 
+  const externalTeamsByTournament = new Map<
+    string,
+    Array<{
+      participationStatus: string;
+      externalActive: boolean;
+      applicationId: string | null;
+    }>
+  >();
+  if (!externalTeamsResult.error) {
+    for (const row of (externalTeamsResult.data ?? []) as Array<{
+      tournament_id: string;
+      application_id: string | null;
+      participation_status: string | null;
+      external_active: boolean | null;
+    }>) {
+      const list = externalTeamsByTournament.get(row.tournament_id) ?? [];
+      list.push({
+        participationStatus: row.participation_status ?? "detected",
+        externalActive: row.external_active !== false,
+        applicationId: row.application_id,
+      });
+      externalTeamsByTournament.set(row.tournament_id, list);
+    }
+  }
+
   const tournaments: AdminDashboardTournament[] = tournamentRows
     .filter((row) => row.status !== "completed" && !row.archived_at)
     .map((row) => {
-      const confirmedTeams = acceptedCounts.get(row.id) ?? 0;
+      const confirmedTeams = countConfirmedParticipants({
+        acceptedApplicationIds: acceptedByTournament.get(row.id) ?? [],
+        externalTeams: externalTeamsByTournament.get(row.id) ?? [],
+      });
       const availableSlots = getAvailableSlots(row.max_teams, confirmedTeams);
 
       return {
@@ -698,13 +736,18 @@ export async function getAdminDashboardData(): Promise<AdminDashboardData> {
     };
   });
 
+  const totalConfirmed = tournaments.reduce(
+    (total, tournament) => total + tournament.confirmedTeams,
+    0,
+  );
+
   return {
     ready: true,
     showNewApplications: settings.dashboardShowNewApplications,
     stats: {
       newApplications: applications.filter((row) => row.status === "new").length,
       underReview: applications.filter((row) => row.status === "under-review").length,
-      confirmedTeams: applications.filter((row) => row.status === "accepted").length,
+      confirmedTeams: totalConfirmed,
       availableSlots: sumFiniteAvailableSlots(tournaments),
       waitlistCount: applications.filter((row) => row.status === "waiting-list").length,
       activeTournaments: tournamentRows.filter((row) => row.status === "active").length,

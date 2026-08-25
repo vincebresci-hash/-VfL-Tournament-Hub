@@ -147,6 +147,7 @@ export type TournamentExternalTeamRow = {
   name: string;
   application_id: string | null;
   manual_override: boolean;
+  participation_status?: "detected" | "confirmed" | "rejected";
   external_active?: boolean;
   external_updated_at?: string | null;
   last_synced_at: string | null;
