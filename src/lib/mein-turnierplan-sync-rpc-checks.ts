@@ -84,6 +84,13 @@ export function runMeinTurnierplanSyncRpcSecurityChecks() {
     join(process.cwd(), "supabase/migrations/20260825103000_mein_turnierplan_sync_rpc.sql"),
     "utf8",
   );
+  const reconciliationMigration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260825120000_fix_mein_turnierplan_group_reconciliation.sql",
+    ),
+    "utf8",
+  );
 
   assert(migration.includes("SECURITY DEFINER"), "RPC must be SECURITY DEFINER");
   assert(migration.includes("SET search_path = public"), "RPC must pin search_path");
@@ -113,6 +120,65 @@ export function runMeinTurnierplanSyncRpcSecurityChecks() {
   assert(
     !migration.includes("GRANT EXECUTE") || !migration.includes("TO anon"),
     "RPC must not grant anon execute",
+  );
+  assert(
+    reconciliationMigration.includes("lower(btrim(name))"),
+    "reconciliation migration must match groups/fields by name",
+  );
+  assert(
+    reconciliationMigration.includes("reconcile by external_id, then by exact name"),
+    "reconciliation migration must document name fallback",
+  );
+  assert(
+    reconciliationMigration.includes("external_source = v_source") &&
+      reconciliationMigration.includes("external_id = v_group.item->>'externalId'"),
+    "reconciliation must attach MTP identity to existing groups",
+  );
+
+  return "ok";
+}
+
+export function runMeinTurnierplanExistingManualGroupsCheck() {
+  const payload = buildSamplePayload(18);
+  const rpcPayload = buildMeinTurnierplanSyncRpcPayload({
+    queryId: "2jrb0hvxvd",
+    payload,
+    mappings: payload.teams.map((team) => ({
+      externalId: team.id,
+      externalName: team.name,
+      applicationId: null,
+      createExternal: true,
+    })),
+  });
+
+  validateMeinTurnierplanSyncRpcPayload(rpcPayload);
+  assert(rpcPayload.groups.some((group) => group.name === "Gruppe A"), "Gruppe A erwartet");
+  assert(rpcPayload.groups.some((group) => group.name === "Gruppe B"), "Gruppe B erwartet");
+  assert(rpcPayload.groups.length === 2, "zwei Gruppen erwartet");
+
+  const migration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260825120000_fix_mein_turnierplan_group_reconciliation.sql",
+    ),
+    "utf8",
+  );
+
+  assert(
+    migration.includes(
+      "AND lower(btrim(name)) = lower(btrim(COALESCE(v_group.item->>'name', '')))",
+    ),
+    "RPC must look up existing groups by exact name before insert",
+  );
+  assert(
+    migration.includes(
+      "AND lower(btrim(name)) = lower(btrim(COALESCE(v_field.item->>'name', '')))",
+    ),
+    "RPC must look up existing fields by exact name before insert",
+  );
+  assert(
+    migration.includes("Keep manual fields, but always attach MTP identity"),
+    "RPC must link protected groups without overwriting manual fields",
   );
 
   return "ok";
@@ -204,7 +270,10 @@ export function runMeinTurnierplanManualOverrideCheck() {
   );
 
   const migration = readFileSync(
-    join(process.cwd(), "supabase/migrations/20260825103000_mein_turnierplan_sync_rpc.sql"),
+    join(
+      process.cwd(),
+      "supabase/migrations/20260825120000_fix_mein_turnierplan_group_reconciliation.sql",
+    ),
     "utf8",
   );
   assert(
@@ -224,5 +293,6 @@ export function runMeinTurnierplanSyncRpcSelfChecks() {
   runMeinTurnierplanTransactionRollbackCheck();
   runMeinTurnierplanIdempotencyCheck();
   runMeinTurnierplanManualOverrideCheck();
+  runMeinTurnierplanExistingManualGroupsCheck();
   return "ok";
 }

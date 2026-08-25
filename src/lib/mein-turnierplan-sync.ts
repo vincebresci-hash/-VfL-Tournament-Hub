@@ -17,6 +17,7 @@ export type SyncDiffCounts = {
   groupsFound: number;
   groupsNew: number;
   groupsUpdated: number;
+  groupsLinked: number;
   matchesFound: number;
   matchesNew: number;
   matchesUpdated: number;
@@ -24,6 +25,7 @@ export type SyncDiffCounts = {
   resultsOpen: number;
   courtsFound: number;
   courtsNew: number;
+  courtsLinked: number;
   manualOverridesProtected: number;
 };
 
@@ -78,6 +80,27 @@ function normalizeLabel(value: string) {
 
 function hubTeamLabel(clubName: string, teamName: string) {
   return `${clubName} · ${teamName}`.trim();
+}
+
+function resolveExistingByExternalOrName<T extends { name: string; externalId: string | null }>(
+  item: { id: string; name: string },
+  rows: T[],
+): { existing: T; via: "external" | "name" } | null {
+  const byExternal = rows.find((row) => row.externalId === item.id);
+  if (byExternal) {
+    return { existing: byExternal, via: "external" };
+  }
+
+  const byName = rows.find(
+    (row) =>
+      normalizeLabel(row.name) === normalizeLabel(item.name) &&
+      (row.externalId == null || row.externalId === item.id),
+  );
+  if (byName) {
+    return { existing: byName, via: "name" };
+  }
+
+  return null;
 }
 
 export function buildDefaultSyncMappings(
@@ -145,16 +168,6 @@ export function buildMeinTurnierplanSyncPreview(input: {
   const existingTeams = new Map(
     input.snapshot.externalTeams.map((team) => [team.externalId, team]),
   );
-  const existingGroups = new Map(
-    input.snapshot.groups
-      .filter((group) => group.externalId)
-      .map((group) => [group.externalId as string, group]),
-  );
-  const existingFields = new Map(
-    input.snapshot.fields
-      .filter((field) => field.externalId)
-      .map((field) => [field.externalId as string, field]),
-  );
   const existingMatches = new Map(
     input.snapshot.matches
       .filter((match) => match.externalId)
@@ -173,19 +186,35 @@ export function buildMeinTurnierplanSyncPreview(input: {
 
   let groupsNew = 0;
   let groupsUpdated = 0;
+  let groupsLinked = 0;
   for (const group of input.payload.groups) {
-    const existing = existingGroups.get(group.id);
-    if (!existing) {
+    const resolved = resolveExistingByExternalOrName(group, input.snapshot.groups);
+    if (!resolved) {
       groupsNew += 1;
-    } else if (existing.name !== group.name) {
+      continue;
+    }
+
+    if (resolved.via === "name" && resolved.existing.externalId == null) {
+      groupsLinked += 1;
+      continue;
+    }
+
+    if (resolved.existing.name !== group.name) {
       groupsUpdated += 1;
     }
   }
 
   let courtsNew = 0;
+  let courtsLinked = 0;
   for (const court of input.payload.courts) {
-    if (!existingFields.has(court.id)) {
+    const resolved = resolveExistingByExternalOrName(court, input.snapshot.fields);
+    if (!resolved) {
       courtsNew += 1;
+      continue;
+    }
+
+    if (resolved.via === "name" && resolved.existing.externalId == null) {
+      courtsLinked += 1;
     }
   }
 
@@ -228,6 +257,7 @@ export function buildMeinTurnierplanSyncPreview(input: {
       groupsFound: input.payload.groups.length,
       groupsNew,
       groupsUpdated,
+      groupsLinked,
       matchesFound: input.payload.matches.length,
       matchesNew,
       matchesUpdated,
@@ -235,6 +265,7 @@ export function buildMeinTurnierplanSyncPreview(input: {
       resultsOpen: input.payload.matches.length - input.payload.completedMatchCount,
       courtsFound: input.payload.courts.length,
       courtsNew,
+      courtsLinked,
       manualOverridesProtected,
     },
   };
@@ -400,6 +431,94 @@ export function runMeinTurnierplanSyncSelfChecks() {
   });
   assert(overwrite.counts.matchesUpdated === 1, "overwrite darf manuelle Spiele aktualisieren");
   assert(overwrite.counts.manualOverridesProtected === 0, "overwrite schützt nicht");
+
+  const manualGroupsSnapshot: HubSyncSnapshot = {
+    ...emptySnapshot,
+    groups: [
+      {
+        id: "hub-group-a",
+        name: "Gruppe A",
+        externalId: null,
+        manualOverride: false,
+      },
+      {
+        id: "hub-group-b",
+        name: "Gruppe B",
+        externalId: null,
+        manualOverride: false,
+      },
+    ],
+    fields: [
+      {
+        id: "hub-field-1",
+        name: "Feld 1",
+        externalId: null,
+        manualOverride: false,
+      },
+    ],
+  };
+
+  const withManualGroups = buildMeinTurnierplanSyncPreview({
+    queryId: "2jrb0hvxvd",
+    payload: {
+      ...payload,
+      groups: [
+        payload.groups[0]!,
+        {
+          id: "B",
+          name: "Gruppe B",
+          teams: [
+            { id: "3", name: "Team Gamma" },
+            { id: "4", name: "Team Delta" },
+          ],
+        },
+      ],
+    },
+    snapshot: manualGroupsSnapshot,
+  });
+  assert(
+    withManualGroups.counts.groupsNew === 0,
+    "bestehende manuelle Gruppen dürfen nicht als neu zählen",
+  );
+  assert(
+    withManualGroups.counts.groupsLinked === 2,
+    "Gruppe A und B müssen als Verknüpfung erkannt werden",
+  );
+  assert(
+    withManualGroups.counts.courtsNew === 0,
+    "bestehendes Feld mit gleichem Namen darf nicht als neu zählen",
+  );
+  assert(
+    withManualGroups.counts.courtsLinked === 1,
+    "Feld 1 muss als Verknüpfung erkannt werden",
+  );
+
+  const afterLink = buildMeinTurnierplanSyncPreview({
+    queryId: "2jrb0hvxvd",
+    payload,
+    snapshot: {
+      ...emptySnapshot,
+      groups: [
+        {
+          id: "hub-group-a",
+          name: "Gruppe A",
+          externalId: "A",
+          manualOverride: false,
+        },
+      ],
+      fields: [
+        {
+          id: "hub-field-1",
+          name: "Feld 1",
+          externalId: "1",
+          manualOverride: false,
+        },
+      ],
+    },
+  });
+  assert(afterLink.counts.groupsNew === 0, "zweite Sync: keine neuen Gruppen");
+  assert(afterLink.counts.groupsLinked === 0, "bereits verknüpfte Gruppen nicht erneut als Link");
+  assert(afterLink.counts.courtsNew === 0, "zweite Sync: keine neuen Felder");
 
   return "ok";
 }

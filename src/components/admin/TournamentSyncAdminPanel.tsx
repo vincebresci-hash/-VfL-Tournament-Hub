@@ -301,6 +301,18 @@ export function TournamentSyncAdminPanel({
             </li>
             <li>
               Gruppen: {preview.counts.groupsFound} gefunden · +{preview.counts.groupsNew} neu
+              {preview.counts.groupsLinked > 0
+                ? ` · ~${preview.counts.groupsLinked} wird verknüpft`
+                : ""}
+              {preview.counts.groupsUpdated > 0
+                ? ` · ~${preview.counts.groupsUpdated} aktualisiert`
+                : ""}
+            </li>
+            <li>
+              Felder: {preview.counts.courtsFound} gefunden · +{preview.counts.courtsNew} neu
+              {preview.counts.courtsLinked > 0
+                ? ` · ~${preview.counts.courtsLinked} wird verknüpft`
+                : ""}
             </li>
             <li>
               Spiele: {preview.counts.matchesFound} gefunden · +{preview.counts.matchesNew} neu · ~

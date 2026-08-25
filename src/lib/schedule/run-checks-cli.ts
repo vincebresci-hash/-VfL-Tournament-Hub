@@ -8,6 +8,7 @@ import { runMeinTurnierplanPublicSourceSelfChecks } from "@/lib/mein-turnierplan
 import { runMeinTurnierplanSyncSelfChecks } from "@/lib/mein-turnierplan-sync";
 import {
   runMeinTurnierplanIdempotencyCheck,
+  runMeinTurnierplanExistingManualGroupsCheck,
   runMeinTurnierplanManualOverrideCheck,
   runMeinTurnierplanSyncRpcSelfChecks,
   runMeinTurnierplanTransactionRollbackCheck,
@@ -26,6 +27,7 @@ try {
   const transactionRollbackCheck = runMeinTurnierplanTransactionRollbackCheck();
   const idempotencyCheck = runMeinTurnierplanIdempotencyCheck();
   const manualOverrideCheck = runMeinTurnierplanManualOverrideCheck();
+  const existingManualGroupsCheck = runMeinTurnierplanExistingManualGroupsCheck();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -38,6 +40,7 @@ try {
   console.log(`transaction-rollback-check: ${transactionRollbackCheck}`);
   console.log(`idempotency-check: ${idempotencyCheck}`);
   console.log(`manual-override-check: ${manualOverrideCheck}`);
+  console.log(`existing-manual-groups-check: ${existingManualGroupsCheck}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
