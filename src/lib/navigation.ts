@@ -1,5 +1,6 @@
 export const mainNavigation = [
   { href: "/turniere", label: "Turniere" },
+  { href: "/live", label: "Live", live: true },
   { href: "/fuer-vereine", label: "Für Vereine" },
   { href: "/ueber-uns", label: "Über uns" },
   { href: "/kontakt", label: "Kontakt" },

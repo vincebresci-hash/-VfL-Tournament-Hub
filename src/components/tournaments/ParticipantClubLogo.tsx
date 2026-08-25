@@ -24,7 +24,7 @@ export function ParticipantClubLogo({
           width={40}
           height={40}
           unoptimized
-          className="h-10 w-10 object-contain"
+          className="h-full w-full object-contain"
         />
       </span>
     );

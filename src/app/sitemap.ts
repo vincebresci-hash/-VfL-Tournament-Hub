@@ -9,6 +9,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes = [
     "",
     "/turniere",
+    "/live",
     "/fuer-vereine",
     "/ueber-uns",
     "/anlage",
@@ -21,8 +22,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const entries: MetadataRoute.Sitemap = staticRoutes.map((path) => ({
     url: `${base}${path || "/"}`,
-    changeFrequency: path === "/turniere" || path === "" ? "daily" : "weekly",
-    priority: path === "" ? 1 : path === "/turniere" ? 0.9 : 0.6,
+    changeFrequency: path === "/turniere" || path === "/live" || path === "" ? "daily" : "weekly",
+    priority: path === "" ? 1 : path === "/turniere" || path === "/live" ? 0.9 : 0.6,
   }));
 
   try {
