@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { getContentSecurityPolicyHeaderValue } from "./src/lib/site";
 
 const nextConfig: NextConfig = {
   // Logo uploads use Server Actions + FormData (max 2 MB file + multipart overhead).
@@ -11,12 +12,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        source: "/(.*)",
+        source: "/:path*",
         headers: [
           {
             key: "Content-Security-Policy",
-            value:
-              "frame-src 'self' https://www.meinturnierplan.de https://meinturnierplan.de;",
+            value: getContentSecurityPolicyHeaderValue(),
           },
         ],
       },
