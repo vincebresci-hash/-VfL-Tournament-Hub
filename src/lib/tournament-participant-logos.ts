@@ -46,17 +46,37 @@ export type ExternalTeamLogoState = {
   logoManualOverride: boolean;
 };
 
+/** Clear only the custom/imported logo_url; keep optional hub club link. */
+export function buildClearCustomLogoState(currentClubId: string | null): ExternalTeamLogoState {
+  return {
+    clubId: currentClubId?.trim() || null,
+    logoUrl: null,
+    logoManualOverride: true,
+  };
+}
+
+/** Unlink hub club only; keep custom logo_url. */
+export function buildUnlinkHubClubState(currentLogoUrl: string | null): ExternalTeamLogoState {
+  return {
+    clubId: null,
+    logoUrl: currentLogoUrl?.trim() || null,
+    logoManualOverride: true,
+  };
+}
+
 export function buildManualLogoState(input: {
   clubId?: string | null;
   logoUrl?: string | null;
   clearLogo?: boolean;
+  clearCustomLogoOnly?: boolean;
+  unlinkHubClubOnly?: boolean;
 }): ExternalTeamLogoState {
-  if (input.clearLogo) {
-    return {
-      clubId: null,
-      logoUrl: null,
-      logoManualOverride: true,
-    };
+  if (input.clearCustomLogoOnly || input.clearLogo) {
+    return buildClearCustomLogoState(input.clubId ?? null);
+  }
+
+  if (input.unlinkHubClubOnly) {
+    return buildUnlinkHubClubState(input.logoUrl ?? null);
   }
 
   const clubId = input.clubId?.trim() || null;
@@ -96,4 +116,20 @@ export function selectTeamsForLogoApply(input: {
 
   const targetIds = [...new Set([input.sourceTeamId, ...uniqueSelected])];
   return { error: null, targetIds };
+}
+
+/** Apply only logo_url to targets — club_id is not required and not copied. */
+export function buildApplyLogoUrlOnlyState(sourceLogoUrl: string | null): {
+  error: string | null;
+  logoUrl: string | null;
+} {
+  const logoUrl = sourceLogoUrl?.trim() || null;
+  if (!logoUrl) {
+    return {
+      error: "Das Quell-Team hat kein eigenes Logo zum Übernehmen.",
+      logoUrl: null,
+    };
+  }
+
+  return { error: null, logoUrl };
 }

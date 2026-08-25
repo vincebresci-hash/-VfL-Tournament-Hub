@@ -8,7 +8,6 @@ export const CLUB_LOGO_ALLOWED_MIME_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
-  "image/gif",
 ] as const;
 
 type LogoMimeType = (typeof CLUB_LOGO_ALLOWED_MIME_TYPES)[number];
@@ -25,8 +24,6 @@ export function clubLogoExtensionForMime(mimeType: LogoMimeType) {
       return "jpg";
     case "image/webp":
       return "webp";
-    case "image/gif":
-      return "gif";
   }
 }
 
@@ -40,7 +37,7 @@ export function validateClubLogoFile(file: File): string | null {
   }
 
   if (!isAllowedClubLogoMimeType(file.type)) {
-    return "Erlaubt sind PNG, JPEG, WebP oder GIF.";
+    return "Erlaubt sind PNG, JPEG oder WebP.";
   }
 
   return null;

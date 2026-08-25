@@ -12,7 +12,9 @@ import {
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import type { TournamentParticipant } from "@/lib/tournament-participants";
 import {
-  buildManualLogoState,
+  buildApplyLogoUrlOnlyState,
+  buildClearCustomLogoState,
+  buildUnlinkHubClubState,
   selectTeamsForLogoApply,
 } from "@/lib/tournament-participant-logos";
 import {
@@ -399,7 +401,7 @@ async function loadExternalTeamForLogoEdit(tournamentId: string, externalTeamId:
 export async function updateExternalTeamLogoAction(input: {
   tournamentId: string;
   externalTeamId: string;
-  mode: "hub-club" | "upload" | "url" | "remove";
+  mode: "hub-club" | "unlink-hub" | "upload" | "url" | "remove";
   clubId?: string | null;
   logoUrl?: string | null;
   logoFile?: File | null;
@@ -420,14 +422,38 @@ export async function updateExternalTeamLogoAction(input: {
   }
 
   const supabase = await createClient();
-  let nextClubId: string | null = existing.team.club_id ? String(existing.team.club_id) : null;
-  let nextLogoUrl: string | null = existing.team.logo_url ? String(existing.team.logo_url) : null;
-  const previousLogoUrl = nextLogoUrl;
+  const currentClubId = existing.team.club_id ? String(existing.team.club_id) : null;
+  const currentLogoUrl = existing.team.logo_url ? String(existing.team.logo_url) : null;
+  const previousLogoUrl = currentLogoUrl;
+
+  let patch: {
+    club_id?: string | null;
+    logo_url?: string | null;
+    logo_manual_override: true;
+    updated_at: string;
+  } = {
+    logo_manual_override: true,
+    updated_at: new Date().toISOString(),
+  };
+  let notice = "Logo wurde gespeichert.";
 
   if (input.mode === "remove") {
-    const state = buildManualLogoState({ clearLogo: true });
-    nextClubId = state.clubId;
-    nextLogoUrl = state.logoUrl;
+    const state = buildClearCustomLogoState(currentClubId);
+    patch = {
+      ...patch,
+      logo_url: state.logoUrl,
+    };
+    notice =
+      currentClubId
+        ? "Eigenes Logo entfernt. Falls der Hub-Verein ein Logo hat, wird dieses weiterhin angezeigt."
+        : "Logo wurde entfernt.";
+  } else if (input.mode === "unlink-hub") {
+    const state = buildUnlinkHubClubState(currentLogoUrl);
+    patch = {
+      ...patch,
+      club_id: state.clubId,
+    };
+    notice = "Hub-Verein-Verknüpfung entfernt.";
   } else if (input.mode === "hub-club") {
     const clubId = input.clubId?.trim() || null;
     if (!clubId) {
@@ -444,28 +470,28 @@ export async function updateExternalTeamLogoAction(input: {
       return { error: "Der gewählte Hub-Verein wurde nicht gefunden.", notice: null };
     }
 
-    const state = buildManualLogoState({
-      clubId,
-      logoUrl: nextLogoUrl,
-    });
-    nextClubId = state.clubId;
-    nextLogoUrl = state.logoUrl;
+    patch = {
+      ...patch,
+      club_id: clubId,
+    };
+    notice = "Hub-Verein verknüpft.";
   } else if (input.mode === "upload") {
-    if (!input.logoFile) {
+    const logoFile = input.logoFile;
+    if (!logoFile || !(logoFile instanceof File) || logoFile.size <= 0) {
       return { error: "Bitte eine Bilddatei auswählen.", notice: null };
     }
 
-    if (!isAllowedClubLogoMimeType(input.logoFile.type)) {
-      return { error: "Erlaubt sind PNG, JPEG, WebP oder GIF.", notice: null };
+    if (!isAllowedClubLogoMimeType(logoFile.type)) {
+      return { error: "Erlaubt sind PNG, JPEG oder WebP.", notice: null };
     }
 
     const uploaded = await uploadClubLogoFile({
       supabase,
-      file: input.logoFile,
+      file: logoFile,
       objectPath: buildExternalTeamLogoObjectPath({
         tournamentId: input.tournamentId,
         externalTeamId: input.externalTeamId,
-        mimeType: input.logoFile.type,
+        mimeType: logoFile.type,
       }),
     });
 
@@ -473,12 +499,12 @@ export async function updateExternalTeamLogoAction(input: {
       return { error: uploaded.error ?? "Upload fehlgeschlagen.", notice: null };
     }
 
-    const state = buildManualLogoState({
-      clubId: nextClubId,
-      logoUrl: uploaded.publicUrl,
-    });
-    nextClubId = state.clubId;
-    nextLogoUrl = state.logoUrl;
+    // Store logo_url only — never invent/require a Hub club.
+    patch = {
+      ...patch,
+      logo_url: uploaded.publicUrl,
+    };
+    notice = "Logo wurde hochgeladen.";
   } else {
     const logoUrl = input.logoUrl?.trim() || null;
     if (!logoUrl) {
@@ -488,22 +514,16 @@ export async function updateExternalTeamLogoAction(input: {
       return { error: "Die Logo-URL ist ungültig.", notice: null };
     }
 
-    const state = buildManualLogoState({
-      clubId: nextClubId,
-      logoUrl,
-    });
-    nextClubId = state.clubId;
-    nextLogoUrl = state.logoUrl;
+    patch = {
+      ...patch,
+      logo_url: logoUrl,
+    };
+    notice = "Logo-URL wurde gespeichert.";
   }
 
   const { error } = await supabase
     .from("tournament_external_teams")
-    .update({
-      club_id: nextClubId,
-      logo_url: nextLogoUrl,
-      logo_manual_override: true,
-      updated_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", input.externalTeamId)
     .eq("tournament_id", input.tournamentId);
 
@@ -512,21 +532,42 @@ export async function updateExternalTeamLogoAction(input: {
   }
 
   if (
-    input.mode === "remove" ||
-    (previousLogoUrl && previousLogoUrl !== nextLogoUrl)
+    Object.prototype.hasOwnProperty.call(patch, "logo_url") &&
+    previousLogoUrl &&
+    previousLogoUrl !== patch.logo_url
   ) {
     await deleteManagedClubLogoIfOwned({ supabase, logoUrl: previousLogoUrl });
   }
 
   revalidateTournamentPaths(loaded.tournament.slug, loaded.tournament.id);
+  return { error: null, notice };
+}
 
-  if (input.mode === "remove") {
-    return { error: null, notice: "Logo wurde entfernt." };
+/**
+ * Reliable file upload via FormData (File arguments are flaky across clients).
+ * Does not require or set club_id.
+ */
+export async function uploadExternalTeamLogoFormAction(
+  formData: FormData,
+): Promise<{ error: string | null; notice: string | null }> {
+  const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+  const externalTeamId = String(formData.get("externalTeamId") ?? "").trim();
+  const logoFile = formData.get("logoFile");
+
+  if (!tournamentId || !externalTeamId) {
+    return { error: "Turnier oder Team fehlt.", notice: null };
   }
-  if (input.mode === "hub-club") {
-    return { error: null, notice: "Hub-Verein für das Logo verknüpft." };
+
+  if (!(logoFile instanceof File)) {
+    return { error: "Bitte eine Bilddatei auswählen.", notice: null };
   }
-  return { error: null, notice: "Logo wurde gespeichert." };
+
+  return updateExternalTeamLogoAction({
+    tournamentId,
+    externalTeamId,
+    mode: "upload",
+    logoFile,
+  });
 }
 
 export async function applyExternalTeamLogoToSelectedTeamsAction(input: {
@@ -569,17 +610,20 @@ export async function applyExternalTeamLogoToSelectedTeamsAction(input: {
     return { error: selection.error, notice: null };
   }
 
-  const logoState = buildManualLogoState({
-    clubId: source.club_id ? String(source.club_id) : null,
-    logoUrl: source.logo_url ? String(source.logo_url) : null,
-  });
+  const logoOnly = buildApplyLogoUrlOnlyState(
+    source.logo_url ? String(source.logo_url) : null,
+  );
+  if (logoOnly.error || !logoOnly.logoUrl) {
+    return {
+      error: logoOnly.error ?? "Das Quell-Team hat kein eigenes Logo zum Übernehmen.",
+      notice: null,
+    };
+  }
 
-  // Always mark override true for applied targets even if source only has hub club.
   const { error } = await supabase
     .from("tournament_external_teams")
     .update({
-      club_id: logoState.clubId,
-      logo_url: logoState.logoUrl,
+      logo_url: logoOnly.logoUrl,
       logo_manual_override: true,
       updated_at: new Date().toISOString(),
     })

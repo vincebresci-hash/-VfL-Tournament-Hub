@@ -5,6 +5,7 @@ import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLog
 import {
   applyExternalTeamLogoToSelectedTeamsAction,
   updateExternalTeamLogoAction,
+  uploadExternalTeamLogoFormAction,
 } from "@/lib/db/tournament-participants-actions";
 import { suggestRelatedTeamsForLogoApply } from "@/lib/tournament-participant-logos";
 import { resolveParticipantLogoUrl } from "@/lib/tournament-participants";
@@ -83,7 +84,8 @@ export function ExternalTeamLogoEditor({
     [candidates, clubId, participant.clubId, participant.clubName, participant.externalTeamId],
   );
 
-  const previewClub = clubs.find((club) => club.id === clubId);
+  const previewClub = clubs.find((club) => club.id === (clubId || participant.clubId || ""));
+  const linkedHubHasLogo = Boolean(previewClub?.logoUrl?.trim());
   const displayPreview = resolveParticipantLogoUrl({
     hubClubLogoUrl: previewClub?.logoUrl ?? null,
     storedLogoUrl: filePreviewUrl || logoUrl.trim() || participant.customLogoUrl,
@@ -107,23 +109,47 @@ export function ExternalTeamLogoEditor({
     );
   }
 
+  function uploadSelectedFile() {
+    if (!file || !participant.externalTeamId) {
+      return;
+    }
+
+    const formData = new FormData();
+    formData.set("tournamentId", tournamentId);
+    formData.set("externalTeamId", participant.externalTeamId);
+    formData.set("logoFile", file);
+    run(() => uploadExternalTeamLogoFormAction(formData));
+  }
+
   return (
     <div className="mt-4 border border-line bg-surface p-4">
       <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
         Logo bearbeiten
       </p>
+      <p className="mt-2 text-[13px] leading-6 text-muted">
+        Ein Hub-Verein ist nicht erforderlich. Du kannst jedem importierten oder manuellen Team
+        direkt ein eigenes Logo zuweisen.
+      </p>
 
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-3">
         <ParticipantClubLogo logoUrl={displayPreview} clubName={participant.clubName} />
         <div className="text-[13px] text-muted">
-          <p>Aktuelle Vorschau</p>
-          <p className="mt-1 text-ink">Priorität: Hub-Verein → eigenes Logo → Placeholder</p>
+          <p className="font-medium text-ink">Aktuelle Vorschau</p>
+          <p className="mt-1">Priorität: Hub-Verein → eigenes Logo → Placeholder</p>
+          {linkedHubHasLogo && participant.customLogoUrl ? (
+            <p className="mt-1 text-ink">
+              Hinweis: Ein Hub-Vereinslogo hat Vorrang vor dem eigenen Logo.
+            </p>
+          ) : null}
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3">
-        <label className="grid gap-1 text-[13px] text-ink">
-          <span className="font-semibold uppercase tracking-[0.08em]">Hub-Verein</span>
+      <section className="mt-5 border border-line bg-white p-4">
+        <h3 className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
+          Optionaler Hub-Verein
+        </h3>
+        <label className="mt-3 grid gap-1 text-[13px] text-ink">
+          <span className="sr-only">Hub-Verein</span>
           <select
             value={clubId}
             onChange={(event) => setClubId(event.target.value)}
@@ -139,59 +165,74 @@ export function ExternalTeamLogoEditor({
             ))}
           </select>
         </label>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={pending || !clubId}
+            onClick={() =>
+              run(() =>
+                updateExternalTeamLogoAction({
+                  tournamentId,
+                  externalTeamId: participant.externalTeamId!,
+                  mode: "hub-club",
+                  clubId,
+                }),
+              )
+            }
+            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          >
+            Hub-Verein verknüpfen
+          </button>
+          {participant.clubId ? (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() =>
+                run(() =>
+                  updateExternalTeamLogoAction({
+                    tournamentId,
+                    externalTeamId: participant.externalTeamId!,
+                    mode: "unlink-hub",
+                  }),
+                )
+              }
+              className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+            >
+              Hub-Verein-Verknüpfung entfernen
+            </button>
+          ) : null}
+        </div>
+      </section>
 
-        <button
-          type="button"
-          disabled={pending || !clubId}
-          onClick={() =>
-            run(() =>
-              updateExternalTeamLogoAction({
-                tournamentId,
-                externalTeamId: participant.externalTeamId!,
-                mode: "hub-club",
-                clubId,
-              }),
-            )
-          }
-          className="inline-flex h-9 w-fit items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
-        >
-          Hub-Verein übernehmen
-        </button>
+      <section className="mt-4 border border-line bg-white p-4">
+        <h3 className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
+          Eigenes Logo
+        </h3>
+        <p className="mt-2 text-[13px] text-muted">
+          Funktioniert auch ohne Hub-Verein. Speichert direkt auf dem Turnierteam.
+        </p>
 
-        <label className="grid gap-1 text-[13px] text-ink">
-          <span className="font-semibold uppercase tracking-[0.08em]">Logo hochladen</span>
+        <label className="mt-3 grid gap-1 text-[13px] text-ink">
+          <span className="font-semibold uppercase tracking-[0.08em]">Datei auswählen</span>
           <input
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/png,image/jpeg,image/webp"
             disabled={pending}
             onChange={(event) => onFileSelected(event.target.files?.[0] ?? null)}
             className="block w-full text-[13px]"
           />
         </label>
-
         <button
           type="button"
           disabled={pending || !file}
-          onClick={() =>
-            run(() =>
-              updateExternalTeamLogoAction({
-                tournamentId,
-                externalTeamId: participant.externalTeamId!,
-                mode: "upload",
-                logoFile: file,
-              }),
-            )
-          }
-          className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+          onClick={uploadSelectedFile}
+          className="mt-3 inline-flex h-9 items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
         >
           Logo hochladen
         </button>
 
-        <label className="grid gap-1 text-[13px] text-ink">
-          <span className="font-semibold uppercase tracking-[0.08em]">
-            Oder Logo-URL{" "}
-            <span className="font-medium normal-case tracking-normal text-muted">(optional)</span>
-          </span>
+        <label className="mt-4 grid gap-1 text-[13px] text-ink">
+          <span className="font-semibold uppercase tracking-[0.08em]">Oder Logo-URL</span>
           <input
             value={logoUrl}
             onChange={(event) => setLogoUrl(event.target.value)}
@@ -200,59 +241,66 @@ export function ExternalTeamLogoEditor({
             disabled={pending}
           />
         </label>
+        <button
+          type="button"
+          disabled={pending || !logoUrl.trim()}
+          onClick={() =>
+            run(() =>
+              updateExternalTeamLogoAction({
+                tournamentId,
+                externalTeamId: participant.externalTeamId!,
+                mode: "url",
+                logoUrl,
+              }),
+            )
+          }
+          className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+        >
+          URL speichern
+        </button>
+      </section>
 
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            disabled={pending || !logoUrl.trim()}
-            onClick={() =>
-              run(() =>
-                updateExternalTeamLogoAction({
-                  tournamentId,
-                  externalTeamId: participant.externalTeamId!,
-                  mode: "url",
-                  logoUrl,
-                }),
-              )
-            }
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
-          >
-            URL speichern
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={() =>
-              run(() =>
-                updateExternalTeamLogoAction({
-                  tournamentId,
-                  externalTeamId: participant.externalTeamId!,
-                  mode: "remove",
-                }),
-              )
-            }
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
-          >
-            Logo entfernen
-          </button>
-          <button
-            type="button"
-            disabled={pending || candidates.length === 0}
-            onClick={openApplyPanel}
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
-          >
-            Für Teams dieses Vereins übernehmen
-          </button>
-          <button
-            type="button"
-            disabled={pending}
-            onClick={onCancel}
-            className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
-          >
-            Schließen
-          </button>
-        </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() =>
+            run(() =>
+              updateExternalTeamLogoAction({
+                tournamentId,
+                externalTeamId: participant.externalTeamId!,
+                mode: "remove",
+              }),
+            )
+          }
+          className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+        >
+          Logo entfernen
+        </button>
+        <button
+          type="button"
+          disabled={pending || candidates.length === 0 || !participant.customLogoUrl}
+          onClick={openApplyPanel}
+          className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+        >
+          Für ausgewählte Teams übernehmen
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={onCancel}
+          className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+        >
+          Schließen
+        </button>
       </div>
+
+      {participant.clubId && linkedHubHasLogo ? (
+        <p className="mt-3 text-[13px] text-muted">
+          „Logo entfernen“ löscht nur das eigene Logo. Das Hub-Vereinslogo bleibt aktiv, solange die
+          Verknüpfung besteht.
+        </p>
+      ) : null}
 
       {showApply ? (
         <div className="mt-4 border border-line bg-white p-4">
@@ -260,8 +308,8 @@ export function ExternalTeamLogoEditor({
             Logo auf Teams übernehmen
           </p>
           <p className="mt-2 text-[13px] text-muted">
-            Vorschläge (gleiche club_id oder exakter Vereinsname) sind vorausgewählt. Bitte prüfen und
-            bestätigen — keine automatische Prefix-Erkennung.
+            Übernimmt die eigene Logo-URL auf die markierten Teams. Kein Hub-Verein erforderlich.
+            Vorschläge (gleiche club_id oder exakter Vereinsname) sind vorausgewählt.
           </p>
 
           <ul className="mt-3 grid gap-2">
