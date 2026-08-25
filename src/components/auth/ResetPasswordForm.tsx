@@ -7,6 +7,7 @@ import { Field, TextInput } from "@/components/apply/FormControls";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/messages";
 import { CLUB_HOME } from "@/lib/auth/roles";
+import { validateNewPassword } from "@/lib/auth/validation";
 import { createClient } from "@/lib/supabase/client";
 
 export function ResetPasswordForm() {
@@ -20,8 +21,9 @@ export function ResetPasswordForm() {
     event.preventDefault();
     setError(null);
 
-    if (password.length < 8) {
-      setError("Das Passwort muss mindestens 8 Zeichen haben.");
+    const passwordError = validateNewPassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 

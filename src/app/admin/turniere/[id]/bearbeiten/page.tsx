@@ -5,7 +5,7 @@ import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
-import { listAdminApplications } from "@/lib/db/queries";
+import { getTournamentOccupancy, listAdminApplications } from "@/lib/db/queries";
 
 type TournamentEditPageProps = {
   params: Promise<{ id: string }>;
@@ -38,11 +38,16 @@ export default async function AdminTournamentEditPage({
     notFound();
   }
 
-  const applicationCount = applicationsResult.applications.filter(
-    (application) =>
-      application.tournamentId === tournament.slug ||
-      application.tournamentId === tournament.id,
-  ).length;
+  const [applicationCount, occupancy] = await Promise.all([
+    Promise.resolve(
+      applicationsResult.applications.filter(
+        (application) =>
+          application.tournamentId === tournament.slug ||
+          application.tournamentId === tournament.id,
+      ).length,
+    ),
+    getTournamentOccupancy(tournament.slug),
+  ]);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -57,6 +62,7 @@ export default async function AdminTournamentEditPage({
         <TournamentAdminForm
           tournament={tournament}
           applicationCount={applicationCount}
+          confirmedParticipants={occupancy?.confirmedTeams ?? 0}
         />
       </div>
     </div>

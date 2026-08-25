@@ -4,11 +4,16 @@ import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPane
 import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
 import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
+import { TournamentSyncAdminPanel } from "@/components/admin/TournamentSyncAdminPanel";
+import { ExternalTeamsParticipationPanel } from "@/components/admin/ExternalTeamsParticipationPanel";
 import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
+import { TournamentStatusCapacityNotice } from "@/components/admin/TournamentStatusCapacityNotice";
 import { applicationStatusLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
 import { acceptedParticipants } from "@/lib/schedule/admin";
-import { getTournamentCapacity } from "@/lib/tournament-capacity";
+import { getTournamentCapacityWithExternal } from "@/lib/mein-turnierplan-participants";
+import type { ExternalTeamAdminRow } from "@/lib/db/mein-turnierplan-participants-actions";
+import type { TournamentParticipant } from "@/lib/tournament-participants";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication, ApplicationStatus } from "@/types/application";
 import type { TournamentStageStatus } from "@/types/schedule";
@@ -16,6 +21,10 @@ import type { TournamentStageStatus } from "@/types/schedule";
 type AdminTournamentDetailViewProps = {
   tournament: AdminTournamentRecord;
   applications: AdminApplication[];
+  externalTeams: ExternalTeamAdminRow[];
+  participants: TournamentParticipant[];
+  groups: Array<{ id: string; name: string }>;
+  clubs: Array<{ id: string; name: string; logoUrl: string | null }>;
   stageStatus: TournamentStageStatus;
   current: "overview" | "participants";
 };
@@ -29,6 +38,10 @@ const applicationSections: Array<{ status: ApplicationStatus; title: string }> =
 export function AdminTournamentDetailView({
   tournament,
   applications,
+  externalTeams,
+  participants,
+  groups,
+  clubs,
   stageStatus,
   current,
 }: AdminTournamentDetailViewProps) {
@@ -37,11 +50,17 @@ export function AdminTournamentDetailView({
       application.tournamentId === tournament.slug ||
       application.tournamentId === tournament.id,
   );
-  const participants = acceptedParticipants(applications, tournament);
-  const capacity = getTournamentCapacity(
-    tournament.maxTeams,
-    related.map((application) => application.applicationStatus),
-  );
+  const acceptedApplications = acceptedParticipants(applications, tournament);
+  const capacity = getTournamentCapacityWithExternal({
+    maxTeams: tournament.maxTeams,
+    applicationStatuses: related.map((application) => application.applicationStatus),
+    acceptedApplicationIds: acceptedApplications.map((application) => application.id),
+    externalTeams: externalTeams.map((team) => ({
+      participationStatus: team.participationStatus,
+      externalActive: team.externalActive,
+      applicationId: team.applicationId,
+    })),
+  });
   const maxLabel = tournament.maxTeams == null ? "—" : String(tournament.maxTeams);
 
   return (
@@ -60,15 +79,45 @@ export function AdminTournamentDetailView({
         <CapacityStat label="In Prüfung" value={String(capacity.underReviewCount)} />
       </div>
 
+      <TournamentStatusCapacityNotice
+        className="mt-5 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
+        dbStatus={tournament.status}
+        maxTeams={tournament.maxTeams}
+        confirmedParticipants={capacity.confirmedTeams}
+        editHref={`/admin/turniere/${tournament.id}/bearbeiten`}
+      />
+
       <div className="mt-8 grid gap-5">
         <AdminCard title="Kapazität">
           <TournamentCapacityForm slug={tournament.slug} maxTeams={tournament.maxTeams} />
         </AdminCard>
 
-        <MeinTurnierplanAdminPanel tournament={tournament} />
+        <MeinTurnierplanAdminPanel tournament={tournament} applications={applications} />
+
+        <TournamentSyncAdminPanel
+          tournament={tournament}
+          applications={applications}
+          detectedExternalTeamCount={
+            externalTeams.filter(
+              (team) => team.externalActive && team.participationStatus === "detected",
+            ).length
+          }
+        />
+
+        <ExternalTeamsParticipationPanel
+          tournamentId={tournament.id}
+          teams={externalTeams}
+          confirmedParticipantCount={capacity.confirmedTeams}
+          maxTeams={tournament.maxTeams}
+        />
 
         <div id="teilnehmer">
-          <TournamentParticipantsPanel participants={participants} />
+          <TournamentParticipantsPanel
+            tournamentId={tournament.id}
+            participants={participants}
+            groups={groups}
+            clubs={clubs}
+          />
         </div>
 
         {applicationSections.map((section) => {

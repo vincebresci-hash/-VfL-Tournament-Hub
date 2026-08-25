@@ -27,9 +27,18 @@ export const metadata: Metadata = {
     template: `%s | ${APP_NAME}`,
   },
   description: APP_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
+  icons: {
+    icon: [{ url: "/icon.png" }],
+    apple: [{ url: "/apple-icon.png" }],
+  },
   openGraph: {
     title: APP_NAME,
     description: APP_DESCRIPTION,
+    url: siteUrl,
+    siteName: APP_NAME,
     locale: "de_DE",
     type: "website",
     images: [{ url: "/hero-vfl.jpg" }],

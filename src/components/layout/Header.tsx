@@ -16,9 +16,14 @@ import type { AuthSession } from "@/types/auth";
 type HeaderProps = {
   variant?: "overlay" | "solid";
   session?: AuthSession | null;
+  liveActive?: boolean;
 };
 
-export function Header({ variant = "overlay", session = null }: HeaderProps) {
+export function Header({
+  variant = "overlay",
+  session = null,
+  liveActive = false,
+}: HeaderProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -72,15 +77,16 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
         >
           <ul className="flex items-center gap-5 xl:gap-7">
             {mainNavigation.map((item) => {
-              const active = pathname === item.href;
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const isLiveItem = "live" in item && item.live;
 
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     className={cn(
-                      "text-[12px] font-medium tracking-[0.1em] uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow",
-                      active
+                      "inline-flex items-center gap-1.5 text-[12px] font-medium tracking-[0.1em] uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow",
+                      active || (isLiveItem && liveActive)
                         ? "text-brand-yellow"
                         : "text-white/72 hover:text-white",
                     )}
@@ -89,11 +95,19 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
                     <span
                       className={cn(
                         "border-b pb-1",
-                        active ? "border-brand-yellow" : "border-transparent",
+                        active || (isLiveItem && liveActive)
+                          ? "border-brand-yellow"
+                          : "border-transparent",
                       )}
                     >
                       {item.label}
                     </span>
+                    {isLiveItem && liveActive ? (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-brand-yellow"
+                        aria-label="Turnier läuft"
+                      />
+                    ) : null}
                   </Link>
                 </li>
               );
@@ -185,7 +199,8 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
         <nav aria-label="Mobile Navigation" className="px-6 py-8">
           <ul className="flex flex-col gap-5">
             {mainNavigation.map((item) => {
-              const active = pathname === item.href;
+              const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const isLiveItem = "live" in item && item.live;
 
               return (
                 <li key={item.href}>
@@ -193,11 +208,16 @@ export function Header({ variant = "overlay", session = null }: HeaderProps) {
                     href={item.href}
                     onClick={() => setOpen(false)}
                     className={cn(
-                      "text-xl font-medium tracking-[0.08em] uppercase",
-                      active ? "text-brand-yellow" : "text-white",
+                      "inline-flex items-center gap-2 text-xl font-medium tracking-[0.08em] uppercase",
+                      active || (isLiveItem && liveActive)
+                        ? "text-brand-yellow"
+                        : "text-white",
                     )}
                   >
                     {item.label}
+                    {isLiveItem && liveActive ? (
+                      <span className="h-2 w-2 rounded-full bg-brand-yellow" aria-hidden />
+                    ) : null}
                   </Link>
                 </li>
               );

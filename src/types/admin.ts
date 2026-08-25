@@ -1,5 +1,5 @@
 import type { ApplicationStatus } from "@/types/application";
-import type { AgeGroup } from "@/types/tournament";
+import type { AgeGroup, LiveDataSource } from "@/types/tournament";
 import type { UserRole } from "@/types/auth";
 
 export const CLUB_RECORD_STATUSES = ["active", "inactive"] as const;
@@ -23,6 +23,7 @@ export type AdminClubListItem = {
   name: string;
   city: string;
   website: string | null;
+  logoUrl: string | null;
   contactName: string;
   contactEmail: string | null;
   contactPhone: string | null;
@@ -64,7 +65,6 @@ export type AdminClubApplication = {
 };
 
 export type AdminClubDetail = AdminClubListItem & {
-  logoUrl: string | null;
   members: AdminClubMember[];
   teams: AdminClubTeam[];
   applications: AdminClubApplication[];
@@ -239,6 +239,14 @@ export type AdminTournamentRecord = {
   meinTurnierplanEnabled: boolean;
   meinTurnierplanLabel: string | null;
   meinTurnierplanEmbedUrl: string | null;
+  liveDataSource: LiveDataSource;
+  meinTurnierplanTournamentId: string | null;
+  meinTurnierplanMatchesWidgetUrl: string | null;
+  meinTurnierplanTableWidgetUrl: string | null;
+  publicScheduleNote: string | null;
+  publicLiveNote: string | null;
+  meinTurnierplanLastSyncedAt?: string | null;
+  meinTurnierplanSyncMeta?: Record<string, unknown> | null;
 };
 
 export type AdminTournamentInput = {
@@ -271,4 +279,10 @@ export type AdminTournamentInput = {
   meinTurnierplanEnabled: boolean;
   meinTurnierplanUrl: string;
   meinTurnierplanLabel: string;
+  liveDataSource: LiveDataSource;
+  meinTurnierplanTournamentId: string;
+  meinTurnierplanMatchesWidgetUrl: string;
+  meinTurnierplanTableWidgetUrl: string;
+  publicScheduleNote: string;
+  publicLiveNote: string;
 };

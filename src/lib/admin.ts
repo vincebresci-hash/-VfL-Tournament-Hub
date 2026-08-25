@@ -8,7 +8,10 @@ import type {
 import type { AgeGroup, Tournament } from "@/types/tournament";
 import type { ClubRecordStatus, EmailTemplateType } from "@/types/admin";
 import type { UserRole } from "@/types/auth";
-import { getTournamentCapacity } from "@/lib/tournament-capacity";
+import {
+  getTournamentCapacityWithExternal,
+  type ExternalTeamForParticipantCount,
+} from "@/lib/mein-turnierplan-participants";
 
 export const applicationStatusLabel: Record<ApplicationStatus, string> = {
   new: "Neu",
@@ -147,16 +150,32 @@ export function getApplicationsForTournament(
 export function getTournamentAdminSummary(
   tournament: Tournament,
   applications: AdminApplication[],
+  externalTeams: ExternalTeamForParticipantCount[] = [],
 ) {
   const related = getApplicationsForTournament(applications, tournament.id);
-  const capacity = getTournamentCapacity(
-    tournament.maxTeams,
-    related.map((item) => item.applicationStatus),
-  );
+  const relatedBySlug =
+    tournament.slug && tournament.slug !== tournament.id
+      ? getApplicationsForTournament(applications, tournament.slug)
+      : [];
+  const allRelated = [...related];
+  for (const item of relatedBySlug) {
+    if (!allRelated.some((existing) => existing.id === item.id)) {
+      allRelated.push(item);
+    }
+  }
+
+  const capacity = getTournamentCapacityWithExternal({
+    maxTeams: tournament.maxTeams,
+    applicationStatuses: allRelated.map((item) => item.applicationStatus),
+    acceptedApplicationIds: allRelated
+      .filter((item) => item.applicationStatus === "accepted")
+      .map((item) => item.id),
+    externalTeams,
+  });
 
   return {
     tournament,
-    applicationsCount: related.length,
+    applicationsCount: allRelated.length,
     confirmedTeams: capacity.confirmedTeams,
     waitlistCount: capacity.waitingListCount,
     underReviewCount: capacity.underReviewCount,
@@ -164,7 +183,7 @@ export function getTournamentAdminSummary(
     availableSlots: capacity.availableSlots,
     isFull: capacity.isFull,
     openApplications: capacity.newCount + capacity.underReviewCount,
-    composition: getCategoryComposition(related),
+    composition: getCategoryComposition(allRelated),
   };
 }
 

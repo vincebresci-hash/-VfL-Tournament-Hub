@@ -17,6 +17,7 @@ import {
   getPublicApplicationState,
 } from "@/lib/public-application-state";
 import { getAppSettings } from "@/lib/settings";
+import { getEffectiveTournamentStatus } from "@/lib/tournament-status";
 import type { PublicTournament } from "@/types/tournament";
 
 type ApplyPageProps = {
@@ -54,6 +55,14 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
     : undefined;
   const settings = await getAppSettings();
   const occupancy = await getTournamentOccupancy(tournament.slug);
+  const confirmedParticipants = occupancy?.confirmedTeams ?? tournament.confirmedTeams;
+  const maxTeams = occupancy?.maxTeams ?? tournament.maxTeams;
+  const effectiveStatus = getEffectiveTournamentStatus({
+    dbStatus: tournament.status,
+    maxTeams,
+    confirmedParticipants,
+    archivedAt: tournament.archivedAt,
+  });
   const applicationState = getPublicApplicationState({
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
@@ -64,7 +73,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
     isFull: occupancy?.isFull ?? tournament.isFull,
     applicationStart: tournament.applicationStart,
     applicationDeadline: tournament.applicationDeadline,
-    maxTeams: occupancy?.maxTeams ?? tournament.maxTeams,
+    maxTeams,
   });
 
   if (applicationState === "closed" || applicationState === "coming-soon") {
@@ -108,7 +117,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
             {formatDateDe(tournament.date)} · {tournament.location}
           </p>
           <div className="mt-3">
-            <StatusBadge status={tournament.status} />
+            <StatusBadge status={effectiveStatus} />
           </div>
           <h1 className="mt-8 font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-[1.75rem]">
             Mannschaft bewerben
@@ -151,6 +160,13 @@ function ApplyShell({ children }: { children: ReactNode }) {
 }
 
 function TournamentSummary({ tournament }: { tournament: PublicTournament }) {
+  const effectiveStatus = getEffectiveTournamentStatus({
+    dbStatus: tournament.status,
+    maxTeams: tournament.maxTeams,
+    confirmedParticipants: tournament.confirmedTeams,
+    archivedAt: tournament.archivedAt,
+  });
+
   return (
     <aside className="border border-line bg-white p-5 lg:sticky lg:top-8">
       <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
@@ -183,7 +199,7 @@ function TournamentSummary({ tournament }: { tournament: PublicTournament }) {
             Status
           </dt>
           <dd className="mt-2">
-            <StatusBadge status={tournament.status} />
+            <StatusBadge status={effectiveStatus} />
           </dd>
         </div>
       </dl>

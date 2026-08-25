@@ -2,8 +2,21 @@ import type { MatchStatus, StandingRow, TournamentMatchRecord } from "@/types/sc
 
 export type StandingsMatch = Pick<
   TournamentMatchRecord,
-  "homeApplicationId" | "awayApplicationId" | "homeScore" | "awayScore" | "status"
+  | "homeApplicationId"
+  | "awayApplicationId"
+  | "homeExternalTeamId"
+  | "awayExternalTeamId"
+  | "homeScore"
+  | "awayScore"
+  | "status"
 >;
+
+export function standingsParticipantId(
+  applicationId: string | null | undefined,
+  externalTeamId?: string | null,
+) {
+  return applicationId ?? externalTeamId ?? null;
+}
 
 export type TieBreakerContext = {
   matches: StandingsMatch[];
@@ -68,12 +81,20 @@ export function computeGroupStandings(
     if (!isCompleted(match.status, match.homeScore, match.awayScore)) {
       continue;
     }
-    if (!match.homeApplicationId || !match.awayApplicationId) {
+    const homeId = standingsParticipantId(
+      match.homeApplicationId,
+      match.homeExternalTeamId,
+    );
+    const awayId = standingsParticipantId(
+      match.awayApplicationId,
+      match.awayExternalTeamId,
+    );
+    if (!homeId || !awayId) {
       continue;
     }
 
-    const home = table.get(match.homeApplicationId);
-    const away = table.get(match.awayApplicationId);
+    const home = table.get(homeId);
+    const away = table.get(awayId);
     if (!home || !away || match.homeScore == null || match.awayScore == null) {
       continue;
     }

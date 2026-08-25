@@ -4,9 +4,12 @@ import { AdminTournamentDetailView } from "@/components/admin/AdminTournamentDet
 import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
+  listAdminClubs,
 } from "@/lib/db/admin-queries";
 import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import { listExternalTeamsForTournamentAction } from "@/lib/db/mein-turnierplan-participants-actions";
 import { stageStatusFor } from "@/lib/schedule/admin";
 
 type TournamentDetailPageProps = {
@@ -50,12 +53,25 @@ export default async function AdminTournamentDetailPage({
     notFound();
   }
 
-  const stage = await getAdminTournamentStage(tournament.id);
+  const [stage, externalTeamsResult, participantsResult, clubsResult] = await Promise.all([
+    getAdminTournamentStage(tournament.id),
+    listExternalTeamsForTournamentAction(tournament.id),
+    getTournamentParticipants(tournament.id),
+    listAdminClubs(),
+  ]);
 
   return (
     <AdminTournamentDetailView
       tournament={tournament}
       applications={applicationsResult.applications}
+      externalTeams={externalTeamsResult.teams}
+      participants={participantsResult}
+      groups={stage.groups.map((group) => ({ id: group.id, name: group.name }))}
+      clubs={clubsResult.clubs.map((club) => ({
+        id: club.id,
+        name: club.name,
+        logoUrl: club.logoUrl,
+      }))}
       stageStatus={stageStatusFor(tournament, stage.groups.length, stage.matches)}
       current={bereich === "teilnehmer" ? "participants" : "overview"}
     />

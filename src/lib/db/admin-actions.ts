@@ -19,6 +19,7 @@ import { sendApplicationStatusEmail } from "@/lib/email/status-mail";
 import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
 import { slugifyTournamentName } from "@/lib/tournaments";
 import { validateMeinTurnierplanInput } from "@/lib/mein-turnierplan";
+import { canAcceptApplicationIntoCapacity } from "@/lib/mein-turnierplan-participants";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -81,14 +82,38 @@ export async function updateApplicationStatusAction(
 
   if (status === "accepted" && previousStatus !== "accepted") {
     if (tournament?.max_teams != null && tournament.max_teams >= 0) {
-      const { count } = await supabase
-        .from("applications")
-        .select("id", { count: "exact", head: true })
-        .eq("tournament_id", tournament.id)
-        .eq("status", "accepted");
+      const [acceptedAppsResult, externalTeamsResult] = await Promise.all([
+        supabase
+          .from("applications")
+          .select("id")
+          .eq("tournament_id", tournament.id)
+          .eq("status", "accepted"),
+        supabase
+          .from("tournament_external_teams")
+          .select("application_id, participation_status, external_active")
+          .eq("tournament_id", tournament.id),
+      ]);
 
-      if ((count ?? 0) >= tournament.max_teams) {
-        return { error: "TURNIER AUSGEBUCHT", notice: null };
+      if (acceptedAppsResult.error || externalTeamsResult.error) {
+        return {
+          error: "Die Kapazität konnte nicht geprüft werden.",
+          notice: null,
+        };
+      }
+
+      const capacity = canAcceptApplicationIntoCapacity({
+        maxTeams: tournament.max_teams,
+        acceptedApplicationIds: (acceptedAppsResult.data ?? []).map((row) => String(row.id)),
+        externalTeams: (externalTeamsResult.data ?? []).map((row) => ({
+          participationStatus: String(row.participation_status ?? "detected"),
+          externalActive: row.external_active !== false,
+          applicationId: row.application_id ? String(row.application_id) : null,
+        })),
+        applicationIdToAccept: applicationId,
+      });
+
+      if (!capacity.ok) {
+        return { error: capacity.error, notice: null };
       }
     }
   }
@@ -467,6 +492,12 @@ function parseTournamentInput(input: AdminTournamentInput): {
     mein_turnierplan_enabled: boolean;
     mein_turnierplan_label: string | null;
     mein_turnierplan_embed_url: string | null;
+    live_data_source: string;
+    mein_turnierplan_tournament_id: string | null;
+    mein_turnierplan_matches_widget_url: string | null;
+    mein_turnierplan_table_widget_url: string | null;
+    public_schedule_note: string | null;
+    public_live_note: string | null;
   } | null;
 } {
   const name = input.name.trim();
@@ -507,6 +538,10 @@ function parseTournamentInput(input: AdminTournamentInput): {
   const meinTurnierplan = validateMeinTurnierplanInput({
     enabled: Boolean(input.meinTurnierplanEnabled),
     url: input.meinTurnierplanUrl,
+    liveDataSource: input.liveDataSource,
+    tournamentId: input.meinTurnierplanTournamentId,
+    matchesWidgetUrl: input.meinTurnierplanMatchesWidgetUrl,
+    tableWidgetUrl: input.meinTurnierplanTableWidgetUrl,
   });
 
   if (meinTurnierplan.error) {
@@ -546,6 +581,12 @@ function parseTournamentInput(input: AdminTournamentInput): {
       mein_turnierplan_enabled: Boolean(input.meinTurnierplanEnabled),
       mein_turnierplan_label: parseOptionalText(input.meinTurnierplanLabel),
       mein_turnierplan_embed_url: null,
+      live_data_source: meinTurnierplan.liveDataSource,
+      mein_turnierplan_tournament_id: meinTurnierplan.tournamentId,
+      mein_turnierplan_matches_widget_url: meinTurnierplan.matchesWidgetUrl,
+      mein_turnierplan_table_widget_url: meinTurnierplan.tableWidgetUrl,
+      public_schedule_note: parseOptionalText(input.publicScheduleNote),
+      public_live_note: parseOptionalText(input.publicLiveNote),
     },
   };
 }

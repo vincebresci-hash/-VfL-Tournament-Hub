@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { TournamentPublicStage } from "@/components/tournaments/TournamentPublicStage";
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { formatDateDe, formatDateTimeDe, formatTimeDe } from "@/lib/format";
 import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
@@ -19,12 +20,21 @@ import { filledPublicInfo, getDisplayCapacity } from "@/lib/public-tournament";
 import { getAppSettings } from "@/lib/settings";
 import { nonempty } from "@/lib/text";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
-import { isMeinTurnierplanPublic } from "@/lib/mein-turnierplan";
-import { tournamentStatusClassName } from "@/lib/tournament-status";
+import {
+  isHybridLiveDataSource,
+  isMeinTurnierplanPublic,
+  showsMeinTurnierplanLiveTab,
+  usesMeinTurnierplanAsPrimaryLive,
+} from "@/lib/mein-turnierplan";
+import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
+import {
+  getEffectiveTournamentStatus,
+  tournamentStatusClassName,
+} from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ tab?: string | string[] }>;
+  searchParams: Promise<{ tab?: string | string[]; live?: string | string[] }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -54,9 +64,10 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const [settings, stage] = await Promise.all([
+  const [settings, stage, meinTurnierplanPublic] = await Promise.all([
     getAppSettings(),
     getPublicTournamentStage(tournament.slug, tournament.id),
+    getPublicMeinTurnierplanData(tournament),
   ]);
   const applicationState = getPublicApplicationState({
     status: tournament.status,
@@ -80,8 +91,19 @@ export default async function TournamentDetailPage({
   const shortDescription = nonempty(tournament.shortDescription);
   const longDescription = nonempty(tournament.description);
   const capacity = getDisplayCapacity(tournament);
+  const effectiveStatus = getEffectiveTournamentStatus({
+    dbStatus: tournament.status,
+    maxTeams: tournament.maxTeams,
+    confirmedParticipants: tournament.confirmedTeams,
+    archivedAt: tournament.archivedAt,
+  });
   const extraInfo = filledPublicInfo(tournament);
   const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
+  const showLiveTab = showsMeinTurnierplanLiveTab(tournament);
+  const meinTurnierplanPrimary = usesMeinTurnierplanAsPrimaryLive(tournament);
+  const meinTurnierplanHybrid = isHybridLiveDataSource(tournament);
+  const showTopMeinTurnierplanButton =
+    showMeinTurnierplan && !showLiveTab;
   const facts = [
     tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
     tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
@@ -142,7 +164,7 @@ export default async function TournamentDetailPage({
                 <span className="inline-flex bg-brand-yellow px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
                   {tournament.ageGroup}
                 </span>
-                <StatusBadge status={tournament.status} />
+                <StatusBadge status={effectiveStatus} />
                 <span
                   className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
                     applicationState === "open"
@@ -198,7 +220,7 @@ export default async function TournamentDetailPage({
             </div>
           </div>
 
-          {showMeinTurnierplan ? (
+          {showTopMeinTurnierplanButton ? (
             <MeinTurnierplanPublicButton
               tournamentName={tournament.name}
               tournamentDate={tournament.date}
@@ -253,6 +275,32 @@ export default async function TournamentDetailPage({
             tab={tab}
             tournamentStatus={tournament.status}
             meinTurnierplanActive={showMeinTurnierplan}
+            showLiveTab={showLiveTab}
+            meinTurnierplanPrimary={meinTurnierplanPrimary}
+            meinTurnierplanHybrid={meinTurnierplanHybrid}
+            publicScheduleNote={tournament.publicScheduleNote}
+            meinTurnierplanPublic={meinTurnierplanPublic}
+            preferSyncedHubData={Boolean(
+              tournament.meinTurnierplanLastSyncedAt &&
+                (stage.matches.length > 0 ||
+                  stage.groups.length > 0 ||
+                  stage.roster.length > 0),
+            )}
+            livePresentation={
+              showLiveTab
+                ? {
+                    tournamentName: tournament.name,
+                    tournamentDate: tournament.date,
+                    tournamentStatus: tournament.status,
+                    presentationUrl: tournament.meinTurnierplanUrl,
+                    customLabel: tournament.meinTurnierplanLabel,
+                    matchesWidgetUrl: tournament.meinTurnierplanMatchesWidgetUrl,
+                    tableWidgetUrl: tournament.meinTurnierplanTableWidgetUrl,
+                    publicLiveNote: tournament.publicLiveNote,
+                    meinTurnierplanEmbedUrl: tournament.meinTurnierplanEmbedUrl,
+                  }
+                : null
+            }
             overview={
               stage.roster.length > 0 ? (
             <section>
@@ -261,9 +309,15 @@ export default async function TournamentDetailPage({
               </h2>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {stage.roster.map((entry) => (
-                  <li key={entry.applicationId} className="border border-line bg-white px-4 py-3 text-[15px] text-ink">
-                    {entry.clubName}
-                    {entry.teamName ? ` · ${entry.teamName}` : ""}
+                  <li
+                    key={entry.applicationId}
+                    className="flex items-center gap-3 border border-line bg-white px-4 py-3 text-[15px] text-ink"
+                  >
+                    <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} />
+                    <span>
+                      {entry.clubName}
+                      {entry.teamName ? ` · ${entry.teamName}` : ""}
+                    </span>
                   </li>
                 ))}
               </ul>

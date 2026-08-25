@@ -7,7 +7,10 @@ import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toLoginErrorMessage } from "@/lib/auth/messages";
 import { getPostLoginRedirect } from "@/lib/auth/redirects";
 import { canAccessAdmin, isUserRole } from "@/lib/auth/roles";
-import { validateLoginForm, type LoginFormErrors } from "@/lib/auth/validation";
+import {
+  validateLoginCredentials,
+  type LoginFormErrors,
+} from "@/lib/auth/validation";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { createClient } from "@/lib/supabase/client";
 
@@ -26,7 +29,7 @@ export function LoginForm({ redirectTo, initialError }: LoginFormProps) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors = validateLoginForm({ email, password, remember });
+    const nextErrors = validateLoginCredentials({ email, password });
     setErrors(nextErrors);
     setFormError(null);
 

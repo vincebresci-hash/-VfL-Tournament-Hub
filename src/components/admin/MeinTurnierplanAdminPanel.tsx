@@ -1,33 +1,87 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
-import { isSafeHttpUrl } from "@/lib/mein-turnierplan";
+import {
+  acceptedTeamsFromApplications,
+  MeinTurnierplanAdminTools,
+} from "@/components/admin/MeinTurnierplanAdminTools";
+import {
+  asLiveDataSource,
+  isSafeHttpUrl,
+} from "@/lib/mein-turnierplan";
 import type { AdminTournamentRecord } from "@/types/admin";
+import type { AdminApplication } from "@/types/application";
+
+const liveDataSourceLabels = {
+  hub: "Eigener Hub",
+  "mein-turnierplan": "MeinTurnierplan",
+  hybrid: "Hybrid",
+} as const;
 
 type MeinTurnierplanAdminPanelProps = {
   tournament: AdminTournamentRecord;
+  applications?: AdminApplication[];
 };
 
 export function MeinTurnierplanAdminPanel({
   tournament,
+  applications = [],
 }: MeinTurnierplanAdminPanelProps) {
+  const router = useRouter();
   const active =
     tournament.meinTurnierplanEnabled &&
     isSafeHttpUrl(tournament.meinTurnierplanUrl ?? "");
   const url = tournament.meinTurnierplanUrl?.trim() ?? "";
+  const liveDataSource = asLiveDataSource(tournament.liveDataSource);
+  const acceptedTeams = acceptedTeamsFromApplications(
+    applications.filter(
+      (application) =>
+        application.tournamentId === tournament.id ||
+        application.tournamentId === tournament.slug,
+    ),
+  );
 
   return (
     <AdminCard title="MeinTurnierplan">
       <dl className="grid gap-3 sm:grid-cols-2">
         <AdminInfo label="Status" value={active ? "Aktiv" : "Inaktiv"} />
         <AdminInfo
+          label="Datenquelle"
+          value={liveDataSourceLabels[liveDataSource]}
+        />
+        <AdminInfo
+          label="Turnier-ID"
+          value={displayValue(tournament.meinTurnierplanTournamentId)}
+        />
+        <AdminInfo
           label="Button-Beschriftung"
           value={displayValue(tournament.meinTurnierplanLabel)}
         />
+        <AdminInfo label="Präsentations-Link" value={url ? url : "—"} />
         <AdminInfo
-          label="URL"
-          value={url ? url : "—"}
+          label="Spielplan-Widget"
+          value={displayValue(tournament.meinTurnierplanMatchesWidgetUrl)}
+        />
+        <AdminInfo
+          label="Tabellen-Widget"
+          value={displayValue(tournament.meinTurnierplanTableWidgetUrl)}
         />
       </dl>
+
+      <MeinTurnierplanAdminTools
+        tournamentId={tournament.id}
+        tournamentIdValue={tournament.meinTurnierplanTournamentId ?? ""}
+        matchesWidgetUrl={tournament.meinTurnierplanMatchesWidgetUrl}
+        tableWidgetUrl={tournament.meinTurnierplanTableWidgetUrl}
+        hasWidgetUrl={Boolean(
+          tournament.meinTurnierplanMatchesWidgetUrl?.trim() ||
+            tournament.meinTurnierplanTableWidgetUrl?.trim(),
+        )}
+        acceptedTeams={acceptedTeams}
+        onImportComplete={() => router.refresh()}
+      />
 
       <div className="mt-5 flex flex-wrap gap-3">
         {active ? (

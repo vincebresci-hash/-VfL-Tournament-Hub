@@ -16,12 +16,14 @@ import {
   updateApplicationStatusAction,
   upsertApplicationReviewAction,
 } from "@/lib/db/admin-actions";
+import { listAllExternalTeamsForAdminAction } from "@/lib/db/mein-turnierplan-participants-actions";
 import type {
   AdminApplication,
   ApplicationStatus,
   InternalCategory,
   TeamStrength,
 } from "@/types/application";
+import type { ExternalTeamForParticipantCount } from "@/lib/mein-turnierplan-participants";
 
 type InternalRatingUpdate = {
   internalCategory?: InternalCategory | null;
@@ -29,8 +31,13 @@ type InternalRatingUpdate = {
   internalNotes?: string | null;
 };
 
+type AdminExternalTeamRow = ExternalTeamForParticipantCount & {
+  tournamentId: string;
+};
+
 type AdminDataContextValue = {
   applications: AdminApplication[];
+  externalTeams: AdminExternalTeamRow[];
   getApplication: (id: string) => AdminApplication | undefined;
   updateStatus: (
     id: string,
@@ -45,6 +52,7 @@ const AdminDataContext = createContext<AdminDataContextValue | null>(null);
 export function AdminDataProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [applications, setApplications] = useState<AdminApplication[]>([]);
+  const [externalTeams, setExternalTeams] = useState<AdminExternalTeamRow[]>([]);
   const [databaseReady, setDatabaseReady] = useState(true);
   const noteTimers = useRef<Record<string, number>>({});
 
@@ -55,13 +63,17 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
 
-    void loadAdminApplicationsAction().then((result) => {
+    void Promise.all([
+      loadAdminApplicationsAction(),
+      listAllExternalTeamsForAdminAction(),
+    ]).then(([applicationsResult, externalResult]) => {
       if (cancelled) {
         return;
       }
 
-      setApplications(result.ready ? result.applications : []);
-      setDatabaseReady(result.ready);
+      setApplications(applicationsResult.ready ? applicationsResult.applications : []);
+      setExternalTeams(externalResult.ready ? externalResult.teams : []);
+      setDatabaseReady(applicationsResult.ready);
     });
 
     return () => {
@@ -79,6 +91,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AdminDataContextValue>(
     () => ({
       applications,
+      externalTeams,
       databaseReady,
       getApplication: (id) =>
         applications.find((application) => application.id === id),
@@ -134,7 +147,7 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         persistRating(id, update);
       },
     }),
-    [applications, persistRating, databaseReady],
+    [applications, externalTeams, persistRating, databaseReady],
   );
 
   return (

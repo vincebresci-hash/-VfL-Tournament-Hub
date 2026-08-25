@@ -32,7 +32,7 @@ export function ApplicationDetail({
   applicationId,
   tournament,
 }: ApplicationDetailProps) {
-  const { getApplication, updateStatus, updateInternalRating, applications } =
+  const { getApplication, updateStatus, updateInternalRating, applications, externalTeams } =
     useAdminData();
   const application = getApplication(applicationId);
   const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(
@@ -46,7 +46,11 @@ export function ApplicationDetail({
     return null;
   }
 
-  const summary = getTournamentAdminSummary(tournament, applications);
+  const summary = getTournamentAdminSummary(
+    tournament,
+    applications,
+    externalTeams.filter((team) => team.tournamentId === tournament.id),
+  );
   const canAccept =
     !summary.isFull || application.applicationStatus === "accepted";
 

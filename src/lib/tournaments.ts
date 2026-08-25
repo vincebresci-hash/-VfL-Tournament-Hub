@@ -3,6 +3,7 @@ import { getAvailableSlots, isTournamentFull } from "@/lib/tournament-capacity";
 import { optimizePublicImageSrc } from "@/lib/public-images";
 import { nonempty } from "@/lib/text";
 import { tournamentStatusOrder } from "@/lib/tournament-status";
+import { asLiveDataSource } from "@/lib/mein-turnierplan";
 import { AGE_GROUPS, TOURNAMENT_PUBLIC_INFO_FIELDS, TOURNAMENT_STATUSES } from "@/types/tournament";
 import type {
   AgeGroup,
@@ -54,6 +55,14 @@ const TOURNAMENT_SELECT = [
   "mein_turnierplan_enabled",
   "mein_turnierplan_label",
   "mein_turnierplan_embed_url",
+  "live_data_source",
+  "mein_turnierplan_tournament_id",
+  "mein_turnierplan_matches_widget_url",
+  "mein_turnierplan_table_widget_url",
+  "public_schedule_note",
+  "public_live_note",
+  "mein_turnierplan_last_synced_at",
+  "mein_turnierplan_sync_meta",
 ].join(", ");
 
 const TOURNAMENT_SELECT_BASIC = [
@@ -155,6 +164,26 @@ function asPositiveInt(
   return value;
 }
 
+function meinTurnierplanFieldsFromRow(row: TournamentRow) {
+  return {
+    meinTurnierplanUrl: nonempty(row.mein_turnierplan_url),
+    meinTurnierplanEnabled: asBoolean(row.mein_turnierplan_enabled, false),
+    meinTurnierplanLabel: nonempty(row.mein_turnierplan_label),
+    meinTurnierplanEmbedUrl: nonempty(row.mein_turnierplan_embed_url),
+    liveDataSource: asLiveDataSource(row.live_data_source),
+    meinTurnierplanTournamentId: nonempty(row.mein_turnierplan_tournament_id),
+    meinTurnierplanMatchesWidgetUrl: nonempty(row.mein_turnierplan_matches_widget_url),
+    meinTurnierplanTableWidgetUrl: nonempty(row.mein_turnierplan_table_widget_url),
+    publicScheduleNote: nonempty(row.public_schedule_note),
+    publicLiveNote: nonempty(row.public_live_note),
+    meinTurnierplanLastSyncedAt: nonempty(row.mein_turnierplan_last_synced_at),
+    meinTurnierplanSyncMeta:
+      row.mein_turnierplan_sync_meta && typeof row.mein_turnierplan_sync_meta === "object"
+        ? row.mein_turnierplan_sync_meta
+        : null,
+  };
+}
+
 export function applicationBelongsToTournament(
   application: { tournamentId: string },
   tournament: { id: string; slug: string },
@@ -236,10 +265,7 @@ export function toTournamentFromRow(
     archivedAt: row.archived_at ?? null,
     availableSlots: Number.isFinite(availableSlots) ? availableSlots : 0,
     isFull: isTournamentFull(row.max_teams, confirmedTeams),
-    meinTurnierplanUrl: nonempty(row.mein_turnierplan_url),
-    meinTurnierplanEnabled: asBoolean(row.mein_turnierplan_enabled, false),
-    meinTurnierplanLabel: nonempty(row.mein_turnierplan_label),
-    meinTurnierplanEmbedUrl: nonempty(row.mein_turnierplan_embed_url),
+    ...meinTurnierplanFieldsFromRow(row),
     ...publicInfoFromRow(row),
   };
 }
@@ -279,10 +305,7 @@ export function toAdminTournamentRecord(row: TournamentRow): AdminTournamentReco
     changingRooms: nonempty(row.changing_rooms),
     catering: nonempty(row.catering),
     teamInfo: nonempty(row.team_info),
-    meinTurnierplanUrl: nonempty(row.mein_turnierplan_url),
-    meinTurnierplanEnabled: asBoolean(row.mein_turnierplan_enabled, false),
-    meinTurnierplanLabel: nonempty(row.mein_turnierplan_label),
-    meinTurnierplanEmbedUrl: nonempty(row.mein_turnierplan_embed_url),
+    ...meinTurnierplanFieldsFromRow(row),
   };
 }
 
@@ -328,6 +351,13 @@ export function toBoardTournament(record: AdminTournamentRecord): Tournament {
     meinTurnierplanEnabled: record.meinTurnierplanEnabled,
     meinTurnierplanLabel: record.meinTurnierplanLabel,
     meinTurnierplanEmbedUrl: record.meinTurnierplanEmbedUrl,
+    liveDataSource: record.liveDataSource,
+    meinTurnierplanTournamentId: record.meinTurnierplanTournamentId,
+    meinTurnierplanMatchesWidgetUrl: record.meinTurnierplanMatchesWidgetUrl,
+    meinTurnierplanTableWidgetUrl: record.meinTurnierplanTableWidgetUrl,
+    publicScheduleNote: record.publicScheduleNote,
+    publicLiveNote: record.publicLiveNote,
+    meinTurnierplanLastSyncedAt: record.meinTurnierplanLastSyncedAt ?? null,
   };
 }
 

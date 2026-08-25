@@ -12,15 +12,18 @@ import {
   deleteTournamentGroupAction,
   renameTournamentGroupAction,
 } from "@/lib/db/schedule-actions";
-import { publicTeamLabel } from "@/lib/schedule/names";
-import type { AdminApplication } from "@/types/application";
+import { scheduleParticipantId } from "@/lib/schedule/admin";
+import {
+  participantSourceLabel,
+  type TournamentParticipant,
+} from "@/lib/tournament-participants";
 import type { TournamentGroupRecord } from "@/types/schedule";
 
 type TournamentGroupsBoardProps = {
   tournamentId: string;
-  participants: AdminApplication[];
+  participants: TournamentParticipant[];
   groups: TournamentGroupRecord[];
-  groupIdByApplicationId: Record<string, string>;
+  groupIdByParticipantId: Record<string, string>;
   hasMatches: boolean;
 };
 
@@ -28,7 +31,7 @@ export function TournamentGroupsBoard({
   tournamentId,
   participants,
   groups,
-  groupIdByApplicationId,
+  groupIdByParticipantId,
   hasMatches,
 }: TournamentGroupsBoardProps) {
   const router = useRouter();
@@ -43,8 +46,12 @@ export function TournamentGroupsBoard({
   );
 
   const unassigned = useMemo(
-    () => participants.filter((application) => !groupIdByApplicationId[application.id]),
-    [participants, groupIdByApplicationId],
+    () =>
+      participants.filter((participant) => {
+        const id = scheduleParticipantId(participant);
+        return Boolean(id) && !groupIdByParticipantId[id!];
+      }),
+    [participants, groupIdByParticipantId],
   );
 
   async function run(task: () => Promise<{ error: string | null; notice?: string | null }>) {
@@ -63,8 +70,8 @@ export function TournamentGroupsBoard({
     router.refresh();
   }
 
-  async function handleAssign(applicationId: string, groupId: string) {
-    await run(() => assignTeamToGroupAction(tournamentId, applicationId, groupId || null));
+  async function handleAssign(participantId: string, groupId: string) {
+    await run(() => assignTeamToGroupAction(tournamentId, participantId, groupId || null));
   }
 
   async function handleAddGroup() {
@@ -144,56 +151,61 @@ export function TournamentGroupsBoard({
       <div className="grid gap-5 lg:grid-cols-2">
         <GroupColumn
           title="Nicht zugeordnet"
-          applications={unassigned}
+          participants={unassigned}
           groups={groups}
-          groupIdByApplicationId={groupIdByApplicationId}
+          groupIdByParticipantId={groupIdByParticipantId}
           disabled={pending || hasMatches}
           onAssign={handleAssign}
         />
-        {groups.map((group) => (
-          <div key={group.id} className="border border-line bg-white p-5 sm:p-6">
-            <div className="flex flex-wrap items-end gap-3">
-              <Field id={`group-name-${group.id}`} label="Gruppenname">
-                <TextInput
-                  id={`group-name-${group.id}`}
-                  value={names[group.id] ?? group.name}
-                  onChange={(event) =>
-                    setNames((current) => ({ ...current, [group.id]: event.target.value }))
-                  }
+        {groups.map((group) => {
+          const groupParticipants = participants.filter((participant) => {
+            const id = scheduleParticipantId(participant);
+            return Boolean(id) && groupIdByParticipantId[id!] === group.id;
+          });
+
+          return (
+            <div key={group.id} className="border border-line bg-white p-5 sm:p-6">
+              <div className="flex flex-wrap items-end gap-3">
+                <Field id={`group-name-${group.id}`} label="Gruppenname">
+                  <TextInput
+                    id={`group-name-${group.id}`}
+                    value={names[group.id] ?? group.name}
+                    onChange={(event) =>
+                      setNames((current) => ({ ...current, [group.id]: event.target.value }))
+                    }
+                  />
+                </Field>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => void handleRename(group.id)}
+                  className="inline-flex h-11 items-center border border-line px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase"
+                >
+                  Umbenennen
+                </button>
+                <button
+                  type="button"
+                  disabled={pending || hasMatches}
+                  onClick={() => setDeleteGroupId(group.id)}
+                  className="inline-flex h-11 items-center px-3 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
+                >
+                  Löschen
+                </button>
+              </div>
+              <div className="mt-4">
+                <GroupColumn
+                  title={`${group.name} · ${groupParticipants.length} Teams`}
+                  participants={groupParticipants}
+                  groups={groups}
+                  groupIdByParticipantId={groupIdByParticipantId}
+                  disabled={pending || hasMatches}
+                  onAssign={handleAssign}
+                  hideTitle
                 />
-              </Field>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() => void handleRename(group.id)}
-                className="inline-flex h-11 items-center border border-line px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase"
-              >
-                Umbenennen
-              </button>
-              <button
-                type="button"
-                disabled={pending || hasMatches}
-                onClick={() => setDeleteGroupId(group.id)}
-                className="inline-flex h-11 items-center px-3 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
-              >
-                Löschen
-              </button>
+              </div>
             </div>
-            <div className="mt-4">
-              <GroupColumn
-                title={`${group.name} · ${participants.filter((item) => groupIdByApplicationId[item.id] === group.id).length} Teams`}
-                applications={participants.filter(
-                  (item) => groupIdByApplicationId[item.id] === group.id,
-                )}
-                groups={groups}
-                groupIdByApplicationId={groupIdByApplicationId}
-                disabled={pending || hasMatches}
-                onAssign={handleAssign}
-                hideTitle
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <ConfirmModal
@@ -215,19 +227,19 @@ export function TournamentGroupsBoard({
 
 function GroupColumn({
   title,
-  applications,
+  participants,
   groups,
-  groupIdByApplicationId,
+  groupIdByParticipantId,
   disabled,
   onAssign,
   hideTitle = false,
 }: {
   title: string;
-  applications: AdminApplication[];
+  participants: TournamentParticipant[];
   groups: TournamentGroupRecord[];
-  groupIdByApplicationId: Record<string, string>;
+  groupIdByParticipantId: Record<string, string>;
   disabled: boolean;
-  onAssign: (applicationId: string, groupId: string) => void;
+  onAssign: (participantId: string, groupId: string) => void;
   hideTitle?: boolean;
 }) {
   return (
@@ -235,36 +247,42 @@ function GroupColumn({
       {hideTitle ? null : (
         <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">{title}</h2>
       )}
-      {applications.length === 0 ? (
+      {participants.length === 0 ? (
         <p className={`${hideTitle ? "" : "mt-4"} text-[14px] text-muted`}>Keine Teams in diesem Bereich.</p>
       ) : (
         <ul className={`${hideTitle ? "" : "mt-4"} grid gap-3`}>
-          {applications.map((application) => (
-            <li key={application.id} className="border border-line p-3">
-              <p className="text-[14px] font-semibold text-ink">
-                {publicTeamLabel(application.clubName, application.teamName)}
-              </p>
-              <p className="mt-1 text-[12px] text-muted">
-                {application.ageGroup}
-                {application.internalCategory ? ` · ${application.internalCategory}` : ""}
-              </p>
-              <div className="mt-3">
-                <SelectInput
-                  disabled={disabled}
-                  value={groupIdByApplicationId[application.id] ?? ""}
-                  onChange={(event) => onAssign(application.id, event.target.value)}
-                  aria-label={`Gruppe zuweisen für ${application.teamName}`}
-                >
-                  <option value="">Nicht zugeordnet</option>
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </SelectInput>
-              </div>
-            </li>
-          ))}
+          {participants.map((participant) => {
+            const participantId = scheduleParticipantId(participant);
+            if (!participantId) {
+              return null;
+            }
+
+            return (
+              <li key={participant.id} className="border border-line p-3">
+                <p className="text-[14px] font-semibold text-ink">{participant.displayName}</p>
+                <p className="mt-1 text-[12px] text-muted">
+                  {participantSourceLabel(participant.source)}
+                  {participant.ageGroup ? ` · ${participant.ageGroup}` : ""}
+                  {participant.groupName ? ` · ${participant.groupName}` : ""}
+                </p>
+                <div className="mt-3">
+                  <SelectInput
+                    disabled={disabled}
+                    value={groupIdByParticipantId[participantId] ?? ""}
+                    onChange={(event) => onAssign(participantId, event.target.value)}
+                    aria-label={`Gruppe zuweisen für ${participant.displayName}`}
+                  >
+                    <option value="">Nicht zugeordnet</option>
+                    {groups.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name}
+                      </option>
+                    ))}
+                  </SelectInput>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
