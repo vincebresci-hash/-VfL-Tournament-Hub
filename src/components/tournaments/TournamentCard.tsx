@@ -8,7 +8,10 @@ import {
 } from "@/lib/public-application-state";
 import { getDisplayCapacity } from "@/lib/public-tournament";
 import { formatDateDe, formatDateTimeDe } from "@/lib/format";
-import { tournamentStatusClassName } from "@/lib/tournament-status";
+import {
+  getEffectiveTournamentStatus,
+  tournamentStatusClassName,
+} from "@/lib/tournament-status";
 import { MeinTurnierplanBadge } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { isMeinTurnierplanPublic } from "@/lib/mein-turnierplan";
 import { cn } from "@/lib/cn";
@@ -38,6 +41,12 @@ export function TournamentCard({
     maxTeams: tournament.maxTeams,
   });
   const capacity = getDisplayCapacity(tournament);
+  const effectiveStatus = getEffectiveTournamentStatus({
+    dbStatus: tournament.status,
+    maxTeams: tournament.maxTeams,
+    confirmedParticipants: tournament.confirmedTeams,
+    archivedAt: tournament.archivedAt,
+  });
   const href = `/turniere/${tournament.slug}`;
   const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
 
@@ -79,11 +88,11 @@ export function TournamentCard({
           ) : null}
 
           <div className="mt-3 flex flex-wrap gap-2">
-            <StatusBadge status={tournament.status} />
+            <StatusBadge status={effectiveStatus} />
             {showMeinTurnierplan ? (
               <MeinTurnierplanBadge
                 date={tournament.date}
-                status={tournament.status}
+                status={effectiveStatus}
                 meinTurnierplanEnabled={tournament.meinTurnierplanEnabled}
                 meinTurnierplanUrl={tournament.meinTurnierplanUrl}
               />

@@ -15,12 +15,17 @@ import {
   updateTournamentAction,
 } from "@/lib/db/admin-actions";
 import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
-import { tournamentStatusLabel } from "@/lib/tournament-status";
+import {
+  getSuggestedTournamentStatusFromCapacity,
+  getTournamentStatusCapacityWarning,
+  tournamentStatusLabel,
+} from "@/lib/tournament-status";
 import type { AdminTournamentInput, AdminTournamentRecord } from "@/types/admin";
 
 type TournamentAdminFormProps = {
   tournament?: AdminTournamentRecord;
   applicationCount?: number;
+  confirmedParticipants?: number;
 };
 
 const emptyValues: AdminTournamentInput = {
@@ -114,6 +119,7 @@ function recordToInput(tournament: AdminTournamentRecord): AdminTournamentInput 
 export function TournamentAdminForm({
   tournament,
   applicationCount = 0,
+  confirmedParticipants = 0,
 }: TournamentAdminFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<AdminTournamentInput>(
@@ -133,6 +139,20 @@ export function TournamentAdminForm({
       })),
     [],
   );
+
+  const parsedMaxTeams = values.maxTeams.trim() === "" ? null : Number(values.maxTeams);
+  const capacityMaxTeams =
+    parsedMaxTeams != null && Number.isFinite(parsedMaxTeams) ? parsedMaxTeams : null;
+  const statusCapacityWarning = getTournamentStatusCapacityWarning({
+    dbStatus: values.status,
+    maxTeams: capacityMaxTeams,
+    confirmedParticipants,
+  });
+  const suggestedStatus = getSuggestedTournamentStatusFromCapacity({
+    dbStatus: values.status,
+    maxTeams: capacityMaxTeams,
+    confirmedParticipants,
+  });
 
   function update<K extends keyof AdminTournamentInput>(
     key: K,
@@ -393,6 +413,18 @@ export function TournamentAdminForm({
               ))}
             </SelectInput>
           </Field>
+          {statusCapacityWarning ? (
+            <div className="sm:col-span-2 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]">
+              <p>{statusCapacityWarning}</p>
+              <button
+                type="button"
+                className="mt-2 inline-flex h-9 items-center border border-[#d9b0b0] bg-white px-3 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
+                onClick={() => update("status", suggestedStatus)}
+              >
+                Status an Belegung anpassen
+              </button>
+            </div>
+          ) : null}
           <Field id="tournament-applications" label="Bewerbungsstatus">
             <SelectInput
               id="tournament-applications"

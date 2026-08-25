@@ -13,7 +13,11 @@ import { liveMatchStatusLabel } from "@/lib/live/live-matches";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
 import { knockoutRoundLabel } from "@/lib/schedule/knockout";
 import { formatDateDe, formatTimeDe } from "@/lib/format";
-import { tournamentStatusClassName, tournamentStatusLabel } from "@/lib/tournament-status";
+import {
+  getEffectiveTournamentStatus,
+  tournamentStatusClassName,
+  tournamentStatusLabel,
+} from "@/lib/tournament-status";
 import { nonempty } from "@/lib/text";
 import { cn } from "@/lib/cn";
 import type { PublicTournament } from "@/types/tournament";
@@ -54,6 +58,13 @@ function SideTournamentCard({
   tournament: PublicTournament;
   href: string;
 }) {
+  const effectiveStatus = getEffectiveTournamentStatus({
+    dbStatus: tournament.status,
+    maxTeams: tournament.maxTeams,
+    confirmedParticipants: tournament.confirmedTeams,
+    archivedAt: tournament.archivedAt,
+  });
+
   return (
     <Link
       href={href}
@@ -66,10 +77,10 @@ function SideTournamentCard({
         <span
           className={cn(
             "px-1.5 py-0.5 text-[11px] font-semibold tracking-[0.08em] uppercase",
-            tournamentStatusClassName[tournament.status],
+            tournamentStatusClassName[effectiveStatus],
           )}
         >
-          {tournamentStatusLabel[tournament.status]}
+          {tournamentStatusLabel[effectiveStatus]}
         </span>
       </div>
       <p className="mt-2 inline-flex items-center gap-1.5 text-[13px] text-muted">
@@ -151,6 +162,14 @@ export function LivePageView({ data }: LivePageViewProps) {
 
   const groupNameById = new Map((stage?.groups ?? []).map((group) => [group.id, group.name]));
   const fieldNameById = new Map((stage?.fields ?? []).map((field) => [field.id, field.name]));
+  const primaryEffectiveStatus = primary
+    ? getEffectiveTournamentStatus({
+        dbStatus: primary.status,
+        maxTeams: primary.maxTeams,
+        confirmedParticipants: primary.confirmedTeams,
+        archivedAt: primary.archivedAt,
+      })
+    : null;
 
   return (
     <div className="bg-surface">
@@ -176,10 +195,10 @@ export function LivePageView({ data }: LivePageViewProps) {
                   <span className="h-2 w-2 animate-pulse rounded-full bg-brand-red" aria-hidden />
                   LIVE
                 </span>
-                {meinTurnierplanActive ? (
+                {meinTurnierplanActive && primaryEffectiveStatus ? (
                   <MeinTurnierplanBadge
                     date={primary.date}
-                    status={primary.status}
+                    status={primaryEffectiveStatus}
                     meinTurnierplanEnabled={primary.meinTurnierplanEnabled}
                     meinTurnierplanUrl={primary.meinTurnierplanUrl}
                   />

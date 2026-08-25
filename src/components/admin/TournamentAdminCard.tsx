@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
+import { TournamentStatusCapacityNotice } from "@/components/admin/TournamentStatusCapacityNotice";
 import { formatDateDe, formatTimeDe } from "@/lib/format";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -44,11 +45,22 @@ export function TournamentAdminCard({
         </div>
       </div>
 
+      <TournamentStatusCapacityNotice
+        className="mt-4 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
+        dbStatus={tournament.status}
+        maxTeams={tournament.maxTeams}
+        confirmedParticipants={confirmedTeams}
+        editHref={`/admin/turniere/${tournament.id}/bearbeiten`}
+      />
+
       <dl className="mt-5 grid grid-cols-2 gap-3 text-[13px] text-muted sm:grid-cols-4 xl:grid-cols-5">
         <Stat label="Datum" value={formatDateDe(tournament.date)} />
         <Stat label="Uhrzeit" value={start ?? "—"} />
         <Stat label="Ort" value={tournament.location || "—"} />
-        <Stat label="Max. Teams" value={tournament.maxTeams == null ? "—" : String(tournament.maxTeams)} />
+        <Stat
+          label="Max. Teams"
+          value={tournament.maxTeams == null ? "—" : String(tournament.maxTeams)}
+        />
         <Stat label="Bestätigt" value={String(confirmedTeams)} />
         <Stat label="Freie Plätze" value={String(availableSlots)} />
         <Stat label="Warteliste" value={String(waitlistCount)} />
@@ -57,7 +69,8 @@ export function TournamentAdminCard({
 
       <p className="mt-4 text-[13px] text-muted">
         {confirmedTeams}
-        {tournament.maxTeams != null ? ` / ${tournament.maxTeams}` : ""} bestätigt · {applicationsCount} Bewerbungen gesamt
+        {tournament.maxTeams != null ? ` / ${tournament.maxTeams}` : ""} bestätigt ·{" "}
+        {applicationsCount} Bewerbungen gesamt
       </p>
 
       <div className="mt-5 flex flex-wrap gap-3">

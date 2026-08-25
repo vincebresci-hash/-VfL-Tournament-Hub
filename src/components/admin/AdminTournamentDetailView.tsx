@@ -7,6 +7,7 @@ import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdm
 import { TournamentSyncAdminPanel } from "@/components/admin/TournamentSyncAdminPanel";
 import { ExternalTeamsParticipationPanel } from "@/components/admin/ExternalTeamsParticipationPanel";
 import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
+import { TournamentStatusCapacityNotice } from "@/components/admin/TournamentStatusCapacityNotice";
 import { applicationStatusLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
 import { acceptedParticipants } from "@/lib/schedule/admin";
@@ -77,6 +78,14 @@ export function AdminTournamentDetailView({
         <CapacityStat label="Warteliste" value={String(capacity.waitingListCount)} />
         <CapacityStat label="In Prüfung" value={String(capacity.underReviewCount)} />
       </div>
+
+      <TournamentStatusCapacityNotice
+        className="mt-5 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
+        dbStatus={tournament.status}
+        maxTeams={tournament.maxTeams}
+        confirmedParticipants={capacity.confirmedTeams}
+        editHref={`/admin/turniere/${tournament.id}/bearbeiten`}
+      />
 
       <div className="mt-8 grid gap-5">
         <AdminCard title="Kapazität">

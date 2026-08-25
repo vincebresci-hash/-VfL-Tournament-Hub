@@ -27,7 +27,10 @@ import {
   usesMeinTurnierplanAsPrimaryLive,
 } from "@/lib/mein-turnierplan";
 import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
-import { tournamentStatusClassName } from "@/lib/tournament-status";
+import {
+  getEffectiveTournamentStatus,
+  tournamentStatusClassName,
+} from "@/lib/tournament-status";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -88,6 +91,12 @@ export default async function TournamentDetailPage({
   const shortDescription = nonempty(tournament.shortDescription);
   const longDescription = nonempty(tournament.description);
   const capacity = getDisplayCapacity(tournament);
+  const effectiveStatus = getEffectiveTournamentStatus({
+    dbStatus: tournament.status,
+    maxTeams: tournament.maxTeams,
+    confirmedParticipants: tournament.confirmedTeams,
+    archivedAt: tournament.archivedAt,
+  });
   const extraInfo = filledPublicInfo(tournament);
   const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
   const showLiveTab = showsMeinTurnierplanLiveTab(tournament);
@@ -155,7 +164,7 @@ export default async function TournamentDetailPage({
                 <span className="inline-flex bg-brand-yellow px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
                   {tournament.ageGroup}
                 </span>
-                <StatusBadge status={tournament.status} />
+                <StatusBadge status={effectiveStatus} />
                 <span
                   className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
                     applicationState === "open"

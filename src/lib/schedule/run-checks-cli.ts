@@ -10,6 +10,7 @@ import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan
 import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
 import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-participant-logos-checks";
 import { runLivePageSelfChecks } from "@/lib/live/live-page-checks";
+import { runTournamentStatusCapacityChecks } from "@/lib/tournament-status-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
   runMeinTurnierplanExistingManualGroupsCheck,
@@ -37,6 +38,7 @@ try {
   const participantLogoManagementChecks = runTournamentParticipantLogoManagementChecks();
   const clubLogoStorageUploadChecks = runTournamentParticipantLogoManagementChecks();
   const livePageChecks = runLivePageSelfChecks();
+  const tournamentStatusCapacityChecks = runTournamentStatusCapacityChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -55,6 +57,7 @@ try {
   console.log(`participant-logo-management-checks: ${participantLogoManagementChecks}`);
   console.log(`club-logo-storage-upload-checks: ${clubLogoStorageUploadChecks}`);
   console.log(`live-page-checks: ${livePageChecks}`);
+  console.log(`tournament-status-capacity-checks: ${tournamentStatusCapacityChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

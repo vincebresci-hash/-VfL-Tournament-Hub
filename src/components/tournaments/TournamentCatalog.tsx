@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { cn } from "@/lib/cn";
 import { sortTournaments } from "@/lib/tournaments";
+import { getEffectiveTournamentStatus } from "@/lib/tournament-status";
 import { AGE_GROUPS, type AgeGroup, type PublicTournament, type TournamentStatus } from "@/types/tournament";
 
 type StatusFilter = "all" | TournamentStatus;
@@ -34,8 +35,13 @@ export function TournamentCatalog({
   const visibleTournaments = useMemo(() => {
     return sortTournaments(
       tournaments.filter((tournament) => {
-        const statusMatch =
-          statusFilter === "all" || tournament.status === statusFilter;
+        const effectiveStatus = getEffectiveTournamentStatus({
+          dbStatus: tournament.status,
+          maxTeams: tournament.maxTeams,
+          confirmedParticipants: tournament.confirmedTeams,
+          archivedAt: tournament.archivedAt,
+        });
+        const statusMatch = statusFilter === "all" || effectiveStatus === statusFilter;
         const ageMatch = ageFilter === "all" || tournament.ageGroup === ageFilter;
         return statusMatch && ageMatch;
       }),
