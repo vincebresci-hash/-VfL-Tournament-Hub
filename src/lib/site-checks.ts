@@ -14,37 +14,61 @@ function assert(condition: unknown, message: string) {
 }
 
 export function runSiteUrlAndCspChecks() {
-  const previous = process.env.NEXT_PUBLIC_SITE_URL;
+  const previousSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const previousVercel = process.env.VERCEL;
+  const previousVercelUrl = process.env.VERCEL_URL;
 
   try {
-    // A) explicit production URL
+    // A) NEXT_PUBLIC_SITE_URL gesetzt => Env verwenden
+    delete process.env.VERCEL;
     process.env.NEXT_PUBLIC_SITE_URL = DEFAULT_PRODUCTION_SITE_URL;
     assert(getSiteUrl() === DEFAULT_PRODUCTION_SITE_URL, "A: explicit SITE_URL");
 
     process.env.NEXT_PUBLIC_SITE_URL = `${DEFAULT_PRODUCTION_SITE_URL}/`;
     assert(getSiteUrl() === DEFAULT_PRODUCTION_SITE_URL, "A: trailing slash stripped");
 
-    // B) without env => localhost
-    delete process.env.NEXT_PUBLIC_SITE_URL;
-    process.env.VERCEL_URL = "vf-l-tournament-cy1dkrg01-briefscan-s-projects.vercel.app";
-    assert(getSiteUrl() === "http://localhost:3000", "B: no VERCEL_URL fallback");
-    delete process.env.VERCEL_URL;
+    // Env hat Vorrang auch auf Vercel
+    process.env.VERCEL = "1";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://example-custom.example";
+    assert(getSiteUrl() === "https://example-custom.example", "A: env wins over Vercel fallback");
 
-    // C/D/E source inspection: sitemap/robots use getSiteUrl and include /live
+    // B) Env fehlt + VERCEL=1 => Production-Domain (nie VERCEL_URL)
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    process.env.VERCEL = "1";
+    process.env.VERCEL_URL = "vf-l-tournament-cy1dkrg01-briefscan-s-projects.vercel.app";
+    assert(getSiteUrl() === DEFAULT_PRODUCTION_SITE_URL, "B: Vercel fallback to production");
+    assert(
+      getSiteUrl() !== `https://${process.env.VERCEL_URL}`,
+      "B: no VERCEL_URL as canonical",
+    );
+
+    // C) Env fehlt + kein VERCEL => localhost
+    delete process.env.VERCEL;
+    delete process.env.VERCEL_URL;
+    delete process.env.NEXT_PUBLIC_SITE_URL;
+    assert(getSiteUrl() === "http://localhost:3000", "C: local fallback");
+
+    // Source inspection: sitemap/robots/layout use getSiteUrl only
     const sitemapSource = readFileSync(join(process.cwd(), "src/app/sitemap.ts"), "utf8");
-    assert(sitemapSource.includes("getSiteUrl"), "C: sitemap uses getSiteUrl");
-    assert(sitemapSource.includes('"/live"'), "E: /live in sitemap");
-    assert(!sitemapSource.includes("VERCEL_URL"), "C: sitemap ignores VERCEL_URL");
+    assert(sitemapSource.includes("getSiteUrl"), "D: sitemap uses getSiteUrl");
+    assert(sitemapSource.includes('"/live"'), "D: /live in sitemap");
+    assert(!sitemapSource.includes("VERCEL_URL"), "D: sitemap ignores VERCEL_URL");
+    assert(!sitemapSource.includes("localhost:3000"), "D: sitemap has no hardcoded localhost");
 
     const robotsSource = readFileSync(join(process.cwd(), "src/app/robots.ts"), "utf8");
     assert(robotsSource.includes("getSiteUrl"), "D: robots uses getSiteUrl");
+    assert(robotsSource.includes("force-dynamic"), "D: robots is dynamic");
     assert(robotsSource.includes("/sitemap.xml"), "D: robots sitemap path");
     assert(robotsSource.includes('"/admin"'), "D: disallow admin");
     assert(robotsSource.includes('"/verein"'), "D: disallow verein");
     assert(robotsSource.includes('"/auth"'), "D: disallow auth");
+    assert(!robotsSource.includes("VERCEL_URL"), "D: robots ignores VERCEL_URL");
+    assert(!robotsSource.includes("localhost:3000"), "D: robots has no hardcoded localhost");
 
     const siteSource = readFileSync(join(process.cwd(), "src/lib/site.ts"), "utf8");
     assert(siteSource.includes("NEXT_PUBLIC_SITE_URL"), "site helper reads SITE_URL");
+    assert(siteSource.includes('process.env.VERCEL === "1"'), "site helper checks VERCEL");
+    assert(siteSource.includes("DEFAULT_PRODUCTION_SITE_URL"), "site helper has production default");
     assert(
       !/process\.env\.VERCEL_URL/.test(siteSource),
       "site helper must not use VERCEL_URL",
@@ -53,6 +77,8 @@ export function runSiteUrlAndCspChecks() {
     const layoutSource = readFileSync(join(process.cwd(), "src/app/layout.tsx"), "utf8");
     assert(layoutSource.includes("metadataBase"), "layout sets metadataBase");
     assert(layoutSource.includes("getSiteUrl"), "layout uses getSiteUrl");
+    assert(!layoutSource.includes("VERCEL_URL"), "layout ignores VERCEL_URL");
+    assert(!layoutSource.includes("localhost:3000"), "layout has no hardcoded localhost");
 
     // F/G CSP header value
     const csp = getContentSecurityPolicyHeaderValue();
@@ -75,10 +101,22 @@ export function runSiteUrlAndCspChecks() {
       "H: www.meinturnierplan.de allowlisted",
     );
   } finally {
-    if (previous === undefined) {
+    if (previousSiteUrl === undefined) {
       delete process.env.NEXT_PUBLIC_SITE_URL;
     } else {
-      process.env.NEXT_PUBLIC_SITE_URL = previous;
+      process.env.NEXT_PUBLIC_SITE_URL = previousSiteUrl;
+    }
+
+    if (previousVercel === undefined) {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = previousVercel;
+    }
+
+    if (previousVercelUrl === undefined) {
+      delete process.env.VERCEL_URL;
+    } else {
+      process.env.VERCEL_URL = previousVercelUrl;
     }
   }
 
