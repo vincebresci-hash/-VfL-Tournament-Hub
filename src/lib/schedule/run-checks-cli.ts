@@ -8,6 +8,7 @@ import { runMeinTurnierplanPublicSourceSelfChecks } from "@/lib/mein-turnierplan
 import { runMeinTurnierplanSyncSelfChecks } from "@/lib/mein-turnierplan-sync";
 import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan-participants-checks";
 import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
+import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-participant-logos-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
   runMeinTurnierplanExistingManualGroupsCheck,
@@ -32,6 +33,7 @@ try {
   const existingManualGroupsCheck = runMeinTurnierplanExistingManualGroupsCheck();
   const participantCountChecks = runMeinTurnierplanParticipantCountChecks();
   const combinedParticipantListChecks = runTournamentParticipantsListChecks();
+  const participantLogoManagementChecks = runTournamentParticipantLogoManagementChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -47,6 +49,7 @@ try {
   console.log(`existing-manual-groups-check: ${existingManualGroupsCheck}`);
   console.log(`mein-turnierplan-participant-count-checks: ${participantCountChecks}`);
   console.log(`combined-participant-list-checks: ${combinedParticipantListChecks}`);
+  console.log(`participant-logo-management-checks: ${participantLogoManagementChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);

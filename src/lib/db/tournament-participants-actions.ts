@@ -11,6 +11,16 @@ import {
 } from "@/lib/mein-turnierplan-participants";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import type { TournamentParticipant } from "@/lib/tournament-participants";
+import {
+  buildManualLogoState,
+  selectTeamsForLogoApply,
+} from "@/lib/tournament-participant-logos";
+import {
+  buildExternalTeamLogoObjectPath,
+  deleteManagedClubLogoIfOwned,
+  isAllowedClubLogoMimeType,
+  uploadClubLogoFile,
+} from "@/lib/storage/club-logos";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -213,7 +223,7 @@ export async function addManualTournamentParticipantAction(input: {
       birth_year: input.birthYear ?? null,
       club_id: clubId,
       logo_url: logoUrl,
-      logo_manual_override: Boolean(logoUrl),
+      logo_manual_override: Boolean(logoUrl || clubId),
       participation_status: "confirmed",
       external_active: true,
     })
@@ -304,7 +314,7 @@ export async function updateManualTournamentParticipantAction(input: {
       birth_year: input.birthYear ?? null,
       club_id: clubId,
       logo_url: logoUrl,
-      logo_manual_override: Boolean(logoUrl),
+      logo_manual_override: Boolean(logoUrl || clubId),
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.externalTeamId);
@@ -366,4 +376,223 @@ export async function deactivateManualTournamentParticipantAction(input: {
 
   revalidateTournamentPaths(loaded.tournament.slug, loaded.tournament.id);
   return { error: null, notice: "Manueller Teilnehmer wurde deaktiviert." };
+}
+
+async function loadExternalTeamForLogoEdit(tournamentId: string, externalTeamId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_external_teams")
+    .select(
+      "id, tournament_id, external_source, name, club_name, team_name, club_id, logo_url, logo_manual_override, participation_status, external_active",
+    )
+    .eq("id", externalTeamId)
+    .eq("tournament_id", tournamentId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { team: null, error: "Das Team wurde nicht gefunden." };
+  }
+
+  return { team: data, error: null };
+}
+
+export async function updateExternalTeamLogoAction(input: {
+  tournamentId: string;
+  externalTeamId: string;
+  mode: "hub-club" | "upload" | "url" | "remove";
+  clubId?: string | null;
+  logoUrl?: string | null;
+  logoFile?: File | null;
+}): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireAdmin();
+  if (access.error) {
+    return { error: access.error, notice: null };
+  }
+
+  const loaded = await loadTournamentMeta(input.tournamentId);
+  if (!loaded.tournament) {
+    return { error: loaded.error, notice: null };
+  }
+
+  const existing = await loadExternalTeamForLogoEdit(input.tournamentId, input.externalTeamId);
+  if (!existing.team) {
+    return { error: existing.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  let nextClubId: string | null = existing.team.club_id ? String(existing.team.club_id) : null;
+  let nextLogoUrl: string | null = existing.team.logo_url ? String(existing.team.logo_url) : null;
+  const previousLogoUrl = nextLogoUrl;
+
+  if (input.mode === "remove") {
+    const state = buildManualLogoState({ clearLogo: true });
+    nextClubId = state.clubId;
+    nextLogoUrl = state.logoUrl;
+  } else if (input.mode === "hub-club") {
+    const clubId = input.clubId?.trim() || null;
+    if (!clubId) {
+      return { error: "Bitte einen Hub-Verein auswählen.", notice: null };
+    }
+
+    const { data: club } = await supabase
+      .from("clubs")
+      .select("id, logo_url")
+      .eq("id", clubId)
+      .maybeSingle();
+
+    if (!club) {
+      return { error: "Der gewählte Hub-Verein wurde nicht gefunden.", notice: null };
+    }
+
+    const state = buildManualLogoState({
+      clubId,
+      logoUrl: nextLogoUrl,
+    });
+    nextClubId = state.clubId;
+    nextLogoUrl = state.logoUrl;
+  } else if (input.mode === "upload") {
+    if (!input.logoFile) {
+      return { error: "Bitte eine Bilddatei auswählen.", notice: null };
+    }
+
+    if (!isAllowedClubLogoMimeType(input.logoFile.type)) {
+      return { error: "Erlaubt sind PNG, JPEG, WebP oder GIF.", notice: null };
+    }
+
+    const uploaded = await uploadClubLogoFile({
+      supabase,
+      file: input.logoFile,
+      objectPath: buildExternalTeamLogoObjectPath({
+        tournamentId: input.tournamentId,
+        externalTeamId: input.externalTeamId,
+        mimeType: input.logoFile.type,
+      }),
+    });
+
+    if (uploaded.error || !uploaded.publicUrl) {
+      return { error: uploaded.error ?? "Upload fehlgeschlagen.", notice: null };
+    }
+
+    const state = buildManualLogoState({
+      clubId: nextClubId,
+      logoUrl: uploaded.publicUrl,
+    });
+    nextClubId = state.clubId;
+    nextLogoUrl = state.logoUrl;
+  } else {
+    const logoUrl = input.logoUrl?.trim() || null;
+    if (!logoUrl) {
+      return { error: "Bitte eine Logo-URL angeben.", notice: null };
+    }
+    if (!(logoUrl.startsWith("https://") || logoUrl.startsWith("http://") || logoUrl.startsWith("/"))) {
+      return { error: "Die Logo-URL ist ungültig.", notice: null };
+    }
+
+    const state = buildManualLogoState({
+      clubId: nextClubId,
+      logoUrl,
+    });
+    nextClubId = state.clubId;
+    nextLogoUrl = state.logoUrl;
+  }
+
+  const { error } = await supabase
+    .from("tournament_external_teams")
+    .update({
+      club_id: nextClubId,
+      logo_url: nextLogoUrl,
+      logo_manual_override: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.externalTeamId)
+    .eq("tournament_id", input.tournamentId);
+
+  if (error) {
+    return { error: "Das Logo konnte nicht gespeichert werden.", notice: null };
+  }
+
+  if (
+    input.mode === "remove" ||
+    (previousLogoUrl && previousLogoUrl !== nextLogoUrl)
+  ) {
+    await deleteManagedClubLogoIfOwned({ supabase, logoUrl: previousLogoUrl });
+  }
+
+  revalidateTournamentPaths(loaded.tournament.slug, loaded.tournament.id);
+
+  if (input.mode === "remove") {
+    return { error: null, notice: "Logo wurde entfernt." };
+  }
+  if (input.mode === "hub-club") {
+    return { error: null, notice: "Hub-Verein für das Logo verknüpft." };
+  }
+  return { error: null, notice: "Logo wurde gespeichert." };
+}
+
+export async function applyExternalTeamLogoToSelectedTeamsAction(input: {
+  tournamentId: string;
+  sourceExternalTeamId: string;
+  selectedExternalTeamIds: string[];
+}): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireAdmin();
+  if (access.error) {
+    return { error: access.error, notice: null };
+  }
+
+  const loaded = await loadTournamentMeta(input.tournamentId);
+  if (!loaded.tournament) {
+    return { error: loaded.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  const { data: teams, error: teamsError } = await supabase
+    .from("tournament_external_teams")
+    .select("id, club_id, logo_url, logo_manual_override")
+    .eq("tournament_id", input.tournamentId);
+
+  if (teamsError || !teams) {
+    return { error: "Die Teams konnten nicht geladen werden.", notice: null };
+  }
+
+  const source = teams.find((team) => String(team.id) === input.sourceExternalTeamId);
+  if (!source) {
+    return { error: "Das Quell-Team wurde nicht gefunden.", notice: null };
+  }
+
+  const selection = selectTeamsForLogoApply({
+    sourceTeamId: input.sourceExternalTeamId,
+    selectedTeamIds: input.selectedExternalTeamIds,
+    availableTeamIds: teams.map((team) => String(team.id)),
+  });
+
+  if (selection.error) {
+    return { error: selection.error, notice: null };
+  }
+
+  const logoState = buildManualLogoState({
+    clubId: source.club_id ? String(source.club_id) : null,
+    logoUrl: source.logo_url ? String(source.logo_url) : null,
+  });
+
+  // Always mark override true for applied targets even if source only has hub club.
+  const { error } = await supabase
+    .from("tournament_external_teams")
+    .update({
+      club_id: logoState.clubId,
+      logo_url: logoState.logoUrl,
+      logo_manual_override: true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tournament_id", input.tournamentId)
+    .in("id", selection.targetIds);
+
+  if (error) {
+    return { error: "Das Logo konnte nicht auf die ausgewählten Teams übernommen werden.", notice: null };
+  }
+
+  revalidateTournamentPaths(loaded.tournament.slug, loaded.tournament.id);
+  return {
+    error: null,
+    notice: `Logo auf ${selection.targetIds.length} Team(s) übernommen.`,
+  };
 }

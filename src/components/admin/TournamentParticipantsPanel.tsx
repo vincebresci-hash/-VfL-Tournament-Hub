@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
+import { ExternalTeamLogoEditor } from "@/components/admin/ExternalTeamLogoEditor";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
   addManualTournamentParticipantAction,
@@ -46,6 +47,7 @@ export function TournamentParticipantsPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<TournamentParticipant | null>(null);
+  const [logoEditingId, setLogoEditingId] = useState<string | null>(null);
   const [clubName, setClubName] = useState("");
   const [teamName, setTeamName] = useState("");
   const [ageGroup, setAgeGroup] = useState("");
@@ -56,6 +58,11 @@ export function TournamentParticipantsPanel({
 
   const sortedParticipants = useMemo(
     () => [...participants].sort((a, b) => a.displayName.localeCompare(b.displayName, "de")),
+    [participants],
+  );
+
+  const externalParticipants = useMemo(
+    () => participants.filter((entry) => Boolean(entry.externalTeamId)),
     [participants],
   );
 
@@ -96,6 +103,15 @@ export function TournamentParticipantsPanel({
       resetForm();
       router.refresh();
     });
+  }
+
+  function handleLogoDone(result: { error: string | null; notice: string | null }) {
+    setError(result.error);
+    setNotice(result.notice);
+    if (!result.error) {
+      setLogoEditingId(null);
+      router.refresh();
+    }
   }
 
   return (
@@ -224,7 +240,8 @@ export function TournamentParticipantsPanel({
           </label>
           <label className="grid gap-1 text-[13px] text-ink">
             <span className="font-semibold uppercase tracking-[0.08em]">
-              Logo-URL <span className="font-medium normal-case tracking-normal text-muted">(optional)</span>
+              Logo-URL{" "}
+              <span className="font-medium normal-case tracking-normal text-muted">(optional)</span>
             </span>
             <input
               value={logoUrl}
@@ -234,7 +251,8 @@ export function TournamentParticipantsPanel({
               inputMode="url"
             />
             <span className="text-[12px] text-muted">
-              Bei gewähltem Hub-Verein wird bevorzugt dessen Vereinslogo angezeigt.
+              Bei gewähltem Hub-Verein wird bevorzugt dessen Vereinslogo angezeigt. Für Upload bitte
+              „Logo bearbeiten“ am Eintrag nutzen.
             </span>
           </label>
           <div className="flex flex-wrap gap-2">
@@ -309,6 +327,20 @@ export function TournamentParticipantsPanel({
                     Bewerbung öffnen →
                   </Link>
                 ) : null}
+                {participant.externalTeamId ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      setLogoEditingId((current) =>
+                        current === participant.externalTeamId ? null : participant.externalTeamId,
+                      )
+                    }
+                    className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                  >
+                    Logo bearbeiten
+                  </button>
+                ) : null}
                 {participant.source === "manual" && participant.externalTeamId ? (
                   <>
                     <button
@@ -337,6 +369,17 @@ export function TournamentParticipantsPanel({
                   </>
                 ) : null}
               </div>
+
+              {participant.externalTeamId && logoEditingId === participant.externalTeamId ? (
+                <ExternalTeamLogoEditor
+                  tournamentId={tournamentId}
+                  participant={participant}
+                  clubs={clubs}
+                  allExternalParticipants={externalParticipants}
+                  onDone={handleLogoDone}
+                  onCancel={() => setLogoEditingId(null)}
+                />
+              ) : null}
             </article>
           ))}
         </div>

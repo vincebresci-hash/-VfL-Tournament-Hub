@@ -23,6 +23,7 @@ import {
   validateMeinTurnierplanTournamentId,
 } from "@/lib/mein-turnierplan";
 import { applicationBelongsToTournament } from "@/lib/tournaments";
+import { shouldSkipMeinTurnierplanLogoSync } from "@/lib/tournament-participant-logos";
 
 async function requireAdmin() {
   const session = await getAuthSession();
@@ -188,7 +189,7 @@ export async function applyMeinTurnierplanTeamLogosAfterSync(input: {
 
   for (const team of teamsWithLogos) {
     const row = byExternalId.get(team.externalId);
-    if (!row || row.logo_manual_override) {
+    if (!row || shouldSkipMeinTurnierplanLogoSync(Boolean(row.logo_manual_override))) {
       continue;
     }
 
