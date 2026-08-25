@@ -155,5 +155,29 @@ export function runApplicationWindowSelfChecks() {
     "ohne max_teams darf keine erfundene Kapazität die Bewerbung schließen",
   );
 
+  // AUDIT-002: when occupancy says full, waitlist gate must still follow existing rules.
+  assert(
+    isPublicApplicationAllowed(
+      baseGate({
+        isFull: true,
+        availableSlots: 0,
+        waitlistEnabled: true,
+        maxTeams: 16,
+      }),
+    ),
+    "K: voll mit Warteliste bleibt erlaubt",
+  );
+  assert(
+    !isPublicApplicationAllowed(
+      baseGate({
+        isFull: true,
+        availableSlots: 0,
+        waitlistEnabled: false,
+        maxTeams: 16,
+      }),
+    ),
+    "K: voll ohne Warteliste bleibt blockiert",
+  );
+
   return "ok";
 }
