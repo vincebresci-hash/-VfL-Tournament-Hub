@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { StandingsTable } from "@/components/tournaments/StandingsTable";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
-import { publicTeamLabel, teamLabel } from "@/lib/schedule/names";
+import { hasDistinctTeamName, publicTeamLabel, teamLabel } from "@/lib/schedule/names";
 import {
   computeKnockoutPlacements,
   knockoutRoundLabel,
@@ -253,9 +253,11 @@ export function TournamentPublicStage({
                     <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} />
                     <div className="min-w-0">
                       <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                        {entry.clubName}
+                        {entry.clubName.trim() || publicTeamLabel(entry.clubName, entry.teamName)}
                       </p>
-                      <p className="mt-1 text-[14px] text-ink">{entry.teamName}</p>
+                      {hasDistinctTeamName(entry.clubName, entry.teamName) ? (
+                        <p className="mt-1 text-[14px] text-ink">{entry.teamName}</p>
+                      ) : null}
                       <p className="mt-2 text-[13px] text-muted">
                         {entry.ageGroup ?? "Altersklasse"}
                         {entry.birthYear ? ` · Jahrgang ${entry.birthYear}` : ""}

@@ -111,31 +111,64 @@ function MatchRow({
   away: LiveTeamRef;
   context: string;
 }) {
+  const status = (
+    <span
+      className={cn(
+        "font-semibold tracking-[0.08em] uppercase",
+        match.status === "live" ? "text-brand-red" : "text-ink",
+      )}
+    >
+      {liveMatchStatusLabel(match.status)}
+    </span>
+  );
+
   return (
     <article className="border border-line bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted">
-        <span>
+        <span className="min-w-0">
           {formatBerlinClock(match.scheduledAt)} · {context}
         </span>
-        <span
-          className={cn(
-            "font-semibold tracking-[0.08em] uppercase",
-            match.status === "live" ? "text-brand-red" : "text-ink",
-          )}
-        >
-          {liveMatchStatusLabel(match.status)}
-        </span>
+        {status}
       </div>
-      <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+
+      {/* Mobile: stacked sides so logos/names never collide */}
+      <div className="mt-3 flex flex-col gap-3 sm:hidden">
+        <div className="flex min-w-0 items-center gap-2">
+          <ParticipantClubLogo
+            logoUrl={home.logoUrl}
+            clubName={home.clubName}
+            className="!h-8 !w-8"
+          />
+          <span className="min-w-0 flex-1 break-words text-[14px] font-medium text-ink">
+            {home.label}
+          </span>
+        </div>
+        <div className="text-center font-display text-xl font-bold text-ink tabular-nums">
+          {scoreLabel(match)}
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <ParticipantClubLogo
+            logoUrl={away.logoUrl}
+            clubName={away.clubName}
+            className="!h-8 !w-8"
+          />
+          <span className="min-w-0 flex-1 break-words text-[14px] font-medium text-ink">
+            {away.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Desktop: compact three-column row */}
+      <div className="mt-3 hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:grid">
         <div className="flex min-w-0 items-center gap-2 justify-self-start">
           <ParticipantClubLogo logoUrl={home.logoUrl} clubName={home.clubName} />
-          <span className="truncate text-[14px] font-medium text-ink">{home.label}</span>
+          <span className="min-w-0 truncate text-[14px] font-medium text-ink">{home.label}</span>
         </div>
         <span className="font-display text-xl font-bold text-ink tabular-nums">
           {scoreLabel(match)}
         </span>
         <div className="flex min-w-0 items-center gap-2 justify-self-end text-right">
-          <span className="truncate text-[14px] font-medium text-ink">{away.label}</span>
+          <span className="min-w-0 truncate text-[14px] font-medium text-ink">{away.label}</span>
           <ParticipantClubLogo logoUrl={away.logoUrl} clubName={away.clubName} />
         </div>
       </div>
