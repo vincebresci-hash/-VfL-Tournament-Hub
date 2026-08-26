@@ -52,7 +52,7 @@ export function runLiveMatchLayoutChecks() {
 
   const matchCard = readFileSync(join(process.cwd(), "src/components/live/LiveMatchCard.tsx"), "utf8");
   assert(matchCard.includes("sm:hidden"), "mobile stacked layout branch");
-  assert(matchCard.includes("sm:grid") || matchCard.includes("hidden") && matchCard.includes("sm:grid"), "desktop grid layout");
+  assert(matchCard.includes("sm:grid") || (matchCard.includes("hidden") && matchCard.includes("sm:grid")), "desktop grid layout");
   assert(matchCard.includes("min-w-0"), "flex/grid children allow shrink");
   assert(
     matchCard.includes("break-words") || matchCard.includes("line-clamp"),
