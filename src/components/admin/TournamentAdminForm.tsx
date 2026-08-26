@@ -725,7 +725,7 @@ export function TournamentAdminForm({
           <Field
             id="tournament-image"
             label="Bild-URL"
-            hint="Lokale Dateien wie /u10.webp oder eine öffentliche URL."
+            hint="Lokale Dateien wie /u10.png oder eine öffentliche URL."
           >
             <TextInput
               id="tournament-image"
