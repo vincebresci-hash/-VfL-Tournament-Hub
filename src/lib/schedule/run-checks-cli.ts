@@ -10,6 +10,7 @@ import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan
 import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
 import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-participant-logos-checks";
 import { runLivePageSelfChecks } from "@/lib/live/live-page-checks";
+import { runMatchCenterDesignChecks } from "@/lib/live/match-center-checks";
 import {
   runLiveMatchLayoutChecks,
   runPublicTeamLabelChecks,
@@ -45,6 +46,7 @@ try {
   const participantLogoManagementChecks = runTournamentParticipantLogoManagementChecks();
   const clubLogoStorageUploadChecks = runTournamentParticipantLogoManagementChecks();
   const livePageChecks = runLivePageSelfChecks();
+  const matchCenterDesignChecks = runMatchCenterDesignChecks();
   const publicTeamLabelChecks = runPublicTeamLabelChecks();
   const liveMatchLayoutChecks = runLiveMatchLayoutChecks();
   const tournamentStatusCapacityChecks = runTournamentStatusCapacityChecks();
@@ -69,6 +71,7 @@ try {
   console.log(`participant-logo-management-checks: ${participantLogoManagementChecks}`);
   console.log(`club-logo-storage-upload-checks: ${clubLogoStorageUploadChecks}`);
   console.log(`live-page-checks: ${livePageChecks}`);
+  console.log(`match-center-design-checks: ${matchCenterDesignChecks}`);
   console.log(`public-team-label-checks: ${publicTeamLabelChecks}`);
   console.log(`live-match-layout-checks: ${liveMatchLayoutChecks}`);
   console.log(`tournament-status-capacity-checks: ${tournamentStatusCapacityChecks}`);

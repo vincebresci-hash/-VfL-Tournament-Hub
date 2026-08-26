@@ -1,18 +1,30 @@
 import Link from "next/link";
-import { CoverImage } from "@/components/brand/CoverImage";
+import type { ReactNode } from "react";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { MeinTurnierplanBadge } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { Container } from "@/components/layout/Container";
+import { LiveMatchCard } from "@/components/live/LiveMatchCard";
+import { LiveShareActions } from "@/components/live/LiveShareActions";
 import {
   resolveLiveTeam,
   type LivePageData,
   type LiveTeamRef,
 } from "@/lib/db/live-queries";
-import { liveMatchStatusLabel } from "@/lib/live/live-matches";
+import {
+  formatUpdatedAgo,
+  LIVE_TYPO,
+  mapsSearchUrl,
+  nextMatchForParticipant,
+  selectNextMatches,
+  selectOtherLiveMatches,
+  selectPrimaryMatchMoment,
+  selectRecentResults,
+} from "@/lib/live/match-center";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
 import { knockoutRoundLabel } from "@/lib/schedule/knockout";
 import { formatDateDe, formatTimeDe } from "@/lib/format";
+import { getSiteUrl } from "@/lib/site";
 import {
   getEffectiveTournamentStatus,
   tournamentStatusClassName,
@@ -27,28 +39,27 @@ type LivePageViewProps = {
   data: LivePageData;
 };
 
-function scoreLabel(match: TournamentMatchRecord) {
-  if (match.homeScore == null || match.awayScore == null) {
-    return "–";
-  }
-  return `${match.homeScore}:${match.awayScore}`;
-}
-
-function matchContextLabel(
+function fieldLabel(
   match: TournamentMatchRecord,
-  groupNameById: Map<string, string>,
   fieldNameById: Map<string, string>,
 ) {
-  const parts: string[] = [];
+  if (!match.fieldId) {
+    return null;
+  }
+  return fieldNameById.get(match.fieldId) ?? "Feld";
+}
+
+function groupOrRoundLabel(
+  match: TournamentMatchRecord,
+  groupNameById: Map<string, string>,
+) {
   if (match.groupId) {
-    parts.push(groupNameById.get(match.groupId) ?? "Gruppe");
-  } else if (match.round) {
-    parts.push(knockoutRoundLabel[match.round] ?? "KO");
+    return groupNameById.get(match.groupId) ?? "Gruppe";
   }
-  if (match.fieldId) {
-    parts.push(fieldNameById.get(match.fieldId) ?? "Feld");
+  if (match.round) {
+    return knockoutRoundLabel[match.round] ?? "KO";
   }
-  return parts.join(" · ") || "Spiel";
+  return null;
 }
 
 function SideTournamentCard({
@@ -68,7 +79,7 @@ function SideTournamentCard({
   return (
     <Link
       href={href}
-      className="block border border-line bg-white p-4 transition-colors hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+      className="block bg-white p-4 ring-1 ring-line transition-colors hover:ring-navy/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
     >
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex bg-brand-yellow px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
@@ -100,79 +111,39 @@ function SideTournamentCard({
   );
 }
 
-function MatchRow({
-  match,
-  home,
-  away,
-  context,
+function SectionHeading({ children }: { children: ReactNode }) {
+  return <h2 className={LIVE_TYPO.section}>{children}</h2>;
+}
+
+function emptyMatchesCopy(primary: PublicTournament, hasCompleted: boolean) {
+  if (hasCompleted) {
+    return "Aktuell läuft kein Spiel. Die letzten Ergebnisse findest du weiter unten.";
+  }
+  const start = formatTimeDe(primary.startTime);
+  if (start) {
+    return `Der Spielplan startet um ${start} Uhr.`;
+  }
+  return "Noch keine Ergebnisse – sie erscheinen hier während des Turniers.";
+}
+
+function ParticipantCard({
+  team,
+  groupName,
+  nextHint,
 }: {
-  match: TournamentMatchRecord;
-  home: LiveTeamRef;
-  away: LiveTeamRef;
-  context: string;
+  team: LiveTeamRef;
+  groupName: string | null;
+  nextHint: string | null;
 }) {
-  const status = (
-    <span
-      className={cn(
-        "font-semibold tracking-[0.08em] uppercase",
-        match.status === "live" ? "text-brand-red" : "text-ink",
-      )}
-    >
-      {liveMatchStatusLabel(match.status)}
-    </span>
-  );
-
   return (
-    <article className="border border-line bg-white p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[12px] text-muted">
-        <span className="min-w-0">
-          {formatBerlinClock(match.scheduledAt)} · {context}
-        </span>
-        {status}
+    <li className="flex min-w-0 items-center gap-3 bg-white px-3 py-3 ring-1 ring-line">
+      <ParticipantClubLogo logoUrl={team.logoUrl} clubName={team.clubName} size="md" />
+      <div className="min-w-0">
+        <p className="truncate text-[15px] font-semibold text-ink">{team.label}</p>
+        {groupName ? <p className={cn(LIVE_TYPO.meta, "mt-0.5")}>{groupName}</p> : null}
+        {nextHint ? <p className={cn(LIVE_TYPO.meta, "mt-1 text-ink/70")}>{nextHint}</p> : null}
       </div>
-
-      {/* Mobile: stacked sides so logos/names never collide */}
-      <div className="mt-3 flex flex-col gap-3 sm:hidden">
-        <div className="flex min-w-0 items-center gap-2">
-          <ParticipantClubLogo
-            logoUrl={home.logoUrl}
-            clubName={home.clubName}
-            className="!h-8 !w-8"
-          />
-          <span className="min-w-0 flex-1 break-words text-[14px] font-medium text-ink">
-            {home.label}
-          </span>
-        </div>
-        <div className="text-center font-display text-xl font-bold text-ink tabular-nums">
-          {scoreLabel(match)}
-        </div>
-        <div className="flex min-w-0 items-center gap-2">
-          <ParticipantClubLogo
-            logoUrl={away.logoUrl}
-            clubName={away.clubName}
-            className="!h-8 !w-8"
-          />
-          <span className="min-w-0 flex-1 break-words text-[14px] font-medium text-ink">
-            {away.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Desktop: compact three-column row */}
-      <div className="mt-3 hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:grid">
-        <div className="flex min-w-0 items-center gap-2 justify-self-start">
-          <ParticipantClubLogo logoUrl={home.logoUrl} clubName={home.clubName} />
-          <span className="min-w-0 truncate text-[14px] font-medium text-ink">{home.label}</span>
-        </div>
-        <span className="font-display text-xl font-bold text-ink tabular-nums">
-          {scoreLabel(match)}
-        </span>
-        <div className="flex min-w-0 items-center gap-2 justify-self-end text-right">
-          <span className="min-w-0 truncate text-[14px] font-medium text-ink">{away.label}</span>
-          <ParticipantClubLogo logoUrl={away.logoUrl} clubName={away.clubName} />
-        </div>
-      </div>
-    </article>
+    </li>
   );
 }
 
@@ -184,8 +155,6 @@ export function LivePageView({ data }: LivePageViewProps) {
     past,
     stage,
     teamMap,
-    highlightMatches,
-    recentResults,
     groups,
     participants,
     capacity,
@@ -195,6 +164,18 @@ export function LivePageView({ data }: LivePageViewProps) {
 
   const groupNameById = new Map((stage?.groups ?? []).map((group) => [group.id, group.name]));
   const fieldNameById = new Map((stage?.fields ?? []).map((field) => [field.id, field.name]));
+  const matches = stage?.matches ?? [];
+  const primaryMoment = selectPrimaryMatchMoment(matches);
+  const primaryMatchId = primaryMoment.match?.id ?? null;
+  const otherLive = selectOtherLiveMatches(matches, primaryMatchId);
+  const nextMatches = selectNextMatches(matches, primaryMatchId, 5);
+  const recentResults = selectRecentResults(matches, 5);
+  const updatedLabel = formatUpdatedAgo(primary?.meinTurnierplanLastSyncedAt);
+  const routeUrl = primary ? mapsSearchUrl(primary.location, primary.address) : null;
+  const liveUrl = `${getSiteUrl()}/live`;
+  const fieldCount = stage?.fields.length ?? 0;
+  const matchCount = matches.filter((match) => match.status !== "cancelled").length;
+
   const primaryEffectiveStatus = primary
     ? getEffectiveTournamentStatus({
         dbStatus: primary.status,
@@ -204,100 +185,86 @@ export function LivePageView({ data }: LivePageViewProps) {
       })
     : null;
 
+  const groupNameByParticipantId = new Map<string, string>();
+  for (const entry of stage?.roster ?? []) {
+    const id = entry.externalTeamId ?? entry.applicationId;
+    if (entry.groupName) {
+      groupNameByParticipantId.set(id, entry.groupName);
+    } else if (entry.groupId) {
+      groupNameByParticipantId.set(id, groupNameById.get(entry.groupId) ?? "Gruppe");
+    }
+  }
+
   return (
     <div className="bg-surface">
+      {/* Compact tournament context – not competing with primary match */}
       {primary ? (
-        <section className="relative overflow-hidden bg-navy text-white">
-          <div className="absolute inset-0">
-            <CoverImage
-              src={primary.image}
-              alt=""
-              className="h-full w-full"
-              sizes="100vw"
-              objectPosition="50% 40%"
-              imageClassName="opacity-35"
-              preload
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-navy via-navy/90 to-navy/55" />
-          </div>
+        <section className="border-b border-line bg-navy text-white">
+          <Container className="py-6 sm:py-8">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={cn(LIVE_TYPO.badge, "bg-brand-yellow text-navy")}>
+                <span className="h-2 w-2 animate-pulse rounded-full bg-brand-red" aria-hidden />
+                LIVE
+              </span>
+              {meinTurnierplanActive && primaryEffectiveStatus ? (
+                <MeinTurnierplanBadge
+                  date={primary.date}
+                  status={primaryEffectiveStatus}
+                  meinTurnierplanEnabled={primary.meinTurnierplanEnabled}
+                  meinTurnierplanUrl={primary.meinTurnierplanUrl}
+                />
+              ) : null}
+            </div>
 
-          <Container className="relative py-10 sm:py-14 lg:py-16">
-            <div className="max-w-3xl">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center gap-2 bg-brand-yellow px-3 py-1 text-[11px] font-semibold tracking-[0.12em] text-navy uppercase">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-brand-red" aria-hidden />
-                  LIVE
-                </span>
-                {meinTurnierplanActive && primaryEffectiveStatus ? (
-                  <MeinTurnierplanBadge
-                    date={primary.date}
-                    status={primaryEffectiveStatus}
-                    meinTurnierplanEnabled={primary.meinTurnierplanEnabled}
-                    meinTurnierplanUrl={primary.meinTurnierplanUrl}
-                  />
-                ) : null}
-              </div>
-
-              <h1 className="mt-5 font-display text-4xl font-bold tracking-wide uppercase sm:text-5xl lg:text-6xl">
-                {primary.name}
-              </h1>
-
-              <p className="mt-4 text-[15px] text-white/75 sm:text-base">
-                {[
-                  primary.ageGroup,
-                  primary.birthYear ? `Jahrgang ${primary.birthYear}` : null,
-                  formatDateDe(primary.date),
-                  formatTimeDe(primary.startTime),
-                  formatTimeDe(primary.endTime)
-                    ? `bis ${formatTimeDe(primary.endTime)}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-
-              <div className="mt-6 grid gap-3 text-[14px] text-white/85 sm:grid-cols-2">
-                {nonempty(primary.location) ? (
-                  <p className="inline-flex items-start gap-2">
-                    <IconPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-yellow" />
+            <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="min-w-0 max-w-3xl">
+                <h1 className={LIVE_TYPO.title}>{primary.name}</h1>
+                <p className="mt-3 text-[14px] text-white/75 sm:text-[15px]">
+                  {[
+                    primary.ageGroup,
+                    primary.birthYear ? `Jahrgang ${primary.birthYear}` : null,
+                    formatDateDe(primary.date),
+                    primary.location,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-white/80 sm:text-[14px]">
+                  {capacity ? (
                     <span>
-                      {primary.location}
-                      {nonempty(primary.address) ? (
-                        <>
-                          <br />
-                          <span className="text-white/65">{primary.address}</span>
-                        </>
-                      ) : null}
+                      {capacity.confirmedTeams}
+                      {capacity.maxTeams != null ? ` / ${capacity.maxTeams}` : ""} Teams
                     </span>
-                  </p>
-                ) : null}
-                {capacity ? (
-                  <p>
-                    Teilnehmer {capacity.confirmedTeams} / {capacity.maxTeams}
-                    {capacity.availableSlots > 0
-                      ? ` · ${capacity.availableSlots} frei`
-                      : ""}
-                  </p>
-                ) : primary.confirmedTeams > 0 ? (
-                  <p>Teilnehmer {primary.confirmedTeams}</p>
-                ) : null}
+                  ) : primary.confirmedTeams > 0 ? (
+                    <span>{primary.confirmedTeams} Teams</span>
+                  ) : null}
+                  {fieldCount > 0 ? <span>{fieldCount} Felder</span> : null}
+                  {matchCount > 0 ? <span>{matchCount} Spiele</span> : null}
+                  {formatTimeDe(primary.endTime) ? (
+                    <span>Ende {formatTimeDe(primary.endTime)} Uhr</span>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-white/60">
+                  {updatedLabel ? <span>{updatedLabel}</span> : null}
+                  {meinTurnierplanActive ? <span>Live-Daten via MeinTurnierplan</span> : null}
+                </div>
               </div>
 
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Link
                   href={`/turniere/${primary.slug}`}
-                  className="inline-flex h-11 items-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066]"
+                  className="inline-flex h-11 items-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
                 >
-                  Zum vollständigen Turnier →
+                  Zum Turnier →
                 </Link>
                 {showLiveSpielplanCta && primary.meinTurnierplanUrl ? (
                   <a
                     href={primary.meinTurnierplanUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex h-11 items-center border border-white/35 px-5 text-[12px] font-semibold tracking-[0.08em] text-white uppercase hover:border-white/70"
+                    className="inline-flex h-11 items-center border border-white/35 px-5 text-[12px] font-semibold tracking-[0.08em] text-white uppercase hover:border-white/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
                   >
-                    Live-Spielplan öffnen
+                    Externer Spielplan
                   </a>
                 ) : null}
               </div>
@@ -320,14 +287,12 @@ export function LivePageView({ data }: LivePageViewProps) {
         </section>
       )}
 
-      <Container className="py-10 sm:py-12">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-          <div className="grid gap-8">
+      <Container className="py-8 sm:py-10 lg:py-12">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-12">
+          <div className="grid gap-10">
             {todayAlso.length > 0 ? (
               <section>
-                <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                  Heute außerdem
-                </h2>
+                <SectionHeading>Heute außerdem</SectionHeading>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   {todayAlso.map((tournament) => (
                     <SideTournamentCard
@@ -342,45 +307,54 @@ export function LivePageView({ data }: LivePageViewProps) {
 
             {primary ? (
               <>
-                <section>
-                  <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                    Jetzt / Als Nächstes
-                  </h2>
-                  {highlightMatches.length === 0 ? (
-                    <p className="mt-4 text-[15px] text-muted">
-                      Noch keine Spieldaten für den Live-Tag verfügbar.
-                    </p>
+                {/* PRIMARY MOMENT */}
+                <section aria-label="Hauptspiel">
+                  {primaryMoment.match ? (
+                    <>
+                      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                        <SectionHeading>
+                          {primaryMoment.kind === "live" ? "Läuft gerade" : "Als Nächstes"}
+                        </SectionHeading>
+                      </div>
+                      <LiveMatchCard
+                        match={primaryMoment.match}
+                        home={resolveLiveTeam(
+                          teamMap,
+                          primaryMoment.match.homeApplicationId,
+                          primaryMoment.match.homeExternalTeamId ?? null,
+                        )}
+                        away={resolveLiveTeam(
+                          teamMap,
+                          primaryMoment.match.awayApplicationId,
+                          primaryMoment.match.awayExternalTeamId ?? null,
+                        )}
+                        variant={primaryMoment.kind === "live" ? "live" : "next"}
+                        fieldLabel={fieldLabel(primaryMoment.match, fieldNameById)}
+                        groupOrRoundLabel={groupOrRoundLabel(
+                          primaryMoment.match,
+                          groupNameById,
+                        )}
+                        featured
+                      />
+                    </>
                   ) : (
-                    <div className="mt-4 grid gap-3">
-                      {highlightMatches.map((match) => (
-                        <MatchRow
-                          key={match.id}
-                          match={match}
-                          home={resolveLiveTeam(
-                            teamMap,
-                            match.homeApplicationId,
-                            match.homeExternalTeamId ?? null,
-                          )}
-                          away={resolveLiveTeam(
-                            teamMap,
-                            match.awayApplicationId,
-                            match.awayExternalTeamId ?? null,
-                          )}
-                          context={matchContextLabel(match, groupNameById, fieldNameById)}
-                        />
-                      ))}
+                    <div className="bg-white p-6 ring-1 ring-line sm:p-8">
+                      <SectionHeading>
+                        {recentResults.length > 0 ? "Turniertag" : "Spielplan"}
+                      </SectionHeading>
+                      <p className={cn(LIVE_TYPO.body, "mt-3 text-muted")}>
+                        {emptyMatchesCopy(primary, recentResults.length > 0)}
+                      </p>
                     </div>
                   )}
                 </section>
 
-                {recentResults.length > 0 ? (
+                {otherLive.length > 0 ? (
                   <section>
-                    <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                      Letzte Ergebnisse
-                    </h2>
+                    <SectionHeading>Läuft jetzt</SectionHeading>
                     <div className="mt-4 grid gap-3">
-                      {recentResults.map((match) => (
-                        <MatchRow
+                      {otherLive.map((match) => (
+                        <LiveMatchCard
                           key={match.id}
                           match={match}
                           home={resolveLiveTeam(
@@ -393,7 +367,63 @@ export function LivePageView({ data }: LivePageViewProps) {
                             match.awayApplicationId,
                             match.awayExternalTeamId ?? null,
                           )}
-                          context={matchContextLabel(match, groupNameById, fieldNameById)}
+                          variant="live"
+                          fieldLabel={fieldLabel(match, fieldNameById)}
+                          groupOrRoundLabel={groupOrRoundLabel(match, groupNameById)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {nextMatches.length > 0 ? (
+                  <section>
+                    <SectionHeading>Als Nächstes</SectionHeading>
+                    <div className="mt-4 grid gap-3">
+                      {nextMatches.map((match) => (
+                        <LiveMatchCard
+                          key={match.id}
+                          match={match}
+                          home={resolveLiveTeam(
+                            teamMap,
+                            match.homeApplicationId,
+                            match.homeExternalTeamId ?? null,
+                          )}
+                          away={resolveLiveTeam(
+                            teamMap,
+                            match.awayApplicationId,
+                            match.awayExternalTeamId ?? null,
+                          )}
+                          variant="next"
+                          fieldLabel={fieldLabel(match, fieldNameById)}
+                          groupOrRoundLabel={groupOrRoundLabel(match, groupNameById)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+
+                {recentResults.length > 0 ? (
+                  <section>
+                    <SectionHeading>Letzte Ergebnisse</SectionHeading>
+                    <div className="mt-4 grid gap-3">
+                      {recentResults.map((match) => (
+                        <LiveMatchCard
+                          key={match.id}
+                          match={match}
+                          home={resolveLiveTeam(
+                            teamMap,
+                            match.homeApplicationId,
+                            match.homeExternalTeamId ?? null,
+                          )}
+                          away={resolveLiveTeam(
+                            teamMap,
+                            match.awayApplicationId,
+                            match.awayExternalTeamId ?? null,
+                          )}
+                          variant="completed"
+                          fieldLabel={fieldLabel(match, fieldNameById)}
+                          groupOrRoundLabel={groupOrRoundLabel(match, groupNameById)}
                         />
                       ))}
                     </div>
@@ -402,43 +432,62 @@ export function LivePageView({ data }: LivePageViewProps) {
 
                 {groups.length > 0 ? (
                   <section>
-                    <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                      Gruppen / Tabelle
-                    </h2>
+                    <SectionHeading>Gruppen &amp; Tabellen</SectionHeading>
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
                       {groups.map((group) => (
-                        <article key={group.id} className="border border-line bg-white p-4">
-                          <h3 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                        <article key={group.id} className="bg-white p-4 ring-1 ring-line sm:p-5">
+                          <h3 className="font-display text-base font-bold tracking-wide text-ink uppercase sm:text-lg">
                             {group.name}
                           </h3>
                           {group.standings.length > 0 ? (
-                            <table className="mt-3 w-full text-left text-[13px]">
+                            <table className="mt-4 w-full text-left text-[13px] sm:text-[14px]">
                               <thead>
                                 <tr className="text-[11px] tracking-[0.08em] text-muted uppercase">
-                                  <th className="pb-2 font-semibold">Pl</th>
-                                  <th className="pb-2 font-semibold">Team</th>
-                                  <th className="pb-2 font-semibold">Sp</th>
+                                  <th className="pb-2 pr-2 font-semibold">Pl</th>
+                                  <th className="pb-2 pr-2 font-semibold">Team</th>
+                                  <th className="hidden pb-2 pr-2 font-semibold sm:table-cell">
+                                    Sp
+                                  </th>
+                                  <th className="hidden pb-2 pr-2 font-semibold md:table-cell">
+                                    TD
+                                  </th>
                                   <th className="pb-2 font-semibold">Pkt</th>
-                                  <th className="pb-2 font-semibold">Diff</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {group.standings.map((row) => (
-                                  <tr key={`${group.id}-${row.team.id}`} className="border-t border-line">
-                                    <td className="py-2 pr-2 tabular-nums">{row.rank}</td>
-                                    <td className="py-2 pr-2">
-                                      <span className="inline-flex items-center gap-2">
+                                  <tr
+                                    key={`${group.id}-${row.team.id}`}
+                                    className={cn(
+                                      "border-t border-line",
+                                      row.rank === 1 && "bg-brand-yellow/15",
+                                      row.rank <= 3 && row.rank > 1 && "bg-surface/80",
+                                    )}
+                                  >
+                                    <td className="py-2.5 pr-2 tabular-nums font-semibold text-ink">
+                                      {row.rank}
+                                    </td>
+                                    <td className="py-2.5 pr-2">
+                                      <span className="inline-flex min-w-0 items-center gap-2">
                                         <ParticipantClubLogo
                                           logoUrl={row.team.logoUrl}
                                           clubName={row.team.clubName}
-                                          className="!h-7 !w-7"
+                                          size="sm"
                                         />
-                                        <span className="line-clamp-1">{row.team.label}</span>
+                                        <span className="line-clamp-1 font-medium text-ink">
+                                          {row.team.label}
+                                        </span>
                                       </span>
                                     </td>
-                                    <td className="py-2 pr-2 tabular-nums">{row.played}</td>
-                                    <td className="py-2 pr-2 tabular-nums">{row.points}</td>
-                                    <td className="py-2 tabular-nums">{row.goalDiff}</td>
+                                    <td className="hidden py-2.5 pr-2 tabular-nums text-ink sm:table-cell">
+                                      {row.played}
+                                    </td>
+                                    <td className="hidden py-2.5 pr-2 tabular-nums text-ink md:table-cell">
+                                      {row.goalDiff > 0 ? `+${row.goalDiff}` : row.goalDiff}
+                                    </td>
+                                    <td className="py-2.5 tabular-nums font-semibold text-ink">
+                                      {row.points}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -446,11 +495,14 @@ export function LivePageView({ data }: LivePageViewProps) {
                           ) : (
                             <ul className="mt-3 grid gap-2">
                               {group.teams.map((team) => (
-                                <li key={team.id} className="flex items-center gap-2 text-[14px] text-ink">
+                                <li
+                                  key={team.id}
+                                  className="flex items-center gap-2 text-[14px] text-ink"
+                                >
                                   <ParticipantClubLogo
                                     logoUrl={team.logoUrl}
                                     clubName={team.clubName}
-                                    className="!h-7 !w-7"
+                                    size="sm"
                                   />
                                   <span className="line-clamp-1">{team.label}</span>
                                 </li>
@@ -465,39 +517,87 @@ export function LivePageView({ data }: LivePageViewProps) {
 
                 {participants.length > 0 ? (
                   <section>
-                    <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                      Teilnehmer
-                    </h2>
+                    <SectionHeading>Teilnehmer</SectionHeading>
                     <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-                      {participants.map((team) => (
-                        <li
-                          key={team.id}
-                          className="flex items-center gap-3 border border-line bg-white px-3 py-2.5 text-[14px] text-ink"
-                        >
-                          <ParticipantClubLogo logoUrl={team.logoUrl} clubName={team.clubName} />
-                          <span className="line-clamp-2">{team.label}</span>
-                        </li>
-                      ))}
+                      {participants.map((team) => {
+                        const next = nextMatchForParticipant(matches, team.id);
+                        const nextHint = next
+                          ? [
+                              "Nächstes Spiel",
+                              formatBerlinClock(next.scheduledAt),
+                              fieldLabel(next, fieldNameById),
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : null;
+                        return (
+                          <ParticipantCard
+                            key={team.id}
+                            team={team}
+                            groupName={groupNameByParticipantId.get(team.id) ?? null}
+                            nextHint={nextHint}
+                          />
+                        );
+                      })}
                     </ul>
                   </section>
                 ) : null}
 
-                <div>
-                  <Link
-                    href={`/turniere/${primary.slug}`}
-                    className="inline-flex text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue"
-                  >
-                    Zum vollständigen Turnier →
-                  </Link>
+                {/* Venue – after matches/tables on mobile */}
+                <section className="lg:hidden">
+                  <SectionHeading>Auf der Anlage</SectionHeading>
+                  <div className="mt-4 bg-white p-5 ring-1 ring-line">
+                    {nonempty(primary.location) ? (
+                      <p className="inline-flex items-start gap-2 text-[15px] text-ink">
+                        <IconPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-yellow" />
+                        <span>
+                          {primary.location}
+                          {nonempty(primary.address) ? (
+                            <>
+                              <br />
+                              <span className="text-muted">{primary.address}</span>
+                            </>
+                          ) : null}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className={LIVE_TYPO.meta}>Ort wird noch bekannt gegeben.</p>
+                    )}
+                    {fieldCount > 0 ? (
+                      <p className={cn(LIVE_TYPO.meta, "mt-3")}>
+                        Felder:{" "}
+                        {(stage?.fields ?? []).map((field) => field.name).join(" · ")}
+                      </p>
+                    ) : null}
+                    {routeUrl ? (
+                      <a
+                        href={routeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                      >
+                        Route öffnen
+                      </a>
+                    ) : null}
+                  </div>
+                </section>
+
+                <div className="lg:hidden">
+                  <SectionHeading>Teilen</SectionHeading>
+                  <LiveShareActions
+                    className="mt-4"
+                    url={liveUrl}
+                    title={`${primary.name} live – VfL Tournament Hub`}
+                  />
                 </div>
               </>
             ) : (
               <section>
-                <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                  Nächste Turniere
-                </h2>
+                <SectionHeading>Nächste Turniere</SectionHeading>
                 {upcoming.length === 0 ? (
-                  <p className="mt-4 text-[15px] text-muted">Aktuell sind keine kommenden Turniere geplant.</p>
+                  <p className="mt-4 text-[15px] text-muted">
+                    Aktuell sind keine kommenden Turniere geplant.
+                  </p>
                 ) : (
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {upcoming.map((tournament) => (
@@ -515,30 +615,75 @@ export function LivePageView({ data }: LivePageViewProps) {
 
           <aside className="grid gap-8 lg:sticky lg:top-6">
             {primary ? (
-              <section>
-                <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                  Kommende Turniere
-                </h2>
-                {upcoming.length === 0 ? (
-                  <p className="mt-3 text-[14px] text-muted">Keine weiteren Termine.</p>
-                ) : (
-                  <div className="mt-3 grid gap-3">
-                    {upcoming.map((tournament) => (
-                      <SideTournamentCard
-                        key={tournament.id}
-                        tournament={tournament}
-                        href={`/turniere/${tournament.slug}`}
-                      />
-                    ))}
+              <>
+                <section className="hidden lg:block">
+                  <SectionHeading>Teilen</SectionHeading>
+                  <LiveShareActions
+                    className="mt-4"
+                    url={liveUrl}
+                    title={`${primary.name} live – VfL Tournament Hub`}
+                  />
+                </section>
+
+                <section className="hidden lg:block">
+                  <SectionHeading>Auf der Anlage</SectionHeading>
+                  <div className="mt-4 bg-white p-5 ring-1 ring-line">
+                    {nonempty(primary.location) ? (
+                      <p className="inline-flex items-start gap-2 text-[15px] text-ink">
+                        <IconPin className="mt-0.5 h-4 w-4 shrink-0 text-brand-yellow" />
+                        <span>
+                          {primary.location}
+                          {nonempty(primary.address) ? (
+                            <>
+                              <br />
+                              <span className="text-muted">{primary.address}</span>
+                            </>
+                          ) : null}
+                        </span>
+                      </p>
+                    ) : (
+                      <p className={LIVE_TYPO.meta}>Ort wird noch bekannt gegeben.</p>
+                    )}
+                    {fieldCount > 0 ? (
+                      <p className={cn(LIVE_TYPO.meta, "mt-3")}>
+                        Felder:{" "}
+                        {(stage?.fields ?? []).map((field) => field.name).join(" · ")}
+                      </p>
+                    ) : null}
+                    {routeUrl ? (
+                      <a
+                        href={routeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-4 inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                      >
+                        Route öffnen
+                      </a>
+                    ) : null}
                   </div>
-                )}
-              </section>
+                </section>
+
+                <section>
+                  <SectionHeading>Kommende Turniere</SectionHeading>
+                  {upcoming.length === 0 ? (
+                    <p className="mt-3 text-[14px] text-muted">Keine weiteren Termine.</p>
+                  ) : (
+                    <div className="mt-3 grid gap-3">
+                      {upcoming.map((tournament) => (
+                        <SideTournamentCard
+                          key={tournament.id}
+                          tournament={tournament}
+                          href={`/turniere/${tournament.slug}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </>
             ) : null}
 
             <section>
-              <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                Vergangene Turniere
-              </h2>
+              <SectionHeading>Vergangene Turniere</SectionHeading>
               {past.length === 0 ? (
                 <p className="mt-3 text-[14px] text-muted">Noch keine vergangenen Turniere.</p>
               ) : (

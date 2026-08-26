@@ -47,15 +47,17 @@ export function runPublicTeamLabelChecks() {
 
 export function runLiveMatchLayoutChecks() {
   const liveView = readFileSync(join(process.cwd(), "src/components/live/LivePageView.tsx"), "utf8");
-  assert(liveView.includes("function MatchRow"), "MatchRow exists");
-  assert(liveView.includes("sm:hidden"), "mobile stacked layout branch");
-  assert(liveView.includes("sm:grid") || liveView.includes("hidden sm:grid"), "desktop grid layout");
-  assert(liveView.includes("min-w-0"), "flex/grid children allow shrink");
+  assert(liveView.includes("LiveMatchCard"), "LiveMatchCard used on live page");
+  assert(!liveView.includes("grid-cols-[1fr_auto_1fr]"), "old always-on 3-col mobile grid removed");
+
+  const matchCard = readFileSync(join(process.cwd(), "src/components/live/LiveMatchCard.tsx"), "utf8");
+  assert(matchCard.includes("sm:hidden"), "mobile stacked layout branch");
+  assert(matchCard.includes("sm:grid") || matchCard.includes("hidden") && matchCard.includes("sm:grid"), "desktop grid layout");
+  assert(matchCard.includes("min-w-0"), "flex/grid children allow shrink");
   assert(
-    liveView.includes("break-words") || liveView.includes("line-clamp"),
+    matchCard.includes("break-words") || matchCard.includes("line-clamp"),
     "long names wrap or clamp",
   );
-  assert(!liveView.includes("grid-cols-[1fr_auto_1fr]"), "old always-on 3-col mobile grid removed");
 
   const namesSource = readFileSync(join(process.cwd(), "src/lib/schedule/names.ts"), "utf8");
   assert(namesSource.includes("toLowerCase()"), "label compare is case-insensitive");
