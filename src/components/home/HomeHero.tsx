@@ -129,7 +129,7 @@ export function HomeHero({
               ) : null}
               {kind === "hub" ? (
                 <span className={cn(LIVE_TYPO.badge, "bg-white/10 text-brand-yellow")}>
-                  VfL Tournament Center
+                  Tournament Hub
                 </span>
               ) : null}
 
