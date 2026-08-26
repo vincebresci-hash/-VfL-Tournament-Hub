@@ -1,14 +1,23 @@
-import { localDateString } from "@/lib/mein-turnierplan";
+import {
+  isHybridLiveDataSource,
+  localDateString,
+  showsMeinTurnierplanLiveTab,
+  usesMeinTurnierplanAsPrimaryLive,
+} from "@/lib/mein-turnierplan";
 import {
   selectPrimaryMatchMoment,
   type PrimaryMatchMoment,
 } from "@/lib/live/match-center";
 import type { LiveTournamentSelection } from "@/lib/live/select-live-tournament";
+import { getDisplayCapacity } from "@/lib/public-tournament";
 import { TOURNAMENT_TIME_ZONE } from "@/lib/schedule/datetime";
 import type { PublicTournament } from "@/types/tournament";
 import type { TournamentMatchRecord } from "@/types/schedule";
 
 export type HomepageHeroKind = "live" | "next" | "hub";
+
+/** Titles at/above this length get a smaller mobile display size. */
+export const HOMEPAGE_LONG_TITLE_CHARS = 26;
 
 export type HomepageHeroMoment = {
   kind: HomepageHeroKind;
@@ -29,6 +38,66 @@ export function isTournamentDayFinished(matches: TournamentMatchRecord[]) {
   const hasScheduled = eligible.some((match) => match.status === "scheduled");
   const hasCompleted = eligible.some((match) => match.status === "completed");
   return !hasLive && !hasScheduled && hasCompleted;
+}
+
+/**
+ * Responsive hero title classes: short names stay large, long names shrink on mobile.
+ * Desktop (lg+) stays bold/large either way.
+ */
+export function homepageHeroTitleClassName(
+  name: string,
+  kind: Exclude<HomepageHeroKind, "hub">,
+): string {
+  const long = name.trim().length >= HOMEPAGE_LONG_TITLE_CHARS;
+  if (kind === "live") {
+    return long
+      ? "text-[1.7rem] leading-[1.12] sm:text-3xl lg:text-5xl xl:text-6xl break-words"
+      : "text-3xl leading-[1.1] sm:text-5xl lg:text-6xl break-words";
+  }
+  return long
+    ? "text-2xl leading-[1.12] sm:text-3xl lg:text-4xl xl:text-5xl break-words"
+    : "text-3xl leading-[1.1] sm:text-4xl lg:text-5xl break-words";
+}
+
+/**
+ * Capacity line for homepage surfaces using existing getDisplayCapacity occupancy.
+ * Hides misleading `0 / X` when MTP/hybrid may hold external participants that are
+ * not yet reflected in application occupancy — without inventing a second counter.
+ */
+export function formatHomepageCapacityLabel(
+  tournament: Pick<
+    PublicTournament,
+    | "confirmedTeams"
+    | "maxTeams"
+    | "liveDataSource"
+    | "meinTurnierplanEnabled"
+    | "meinTurnierplanUrl"
+  >,
+): string | null {
+  const capacity = getDisplayCapacity(tournament);
+
+  if (capacity) {
+    if (capacity.confirmedTeams > 0) {
+      return `${capacity.confirmedTeams} / ${capacity.maxTeams} Teams`;
+    }
+
+    const externalLiveLikely =
+      showsMeinTurnierplanLiveTab(tournament) ||
+      usesMeinTurnierplanAsPrimaryLive(tournament) ||
+      isHybridLiveDataSource(tournament);
+
+    if (externalLiveLikely) {
+      return null;
+    }
+
+    return `${capacity.confirmedTeams} / ${capacity.maxTeams} Teams`;
+  }
+
+  if (tournament.confirmedTeams > 0) {
+    return `${tournament.confirmedTeams} Teams`;
+  }
+
+  return null;
 }
 
 /**

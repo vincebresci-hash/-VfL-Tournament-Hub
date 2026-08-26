@@ -3,12 +3,14 @@ import { CoverImage } from "@/components/brand/CoverImage";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { LIVE_TYPO } from "@/lib/live/match-center";
-import { getDisplayCapacity } from "@/lib/public-tournament";
 import {
   getPublicApplicationState,
   isPublicApplicationAllowed,
 } from "@/lib/public-application-state";
-import { daysUntilTournamentDate } from "@/lib/home/homepage-moment";
+import {
+  daysUntilTournamentDate,
+  homepageHeroTitleClassName,
+} from "@/lib/home/homepage-moment";
 import { formatDateDe, formatTimeDe } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { HomepageHeroKind } from "@/lib/home/homepage-moment";
@@ -42,7 +44,6 @@ export function HomeHero({
   matchTeaser,
 }: HomeHeroProps) {
   const imageSrc = heroImageSrc(tournament);
-  const capacity = tournament ? getDisplayCapacity(tournament) : null;
 
   const applicationState = tournament
     ? getPublicApplicationState({
@@ -101,14 +102,16 @@ export function HomeHero({
 
         <Container
           className={cn(
-            kind === "hub" ? "py-12 sm:py-14 lg:py-16" : "py-8 sm:py-10 lg:py-12",
+            kind === "hub"
+              ? "py-10 sm:py-12 lg:py-16"
+              : "py-5 sm:py-7 lg:py-12",
           )}
         >
           <div
             className={cn(
-              "grid gap-8",
+              "grid gap-5 lg:gap-10",
               imageSrc
-                ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)] lg:items-center lg:gap-10"
+                ? "lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.9fr)] lg:items-center"
                 : "max-w-3xl",
             )}
           >
@@ -135,14 +138,14 @@ export function HomeHero({
 
               {kind === "hub" ? (
                 <>
-                  <h1 className="mt-4 font-display text-4xl font-bold tracking-wide uppercase sm:text-5xl lg:text-6xl">
+                  <h1 className="mt-3 font-display text-4xl font-bold tracking-wide uppercase sm:text-5xl lg:text-6xl">
                     VfL Tournament Center
                   </h1>
-                  <p className="mt-4 max-w-xl text-[15px] leading-7 text-white/75 sm:text-base">
+                  <p className="mt-3 max-w-xl text-[15px] leading-7 text-white/75 sm:mt-4 sm:text-base">
                     Neue Jugendturniere werden hier veröffentlicht. Spielplan, Ergebnisse
                     und Bewerbungen – zentral im Hub.
                   </p>
-                  <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <div className="mt-6 flex flex-col gap-3 sm:mt-8 sm:flex-row sm:flex-wrap">
                     <Link
                       href="/turniere"
                       className="inline-flex h-11 items-center justify-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase transition-colors hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -161,16 +164,14 @@ export function HomeHero({
                 <>
                   <h1
                     className={cn(
-                      "mt-3.5 font-display font-bold tracking-wide uppercase",
-                      kind === "live"
-                        ? "text-4xl sm:text-5xl lg:text-6xl"
-                        : "text-3xl sm:text-4xl lg:text-5xl",
+                      "mt-2.5 font-display font-bold tracking-wide uppercase sm:mt-3.5",
+                      homepageHeroTitleClassName(tournament.name, kind),
                     )}
                   >
                     {tournament.name}
                   </h1>
 
-                  <p className="mt-3 text-[14px] text-white/75 sm:text-[15px]">
+                  <p className="mt-2 text-[13px] text-white/75 sm:mt-3 sm:text-[15px]">
                     {[
                       tournament.ageGroup,
                       tournament.birthYear ? `Jahrgang ${tournament.birthYear}` : null,
@@ -182,31 +183,31 @@ export function HomeHero({
                       .join(" · ")}
                   </p>
 
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-white/80">
-                    {capacityLabel ? <span>{capacityLabel}</span> : null}
-                    {capacity && !capacityLabel ? (
-                      <span>
-                        {capacity.confirmedTeams} / {capacity.maxTeams} Teams
-                      </span>
-                    ) : null}
-                    {kind === "live" && fieldCount > 0 ? (
-                      <span>
-                        {fieldCount} Feld{fieldCount === 1 ? "" : "er"}
-                      </span>
-                    ) : null}
-                    {kind === "live" && matchCount > 0 ? (
-                      <span>
-                        {matchCount} Spiel{matchCount === 1 ? "" : "e"}
-                      </span>
-                    ) : null}
-                    {daysUntil != null ? (
-                      <span>
-                        Noch {daysUntil} Tag{daysUntil === 1 ? "" : "e"}
-                      </span>
-                    ) : null}
-                  </div>
+                  {(capacityLabel ||
+                    (kind === "live" && fieldCount > 0) ||
+                    (kind === "live" && matchCount > 0) ||
+                    daysUntil != null) ? (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-white/80 sm:mt-3 sm:text-[13px]">
+                      {capacityLabel ? <span>{capacityLabel}</span> : null}
+                      {kind === "live" && fieldCount > 0 ? (
+                        <span>
+                          {fieldCount} Feld{fieldCount === 1 ? "" : "er"}
+                        </span>
+                      ) : null}
+                      {kind === "live" && matchCount > 0 ? (
+                        <span>
+                          {matchCount} Spiel{matchCount === 1 ? "" : "e"}
+                        </span>
+                      ) : null}
+                      {daysUntil != null ? (
+                        <span>
+                          Noch {daysUntil} Tag{daysUntil === 1 ? "" : "e"}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
 
-                  <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                  <div className="mt-5 flex flex-col gap-2.5 sm:mt-7 sm:flex-row sm:flex-wrap sm:gap-3">
                     {kind === "live" ? (
                       <>
                         <Link
@@ -249,13 +250,15 @@ export function HomeHero({
                     )}
                   </div>
 
-                  {matchTeaser ? <div className="mt-6 max-w-xl">{matchTeaser}</div> : null}
+                  {matchTeaser ? (
+                    <div className="mt-4 max-w-xl sm:mt-6">{matchTeaser}</div>
+                  ) : null}
                 </>
               ) : null}
             </div>
 
             {imageSrc ? (
-              <div className="relative aspect-[16/11] w-full overflow-hidden lg:hidden">
+              <div className="relative aspect-[16/9] max-h-44 w-full overflow-hidden sm:max-h-52 lg:hidden">
                 <CoverImage
                   src={imageSrc}
                   alt={tournament?.name ? `Turnierbild ${tournament.name}` : "Turnierbild"}

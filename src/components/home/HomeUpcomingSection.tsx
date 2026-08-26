@@ -7,7 +7,7 @@ import {
   getPublicApplicationState,
   isPublicApplicationAllowed,
 } from "@/lib/public-application-state";
-import { getDisplayCapacity } from "@/lib/public-tournament";
+import { formatHomepageCapacityLabel } from "@/lib/home/homepage-moment";
 import {
   getEffectiveTournamentStatus,
 } from "@/lib/tournament-status";
@@ -36,7 +36,7 @@ function UpcomingCard({
     confirmedParticipants: tournament.confirmedTeams,
     archivedAt: tournament.archivedAt,
   });
-  const capacity = getDisplayCapacity(tournament);
+  const capacityLabel = formatHomepageCapacityLabel(tournament);
   const applicationState = getPublicApplicationState({
     status: tournament.status,
     applicationsEnabled,
@@ -76,7 +76,7 @@ function UpcomingCard({
         <time dateTime={tournament.date}>{formatDateDe(tournament.date)}</time>
       </p>
 
-      <h3 className="mt-2 font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <h3 className="mt-2 font-display text-lg font-bold tracking-wide text-ink uppercase break-words">
         {tournament.name}
       </h3>
 
@@ -87,14 +87,8 @@ function UpcomingCard({
         </p>
       ) : null}
 
-      {capacity ? (
-        <p className={cn(LIVE_TYPO.meta, "mt-3")}>
-          {capacity.confirmedTeams} / {capacity.maxTeams} Teams
-        </p>
-      ) : null}
-
-      {applicationState === "waitlist" ? (
-        <p className={cn(LIVE_TYPO.meta, "mt-1 text-ink/70")}>Warteliste</p>
+      {capacityLabel ? (
+        <p className={cn(LIVE_TYPO.meta, "mt-3")}>{capacityLabel}</p>
       ) : null}
 
       <div className="mt-auto flex flex-wrap gap-2 pt-4">

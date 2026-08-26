@@ -8,8 +8,7 @@ import { PartnersSection } from "@/components/home/PartnersSection";
 import { Container } from "@/components/layout/Container";
 import { Footer } from "@/components/layout/Footer";
 import type { LivePageData } from "@/lib/db/live-queries";
-import { resolveHomepageHeroMoment } from "@/lib/home/homepage-moment";
-import { getDisplayCapacity } from "@/lib/public-tournament";
+import { resolveHomepageHeroMoment, formatHomepageCapacityLabel } from "@/lib/home/homepage-moment";
 import { knockoutRoundLabel } from "@/lib/schedule/knockout";
 import type { TournamentMatchRecord } from "@/types/schedule";
 
@@ -66,19 +65,9 @@ export function HomePageView({
 
   const fieldCount = data.stage?.fields.length ?? 0;
   const matchCount = matches.filter((match) => match.status !== "cancelled").length;
-
-  const heroCapacity =
-    moment.kind === "live" && data.capacity
-      ? data.capacity
-      : moment.tournament
-        ? getDisplayCapacity(moment.tournament)
-        : null;
-
-  const capacityLabel = heroCapacity
-    ? `${heroCapacity.confirmedTeams} / ${heroCapacity.maxTeams} Teams`
-    : moment.tournament && moment.tournament.confirmedTeams > 0
-      ? `${moment.tournament.confirmedTeams} Teams`
-      : null;
+  const capacityLabel = moment.tournament
+    ? formatHomepageCapacityLabel(moment.tournament)
+    : null;
 
   const teaser =
     moment.kind === "live" && moment.matchMoment ? (

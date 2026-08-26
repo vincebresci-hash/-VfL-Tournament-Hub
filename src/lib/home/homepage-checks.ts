@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   daysUntilTournamentDate,
+  formatHomepageCapacityLabel,
+  homepageHeroTitleClassName,
+  HOMEPAGE_LONG_TITLE_CHARS,
   isTournamentDayFinished,
   resolveHomepageHeroMoment,
 } from "@/lib/home/homepage-moment";
@@ -235,6 +238,81 @@ export function runHomepageSelfChecks() {
   assert(daysUntilTournamentDate("2026-08-19", now) === null, "no countdown past");
   assert(daysUntilTournamentDate(null, now) === null, "no fake countdown");
 
+  // Long vs short title classes
+  const shortTitle = homepageHeroTitleClassName("Victory Cup", "live");
+  const longTitle = homepageHeroTitleClassName(
+    "19. Mosolf-Schulen-Cup 2026 (Klassen 7)",
+    "live",
+  );
+  assert(
+    "19. Mosolf-Schulen-Cup 2026 (Klassen 7)".length >= HOMEPAGE_LONG_TITLE_CHARS,
+    "mosolf counts as long",
+  );
+  assert(shortTitle.includes("text-3xl"), "short title stays bold on mobile");
+  assert(longTitle.includes("text-[1.7rem]"), "long title shrinks on mobile");
+  assert(longTitle.includes("lg:text-5xl") || longTitle.includes("xl:text-6xl"), "long title large on desktop");
+  assert(shortTitle !== longTitle, "title classes differ by length");
+
+  // Capacity: hub 0 is shown; MTP/hybrid 0 is hidden; positive always shown
+  assert(
+    formatHomepageCapacityLabel(
+      baseTournament({
+        confirmedTeams: 0,
+        maxTeams: 10,
+        liveDataSource: "hub",
+        meinTurnierplanEnabled: false,
+      }),
+    ) === "0 / 10 Teams",
+    "G hub zero is reliable",
+  );
+  assert(
+    formatHomepageCapacityLabel(
+      baseTournament({
+        confirmedTeams: 0,
+        maxTeams: 10,
+        liveDataSource: "mein-turnierplan",
+        meinTurnierplanEnabled: true,
+        meinTurnierplanUrl: "https://www.meinturnierplan.de/x",
+      }),
+    ) === null,
+    "F MTP-only zero hidden",
+  );
+  assert(
+    formatHomepageCapacityLabel(
+      baseTournament({
+        confirmedTeams: 0,
+        maxTeams: 10,
+        liveDataSource: "hybrid",
+        meinTurnierplanEnabled: true,
+        meinTurnierplanUrl: "https://www.meinturnierplan.de/x",
+      }),
+    ) === null,
+    "H hybrid zero hidden",
+  );
+  assert(
+    formatHomepageCapacityLabel(
+      baseTournament({
+        confirmedTeams: 8,
+        maxTeams: 16,
+        liveDataSource: "hybrid",
+        meinTurnierplanEnabled: true,
+        meinTurnierplanUrl: "https://www.meinturnierplan.de/x",
+      }),
+    ) === "8 / 16 Teams",
+    "H hybrid positive shown",
+  );
+  assert(
+    formatHomepageCapacityLabel(
+      baseTournament({
+        confirmedTeams: 5,
+        maxTeams: 16,
+        liveDataSource: "hub",
+        meinTurnierplanEnabled: false,
+      }),
+    ) === "5 / 16 Teams",
+    "G application-only positive",
+  );
+
   const page = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
   assert(page.includes("getLivePageData"), "page reuses live data");
   assert(page.includes("HomePageView"), "page uses HomePageView");
@@ -245,6 +323,7 @@ export function runHomepageSelfChecks() {
     "utf8",
   );
   assert(view.includes("resolveHomepageHeroMoment"), "view uses moment helper");
+  assert(view.includes("formatHomepageCapacityLabel"), "capacity helper wired");
   assert(view.includes("HomeUpcomingSection"), "upcoming section");
   assert(view.includes("HomeRecentSection"), "recent section");
   assert(view.includes("HomeClubsTeaser"), "clubs teaser");
@@ -255,6 +334,8 @@ export function runHomepageSelfChecks() {
   assert(hero.includes("Nächstes Turnier"), "next badge");
   assert(hero.includes("VfL Tournament Center"), "hub hero");
   assert(hero.includes("/live"), "live href");
+  assert(hero.includes("homepageHeroTitleClassName"), "responsive title helper");
+  assert(hero.includes("max-h-44") || hero.includes("aspect-[16/9]"), "compact mobile image");
 
   return "ok";
 }
