@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CoverImage } from "@/components/brand/CoverImage";
+import { TournamentImageFrame } from "@/components/brand/TournamentImageFrame";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import {
   getPublicApplicationState,
@@ -74,10 +74,11 @@ export function TournamentCard({
         className="relative block focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
         aria-label={`${tournament.name} – Turnier ansehen`}
       >
-        <CoverImage
+        <TournamentImageFrame
           src={tournament.image}
           alt=""
-          className="aspect-[16/10] w-full"
+          className="w-full"
+          aspectClassName="aspect-[16/9]"
           sizes="(min-width: 1280px) 320px, (min-width: 768px) 50vw, 100vw"
           objectPosition="50% 42%"
           imageClassName="transition-transform duration-700 ease-out group-hover:scale-[1.03]"

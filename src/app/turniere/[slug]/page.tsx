@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CoverImage } from "@/components/brand/CoverImage";
+import { TournamentImageFrame } from "@/components/brand/TournamentImageFrame";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -152,10 +152,12 @@ export default async function TournamentDetailPage({
           </Link>
 
           <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
-            <CoverImage
+            <TournamentImageFrame
               src={tournament.image}
               alt={tournament.name}
-              className="aspect-[16/9] w-full rounded-[12px]"
+              variant="hero"
+              className="w-full"
+              aspectClassName="aspect-[16/9]"
               sizes="(min-width: 1024px) 55vw, 100vw"
               objectPosition="50% 42%"
             />
