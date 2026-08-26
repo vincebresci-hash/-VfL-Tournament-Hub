@@ -159,7 +159,7 @@ export default async function TournamentDetailPage({
               className="w-full"
               aspectClassName="aspect-[16/9]"
               sizes="(min-width: 1024px) 55vw, 100vw"
-              objectPosition="50% 42%"
+              objectPosition="50% 50%"
             />
 
             <div>

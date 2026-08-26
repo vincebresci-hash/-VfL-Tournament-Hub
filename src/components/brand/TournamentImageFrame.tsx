@@ -32,7 +32,7 @@ export function TournamentImageFrame({
   aspectClassName = "aspect-[16/9]",
   sizes,
   preload = false,
-  objectPosition = "50% 42%",
+  objectPosition = "50% 50%",
   imageClassName,
   variant = "card",
 }: TournamentImageFrameProps) {
