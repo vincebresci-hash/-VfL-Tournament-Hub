@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   formatUpdatedAgo,
   mapsSearchUrl,
+  primaryMomentEmptyCopy,
   selectNextMatches,
   selectOtherLiveMatches,
   selectPrimaryMatchMoment,
@@ -112,8 +113,29 @@ export function runMatchCenterDesignChecks() {
   assert(selectRecentResults([done, live], 5)[0]?.id === "done-1", "recent completed");
 
   assert(formatUpdatedAgo(null) === null, "no fake timestamp");
-  assert(formatUpdatedAgo(new Date().toISOString())?.includes("Aktualisiert"), "relative update");
+  assert(
+    formatUpdatedAgo(new Date().toISOString())?.includes("Synchronisierung") ||
+      formatUpdatedAgo(new Date().toISOString())?.includes("synchronisiert"),
+    "relative sync wording",
+  );
   assert(mapsSearchUrl("Sportpark", "Musterstr. 1")?.includes("maps"), "maps url");
+
+  const finished = primaryMomentEmptyCopy({
+    hasLive: false,
+    hasScheduled: false,
+    hasCompleted: true,
+    startTimeLabel: null,
+  });
+  assert(finished.title.includes("beendet"), "finished title");
+  assert(finished.body.includes("Turniertag ist beendet"), "finished body");
+
+  const lull = primaryMomentEmptyCopy({
+    hasLive: false,
+    hasScheduled: true,
+    hasCompleted: true,
+    startTimeLabel: null,
+  });
+  assert(lull.body.includes("Aktuell läuft kein Spiel"), "midday lull copy");
 
   const view = readFileSync(join(process.cwd(), "src/components/live/LivePageView.tsx"), "utf8");
   assert(view.includes("LiveMatchCard"), "view uses LiveMatchCard");
@@ -123,6 +145,12 @@ export function runMatchCenterDesignChecks() {
   assert(view.includes("Als Nächstes"), "next section");
   assert(view.includes("Letzte Ergebnisse"), "results section");
   assert(view.includes("Gruppen"), "groups section");
+  assert(!view.includes("MeinTurnierplanBadge"), "no duplicate LIVE MTP badge");
+  assert(view.includes("Live-Daten via MeinTurnierplan"), "MTP source line kept");
+  assert(view.includes("heroCompact"), "compact hero when no live primary");
+  assert(view.includes("Letzte Synchronisierung") === false, "sync wording lives in helper");
+  assert(view.includes("formatUpdatedAgo"), "uses sync helper");
+  assert(view.includes("primaryMomentEmptyCopy"), "uses empty copy helper");
 
   const card = readFileSync(join(process.cwd(), "src/components/live/LiveMatchCard.tsx"), "utf8");
   assert(card.includes('variant === "live"'), "live variant");

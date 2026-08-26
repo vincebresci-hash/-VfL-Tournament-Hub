@@ -61,7 +61,7 @@ export function LiveMatchCard({
       aria-label={`${home.label} gegen ${away.label}, Stand ${score}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className={cn(LIVE_TYPO.meta, "min-w-0 text-ink/70")}>
+        <div className={cn(LIVE_TYPO.meta, "min-w-0 text-muted")}>
           {variant === "live" ? (
             <span className="inline-flex flex-wrap items-center gap-2">
               <span className={cn(LIVE_TYPO.badge, "bg-brand-yellow text-navy")}>
@@ -69,16 +69,12 @@ export function LiveMatchCard({
                 LIVE
               </span>
               {metaParts.length > 0 ? (
-                <span className="font-semibold tracking-[0.06em] text-ink uppercase">
-                  {metaParts.join(" · ")}
-                </span>
+                <span className="tracking-[0.04em] text-muted uppercase">{metaParts.join(" · ")}</span>
               ) : null}
             </span>
           ) : (
-            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-              {clock ? (
-                <span className="font-semibold tabular-nums tracking-[0.04em] text-ink">{clock}</span>
-              ) : null}
+            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-muted">
+              {clock ? <span className="tabular-nums text-ink/80">{clock}</span> : null}
               {metaParts.length > 0 ? <span>{metaParts.join(" · ")}</span> : null}
             </span>
           )}
@@ -129,11 +125,11 @@ export function LiveMatchCard({
         {featured && clock ? <p className={cn(LIVE_TYPO.meta, "text-center")}>{clock}</p> : null}
       </div>
 
-      {/* Compact desktop row */}
+      {/* Compact desktop row – logos stronger, score prioritized, meta stays quiet */}
       {!featured ? (
-        <div className="mt-4 hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:grid">
-          <div className="flex min-w-0 items-center gap-2.5 justify-self-start">
-            <ParticipantClubLogo logoUrl={home.logoUrl} clubName={home.clubName} size={logoSize} />
+        <div className="mt-4 hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 sm:grid">
+          <div className="flex min-w-0 items-center gap-3 justify-self-start">
+            <ParticipantClubLogo logoUrl={home.logoUrl} clubName={home.clubName} size="md" />
             <span
               className={cn(
                 "min-w-0 truncate text-[15px] font-medium text-ink",
@@ -145,13 +141,13 @@ export function LiveMatchCard({
           </div>
           <span
             className={cn(
-              "font-display text-2xl font-bold tabular-nums text-ink",
+              "min-w-[4.5rem] text-center font-display text-3xl font-bold tabular-nums text-ink",
               variant === "live" && "text-navy",
             )}
           >
             {score}
           </span>
-          <div className="flex min-w-0 items-center gap-2.5 justify-self-end text-right">
+          <div className="flex min-w-0 items-center gap-3 justify-self-end text-right">
             <span
               className={cn(
                 "min-w-0 truncate text-[15px] font-medium text-ink",
@@ -160,7 +156,7 @@ export function LiveMatchCard({
             >
               {away.label}
             </span>
-            <ParticipantClubLogo logoUrl={away.logoUrl} clubName={away.clubName} size={logoSize} />
+            <ParticipantClubLogo logoUrl={away.logoUrl} clubName={away.clubName} size="md" />
           </div>
         </div>
       ) : (

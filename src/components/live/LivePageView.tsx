@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
-import { MeinTurnierplanBadge } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { Container } from "@/components/layout/Container";
 import { LiveMatchCard } from "@/components/live/LiveMatchCard";
@@ -16,6 +15,7 @@ import {
   LIVE_TYPO,
   mapsSearchUrl,
   nextMatchForParticipant,
+  primaryMomentEmptyCopy,
   selectNextMatches,
   selectOtherLiveMatches,
   selectPrimaryMatchMoment,
@@ -115,17 +115,6 @@ function SectionHeading({ children }: { children: ReactNode }) {
   return <h2 className={LIVE_TYPO.section}>{children}</h2>;
 }
 
-function emptyMatchesCopy(primary: PublicTournament, hasCompleted: boolean) {
-  if (hasCompleted) {
-    return "Aktuell läuft kein Spiel. Die letzten Ergebnisse findest du weiter unten.";
-  }
-  const start = formatTimeDe(primary.startTime);
-  if (start) {
-    return `Der Spielplan startet um ${start} Uhr.`;
-  }
-  return "Noch keine Ergebnisse – sie erscheinen hier während des Turniers.";
-}
-
 function ParticipantCard({
   team,
   groupName,
@@ -170,20 +159,23 @@ export function LivePageView({ data }: LivePageViewProps) {
   const otherLive = selectOtherLiveMatches(matches, primaryMatchId);
   const nextMatches = selectNextMatches(matches, primaryMatchId, 5);
   const recentResults = selectRecentResults(matches, 5);
-  const updatedLabel = formatUpdatedAgo(primary?.meinTurnierplanLastSyncedAt);
+  const hasLiveMatch = matches.some((match) => match.status === "live");
+  const hasScheduledMatch = matches.some((match) => match.status === "scheduled");
+  const hasCompletedMatch = recentResults.length > 0;
+  const tournamentDayFinished = !hasLiveMatch && !hasScheduledMatch && hasCompletedMatch;
+  const hasLivePrimary = primaryMoment.kind === "live";
+  const heroCompact = !hasLivePrimary;
+  const syncLabel = formatUpdatedAgo(primary?.meinTurnierplanLastSyncedAt);
   const routeUrl = primary ? mapsSearchUrl(primary.location, primary.address) : null;
   const liveUrl = `${getSiteUrl()}/live`;
   const fieldCount = stage?.fields.length ?? 0;
   const matchCount = matches.filter((match) => match.status !== "cancelled").length;
-
-  const primaryEffectiveStatus = primary
-    ? getEffectiveTournamentStatus({
-        dbStatus: primary.status,
-        maxTeams: primary.maxTeams,
-        confirmedParticipants: primary.confirmedTeams,
-        archivedAt: primary.archivedAt,
-      })
-    : null;
+  const emptyPrimary = primaryMomentEmptyCopy({
+    hasLive: hasLiveMatch,
+    hasScheduled: hasScheduledMatch,
+    hasCompleted: hasCompletedMatch,
+    startTimeLabel: formatTimeDe(primary?.startTime ?? null),
+  });
 
   const groupNameByParticipantId = new Map<string, string>();
   for (const entry of stage?.roster ?? []) {
@@ -200,26 +192,41 @@ export function LivePageView({ data }: LivePageViewProps) {
       {/* Compact tournament context – not competing with primary match */}
       {primary ? (
         <section className="border-b border-line bg-navy text-white">
-          <Container className="py-6 sm:py-8">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className={cn(LIVE_TYPO.badge, "bg-brand-yellow text-navy")}>
-                <span className="h-2 w-2 animate-pulse rounded-full bg-brand-red" aria-hidden />
-                LIVE
-              </span>
-              {meinTurnierplanActive && primaryEffectiveStatus ? (
-                <MeinTurnierplanBadge
-                  date={primary.date}
-                  status={primaryEffectiveStatus}
-                  meinTurnierplanEnabled={primary.meinTurnierplanEnabled}
-                  meinTurnierplanUrl={primary.meinTurnierplanUrl}
-                />
-              ) : null}
-            </div>
+          <Container
+            className={cn(heroCompact ? "py-4 sm:py-5 lg:py-6" : "py-6 sm:py-8 lg:py-10")}
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start lg:gap-8">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  {tournamentDayFinished ? (
+                    <span className={cn(LIVE_TYPO.badge, "bg-white/10 text-white")}>Beendet</span>
+                  ) : (
+                    <span className={cn(LIVE_TYPO.badge, "bg-brand-yellow text-navy")}>
+                      <span
+                        className="h-2 w-2 animate-pulse rounded-full bg-brand-red"
+                        aria-hidden
+                      />
+                      LIVE
+                    </span>
+                  )}
+                </div>
 
-            <div className="mt-4 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div className="min-w-0 max-w-3xl">
-                <h1 className={LIVE_TYPO.title}>{primary.name}</h1>
-                <p className="mt-3 text-[14px] text-white/75 sm:text-[15px]">
+                <h1
+                  className={cn(
+                    "font-display font-bold tracking-wide uppercase",
+                    heroCompact
+                      ? "mt-2.5 text-2xl sm:text-3xl"
+                      : "mt-4 text-3xl sm:text-4xl lg:text-5xl",
+                  )}
+                >
+                  {primary.name}
+                </h1>
+                <p
+                  className={cn(
+                    "text-white/75",
+                    heroCompact ? "mt-2 text-[13px] sm:text-[14px]" : "mt-3 text-[14px] sm:text-[15px]",
+                  )}
+                >
                   {[
                     primary.ageGroup,
                     primary.birthYear ? `Jahrgang ${primary.birthYear}` : null,
@@ -229,7 +236,12 @@ export function LivePageView({ data }: LivePageViewProps) {
                     .filter(Boolean)
                     .join(" · ")}
                 </p>
-                <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13px] text-white/80 sm:text-[14px]">
+                <div
+                  className={cn(
+                    "flex flex-wrap gap-x-4 gap-y-1 text-white/80",
+                    heroCompact ? "mt-2.5 text-[12px] sm:text-[13px]" : "mt-4 text-[13px] sm:text-[14px]",
+                  )}
+                >
                   {capacity ? (
                     <span>
                       {capacity.confirmedTeams}
@@ -244,13 +256,18 @@ export function LivePageView({ data }: LivePageViewProps) {
                     <span>Ende {formatTimeDe(primary.endTime)}</span>
                   ) : null}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-white/60">
-                  {updatedLabel ? <span>{updatedLabel}</span> : null}
+                <div
+                  className={cn(
+                    "flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/55 sm:text-[12px]",
+                    heroCompact ? "mt-2" : "mt-3",
+                  )}
+                >
+                  {syncLabel ? <span>{syncLabel}</span> : null}
                   {meinTurnierplanActive ? <span>Live-Daten via MeinTurnierplan</span> : null}
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-2 sm:gap-3 lg:justify-end lg:pt-1">
                 <Link
                   href={`/turniere/${primary.slug}`}
                   className="inline-flex h-11 items-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
@@ -338,12 +355,15 @@ export function LivePageView({ data }: LivePageViewProps) {
                       />
                     </>
                   ) : (
-                    <div className="bg-white p-6 ring-1 ring-line sm:p-8">
-                      <SectionHeading>
-                        {recentResults.length > 0 ? "Turniertag" : "Spielplan"}
-                      </SectionHeading>
-                      <p className={cn(LIVE_TYPO.body, "mt-3 text-muted")}>
-                        {emptyMatchesCopy(primary, recentResults.length > 0)}
+                    <div
+                      className={cn(
+                        "bg-white ring-1 ring-line",
+                        heroCompact ? "p-4 sm:p-5" : "p-6 sm:p-8",
+                      )}
+                    >
+                      <SectionHeading>{emptyPrimary.title}</SectionHeading>
+                      <p className={cn(LIVE_TYPO.body, "mt-2 text-muted sm:mt-3")}>
+                        {emptyPrimary.body}
                       </p>
                     </div>
                   )}

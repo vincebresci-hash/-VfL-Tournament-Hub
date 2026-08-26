@@ -99,19 +99,53 @@ export function formatUpdatedAgo(iso: string | null | undefined, now = new Date(
   const diffMs = Math.max(0, now.getTime() - then.getTime());
   const minutes = Math.floor(diffMs / 60_000);
   if (minutes < 1) {
-    return "Aktualisiert gerade eben";
+    return "Gerade eben synchronisiert";
   }
   if (minutes === 1) {
-    return "Aktualisiert vor 1 Min.";
+    return "Letzte Synchronisierung vor 1 Min.";
   }
   if (minutes < 60) {
-    return `Aktualisiert vor ${minutes} Min.`;
+    return `Letzte Synchronisierung vor ${minutes} Min.`;
   }
   const hours = Math.floor(minutes / 60);
   if (hours === 1) {
-    return "Aktualisiert vor 1 Std.";
+    return "Letzte Synchronisierung vor 1 Std.";
   }
-  return `Aktualisiert vor ${hours} Std.`;
+  return `Letzte Synchronisierung vor ${hours} Std.`;
+}
+
+/** Empty primary-moment copy from match statuses only (no invented live state). */
+export function primaryMomentEmptyCopy(input: {
+  hasLive: boolean;
+  hasScheduled: boolean;
+  hasCompleted: boolean;
+  startTimeLabel: string | null;
+}): { title: string; body: string } {
+  if (!input.hasLive && !input.hasScheduled && input.hasCompleted) {
+    return {
+      title: "Turniertag beendet",
+      body: "Der Turniertag ist beendet. Alle Ergebnisse und Platzierungen findest du hier.",
+    };
+  }
+
+  if (!input.hasLive && input.hasScheduled) {
+    return {
+      title: "Turniertag",
+      body: "Aktuell läuft kein Spiel. Als Nächstes findest du die kommenden Partien weiter unten.",
+    };
+  }
+
+  if (input.startTimeLabel) {
+    return {
+      title: "Spielplan",
+      body: `Der Spielplan startet um ${input.startTimeLabel}.`,
+    };
+  }
+
+  return {
+    title: "Spielplan",
+    body: "Noch keine Ergebnisse – sie erscheinen hier während des Turniers.",
+  };
 }
 
 export function mapsSearchUrl(location: string | null | undefined, address: string | null | undefined) {
