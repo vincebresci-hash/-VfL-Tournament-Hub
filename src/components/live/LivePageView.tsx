@@ -241,7 +241,7 @@ export function LivePageView({ data }: LivePageViewProps) {
                   {fieldCount > 0 ? <span>{fieldCount} Felder</span> : null}
                   {matchCount > 0 ? <span>{matchCount} Spiele</span> : null}
                   {formatTimeDe(primary.endTime) ? (
-                    <span>Ende {formatTimeDe(primary.endTime)} Uhr</span>
+                    <span>Ende {formatTimeDe(primary.endTime)}</span>
                   ) : null}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-white/60">
