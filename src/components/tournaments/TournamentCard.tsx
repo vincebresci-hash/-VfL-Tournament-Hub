@@ -108,20 +108,26 @@ export function TournamentCard({
 
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <StatusBadge status={effectiveStatus} />
-          <span
-            className={cn(
-              "inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase",
-              applicationState === "open"
-                ? tournamentStatusClassName.active
-                : applicationState === "waitlist"
-                  ? tournamentStatusClassName.full
-                  : applicationState === "coming-soon"
-                    ? tournamentStatusClassName["coming-soon"]
-                    : tournamentStatusClassName.completed,
-            )}
-          >
-            {publicApplicationStateLabel[applicationState]}
-          </span>
+          {/* Application badge only when it adds info beyond tournament status */}
+          {applicationState === "waitlist" ||
+          applicationState === "coming-soon" ||
+          (applicationState === "closed" && effectiveStatus !== "completed") ||
+          (applicationState === "open" && effectiveStatus !== "active") ? (
+            <span
+              className={cn(
+                "inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase",
+                applicationState === "open"
+                  ? tournamentStatusClassName.active
+                  : applicationState === "waitlist"
+                    ? tournamentStatusClassName.full
+                    : applicationState === "coming-soon"
+                      ? tournamentStatusClassName["coming-soon"]
+                      : tournamentStatusClassName.completed,
+              )}
+            >
+              {publicApplicationStateLabel[applicationState]}
+            </span>
+          ) : null}
           {showMeinTurnierplan ? (
             <MeinTurnierplanBadge
               date={tournament.date}
