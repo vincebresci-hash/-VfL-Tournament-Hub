@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { CLUB_NAME, OFFICIAL_CLUB_WEBSITE } from "@/data/club";
 
-export const metadata: Metadata = { title: "Partner" };
+export const metadata: Metadata = withCanonical("/partner", {
+  title: "Partner"
+});
 
 export default function PartnerPage() {
   return (

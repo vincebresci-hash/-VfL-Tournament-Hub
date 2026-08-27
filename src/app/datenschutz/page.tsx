@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import {
@@ -8,7 +9,9 @@ import {
 } from "@/data/club";
 import { telHref } from "@/lib/contact";
 
-export const metadata: Metadata = { title: "Datenschutz" };
+export const metadata: Metadata = withCanonical("/datenschutz", {
+  title: "Datenschutz"
+});
 
 export default function DatenschutzPage() {
   return (

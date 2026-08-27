@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { IconCheck } from "@/components/ui/icons";
 import { CLUB_NAME } from "@/data/club";
 
-export const metadata: Metadata = { title: "Für Vereine" };
+export const metadata: Metadata = withCanonical("/fuer-vereine", {
+  title: "Für Vereine"
+});
 
 const steps = [
   {

@@ -5,10 +5,11 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { listPublicTournaments } from "@/lib/db/tournament-queries";
 import { getAppSettings } from "@/lib/settings";
+import { withCanonical } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withCanonical("/turniere", {
   title: "Turniere",
-};
+});
 
 export const dynamic = "force-dynamic";
 

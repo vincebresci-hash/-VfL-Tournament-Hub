@@ -19,6 +19,7 @@ import {
 import { getAppSettings } from "@/lib/settings";
 import { getEffectiveTournamentStatus } from "@/lib/tournament-status";
 import type { PublicTournament } from "@/types/tournament";
+import { withCanonical } from "@/lib/site";
 
 type ApplyPageProps = {
   params: Promise<{ slug: string }>;
@@ -32,9 +33,9 @@ export async function generateMetadata({
   const { slug } = await params;
   const tournament = await getPublicTournamentBySlug(slug);
 
-  return {
+  return withCanonical(`/turniere/${slug}/bewerben`, {
     title: tournament ? `Bewerbung · ${tournament.name}` : "Bewerbung",
-  };
+  });
 }
 
 export default async function TournamentApplyPage({ params }: ApplyPageProps) {

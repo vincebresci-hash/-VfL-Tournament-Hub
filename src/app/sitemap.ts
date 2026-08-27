@@ -13,6 +13,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     "/fuer-vereine",
     "/ueber-uns",
     "/anlage",
+    "/partner",
+    "/news",
     "/faq",
     "/kontakt",
     "/impressum",

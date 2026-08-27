@@ -32,6 +32,8 @@ import {
   tournamentStatusClassName,
 } from "@/lib/tournament-status";
 import { publicTeamLabel } from "@/lib/schedule/names";
+import { tournamentImageObjectPosition } from "@/data/tournaments";
+import { withCanonical } from "@/lib/site";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -46,10 +48,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const tournament = await getPublicTournamentBySlug(slug);
 
-  return {
+  return withCanonical(`/turniere/${slug}`, {
     title: tournament?.name ?? "Turnier",
     description: nonempty(tournament?.shortDescription) ?? nonempty(tournament?.description) ?? undefined,
-  };
+  });
 }
 
 export default async function TournamentDetailPage({
@@ -159,7 +161,7 @@ export default async function TournamentDetailPage({
               className="w-full"
               aspectClassName="aspect-[16/9]"
               sizes="(min-width: 1024px) 55vw, 100vw"
-              objectPosition="50% 50%"
+              objectPosition={tournamentImageObjectPosition(tournament.ageGroup)}
             />
 
             <div>

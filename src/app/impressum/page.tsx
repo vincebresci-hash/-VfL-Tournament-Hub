@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import {
@@ -12,7 +13,9 @@ import {
 } from "@/data/club";
 import { telHref } from "@/lib/contact";
 
-export const metadata: Metadata = { title: "Impressum" };
+export const metadata: Metadata = withCanonical("/impressum", {
+  title: "Impressum"
+});
 
 export default function ImpressumPage() {
   return (

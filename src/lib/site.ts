@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 /**
  * Public canonical site origin.
  * Prefer NEXT_PUBLIC_SITE_URL in every deployed environment.
@@ -18,6 +20,31 @@ export function getSiteUrl() {
   }
 
   return "http://localhost:3000";
+}
+
+/**
+ * Pathname for Metadata `alternates.canonical` (resolved via metadataBase).
+ * Pass "/" for the homepage or a rooted path like "/turniere".
+ */
+export function canonicalPath(pathname: string) {
+  const trimmed = pathname.trim();
+  if (!trimmed || trimmed === "/") {
+    return "/";
+  }
+
+  const withSlash = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return withSlash.replace(/\/+$/, "") || "/";
+}
+
+/** Merge a self-referencing canonical into page metadata. */
+export function withCanonical(pathname: string, metadata: Metadata = {}): Metadata {
+  return {
+    ...metadata,
+    alternates: {
+      ...metadata.alternates,
+      canonical: canonicalPath(pathname),
+    },
+  };
 }
 
 export const MEIN_TURNIERPLAN_FRAME_SRC_HOSTS = [
