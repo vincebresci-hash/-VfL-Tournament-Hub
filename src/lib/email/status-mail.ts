@@ -8,8 +8,9 @@ import {
 } from "@/lib/email/provider";
 import {
   parseStatusEmailReservation,
+  resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
-  shouldSkipStatusEmailAfterReservation,
+  STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
 } from "@/lib/email/status-mail-idempotency";
 import { templateTypeForStatus } from "@/lib/email/templates";
 import { formatDateDe } from "@/lib/format";
@@ -103,11 +104,11 @@ async function reserveStatusEmailSend(
   });
 
   if (error) {
-    if (isMissingRelationError(error)) {
-      return "send";
-    }
-
-    console.error("reserve_application_status_email_send failed", error.message);
+    console.error(
+      "reserve_application_status_email_send failed",
+      error.message,
+      error.code ?? "",
+    );
     return "error";
   }
 
@@ -135,8 +136,12 @@ async function releaseStatusEmailSend(
     p_template_type: templateType,
   });
 
-  if (error && !isMissingRelationError(error)) {
-    console.error("release_application_status_email_send failed", error.message);
+  if (error) {
+    console.error(
+      "release_application_status_email_send failed",
+      error.message,
+      error.code ?? "",
+    );
   }
 }
 
@@ -282,15 +287,18 @@ export async function sendApplicationStatusEmail(input: {
   }
 
   const reservation = await reserveStatusEmailSend(input.applicationId, templateType);
-  if (reservation === "error") {
+  const decision = resolveStatusEmailSendDecision(reservation);
+
+  if (decision.action === "fail_closed") {
+    console.error(decision.error);
     return {
       sent: false,
       skipped: false,
-      error: "Die Idempotenz-Prüfung für den E-Mail-Versand ist fehlgeschlagen.",
+      error: decision.error ?? STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
     };
   }
 
-  if (shouldSkipStatusEmailAfterReservation(reservation)) {
+  if (decision.action === "skip") {
     return { sent: false, skipped: true, error: null };
   }
 

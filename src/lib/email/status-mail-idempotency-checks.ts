@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  isStatusEmailReservationError,
   parseStatusEmailReservation,
+  resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   shouldSkipStatusEmailAfterReservation,
   simulateStatusEmailFlow,
   STATUS_EMAIL_IDEMPOTENCY_SCENARIOS,
+  STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
   type StatusEmailScenario,
 } from "@/lib/email/status-mail-idempotency";
 
@@ -60,6 +63,31 @@ export function runStatusEmailIdempotencySelfChecks() {
   assert(
     !shouldReleaseStatusEmailReservation({ sendOk: true, logStatus: "sent" }),
     "successful sent must keep reservation",
+  );
+
+  assert(
+    isStatusEmailReservationError("error"),
+    "error reservation must be detectable",
+  );
+  assert(
+    resolveStatusEmailSendDecision("error").action === "fail_closed",
+    "error reservation must fail closed",
+  );
+  assert(
+    resolveStatusEmailSendDecision("error").error ===
+      STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
+    "error reservation must return idempotency unavailable message",
+  );
+
+  const statusMailSource = readFileSync(
+    join(process.cwd(), "src/lib/email/status-mail.ts"),
+    "utf8",
+  );
+  assert(
+    !/isMissingRelationError\(error\)[\s\S]{0,200}?return "send"/.test(
+      statusMailSource,
+    ),
+    "status-mail must not fall back to send when migration/RPC is missing",
   );
 
   const migration = readFileSync(
@@ -138,6 +166,19 @@ export function runStatusEmailIdempotencySelfChecks() {
     expectedRelease: false,
   };
   runScenario(scenarioF, "app-f-other");
+
+  const scenarioG: StatusEmailScenario = {
+    id: "G",
+    priorSentTemplates: [],
+    reservationKeys: [],
+    targetTemplate: "application-accepted",
+    reserveResult: "error",
+    sendOk: false,
+    logStatus: "failed",
+    expectedAction: "fail_closed",
+    expectedRelease: false,
+  };
+  runScenario(scenarioG, "app-g");
 
   return "ok";
 }

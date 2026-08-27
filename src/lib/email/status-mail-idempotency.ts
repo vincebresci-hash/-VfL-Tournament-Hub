@@ -2,6 +2,11 @@ import type { EmailTemplateType } from "@/types/admin";
 
 export type StatusEmailReservation = "send" | "skip";
 
+export type StatusEmailReservationOutcome = StatusEmailReservation | "error";
+
+export const STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR =
+  "Status-E-Mail-Versand blockiert: Idempotenz-Migration oder RPC nicht verfügbar.";
+
 export const STATUS_EMAIL_TEMPLATE_TYPES: readonly EmailTemplateType[] = [
   "application-accepted",
   "waiting-list",
@@ -25,6 +30,32 @@ export function shouldSkipStatusEmailAfterReservation(
   return reservation === "skip";
 }
 
+export function isStatusEmailReservationError(
+  reservation: StatusEmailReservationOutcome,
+): boolean {
+  return reservation === "error";
+}
+
+export function resolveStatusEmailSendDecision(
+  reservation: StatusEmailReservationOutcome,
+): {
+  action: "send" | "skip" | "fail_closed";
+  error: string | null;
+} {
+  if (reservation === "error") {
+    return {
+      action: "fail_closed",
+      error: STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
+    };
+  }
+
+  if (shouldSkipStatusEmailAfterReservation(reservation)) {
+    return { action: "skip", error: null };
+  }
+
+  return { action: "send", error: null };
+}
+
 export function shouldReleaseStatusEmailReservation(input: {
   sendOk: boolean;
   logStatus: "sent" | "failed" | "skipped";
@@ -37,10 +68,10 @@ export type StatusEmailScenario = {
   priorSentTemplates: EmailTemplateType[];
   reservationKeys: EmailTemplateType[];
   targetTemplate: EmailTemplateType;
-  reserveResult: StatusEmailReservation;
+  reserveResult: StatusEmailReservationOutcome;
   sendOk: boolean;
   logStatus: "sent" | "failed" | "skipped";
-  expectedAction: "send" | "skip";
+  expectedAction: "send" | "skip" | "fail_closed";
   expectedRelease: boolean;
 };
 
@@ -124,18 +155,24 @@ export function simulateStatusEmailFlow(
   applicationId: string,
   otherApplicationId = "other-application-id",
 ): {
-  action: "send" | "skip";
+  action: "send" | "skip" | "fail_closed";
   release: boolean;
 } {
-  const reservation = simulateReserveStatusEmailSend({
-    priorSentTemplates: scenario.priorSentTemplates,
-    reservationKeys: scenario.reservationKeys,
-    targetTemplate: scenario.targetTemplate,
-    reserveResult: scenario.reserveResult,
-  });
+  const reservation: StatusEmailReservationOutcome =
+    scenario.reserveResult === "error"
+      ? "error"
+      : simulateReserveStatusEmailSend({
+          priorSentTemplates: scenario.priorSentTemplates,
+          reservationKeys: scenario.reservationKeys,
+          targetTemplate: scenario.targetTemplate,
+          reserveResult: scenario.reserveResult,
+        });
 
-  if (shouldSkipStatusEmailAfterReservation(reservation)) {
-    return { action: "skip", release: false };
+  const decision = resolveStatusEmailSendDecision(reservation);
+  if (decision.action !== "send") {
+    void applicationId;
+    void otherApplicationId;
+    return { action: decision.action, release: false };
   }
 
   const release = shouldReleaseStatusEmailReservation({
