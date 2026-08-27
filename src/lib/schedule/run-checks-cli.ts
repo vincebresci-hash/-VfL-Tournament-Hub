@@ -19,6 +19,7 @@ import {
 import { runTournamentStatusCapacityChecks } from "@/lib/tournament-status-checks";
 import { runSiteUrlAndCspChecks } from "@/lib/site-checks";
 import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-checks";
+import { runClubProfileSecurityChecks } from "@/lib/auth/club-profile-security-checks";
 import { runAdminScheduleParticipantChecks } from "@/lib/schedule/admin-schedule-participants-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
@@ -53,6 +54,7 @@ try {
   const tournamentStatusCapacityChecks = runTournamentStatusCapacityChecks();
   const siteUrlAndCspChecks = runSiteUrlAndCspChecks();
   const authLoginValidationChecks = runAuthLoginValidationChecks();
+  const clubProfileSecurityChecks = runClubProfileSecurityChecks();
   const adminScheduleParticipantChecks = runAdminScheduleParticipantChecks();
   const statusEmailIdempotencyChecks = runStatusEmailIdempotencySelfChecks();
   console.log(`schedule-checks: ${schedule}`);
@@ -79,6 +81,7 @@ try {
   console.log(`tournament-status-capacity-checks: ${tournamentStatusCapacityChecks}`);
   console.log(`site-url-csp-checks: ${siteUrlAndCspChecks}`);
   console.log(`auth-login-validation-checks: ${authLoginValidationChecks}`);
+  console.log(`club-profile-security-checks: ${clubProfileSecurityChecks}`);
   console.log(`admin-schedule-participant-checks: ${adminScheduleParticipantChecks}`);
   console.log(`status-email-idempotency-checks: ${statusEmailIdempotencyChecks}`);
 } catch (error) {
