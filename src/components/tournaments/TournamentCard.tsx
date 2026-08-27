@@ -14,6 +14,7 @@ import {
 } from "@/lib/tournament-status";
 import { MeinTurnierplanBadge } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { isMeinTurnierplanPublic } from "@/lib/mein-turnierplan";
+import { tournamentImageObjectPosition } from "@/data/tournaments";
 import { cn } from "@/lib/cn";
 import type { PublicTournament } from "@/types/tournament";
 
@@ -80,7 +81,7 @@ export function TournamentCard({
           className="w-full"
           aspectClassName="aspect-[16/9]"
           sizes="(min-width: 1280px) 320px, (min-width: 768px) 50vw, 100vw"
-          objectPosition="50% 50%"
+          objectPosition={tournamentImageObjectPosition(tournament.ageGroup)}
           imageClassName="transition-transform duration-700 ease-out group-hover:scale-[1.03]"
         />
       </Link>

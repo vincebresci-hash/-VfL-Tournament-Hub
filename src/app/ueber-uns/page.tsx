@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { CoverImage } from "@/components/brand/CoverImage";
 import { CLUB_NAME, CLUB_SLOGAN } from "@/data/club";
 import { HUB_NAME, media } from "@/lib/constants";
 
-export const metadata: Metadata = { title: "Über uns" };
+export const metadata: Metadata = withCanonical("/ueber-uns", {
+  title: "Über uns"
+});
 
 const hubFeatures = [
   "Turniere entdecken",

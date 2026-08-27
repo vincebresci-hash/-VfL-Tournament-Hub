@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import { AuthCard, AuthHeadline, AuthShell } from "@/components/auth/AuthShell";
 import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
 import { getAuthSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Passwort zurücksetzen" };
+export const metadata: Metadata = withCanonical("/passwort-zuruecksetzen", {
+  title: "Passwort zurücksetzen"
+});
 
 export default async function ResetPasswordPage() {
   const session = await getAuthSession();

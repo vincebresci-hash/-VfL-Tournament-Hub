@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { AuthCard, AuthHeadline, AuthShell } from "@/components/auth/AuthShell";
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
 
-export const metadata: Metadata = { title: "Passwort vergessen" };
+export const metadata: Metadata = withCanonical("/passwort-vergessen", {
+  title: "Passwort vergessen"
+});
 
 export default function ForgotPasswordPage() {
   return (

@@ -3,14 +3,15 @@ import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { LivePageView } from "@/components/live/LivePageView";
 import { getLivePageData } from "@/lib/db/live-queries";
+import { withCanonical } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withCanonical("/live", {
   title: "Live",
   description:
     "Aktuelles Turnier live: Spielplan, Ergebnisse, Gruppen und Tabellen im VfL Tournament Hub.",
-};
+});
 
 export default async function LivePage() {
   const data = await getLivePageData();

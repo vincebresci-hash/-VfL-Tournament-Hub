@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCheckCircle } from "@/components/ui/icons";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = withCanonical("/bewerbung-erfolgreich", {
   title: "Bewerbung eingegangen",
-};
+});
 
 export default function ApplicationSuccessPage() {
   return (

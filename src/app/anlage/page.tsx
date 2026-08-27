@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { CoverImage } from "@/components/brand/CoverImage";
@@ -10,7 +11,9 @@ import {
 } from "@/data/club";
 import { media } from "@/lib/constants";
 
-export const metadata: Metadata = { title: "Unsere Anlage" };
+export const metadata: Metadata = withCanonical("/anlage", {
+  title: "Unsere Anlage"
+});
 
 export default function AnlagePage() {
   return (

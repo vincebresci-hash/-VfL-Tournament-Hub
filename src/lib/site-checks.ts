@@ -52,6 +52,8 @@ export function runSiteUrlAndCspChecks() {
     const sitemapSource = readFileSync(join(process.cwd(), "src/app/sitemap.ts"), "utf8");
     assert(sitemapSource.includes("getSiteUrl"), "D: sitemap uses getSiteUrl");
     assert(sitemapSource.includes('"/live"'), "D: /live in sitemap");
+    assert(sitemapSource.includes('"/partner"'), "D: /partner in sitemap");
+    assert(sitemapSource.includes('"/news"'), "D: /news in sitemap");
     assert(!sitemapSource.includes("VERCEL_URL"), "D: sitemap ignores VERCEL_URL");
     assert(!sitemapSource.includes("localhost:3000"), "D: sitemap has no hardcoded localhost");
 
@@ -69,6 +71,8 @@ export function runSiteUrlAndCspChecks() {
     assert(siteSource.includes("NEXT_PUBLIC_SITE_URL"), "site helper reads SITE_URL");
     assert(siteSource.includes('process.env.VERCEL === "1"'), "site helper checks VERCEL");
     assert(siteSource.includes("DEFAULT_PRODUCTION_SITE_URL"), "site helper has production default");
+    assert(siteSource.includes("withCanonical"), "site helper exports withCanonical");
+    assert(siteSource.includes("canonicalPath"), "site helper exports canonicalPath");
     assert(
       !/process\.env\.VERCEL_URL/.test(siteSource),
       "site helper must not use VERCEL_URL",
@@ -79,7 +83,10 @@ export function runSiteUrlAndCspChecks() {
     assert(layoutSource.includes("getSiteUrl"), "layout uses getSiteUrl");
     assert(!layoutSource.includes("VERCEL_URL"), "layout ignores VERCEL_URL");
     assert(!layoutSource.includes("localhost:3000"), "layout has no hardcoded localhost");
-
+    assert(
+      !/alternates:\s*\{\s*canonical:\s*"\/"/.test(layoutSource),
+      "layout must not force global canonical /",
+    );
     // F/G CSP header value
     const csp = getContentSecurityPolicyHeaderValue();
     assert(csp.includes("frame-src"), "F: CSP has frame-src");

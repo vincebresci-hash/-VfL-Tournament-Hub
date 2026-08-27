@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthCard, AuthHeadline, AuthShell } from "@/components/auth/AuthShell";
@@ -7,7 +8,9 @@ import { AUTH_ERROR_MESSAGES } from "@/lib/auth/messages";
 import { getPostLoginRedirect, readRedirectParam } from "@/lib/auth/redirects";
 import { getAuthSession } from "@/lib/auth/session";
 
-export const metadata: Metadata = { title: "Vereins-Login" };
+export const metadata: Metadata = withCanonical("/login", {
+  title: "Vereins-Login"
+});
 
 type LoginPageProps = {
   searchParams: Promise<{ redirect?: string | string[]; error?: string | string[] }>;

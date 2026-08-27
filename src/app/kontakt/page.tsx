@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { IconMail, IconPhone, IconPin } from "@/components/ui/icons";
@@ -16,7 +17,9 @@ import {
 import { HUB_NAME } from "@/lib/constants";
 import { getAppSettings } from "@/lib/settings";
 
-export const metadata: Metadata = { title: "Kontakt" };
+export const metadata: Metadata = withCanonical("/kontakt", {
+  title: "Kontakt"
+});
 
 export default async function KontaktPage() {
   const settings = await getAppSettings();

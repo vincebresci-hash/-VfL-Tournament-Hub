@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import { ContentPage } from "@/components/layout/ContentPage";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "Nutzungsbedingungen" };
+export const metadata: Metadata = withCanonical("/nutzungsbedingungen", {
+  title: "Nutzungsbedingungen"
+});
 
 export default function TermsPage() {
   return (

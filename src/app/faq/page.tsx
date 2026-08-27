@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
+import { withCanonical } from "@/lib/site";
 import { Accordion } from "@/components/ui/Accordion";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { getFaqItems } from "@/data/faq";
 import { getAppSettings } from "@/lib/settings";
 import Link from "next/link";
 
-export const metadata: Metadata = { title: "FAQ" };
+export const metadata: Metadata = withCanonical("/faq", {
+  title: "FAQ"
+});
 
 export default async function FaqPage() {
   const settings = await getAppSettings();
