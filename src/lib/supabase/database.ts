@@ -623,6 +623,20 @@ export type Database = {
         };
         Returns: undefined;
       };
+      reserve_application_status_email_send: {
+        Args: {
+          p_application_id: string;
+          p_template_type: EmailTemplateTypeRow;
+        };
+        Returns: string;
+      };
+      release_application_status_email_send: {
+        Args: {
+          p_application_id: string;
+          p_template_type: EmailTemplateTypeRow;
+        };
+        Returns: undefined;
+      };
       sync_mein_turnierplan_tournament: {
         Args: {
           p_tournament_id: string;

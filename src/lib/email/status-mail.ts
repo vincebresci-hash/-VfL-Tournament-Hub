@@ -6,6 +6,12 @@ import {
   getEmailProvider,
   renderEmailTemplate,
 } from "@/lib/email/provider";
+import {
+  parseStatusEmailReservation,
+  resolveStatusEmailSendDecision,
+  shouldReleaseStatusEmailReservation,
+  STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
+} from "@/lib/email/status-mail-idempotency";
 import { templateTypeForStatus } from "@/lib/email/templates";
 import { formatDateDe } from "@/lib/format";
 import type { ApplicationStatus } from "@/types/application";
@@ -85,6 +91,58 @@ function applicationVariables(
     location: firstText(tournament?.location),
     application_status: applicationStatusLabel[status],
   };
+}
+
+async function reserveStatusEmailSend(
+  applicationId: string,
+  templateType: EmailTemplateType,
+): Promise<"send" | "skip" | "error"> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("reserve_application_status_email_send", {
+    p_application_id: applicationId,
+    p_template_type: templateType,
+  });
+
+  if (error) {
+    console.error(
+      "reserve_application_status_email_send failed",
+      error.message,
+      error.code ?? "",
+    );
+    return "error";
+  }
+
+  const reservation = parseStatusEmailReservation(
+    typeof data === "string" ? data : null,
+  );
+  if (!reservation) {
+    console.error(
+      "reserve_application_status_email_send returned unexpected value",
+      data,
+    );
+    return "error";
+  }
+
+  return reservation;
+}
+
+async function releaseStatusEmailSend(
+  applicationId: string,
+  templateType: EmailTemplateType,
+) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("release_application_status_email_send", {
+    p_application_id: applicationId,
+    p_template_type: templateType,
+  });
+
+  if (error) {
+    console.error(
+      "release_application_status_email_send failed",
+      error.message,
+      error.code ?? "",
+    );
+  }
 }
 
 async function writeEmailLog(entry: {
@@ -228,6 +286,22 @@ export async function sendApplicationStatusEmail(input: {
     return { sent: false, skipped: true, error: null };
   }
 
+  const reservation = await reserveStatusEmailSend(input.applicationId, templateType);
+  const decision = resolveStatusEmailSendDecision(reservation);
+
+  if (decision.action === "fail_closed") {
+    console.error(decision.error);
+    return {
+      sent: false,
+      skipped: false,
+      error: decision.error ?? STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
+    };
+  }
+
+  if (decision.action === "skip") {
+    return { sent: false, skipped: true, error: null };
+  }
+
   const variables = applicationVariables(application, input.status);
   const subject = renderEmailTemplate(template.subject, variables);
   const body = renderEmailTemplate(template.body, variables);
@@ -239,6 +313,12 @@ export async function sendApplicationStatusEmail(input: {
     templateId: template.id,
   });
 
+  const logStatus: EmailLogStatus = result.ok
+    ? "sent"
+    : result.skipped
+      ? "skipped"
+      : "failed";
+
   await writeEmailLog({
     applicationId: input.applicationId,
     templateId: template.id,
@@ -246,12 +326,21 @@ export async function sendApplicationStatusEmail(input: {
     toEmail: to,
     subject,
     body,
-    status: result.ok ? "sent" : result.skipped ? "skipped" : "failed",
+    status: logStatus,
     error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
     provider: result.provider,
     providerMessageId: result.providerMessageId ?? null,
     createdBy: input.actorId,
   });
+
+  if (
+    shouldReleaseStatusEmailReservation({
+      sendOk: result.ok,
+      logStatus,
+    })
+  ) {
+    await releaseStatusEmailSend(input.applicationId, templateType);
+  }
 
   if (result.ok) {
     return { sent: true, skipped: false, error: null };
