@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { TournamentImageFrame } from "@/components/brand/TournamentImageFrame";
-import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
@@ -14,7 +13,7 @@ import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
   getPublicApplicationState,
-  publicApplicationStateLabel,
+  getPublicApplicationStatusDisplay,
 } from "@/lib/public-application-state";
 import { filledPublicInfo, getDisplayCapacity } from "@/lib/public-tournament";
 import { getAppSettings } from "@/lib/settings";
@@ -27,10 +26,6 @@ import {
   usesMeinTurnierplanAsPrimaryLive,
 } from "@/lib/mein-turnierplan";
 import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
-import {
-  getEffectiveTournamentStatus,
-  tournamentStatusClassName,
-} from "@/lib/tournament-status";
 import { publicTeamLabel } from "@/lib/schedule/names";
 import { tournamentImageObjectPosition } from "@/data/tournaments";
 import { withCanonical } from "@/lib/site";
@@ -72,7 +67,7 @@ export default async function TournamentDetailPage({
     getPublicTournamentStage(tournament.slug, tournament.id),
     getPublicMeinTurnierplanData(tournament),
   ]);
-  const applicationState = getPublicApplicationState({
+  const applicationGate = {
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
     applicationsOpen: tournament.applicationsOpen,
@@ -83,7 +78,9 @@ export default async function TournamentDetailPage({
     applicationStart: tournament.applicationStart,
     applicationDeadline: tournament.applicationDeadline,
     maxTeams: tournament.maxTeams,
-  });
+  };
+  const applicationState = getPublicApplicationState(applicationGate);
+  const applicationStatusDisplay = getPublicApplicationStatusDisplay(applicationGate);
   const canApply = applicationState === "open" || applicationState === "waitlist";
   const ctaLabel =
     applicationState === "waitlist"
@@ -94,12 +91,6 @@ export default async function TournamentDetailPage({
   const shortDescription = nonempty(tournament.shortDescription);
   const longDescription = nonempty(tournament.description);
   const capacity = getDisplayCapacity(tournament);
-  const effectiveStatus = getEffectiveTournamentStatus({
-    dbStatus: tournament.status,
-    maxTeams: tournament.maxTeams,
-    confirmedParticipants: tournament.confirmedTeams,
-    archivedAt: tournament.archivedAt,
-  });
   const extraInfo = filledPublicInfo(tournament);
   const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
   const showLiveTab = showsMeinTurnierplanLiveTab(tournament);
@@ -169,19 +160,10 @@ export default async function TournamentDetailPage({
                 <span className="inline-flex bg-brand-yellow px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
                   {tournament.ageGroup}
                 </span>
-                <StatusBadge status={effectiveStatus} />
                 <span
-                  className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
-                    applicationState === "open"
-                      ? tournamentStatusClassName.active
-                      : applicationState === "waitlist"
-                        ? tournamentStatusClassName.full
-                        : applicationState === "coming-soon"
-                          ? tournamentStatusClassName["coming-soon"]
-                          : tournamentStatusClassName.completed
-                  }`}
+                  className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${applicationStatusDisplay.className}`}
                 >
-                  {publicApplicationStateLabel[applicationState]}
+                  {applicationStatusDisplay.label}
                 </span>
               </div>
 
