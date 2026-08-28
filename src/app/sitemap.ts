@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getSiteUrl } from "@/lib/site";
+import { listPublishedNewsPosts } from "@/lib/db/news-queries";
 import { listPublicTournaments } from "@/lib/db/tournament-queries";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   } catch {
     // Sitemap bleibt ohne Turniere nutzbar, falls die Datenbank nicht erreichbar ist.
+  }
+
+  try {
+    const newsPosts = await listPublishedNewsPosts();
+    for (const post of newsPosts) {
+      entries.push({
+        url: `${base}/news/${post.slug}`,
+        lastModified: post.updatedAt,
+        changeFrequency: "weekly",
+        priority: 0.7,
+      });
+    }
+  } catch {
+    // Sitemap bleibt ohne News nutzbar, falls die Datenbank nicht erreichbar ist.
   }
 
   return entries;

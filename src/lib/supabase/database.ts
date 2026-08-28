@@ -287,6 +287,21 @@ export type EmailTemplateRow = {
   updated_at: string;
 };
 
+export type NewsPostRow = {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  image_url: string | null;
+  published_at: string | null;
+  featured: boolean;
+  tournament_id: string | null;
+  created_at: string;
+  updated_at: string;
+  archived_at: string | null;
+};
+
 export type AppSettingRow = {
   id: string;
   key: string;
@@ -433,6 +448,25 @@ export type Database = {
           type: EmailTemplateTypeRow;
         },
         Partial<EmailTemplateRow>
+      >;
+      news_posts: Table<
+        NewsPostRow,
+        Partial<NewsPostRow> & {
+          title: string;
+          slug: string;
+          excerpt: string;
+          content: string;
+        },
+        Partial<NewsPostRow>,
+        [
+          {
+            foreignKeyName: "news_posts_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ]
       >;
       app_settings: Table<
         AppSettingRow,
