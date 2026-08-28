@@ -22,6 +22,7 @@ import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-c
 import { runClubProfileSecurityChecks } from "@/lib/auth/club-profile-security-checks";
 import { runDuplicateApplicationChecks } from "@/lib/applications/duplicate-application-checks";
 import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-application-fields-checks";
+import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runNewsSelfChecks } from "@/lib/news-checks";
@@ -62,6 +63,7 @@ try {
   const clubProfileSecurityChecks = runClubProfileSecurityChecks();
   const duplicateApplicationChecks = runDuplicateApplicationChecks();
   const guestApplicationFieldsChecks = runGuestApplicationFieldsChecks();
+  const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
   const newsSelfChecks = runNewsSelfChecks();
@@ -94,6 +96,7 @@ try {
   console.log(`club-profile-security-checks: ${clubProfileSecurityChecks}`);
   console.log(`duplicate-application-checks: ${duplicateApplicationChecks}`);
   console.log(`guest-application-fields-checks: ${guestApplicationFieldsChecks}`);
+  console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);
   console.log(`news-self-checks: ${newsSelfChecks}`);

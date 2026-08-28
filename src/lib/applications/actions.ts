@@ -23,7 +23,10 @@ import {
   DUPLICATE_TEAM_APPLICATION_MESSAGE,
   isDuplicateTeamApplicationViolation,
 } from "@/lib/applications/duplicate-team-application";
-import { guestApplicationFieldSnapshot } from "@/lib/applications/guest-application-fields";
+import {
+  guestApplicationFieldSnapshot,
+  optionalApplicationText,
+} from "@/lib/applications/guest-application-fields";
 
 export type SubmitApplicationResult = {
   error: string | null;
@@ -278,7 +281,7 @@ function applicationSnapshot(values: ApplicationFormValues) {
     team_name: values.teamName.trim(),
     age_group: ageGroup,
     birth_year: Number(values.birthYear),
-    league: values.league.trim(),
+    league: optionalApplicationText(values.league),
     division: values.division.trim() || null,
     self_rated_strength: Number(values.selfRatedStrength),
     team_description: values.teamDescription.trim() || null,
@@ -286,7 +289,7 @@ function applicationSnapshot(values: ApplicationFormValues) {
     contact_last_name: values.contactLastName.trim(),
     contact_role: values.contactRole.trim(),
     contact_email: values.contactEmail.trim(),
-    contact_phone: values.contactPhone.trim(),
+    contact_phone: optionalApplicationText(values.contactPhone),
     staff_count: values.staffCount.trim() ? Number(values.staffCount) : null,
     notes: values.notes.trim() || null,
     ...guestApplicationFieldSnapshot(values),

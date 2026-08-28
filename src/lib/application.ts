@@ -169,10 +169,6 @@ export function validateApplicationForm(
     errors.birthYear = "Bitte einen plausiblen Jahrgang angeben.";
   }
 
-  if (!isFilled(values.league)) {
-    errors.league = "Bitte die aktuelle Spielklasse angeben.";
-  }
-
   if (!teamStrengthOptions.some((option) => String(option.value) === values.selfRatedStrength)) {
     errors.selfRatedStrength = "Bitte die Spielstärke auswählen.";
   }
@@ -195,9 +191,7 @@ export function validateApplicationForm(
     errors.contactEmail = "Bitte eine gültige E-Mail-Adresse angeben.";
   }
 
-  if (!isFilled(values.contactPhone)) {
-    errors.contactPhone = "Bitte eine Telefonnummer angeben.";
-  } else if (!isValidPhone(values.contactPhone)) {
+  if (isFilled(values.contactPhone) && !isValidPhone(values.contactPhone)) {
     errors.contactPhone = "Bitte eine gültige Telefonnummer angeben.";
   }
 
@@ -251,7 +245,7 @@ export function toTournamentApplication(
     teamName: values.teamName.trim(),
     ageGroup: values.ageGroup,
     birthYear: Number(values.birthYear),
-    league: values.league.trim(),
+    league: optional(values.league) ?? "",
     division: optional(values.division),
     selfRatedStrength: Number(values.selfRatedStrength) as TeamStrength,
     teamDescription: optional(values.teamDescription),
@@ -262,7 +256,7 @@ export function toTournamentApplication(
     contactLastName: values.contactLastName.trim(),
     contactRole: values.contactRole.trim(),
     contactEmail: values.contactEmail.trim(),
-    contactPhone: values.contactPhone.trim(),
+    contactPhone: optional(values.contactPhone) ?? "",
     alternativePhone: optional(values.alternativePhone),
     staffCount: isFilled(values.staffCount) ? Number(values.staffCount) : null,
     notes: optional(values.notes),
