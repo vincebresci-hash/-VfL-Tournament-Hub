@@ -55,7 +55,9 @@ export function runPaymentStatusChecks() {
   assert(migration.includes("paid_at timestamptz"), "paid_at column");
   assert(migration.includes("payment_note text"), "payment_note column");
   assert(migration.includes("SET payment_status = 'pending'"), "backfill pending");
-  assert(migration.includes("guard_application_payment_fields"), "payment field guard");
+  assert(migration.includes("DROP TRIGGER IF EXISTS applications_payment_fields_guard"), "backfill before guard trigger");
+  assert(!migration.includes("ON CONFLICT"), "no blind template ON CONFLICT");
+  assert(migration.includes("{{participation_url}}"), "participation_url preserved in template");
   assert(migration.includes("validate_secure_access_token"), "token RPC extended");
   assert(migration.includes("participation_fee numeric"), "token returns fee");
   assert(!migration.includes("tournament_occupancy"), "occupancy unchanged in migration");
@@ -87,6 +89,18 @@ export function runPaymentStatusChecks() {
   });
   assert(paidUpdate.payment_status === "paid", "pending -> paid");
   assert(paidUpdate.paid_at !== null, "paid_at auto set");
+
+  const paidAgain = normalizePaymentUpdate({
+    paymentStatus: "paid",
+    participationFee: 100,
+    paidAt: null,
+    paymentNote: null,
+    existingPaidAt: "2026-01-15T10:00:00.000Z",
+  });
+  assert(
+    paidAgain.paid_at === "2026-01-15T10:00:00.000Z",
+    "paid -> paid preserves existing paid_at",
+  );
 
   // 3 paid -> pending
   const backToPending = normalizePaymentUpdate({

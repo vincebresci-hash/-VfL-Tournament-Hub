@@ -29,6 +29,9 @@ ALTER TABLE public.applications
 ALTER TABLE public.applications
   ADD COLUMN IF NOT EXISTS payment_note text;
 
+-- Backfill must run before the payment guard trigger exists (or is re-enabled).
+DROP TRIGGER IF EXISTS applications_payment_fields_guard ON public.applications;
+
 UPDATE public.applications
 SET payment_status = 'pending'::public.payment_status
 WHERE payment_status IS NULL;

@@ -45,7 +45,7 @@ export async function updateApplicationPaymentAction(input: {
   const supabase = await createClient();
   const { data: application, error: loadError } = await supabase
     .from("applications")
-    .select("id, status")
+    .select("id, status, paid_at")
     .eq("id", input.applicationId)
     .maybeSingle();
 
@@ -62,6 +62,7 @@ export async function updateApplicationPaymentAction(input: {
     participationFee,
     paidAt: input.paymentStatus === "paid" ? paidAt : null,
     paymentNote: input.paymentNote,
+    existingPaidAt: application.paid_at,
   });
 
   const { error } = await supabase
