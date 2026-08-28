@@ -7,6 +7,7 @@ export const clubApplicationStatusLabel: Record<ApplicationStatus, string> = {
   accepted: "Angenommen",
   "waiting-list": "Warteliste",
   rejected: "Abgelehnt",
+  cancelled: "Abgesagt",
 };
 
 export const clubApplicationStatusClassName: Record<ApplicationStatus, string> = {
@@ -15,6 +16,7 @@ export const clubApplicationStatusClassName: Record<ApplicationStatus, string> =
   accepted: "bg-navy text-white/86",
   "waiting-list": "bg-[#eceef2] text-ink",
   rejected: "bg-[#e8eaee] text-muted",
+  cancelled: "bg-[#f2e8e8] text-[#8a3b3b]",
 };
 
 export function clubStatusBadgeClassName(status: ApplicationStatus) {

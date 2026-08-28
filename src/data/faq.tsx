@@ -133,12 +133,29 @@ export function getFaqItems(settings?: AppSettings): FaqItem[] {
     },
     {
       id: "aendern",
-      question: "Kann eine Bewerbung nachträglich geändert werden?",
+      question: "Kann eine Bewerbung nachträglich geändert oder abgesagt werden?",
       answer: (
         <>
           Im Tournament Hub könnt ihr eine abgeschickte Bewerbung nicht selbst
-          bearbeiten. Wenn sich Angaben ändern, wendet euch bitte über die
-          Kontaktseite an uns, damit wir das intern anpassen können.
+          bearbeiten. Für Angabenänderungen wendet euch bitte über die Kontaktseite
+          an uns. Eine Turnierteilnahme könnt ihr nach Zusage als Absageanfrage
+          stellen – im Vereinskonto oder über den sicheren Link aus der
+          Zusage-E-Mail. Die Absage ist erst nach Bestätigung durch den VfL
+          Kirchheim wirksam.
+        </>
+      ),
+    },
+    {
+      id: "absage",
+      question: "Wie kann ich eine Turnierteilnahme absagen?",
+      answer: (
+        <>
+          Eine Absage muss spätestens 14 Tage vor Turnierbeginn über den Tournament
+          Hub bzw. das vorgesehene Absageformular eingereicht werden. Kurzfristigere
+          Absagen sind nur aus einem triftigen Grund möglich. Eine Absage wird
+          zunächst als Anfrage übermittelt und ist erst nach Bestätigung durch den
+          VfL Kirchheim wirksam. Dadurch können frei werdende Startplätze rechtzeitig
+          an Ersatzmannschaften vergeben werden.
         </>
       ),
     },

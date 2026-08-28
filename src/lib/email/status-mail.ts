@@ -12,6 +12,7 @@ import {
   shouldReleaseStatusEmailReservation,
   STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
 } from "@/lib/email/status-mail-idempotency";
+import { ensureParticipationCancellationToken } from "@/lib/cancellations/participation-token";
 import { templateTypeForStatus } from "@/lib/email/templates";
 import { formatDateDe } from "@/lib/format";
 import type { ApplicationStatus } from "@/types/application";
@@ -72,6 +73,7 @@ function firstText(...values: Array<string | null | undefined>) {
 function applicationVariables(
   row: StatusMailApplication,
   status: ApplicationStatus,
+  participationUrl = "",
 ): Record<string, string> {
   const club = firstRelation(row.clubs);
   const team = firstRelation(row.teams);
@@ -90,6 +92,7 @@ function applicationVariables(
     tournament_date: tournamentDate,
     location: firstText(tournament?.location),
     application_status: applicationStatusLabel[status],
+    participation_url: participationUrl,
   };
 }
 
@@ -302,7 +305,19 @@ export async function sendApplicationStatusEmail(input: {
     return { sent: false, skipped: true, error: null };
   }
 
-  const variables = applicationVariables(application, input.status);
+  let participationUrl = "";
+  if (input.status === "accepted") {
+    const tournament = firstRelation(application.tournaments);
+    if (tournament?.date) {
+      participationUrl =
+        (await ensureParticipationCancellationToken({
+          applicationId: input.applicationId,
+          tournamentDate: tournament.date,
+        })) ?? "";
+    }
+  }
+
+  const variables = applicationVariables(application, input.status, participationUrl);
   const subject = renderEmailTemplate(template.subject, variables);
   const body = renderEmailTemplate(template.body, variables);
   const result = await getEmailProvider().send({

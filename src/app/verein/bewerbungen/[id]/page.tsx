@@ -4,6 +4,7 @@ import { ClubApplicationDetail } from "@/components/club/ClubApplicationDetail";
 import { CLUB_LOGIN } from "@/lib/auth/roles";
 import { getAuthSession } from "@/lib/auth/session";
 import { loadClubApplicationById } from "@/lib/club/workspace";
+import { getPendingCancellationForApplication } from "@/lib/cancellations/queries";
 
 type ClubApplicationPageProps = {
   params: Promise<{ id: string }>;
@@ -38,5 +39,20 @@ export default async function ClubApplicationPage({
     notFound();
   }
 
-  return <ClubApplicationDetail application={application} />;
+  const pendingCancellation = await getPendingCancellationForApplication(application.id);
+
+  return (
+    <ClubApplicationDetail
+      application={application}
+      pendingCancellation={
+        pendingCancellation
+          ? {
+              id: pendingCancellation.id,
+              requestedAt: pendingCancellation.requested_at,
+              isLateRequest: pendingCancellation.is_late_request,
+            }
+          : null
+      }
+    />
+  );
 }

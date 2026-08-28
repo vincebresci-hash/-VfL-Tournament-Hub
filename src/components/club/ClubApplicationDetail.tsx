@@ -1,3 +1,4 @@
+import { CancellationRequestPanel } from "@/components/club/CancellationRequestPanel";
 import { ClubStatusBadge } from "@/components/club/ClubStatusBadge";
 import { clubTypeLabel } from "@/lib/admin";
 import { formatDateDe, formatDateTimeDe } from "@/lib/format";
@@ -5,9 +6,17 @@ import type { ClubApplicationView } from "@/types/club";
 
 type ClubApplicationDetailProps = {
   application: ClubApplicationView;
+  pendingCancellation: {
+    id: string;
+    requestedAt: string;
+    isLateRequest: boolean;
+  } | null;
 };
 
-export function ClubApplicationDetail({ application }: ClubApplicationDetailProps) {
+export function ClubApplicationDetail({
+  application,
+  pendingCancellation,
+}: ClubApplicationDetailProps) {
   const accepted = application.applicationStatus === "accepted";
 
   return (
@@ -82,6 +91,15 @@ export function ClubApplicationDetail({ application }: ClubApplicationDetailProp
               </p>
             </div>
           ) : null}
+
+          <CancellationRequestPanel
+            applicationId={application.id}
+            applicationStatus={application.applicationStatus}
+            tournamentName={application.tournamentName}
+            teamName={application.teamName}
+            tournamentDate={application.tournamentDate}
+            pendingRequest={pendingCancellation}
+          />
         </aside>
       </div>
     </div>

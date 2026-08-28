@@ -19,6 +19,7 @@ export const applicationStatusLabel: Record<ApplicationStatus, string> = {
   accepted: "Angenommen",
   "waiting-list": "Warteliste",
   rejected: "Abgelehnt",
+  cancelled: "Abgesagt",
 };
 
 export const applicationStatusClassName: Record<ApplicationStatus, string> = {
@@ -27,6 +28,7 @@ export const applicationStatusClassName: Record<ApplicationStatus, string> = {
   accepted: "bg-navy text-white/86",
   "waiting-list": "bg-[#eceef2] text-ink",
   rejected: "bg-[#e8eaee] text-muted",
+  cancelled: "bg-[#f2e8e8] text-[#8a3b3b]",
 };
 
 export const applicationStatusFilters: Array<{
@@ -39,6 +41,7 @@ export const applicationStatusFilters: Array<{
   { id: "accepted", label: "Angenommen" },
   { id: "waiting-list", label: "Warteliste" },
   { id: "rejected", label: "Abgelehnt" },
+  { id: "cancelled", label: "Abgesagt" },
 ];
 
 export const applicationSortOptions = [
@@ -104,6 +107,8 @@ export function countByStatus(applications: AdminApplication[]) {
       (item) => item.applicationStatus === "waiting-list",
     ).length,
     rejected: applications.filter((item) => item.applicationStatus === "rejected")
+      .length,
+    cancelled: applications.filter((item) => item.applicationStatus === "cancelled")
       .length,
   };
 }
@@ -272,6 +277,10 @@ export const emailTemplateTypeLabel: Record<EmailTemplateType, string> = {
   "application-under-review": "In Prüfung",
   "waiting-list": "Warteliste",
   "application-rejected": "Bewerbung abgelehnt",
+  "cancellation-request-received": "Absageanfrage (Admin)",
+  "cancellation-request-submitted": "Absageanfrage eingegangen",
+  "cancellation-confirmed": "Absage bestätigt",
+  "cancellation-rejected": "Absageanfrage abgelehnt",
   "follow-up": "Rückfrage",
   general: "Allgemeine Nachricht",
 };
