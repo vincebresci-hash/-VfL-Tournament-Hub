@@ -255,6 +255,9 @@ export type ApplicationRow = {
   contact_role: string | null;
   contact_email: string | null;
   contact_phone: string | null;
+  alternative_phone: string | null;
+  website: string | null;
+  club_type: string | null;
   staff_count: number | null;
   notes: string | null;
   status: ApplicationStatusRow;

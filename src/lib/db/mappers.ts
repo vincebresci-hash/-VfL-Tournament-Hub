@@ -1,8 +1,9 @@
 import { AGE_GROUPS } from "@/types/tournament";
-import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS } from "@/types/application";
+import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS, CLUB_TYPES } from "@/types/application";
 import type {
   AdminApplication,
   ApplicationStatus,
+  ClubType,
   InternalCategory,
   TeamStrength,
 } from "@/types/application";
@@ -89,6 +90,14 @@ function firstText(...values: Array<string | null | undefined>) {
   return "";
 }
 
+function asClubType(value: string | null | undefined): ClubType | null {
+  if (value && CLUB_TYPES.includes(value as ClubType)) {
+    return value as ClubType;
+  }
+
+  return null;
+}
+
 function applicationBase(row: ApplicationWithRelations) {
   const club = row.clubs;
   const team = row.teams;
@@ -104,7 +113,7 @@ function applicationBase(row: ApplicationWithRelations) {
     tournamentLocation: tournament?.location ?? "",
     clubName: firstText(row.club_name, club?.name) || "Verein",
     clubCity: firstText(row.club_city, club?.city),
-    website: club?.website ?? null,
+    website: row.website ?? club?.website ?? null,
     teamName: firstText(row.team_name, team?.name) || "Mannschaft",
     ageGroup: asAgeGroup(
       firstText(row.age_group, team?.age_group, tournament?.age_group) || undefined,
@@ -114,13 +123,13 @@ function applicationBase(row: ApplicationWithRelations) {
     division: firstText(row.division, team?.division) || null,
     selfRatedStrength: asStrength(row.self_rated_strength ?? team?.self_rated_strength),
     teamDescription: row.team_description,
-    clubType: null,
+    clubType: asClubType(row.club_type),
     contactFirstName: row.contact_first_name ?? "",
     contactLastName: row.contact_last_name ?? "",
     contactRole: row.contact_role ?? "",
     contactEmail: row.contact_email ?? "",
     contactPhone: row.contact_phone ?? "",
-    alternativePhone: null,
+    alternativePhone: row.alternative_phone ?? null,
     staffCount: row.staff_count,
     notes: row.notes,
     applicationStatus: asStatus(row.status),

@@ -85,14 +85,15 @@ export function ApplicationDetail({
           <DetailCard title="Verein">
             <Info label="Vereinsname" value={application.clubName} />
             <Info label="Ort" value={application.clubCity} />
-            <Info
-              label="Website"
-              value={application.website ?? "Keine Angabe"}
-            />
-            <Info
-              label="Vereinstyp"
-              value={getClubTypeLabel(application.clubType)}
-            />
+            {application.website ? (
+              <Info label="Website" value={application.website} />
+            ) : null}
+            {application.clubType ? (
+              <Info
+                label="Vereinstyp"
+                value={getClubTypeLabel(application.clubType)}
+              />
+            ) : null}
           </DetailCard>
 
           <DetailCard title="Mannschaft">
@@ -117,10 +118,12 @@ export function ApplicationDetail({
             <Info label="Funktion" value={application.contactRole} />
             <Info label="E-Mail" value={application.contactEmail} />
             <Info label="Telefon" value={application.contactPhone} />
-            <Info
-              label="Alternative Telefonnummer"
-              value={application.alternativePhone ?? "Keine Angabe"}
-            />
+            {application.alternativePhone ? (
+              <Info
+                label="Alternative Telefonnummer"
+                value={application.alternativePhone}
+              />
+            ) : null}
           </DetailCard>
 
           <DetailCard title="Turnier">
