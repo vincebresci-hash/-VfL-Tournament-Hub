@@ -19,6 +19,10 @@ import { isPublicApplicationAllowed } from "@/lib/public-application-state";
 import { AGE_GROUPS } from "@/types/tournament";
 import type { AgeGroup } from "@/types/tournament";
 import type { Json } from "@/lib/supabase/database";
+import {
+  DUPLICATE_TEAM_APPLICATION_MESSAGE,
+  isDuplicateTeamApplicationViolation,
+} from "@/lib/applications/duplicate-team-application";
 
 export type SubmitApplicationResult = {
   error: string | null;
@@ -187,6 +191,17 @@ async function submitClubApplication(
       .eq("club_id", clubId);
   }
 
+  const { data: existingApplication } = await supabase
+    .from("applications")
+    .select("id")
+    .eq("tournament_id", tournamentId)
+    .eq("team_id", teamId)
+    .maybeSingle();
+
+  if (existingApplication) {
+    return { error: DUPLICATE_TEAM_APPLICATION_MESSAGE };
+  }
+
   const { data, error } = await supabase
     .from("applications")
     .insert({
@@ -201,6 +216,10 @@ async function submitClubApplication(
     .single();
 
   if (error || !data) {
+    if (isDuplicateTeamApplicationViolation(error)) {
+      return { error: DUPLICATE_TEAM_APPLICATION_MESSAGE };
+    }
+
     return {
       error: toUserFacingDbError("Die Bewerbung konnte nicht gespeichert werden.", error),
     };
