@@ -8,6 +8,7 @@ export const mainNavigation = [
 
 export const footerNavigation = [
   { href: "/turniere", label: "Turniere" },
+  { href: "/news", label: "News" },
   { href: "/fuer-vereine", label: "Für Vereine" },
   { href: "/faq", label: "FAQ" },
   { href: "/kontakt", label: "Kontakt" },

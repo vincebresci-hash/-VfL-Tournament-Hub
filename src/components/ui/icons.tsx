@@ -44,6 +44,15 @@ export function IconMessage(props: IconProps) {
   );
 }
 
+export function IconNews(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6 4.5h12v15H6z" {...stroke} />
+      <path d="M9 8.5h6M9 12h6M9 15.5h4" {...stroke} />
+    </IconBase>
+  );
+}
+
 export function IconShield(props: IconProps) {
   return (
     <IconBase {...props}>
