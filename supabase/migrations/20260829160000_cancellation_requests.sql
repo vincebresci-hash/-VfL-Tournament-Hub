@@ -563,13 +563,22 @@ GRANT INSERT ON TABLE public.cancellation_requests TO authenticated;
 GRANT UPDATE ON TABLE public.cancellation_requests TO authenticated;
 
 -- -----------------------------------------------------------------------------
--- Email templates
+-- Email templates (idempotent: UPDATE existing row by type, else INSERT)
+-- Production has active_email_template(p_type) but NOT upsert_status_email_template.
+-- email_templates has no UNIQUE(type); do not use ON CONFLICT(type).
 -- -----------------------------------------------------------------------------
 
-SELECT public.upsert_status_email_template(
-  'Absageanfrage eingegangen (Admin)',
-  'Absageanfrage – {{tournament_name}} / {{team_name}}',
-  $tpl$Neue Absageanfrage
+DO $seed$
+DECLARE
+  v_type public.email_template_type;
+  v_name text;
+  v_subject text;
+  v_body text;
+BEGIN
+  v_type := 'cancellation-request-received';
+  v_name := 'Absageanfrage eingegangen (Admin)';
+  v_subject := 'Absageanfrage – {{tournament_name}} / {{team_name}}';
+  v_body := $body$Neue Absageanfrage
 
 Turnier: {{tournament_name}}
 Mannschaft: {{team_name}}
@@ -580,14 +589,25 @@ E-Mail: {{contact_email}}
 Fristgerecht: {{cancellation_on_time_label}}
 Grund: {{cancellation_reason}}
 
-Bitte im Admin-Bereich prüfen.$tpl$,
-  'cancellation-request-received'
-);
+Bitte im Admin-Bereich prüfen.$body$;
 
-SELECT public.upsert_status_email_template(
-  'Absageanfrage eingegangen (Mannschaft)',
-  'Absageanfrage eingegangen – {{tournament_name}}',
-  $tpl$Hallo {{contact_first_name}},
+  IF EXISTS (SELECT 1 FROM public.email_templates WHERE type = v_type) THEN
+    UPDATE public.email_templates
+    SET
+      name = v_name,
+      subject = v_subject,
+      body = v_body,
+      updated_at = now()
+    WHERE type = v_type;
+  ELSE
+    INSERT INTO public.email_templates (name, subject, body, type, active)
+    VALUES (v_name, v_subject, v_body, v_type, true);
+  END IF;
+
+  v_type := 'cancellation-request-submitted';
+  v_name := 'Absageanfrage eingegangen (Mannschaft)';
+  v_subject := 'Absageanfrage eingegangen – {{tournament_name}}';
+  v_body := $body$Hallo {{contact_first_name}},
 
 wir haben eure Absageanfrage für {{team_name}} beim {{tournament_name}} erhalten.
 
@@ -595,14 +615,25 @@ Die Absage ist erst nach Bestätigung durch den VfL Kirchheim wirksam.
 
 Sportliche Grüße
 VfL Kirchheim
-Tournament Hub$tpl$,
-  'cancellation-request-submitted'
-);
+Tournament Hub$body$;
 
-SELECT public.upsert_status_email_template(
-  'Absage bestätigt',
-  'Absage bestätigt – {{tournament_name}}',
-  $tpl$Hallo {{contact_first_name}},
+  IF EXISTS (SELECT 1 FROM public.email_templates WHERE type = v_type) THEN
+    UPDATE public.email_templates
+    SET
+      name = v_name,
+      subject = v_subject,
+      body = v_body,
+      updated_at = now()
+    WHERE type = v_type;
+  ELSE
+    INSERT INTO public.email_templates (name, subject, body, type, active)
+    VALUES (v_name, v_subject, v_body, v_type, true);
+  END IF;
+
+  v_type := 'cancellation-confirmed';
+  v_name := 'Absage bestätigt';
+  v_subject := 'Absage bestätigt – {{tournament_name}}';
+  v_body := $body$Hallo {{contact_first_name}},
 
 eure Absageanfrage für {{team_name}} beim {{tournament_name}} wurde bestätigt.
 
@@ -610,14 +641,25 @@ Eure Mannschaft gilt damit als abgesagt.
 
 Sportliche Grüße
 VfL Kirchheim
-Tournament Hub$tpl$,
-  'cancellation-confirmed'
-);
+Tournament Hub$body$;
 
-SELECT public.upsert_status_email_template(
-  'Absageanfrage abgelehnt',
-  'Absageanfrage abgelehnt – {{tournament_name}}',
-  $tpl$Hallo {{contact_first_name}},
+  IF EXISTS (SELECT 1 FROM public.email_templates WHERE type = v_type) THEN
+    UPDATE public.email_templates
+    SET
+      name = v_name,
+      subject = v_subject,
+      body = v_body,
+      updated_at = now()
+    WHERE type = v_type;
+  ELSE
+    INSERT INTO public.email_templates (name, subject, body, type, active)
+    VALUES (v_name, v_subject, v_body, v_type, true);
+  END IF;
+
+  v_type := 'cancellation-rejected';
+  v_name := 'Absageanfrage abgelehnt';
+  v_subject := 'Absageanfrage abgelehnt – {{tournament_name}}';
+  v_body := $body$Hallo {{contact_first_name}},
 
 eure Absageanfrage für {{team_name}} beim {{tournament_name}} konnte nicht bestätigt werden.
 
@@ -627,9 +669,61 @@ Bei Rückfragen meldet euch bitte über die Kontaktseite.
 
 Sportliche Grüße
 VfL Kirchheim
-Tournament Hub$tpl$,
-  'cancellation-rejected'
-);
+Tournament Hub$body$;
+
+  IF EXISTS (SELECT 1 FROM public.email_templates WHERE type = v_type) THEN
+    UPDATE public.email_templates
+    SET
+      name = v_name,
+      subject = v_subject,
+      body = v_body,
+      updated_at = now()
+    WHERE type = v_type;
+  ELSE
+    INSERT INTO public.email_templates (name, subject, body, type, active)
+    VALUES (v_name, v_subject, v_body, v_type, true);
+  END IF;
+
+  v_type := 'application-accepted';
+  v_name := 'Bewerbung angenommen';
+  v_subject := 'Zusage – {{tournament_name}}';
+  v_body := $body$Hallo {{contact_first_name}},
+
+vielen Dank für eure Bewerbung mit {{team_name}} für den {{tournament_name}}.
+
+Damit ist eure Teilnahme an unserem Turnier bestätigt.
+
+Turnier:
+{{tournament_name}}
+Altersklasse: {{age_group}}
+Datum: {{tournament_date}}
+Ort: {{location}}
+
+{{participation_url}}
+
+Weitere organisatorische Informationen, den Ablauf sowie gegebenenfalls den Spielplan erhaltet ihr rechtzeitig vor dem Turnier.
+
+Wir freuen uns, euch bei uns in Kirchheim begrüßen zu dürfen und wünschen euch schon jetzt eine gute Anreise und ein tolles Turnier.
+
+Sportliche Grüße
+
+VfL Kirchheim
+Tournament Hub$body$;
+
+  IF EXISTS (SELECT 1 FROM public.email_templates WHERE type = v_type) THEN
+    UPDATE public.email_templates
+    SET
+      name = v_name,
+      subject = v_subject,
+      body = v_body,
+      updated_at = now()
+    WHERE type = v_type;
+  ELSE
+    INSERT INTO public.email_templates (name, subject, body, type, active)
+    VALUES (v_name, v_subject, v_body, v_type, true);
+  END IF;
+END
+$seed$;
 
 -- -----------------------------------------------------------------------------
 -- Grants
@@ -662,31 +756,3 @@ GRANT EXECUTE ON FUNCTION public.reserve_cancellation_email_send(
   uuid, public.email_template_type
 ) TO authenticated;
 
--- Accepted mail may include participation link placeholder
-SELECT public.upsert_status_email_template(
-  'Bewerbung angenommen',
-  'Zusage – {{tournament_name}}',
-  $tpl$Hallo {{contact_first_name}},
-
-vielen Dank für eure Bewerbung mit {{team_name}} für den {{tournament_name}}.
-
-Damit ist eure Teilnahme an unserem Turnier bestätigt.
-
-Turnier:
-{{tournament_name}}
-Altersklasse: {{age_group}}
-Datum: {{tournament_date}}
-Ort: {{location}}
-
-{{participation_url}}
-
-Weitere organisatorische Informationen, den Ablauf sowie gegebenenfalls den Spielplan erhaltet ihr rechtzeitig vor dem Turnier.
-
-Wir freuen uns, euch bei uns in Kirchheim begrüßen zu dürfen und wünschen euch schon jetzt eine gute Anreise und ein tolles Turnier.
-
-Sportliche Grüße
-
-VfL Kirchheim
-Tournament Hub$tpl$,
-  'application-accepted'
-);

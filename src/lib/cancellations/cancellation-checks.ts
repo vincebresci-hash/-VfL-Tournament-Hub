@@ -19,7 +19,7 @@ function assert(condition: boolean, message: string) {
 
 function readMigration() {
   return readFileSync(
-    join(process.cwd(), "supabase/migrations/20260829140000_cancellation_requests.sql"),
+    join(process.cwd(), "supabase/migrations/20260829160000_cancellation_requests.sql"),
     "utf8",
   );
 }
@@ -58,6 +58,10 @@ export function runCancellationRequestsChecks() {
   assert(migration.includes("cancellation_email_send_keys"), "cancellation email idempotency table");
   assert(migration.includes("public_action_attempts"), "rate limit table exists");
   assert(migration.includes("ENABLE ROW LEVEL SECURITY"), "RLS enabled");
+  assert(!migration.includes("public.upsert_status_email_template("), "no upsert_status_email_template dependency");
+  assert(migration.includes("IF EXISTS (SELECT 1 FROM public.email_templates WHERE type = v_type)"), "idempotent template seeding by type");
+  assert(migration.includes("cancellation-request-submitted"), "cancellation-request-submitted template seeded");
+  assert(migration.includes("{{participation_url}}"), "application-accepted participation_url placeholder");
 
   assert(actions.includes("submitClubCancellationRequestAction"), "club action exists");
   assert(actions.includes("submitExternalCancellationRequestAction"), "external action exists");
