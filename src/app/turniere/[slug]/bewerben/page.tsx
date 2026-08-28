@@ -15,7 +15,9 @@ import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import { formatDateDe } from "@/lib/format";
 import {
   getPublicApplicationState,
+  type PublicApplicationState,
 } from "@/lib/public-application-state";
+import { ApplicationCapacitySummary } from "@/components/apply/ApplicationCapacitySummary";
 import { getAppSettings } from "@/lib/settings";
 import { getEffectiveTournamentStatus } from "@/lib/tournament-status";
 import type { PublicTournament } from "@/types/tournament";
@@ -140,7 +142,12 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
             />
           </div>
           <div className="order-1 lg:order-2">
-            <TournamentSummary tournament={tournament} />
+            <TournamentSummary
+              tournament={tournament}
+              applicationState={applicationState}
+              confirmedTeams={confirmedParticipants}
+              maxTeams={maxTeams}
+            />
           </div>
         </div>
       </Container>
@@ -160,11 +167,21 @@ function ApplyShell({ children }: { children: ReactNode }) {
   );
 }
 
-function TournamentSummary({ tournament }: { tournament: PublicTournament }) {
+function TournamentSummary({
+  tournament,
+  applicationState,
+  confirmedTeams,
+  maxTeams,
+}: {
+  tournament: PublicTournament;
+  applicationState: PublicApplicationState;
+  confirmedTeams: number;
+  maxTeams: number | null;
+}) {
   const effectiveStatus = getEffectiveTournamentStatus({
     dbStatus: tournament.status,
-    maxTeams: tournament.maxTeams,
-    confirmedParticipants: tournament.confirmedTeams,
+    maxTeams,
+    confirmedParticipants: confirmedTeams,
     archivedAt: tournament.archivedAt,
   });
 
@@ -204,6 +221,11 @@ function TournamentSummary({ tournament }: { tournament: PublicTournament }) {
           </dd>
         </div>
       </dl>
+      <ApplicationCapacitySummary
+        maxTeams={maxTeams}
+        confirmedTeams={confirmedTeams}
+        applicationState={applicationState}
+      />
     </aside>
   );
 }

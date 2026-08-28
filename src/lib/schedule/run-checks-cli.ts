@@ -22,6 +22,7 @@ import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-c
 import { runClubProfileSecurityChecks } from "@/lib/auth/club-profile-security-checks";
 import { runDuplicateApplicationChecks } from "@/lib/applications/duplicate-application-checks";
 import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-application-fields-checks";
+import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runAdminScheduleParticipantChecks } from "@/lib/schedule/admin-schedule-participants-checks";
 import {
   runMeinTurnierplanIdempotencyCheck,
@@ -59,6 +60,7 @@ try {
   const clubProfileSecurityChecks = runClubProfileSecurityChecks();
   const duplicateApplicationChecks = runDuplicateApplicationChecks();
   const guestApplicationFieldsChecks = runGuestApplicationFieldsChecks();
+  const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const adminScheduleParticipantChecks = runAdminScheduleParticipantChecks();
   const statusEmailIdempotencyChecks = runStatusEmailIdempotencySelfChecks();
   console.log(`schedule-checks: ${schedule}`);
@@ -88,6 +90,7 @@ try {
   console.log(`club-profile-security-checks: ${clubProfileSecurityChecks}`);
   console.log(`duplicate-application-checks: ${duplicateApplicationChecks}`);
   console.log(`guest-application-fields-checks: ${guestApplicationFieldsChecks}`);
+  console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`admin-schedule-participant-checks: ${adminScheduleParticipantChecks}`);
   console.log(`status-email-idempotency-checks: ${statusEmailIdempotencyChecks}`);
 } catch (error) {
