@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
+import { PaymentStatusPanel } from "@/components/admin/PaymentStatusPanel";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { InternalRating } from "@/components/admin/InternalRating";
@@ -147,6 +148,17 @@ export function ApplicationDetail({
               }
             />
           </DetailCard>
+
+          <PaymentStatusPanel
+            applicationId={application.id}
+            applicationStatus={application.applicationStatus}
+            payment={{
+              paymentStatus: application.paymentStatus,
+              participationFee: application.participationFee,
+              paidAt: application.paidAt,
+              paymentNote: application.paymentNote,
+            }}
+          />
 
           <InternalRating
             category={application.internalCategory}

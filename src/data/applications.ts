@@ -66,6 +66,10 @@ function createApplication(seed: ApplicationSeed): AdminApplication {
     internalCategory: seed.internalCategory ?? null,
     internalStrength: seed.internalStrength ?? null,
     internalNotes: seed.internalNotes ?? null,
+    paymentStatus: "pending",
+    participationFee: null,
+    paidAt: null,
+    paymentNote: null,
   };
 }
 

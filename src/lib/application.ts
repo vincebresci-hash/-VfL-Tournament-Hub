@@ -262,5 +262,9 @@ export function toTournamentApplication(
     notes: optional(values.notes),
     applicationStatus: "new" satisfies ApplicationStatus,
     createdAt: new Date().toISOString(),
+    paymentStatus: "pending",
+    participationFee: null,
+    paidAt: null,
+    paymentNote: null,
   };
 }

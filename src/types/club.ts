@@ -1,6 +1,7 @@
 import type { ClubType, TeamStrength } from "@/types/application";
 import type { ApplicationStatus } from "@/types/application";
 import type { AgeGroup } from "@/types/tournament";
+import type { ApplicationPayment } from "@/types/payment";
 
 /**
  * Club-facing application DTO.
@@ -35,4 +36,4 @@ export type ClubApplicationView = {
   notes: string | null;
   applicationStatus: ApplicationStatus;
   createdAt: string;
-};
+} & ApplicationPayment;

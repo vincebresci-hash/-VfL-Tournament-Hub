@@ -1,4 +1,5 @@
 import { CancellationRequestPanel } from "@/components/club/CancellationRequestPanel";
+import { PaymentStatusDisplay } from "@/components/payments/PaymentStatusDisplay";
 import { ClubStatusBadge } from "@/components/club/ClubStatusBadge";
 import { clubTypeLabel } from "@/lib/admin";
 import { formatDateDe, formatDateTimeDe } from "@/lib/format";
@@ -80,16 +81,26 @@ export function ClubApplicationDetail({
           </div>
 
           {accepted ? (
-            <div className="border border-navy bg-navy p-5 text-white">
-              <p className="font-display text-lg font-bold tracking-wide uppercase">
-                Teilnahme bestätigt
-              </p>
-              <p className="mt-3 text-[14px] leading-6 text-white/70">
-                Turnierinformationen, Treffpunkt, Spielplan, Dokumente und
-                organisatorische Hinweise erscheinen hier, sobald sie freigegeben
-                sind.
-              </p>
-            </div>
+            <>
+              <div className="border border-navy bg-navy p-5 text-white">
+                <p className="font-display text-lg font-bold tracking-wide uppercase">
+                  Teilnahme bestätigt
+                </p>
+                <p className="mt-3 text-[14px] leading-6 text-white/70">
+                  Turnierinformationen, Treffpunkt, Spielplan, Dokumente und
+                  organisatorische Hinweise erscheinen hier, sobald sie freigegeben
+                  sind.
+                </p>
+              </div>
+              <PaymentStatusDisplay
+                payment={{
+                  paymentStatus: application.paymentStatus,
+                  participationFee: application.participationFee,
+                  paidAt: application.paidAt,
+                  paymentNote: application.paymentNote,
+                }}
+              />
+            </>
           ) : null}
 
           <CancellationRequestPanel

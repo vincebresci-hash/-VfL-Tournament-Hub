@@ -41,6 +41,8 @@ export type CancellationRequestListItem = CancellationRequest & {
   daysUntilTournament: number | null;
 };
 
+import type { ApplicationPayment } from "@/types/payment";
+
 export type ParticipationPortalView = {
   tokenId: string;
   applicationId: string;
@@ -50,4 +52,4 @@ export type ParticipationPortalView = {
   daysUntilTournament: number | null;
   isLateRequestWindow: boolean;
   hasPendingRequest: boolean;
-};
+} & ApplicationPayment;

@@ -13,6 +13,7 @@ import {
   hashSecureAccessToken,
   isValidSecureAccessTokenFormat,
 } from "@/lib/cancellations/tokens";
+import { toApplicationPayment } from "@/lib/payments/mappers";
 import type { ParticipationPortalView } from "@/types/cancellation";
 
 export type ActionResult = {
@@ -75,6 +76,12 @@ export async function loadParticipationPortalByToken(
       ? isLateCancellationRequest(tournamentDate)
       : false,
     hasPendingRequest: Boolean(pendingId),
+    ...toApplicationPayment({
+      payment_status: row.payment_status,
+      participation_fee: row.participation_fee,
+      paid_at: row.paid_at,
+      payment_note: null,
+    }),
   };
 }
 

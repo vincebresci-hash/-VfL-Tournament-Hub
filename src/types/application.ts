@@ -1,4 +1,5 @@
 import type { AgeGroup } from "@/types/tournament";
+import type { ApplicationPayment } from "@/types/payment";
 
 export const APPLICATION_STATUSES = [
   "new",
@@ -48,7 +49,7 @@ export type TournamentApplication = {
   notes: string | null;
   applicationStatus: ApplicationStatus;
   createdAt: string;
-};
+} & ApplicationPayment;
 
 export const INTERNAL_CATEGORIES = ["S", "A", "B", "C"] as const;
 
@@ -58,4 +59,4 @@ export type AdminApplication = TournamentApplication & {
   internalCategory: InternalCategory | null;
   internalStrength: TeamStrength | null;
   internalNotes: string | null;
-};
+} & ApplicationPayment;

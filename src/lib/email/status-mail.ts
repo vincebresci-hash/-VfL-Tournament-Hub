@@ -14,6 +14,9 @@ import {
 } from "@/lib/email/status-mail-idempotency";
 import { ensureParticipationCancellationToken } from "@/lib/cancellations/participation-token";
 import { templateTypeForStatus } from "@/lib/email/templates";
+import { formatCurrencyEur } from "@/lib/payments/format";
+import { paymentStatusLabel } from "@/lib/payments/labels";
+import { toApplicationPayment } from "@/lib/payments/mappers";
 import { formatDateDe } from "@/lib/format";
 import type { ApplicationStatus } from "@/types/application";
 import type { EmailLogStatus, EmailTemplateType } from "@/types/admin";
@@ -34,6 +37,10 @@ type StatusMailApplication = {
   club_city: string | null;
   team_name: string | null;
   age_group: string | null;
+  participation_fee?: number | string | null;
+  payment_status?: string | null;
+  paid_at?: string | null;
+  payment_note?: string | null;
   clubs?: Pick<ClubRow, "name"> | Pick<ClubRow, "name">[] | null;
   teams?:
     | Pick<TeamRow, "name" | "age_group">
@@ -81,6 +88,15 @@ function applicationVariables(
   const tournamentDate = tournament?.date
     ? formatDateDe(tournament.date)
     : "";
+  const payment = toApplicationPayment(row);
+  const participationFeeLine =
+    payment.participationFee != null
+      ? `Startgebühr: ${formatCurrencyEur(payment.participationFee)}`
+      : "";
+  const paymentBindingNotice =
+    payment.participationFee != null
+      ? "Die Teilnahme wird nach vollständigem Eingang der Startgebühr verbindlich. Die Zahlungsinformationen werden mit der Zusage bzw. über den Tournament Hub mitgeteilt."
+      : "";
 
   return {
     contact_first_name: firstText(row.contact_first_name),
@@ -93,6 +109,9 @@ function applicationVariables(
     location: firstText(tournament?.location),
     application_status: applicationStatusLabel[status],
     participation_url: participationUrl,
+    participation_fee_line: participationFeeLine,
+    payment_binding_notice: paymentBindingNotice,
+    payment_status_label: paymentStatusLabel[payment.paymentStatus],
   };
 }
 
@@ -195,7 +214,7 @@ export async function sendApplicationStatusEmail(input: {
   const { data, error } = await supabase
     .from("applications")
     .select(
-      "id, status, contact_email, contact_first_name, contact_last_name, club_name, club_city, team_name, age_group, clubs (name), teams (name, age_group), tournaments (name, date, location, age_group)",
+      "id, status, contact_email, contact_first_name, contact_last_name, club_name, club_city, team_name, age_group, payment_status, participation_fee, paid_at, payment_note, clubs (name), teams (name, age_group), tournaments (name, date, location, age_group)",
     )
     .eq("id", input.applicationId)
     .maybeSingle();

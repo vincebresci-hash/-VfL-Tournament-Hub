@@ -47,6 +47,10 @@ export function toClubApplicationView(
     notes: application.notes,
     applicationStatus: application.applicationStatus,
     createdAt: application.createdAt,
+    paymentStatus: application.paymentStatus ?? "pending",
+    participationFee: application.participationFee ?? null,
+    paidAt: application.paidAt ?? null,
+    paymentNote: application.paymentNote ?? null,
   };
 }
 

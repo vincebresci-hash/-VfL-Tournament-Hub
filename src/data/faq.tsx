@@ -160,6 +160,17 @@ export function getFaqItems(settings?: AppSettings): FaqItem[] {
       ),
     },
     {
+      id: "verbindliche-teilnahme",
+      question: "Wann ist die Teilnahme verbindlich?",
+      answer: (
+        <>
+          Die Teilnahme wird nach Annahme der Bewerbung und vollständigem Eingang
+          der Startgebühr verbindlich. Die Zahlungsinformationen werden mit der
+          Zusage bzw. über den Tournament Hub mitgeteilt.
+        </>
+      ),
+    },
+    {
       id: "kontakt",
       question: "An wen wende ich mich bei Fragen?",
       answer: (
