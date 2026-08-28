@@ -771,6 +771,14 @@ export type Database = {
           tournament_name: string;
           team_name: string;
           tournament_date: string;
+        }>;
+      };
+      get_external_participation_payment_by_token: {
+        Args: {
+          p_token_hash: string;
+          p_purpose: "cancellation" | "communication_confirm";
+        };
+        Returns: Array<{
           payment_status: PaymentStatusRow;
           participation_fee: number | null;
           paid_at: string | null;

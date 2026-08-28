@@ -91,77 +91,52 @@ CREATE TRIGGER applications_payment_fields_guard
   EXECUTE FUNCTION public.guard_application_payment_fields();
 
 -- -----------------------------------------------------------------------------
--- Extend secure token validation with payment context (read-only)
+-- External participation payment (token-scoped, separate from validate_secure_access_token)
+-- PR A validate_secure_access_token return type must remain unchanged (42P13 safe).
 -- -----------------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.validate_secure_access_token(
+CREATE OR REPLACE FUNCTION public.get_external_participation_payment_by_token(
   p_token_hash text,
   p_purpose public.secure_access_token_purpose
 )
 RETURNS TABLE (
-  token_id uuid,
-  application_id uuid,
-  tournament_name text,
-  team_name text,
-  tournament_date date,
   payment_status public.payment_status,
   participation_fee numeric,
   paid_at timestamptz
 )
 LANGUAGE plpgsql
-VOLATILE
+STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-DECLARE
-  v_token public.secure_access_tokens%ROWTYPE;
-  v_app public.applications%ROWTYPE;
-  v_tournament public.tournaments%ROWTYPE;
 BEGIN
   IF char_length(p_token_hash) <> 64 THEN
     RETURN;
   END IF;
 
-  SELECT * INTO v_token
-  FROM public.secure_access_tokens
-  WHERE token_hash = p_token_hash
-    AND purpose = p_purpose
-    AND revoked_at IS NULL
-    AND expires_at > now()
-  LIMIT 1;
-
-  IF NOT FOUND THEN
-    RETURN;
-  END IF;
-
-  SELECT * INTO v_app
-  FROM public.applications
-  WHERE id = v_token.application_id;
-
-  IF NOT FOUND OR v_app.status IS DISTINCT FROM 'accepted'::public.application_status THEN
-    RETURN;
-  END IF;
-
-  SELECT * INTO v_tournament
-  FROM public.tournaments
-  WHERE id = v_app.tournament_id;
-
-  UPDATE public.secure_access_tokens
-  SET last_used_at = now()
-  WHERE id = v_token.id;
-
   RETURN QUERY
   SELECT
-    v_token.id,
-    v_app.id,
-    COALESCE(NULLIF(btrim(v_tournament.name), ''), 'Turnier'),
-    COALESCE(NULLIF(btrim(v_app.team_name), ''), 'Mannschaft'),
-    v_tournament.date,
-    v_app.payment_status,
-    v_app.participation_fee,
-    v_app.paid_at;
+    a.payment_status,
+    a.participation_fee,
+    a.paid_at
+  FROM public.secure_access_tokens t
+  INNER JOIN public.applications a ON a.id = t.application_id
+  WHERE t.token_hash = p_token_hash
+    AND t.purpose = p_purpose
+    AND t.revoked_at IS NULL
+    AND t.expires_at > now()
+    AND a.status = 'accepted'::public.application_status
+  LIMIT 1;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.get_external_participation_payment_by_token(
+  text, public.secure_access_token_purpose
+) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.get_external_participation_payment_by_token(
+  text, public.secure_access_token_purpose
+) TO anon, authenticated;
 
 -- -----------------------------------------------------------------------------
 -- application-accepted email: optional payment placeholders (idempotent by type)

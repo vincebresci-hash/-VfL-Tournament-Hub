@@ -14,6 +14,7 @@ import {
   isValidSecureAccessTokenFormat,
 } from "@/lib/cancellations/tokens";
 import { toApplicationPayment } from "@/lib/payments/mappers";
+import { loadExternalParticipationPaymentByToken } from "@/lib/payments/external-payment";
 import type { ParticipationPortalView } from "@/types/cancellation";
 
 export type ActionResult = {
@@ -52,6 +53,17 @@ export async function loadParticipationPortalByToken(
 
   const row = data[0];
   const pendingId = await getPendingCancellationRequestId(row.application_id);
+  const payment =
+    (await loadExternalParticipationPaymentByToken({
+      token,
+      purpose: "cancellation",
+    })) ??
+    toApplicationPayment({
+      payment_status: "pending",
+      participation_fee: null,
+      paid_at: null,
+      payment_note: null,
+    });
   const tournamentDate = row.tournament_date;
   const daysUntil = tournamentDate
     ? Math.ceil(
@@ -76,12 +88,7 @@ export async function loadParticipationPortalByToken(
       ? isLateCancellationRequest(tournamentDate)
       : false,
     hasPendingRequest: Boolean(pendingId),
-    ...toApplicationPayment({
-      payment_status: row.payment_status,
-      participation_fee: row.participation_fee,
-      paid_at: row.paid_at,
-      payment_note: null,
-    }),
+    ...payment,
   };
 }
 

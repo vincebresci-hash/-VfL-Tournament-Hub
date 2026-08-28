@@ -58,8 +58,21 @@ export function runPaymentStatusChecks() {
   assert(migration.includes("DROP TRIGGER IF EXISTS applications_payment_fields_guard"), "backfill before guard trigger");
   assert(!migration.includes("ON CONFLICT"), "no blind template ON CONFLICT");
   assert(migration.includes("{{participation_url}}"), "participation_url preserved in template");
-  assert(migration.includes("validate_secure_access_token"), "token RPC extended");
-  assert(migration.includes("participation_fee numeric"), "token returns fee");
+  assert(
+    !migration.includes("CREATE OR REPLACE FUNCTION public.validate_secure_access_token"),
+    "validate_secure_access_token return type unchanged (42P13 safe)",
+  );
+  assert(
+    migration.includes("get_external_participation_payment_by_token"),
+    "separate external payment RPC",
+  );
+  assert(
+    migration.includes("payment_status public.payment_status") &&
+      migration.includes("participation_fee numeric") &&
+      migration.includes("paid_at timestamptz"),
+    "external payment RPC minimal return",
+  );
+  assert(!migration.includes("DROP FUNCTION"), "no DROP FUNCTION in migration");
   assert(!migration.includes("tournament_occupancy"), "occupancy unchanged in migration");
 
   assert(actions.includes("canAccessAdmin"), "admin-only payment updates");
