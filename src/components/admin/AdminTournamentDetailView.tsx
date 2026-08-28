@@ -87,6 +87,13 @@ export function AdminTournamentDetailView({
         editHref={`/admin/turniere/${tournament.id}/bearbeiten`}
       />
 
+      {capacity.availableSlots > 0 && capacity.waitingListCount > 0 ? (
+        <p className="mt-5 border border-line bg-white px-4 py-3 text-[13px] leading-6 text-ink">
+          Freier Startplatz – Wartelistenmannschaft auswählen ({capacity.waitingListCount}{" "}
+          auf der Warteliste).
+        </p>
+      ) : null}
+
       <div className="mt-8 grid gap-5">
         <AdminCard title="Kapazität">
           <TournamentCapacityForm slug={tournament.slug} maxTeams={tournament.maxTeams} />

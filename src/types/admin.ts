@@ -12,6 +12,10 @@ export const EMAIL_TEMPLATE_TYPES = [
   "application-under-review",
   "waiting-list",
   "application-rejected",
+  "cancellation-request-received",
+  "cancellation-request-submitted",
+  "cancellation-confirmed",
+  "cancellation-rejected",
   "follow-up",
   "general",
 ] as const;

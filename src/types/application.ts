@@ -6,6 +6,7 @@ export const APPLICATION_STATUSES = [
   "accepted",
   "waiting-list",
   "rejected",
+  "cancelled",
 ] as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];

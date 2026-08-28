@@ -12,7 +12,8 @@ export type ApplicationStatusRow =
   | "under-review"
   | "accepted"
   | "waiting-list"
-  | "rejected";
+  | "rejected"
+  | "cancelled";
 export type TournamentStatusRow = "coming-soon" | "active" | "full" | "completed";
 export type InternalCategoryRow = "S" | "A" | "B" | "C";
 export type ClubStatusRow = "active" | "inactive";
@@ -22,6 +23,10 @@ export type EmailTemplateTypeRow =
   | "application-under-review"
   | "waiting-list"
   | "application-rejected"
+  | "cancellation-request-received"
+  | "cancellation-request-submitted"
+  | "cancellation-confirmed"
+  | "cancellation-rejected"
   | "follow-up"
   | "general";
 
@@ -329,6 +334,33 @@ export type EmailLogRow = {
   created_at: string;
 };
 
+export type SecureAccessTokenRow = {
+  id: string;
+  application_id: string;
+  purpose: "cancellation" | "communication_confirm";
+  token_hash: string;
+  expires_at: string;
+  used_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+};
+
+export type CancellationRequestRow = {
+  id: string;
+  application_id: string;
+  requested_by_type: "club" | "external";
+  reason: string | null;
+  is_late_request: boolean;
+  status: "pending" | "confirmed" | "rejected";
+  requested_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TournamentOccupancyRow = {
   slug: string;
   max_teams: number | null;
@@ -490,6 +522,42 @@ export type Database = {
             columns: ["template_id"];
             isOneToOne: false;
             referencedRelation: "email_templates";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      secure_access_tokens: Table<
+        SecureAccessTokenRow,
+        Partial<SecureAccessTokenRow> & {
+          application_id: string;
+          purpose: SecureAccessTokenRow["purpose"];
+          token_hash: string;
+          expires_at: string;
+        },
+        Partial<SecureAccessTokenRow>,
+        [
+          {
+            foreignKeyName: "secure_access_tokens_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      cancellation_requests: Table<
+        CancellationRequestRow,
+        Partial<CancellationRequestRow> & {
+          application_id: string;
+          requested_by_type: CancellationRequestRow["requested_by_type"];
+        },
+        Partial<CancellationRequestRow>,
+        [
+          {
+            foreignKeyName: "cancellation_requests_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
             referencedColumns: ["id"];
           },
         ]
@@ -673,6 +741,50 @@ export type Database = {
           p_template_type: EmailTemplateTypeRow;
         };
         Returns: undefined;
+      };
+      store_secure_access_token: {
+        Args: {
+          p_application_id: string;
+          p_purpose: "cancellation" | "communication_confirm";
+          p_token_hash: string;
+          p_expires_at: string;
+        };
+        Returns: string;
+      };
+      validate_secure_access_token: {
+        Args: {
+          p_token_hash: string;
+          p_purpose: "cancellation" | "communication_confirm";
+        };
+        Returns: Array<{
+          token_id: string;
+          application_id: string;
+          tournament_name: string;
+          team_name: string;
+          tournament_date: string;
+        }>;
+      };
+      submit_cancellation_request_external: {
+        Args: {
+          p_token_hash: string;
+          p_reason: string;
+        };
+        Returns: string;
+      };
+      decide_cancellation_request: {
+        Args: {
+          p_request_id: string;
+          p_decision: string;
+          p_admin_note?: string | null;
+        };
+        Returns: undefined;
+      };
+      reserve_cancellation_email_send: {
+        Args: {
+          p_cancellation_request_id: string;
+          p_template_type: EmailTemplateTypeRow;
+        };
+        Returns: string;
       };
       sync_mein_turnierplan_tournament: {
         Args: {

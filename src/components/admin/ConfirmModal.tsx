@@ -1,10 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 type ConfirmModalProps = {
   open: boolean;
   title: string;
   confirmLabel?: string;
   cancelLabel?: string;
+  children?: ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -14,6 +17,7 @@ export function ConfirmModal({
   title,
   confirmLabel = "Bestätigen",
   cancelLabel = "Abbrechen",
+  children,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
@@ -41,6 +45,7 @@ export function ConfirmModal({
         >
           {title}
         </h2>
+        {children ? <div className="mt-4">{children}</div> : null}
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
