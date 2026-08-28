@@ -23,6 +23,7 @@ import {
   DUPLICATE_TEAM_APPLICATION_MESSAGE,
   isDuplicateTeamApplicationViolation,
 } from "@/lib/applications/duplicate-team-application";
+import { guestApplicationFieldSnapshot } from "@/lib/applications/guest-application-fields";
 
 export type SubmitApplicationResult = {
   error: string | null;
@@ -288,5 +289,6 @@ function applicationSnapshot(values: ApplicationFormValues) {
     contact_phone: values.contactPhone.trim(),
     staff_count: values.staffCount.trim() ? Number(values.staffCount) : null,
     notes: values.notes.trim() || null,
+    ...guestApplicationFieldSnapshot(values),
   };
 }
