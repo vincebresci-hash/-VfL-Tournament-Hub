@@ -6,7 +6,7 @@ import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadg
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { InternalRating } from "@/components/admin/InternalRating";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
-import { AdminNotice } from "@/components/admin/AdminPanel";
+import { AdminNotice, displayValue } from "@/components/admin/AdminPanel";
 import {
   getClubTypeLabel,
   getStatusDecisionCopy,
@@ -100,7 +100,7 @@ export function ApplicationDetail({
             <Info label="Mannschaftsname" value={application.teamName} />
             <Info label="Altersklasse" value={application.ageGroup} />
             <Info label="Jahrgang" value={String(application.birthYear)} />
-            <Info label="Liga" value={application.league} />
+            <Info label="Liga" value={displayValue(application.league)} />
             <Info label="Staffel" value={application.division ?? "Keine Angabe"} />
             <Info
               label="Selbsteinschätzung Spielstärke"
@@ -117,7 +117,7 @@ export function ApplicationDetail({
             <Info label="Nachname" value={application.contactLastName} />
             <Info label="Funktion" value={application.contactRole} />
             <Info label="E-Mail" value={application.contactEmail} />
-            <Info label="Telefon" value={application.contactPhone} />
+            <Info label="Telefon" value={displayValue(application.contactPhone)} />
             {application.alternativePhone ? (
               <Info
                 label="Alternative Telefonnummer"

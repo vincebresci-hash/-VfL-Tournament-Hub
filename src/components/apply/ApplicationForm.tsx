@@ -246,7 +246,7 @@ export function ApplicationForm({
           </Field>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="league" label="Aktuelle Spielklasse / Liga" error={errors.league}>
+          <Field id="league" label="Aktuelle Spielklasse / Liga" optional error={errors.league}>
             <TextInput
               id="league"
               name="league"
@@ -369,7 +369,7 @@ export function ApplicationForm({
           />
         </Field>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="contactPhone" label="Telefonnummer" error={errors.contactPhone}>
+          <Field id="contactPhone" label="Telefonnummer" optional error={errors.contactPhone}>
             <TextInput
               id="contactPhone"
               name="contactPhone"

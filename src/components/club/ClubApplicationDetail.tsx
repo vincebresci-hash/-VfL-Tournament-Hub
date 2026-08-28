@@ -33,7 +33,7 @@ export function ClubApplicationDetail({ application }: ClubApplicationDetailProp
               value={formatDateTimeDe(application.createdAt)}
             />
             <Detail term="Jahrgang" value={String(application.birthYear)} />
-            <Detail term="Liga" value={application.league} />
+            <Detail term="Liga" value={displayOptional(application.league)} />
             {application.division ? (
               <Detail term="Staffel" value={application.division} />
             ) : null}
@@ -51,7 +51,7 @@ export function ClubApplicationDetail({ application }: ClubApplicationDetailProp
             />
             <Detail term="Funktion" value={application.contactRole} />
             <Detail term="E-Mail" value={application.contactEmail} />
-            <Detail term="Telefon" value={application.contactPhone} />
+            <Detail term="Telefon" value={displayOptional(application.contactPhone)} />
           </dl>
           {application.teamDescription ? (
             <p className="mt-6 text-[14px] leading-7 text-muted">
@@ -97,4 +97,9 @@ function Detail({ term, value }: { term: string; value: string }) {
       <dd className="mt-1 text-[14px] text-ink">{value}</dd>
     </div>
   );
+}
+
+function displayOptional(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "–";
 }
