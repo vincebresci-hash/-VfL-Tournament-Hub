@@ -1,3 +1,4 @@
+import { tournamentStatusClassName } from "@/lib/tournament-status";
 import type { TournamentStatus } from "@/types/tournament";
 
 export type PublicApplicationState = "coming-soon" | "open" | "waitlist" | "closed";
@@ -63,10 +64,86 @@ export function isPublicApplicationAllowed(input: PublicApplicationGateInput) {
 
 export const publicApplicationStateLabel: Record<PublicApplicationState, string> = {
   "coming-soon": "Demnächst bewerben",
-  open: "Anmeldung offen",
+  open: "Bewerbung offen",
   waitlist: "Turnier aktuell voll",
   closed: "Bewerbung geschlossen",
 };
+
+export type PublicApplicationStatusDisplay = {
+  state: PublicApplicationState;
+  label: string;
+  className: string;
+};
+
+function isApplicationClosedDueToSoldOut(
+  input: PublicApplicationGateInput,
+  now: Date,
+): boolean {
+  if (!input.isFull || input.waitlistEnabled) {
+    return false;
+  }
+
+  if (!input.applicationsEnabled || input.applicationsOpen === false) {
+    return false;
+  }
+
+  if (input.archivedAt || input.status === "completed") {
+    return false;
+  }
+
+  if (input.applicationStart && now < new Date(input.applicationStart)) {
+    return false;
+  }
+
+  if (input.applicationDeadline && now > new Date(input.applicationDeadline)) {
+    return false;
+  }
+
+  return true;
+}
+
+/** Single public badge label/class derived from application gate truth. */
+export function getPublicApplicationStatusDisplay(
+  input: PublicApplicationGateInput,
+): PublicApplicationStatusDisplay {
+  const state = getPublicApplicationState(input);
+  const now = input.now ?? new Date();
+
+  switch (state) {
+    case "open":
+      return {
+        state,
+        label: publicApplicationStateLabel.open,
+        className: tournamentStatusClassName.active,
+      };
+    case "coming-soon":
+      return {
+        state,
+        label: publicApplicationStateLabel["coming-soon"],
+        className: tournamentStatusClassName["coming-soon"],
+      };
+    case "waitlist":
+      return {
+        state,
+        label: publicApplicationStateLabel.waitlist,
+        className: tournamentStatusClassName.full,
+      };
+    case "closed":
+      if (isApplicationClosedDueToSoldOut(input, now)) {
+        return {
+          state,
+          label: "Ausgebucht",
+          className: tournamentStatusClassName.full,
+        };
+      }
+
+      return {
+        state,
+        label: publicApplicationStateLabel.closed,
+        className: tournamentStatusClassName.completed,
+      };
+  }
+}
 
 function assert(condition: unknown, message: string) {
   if (!condition) {
