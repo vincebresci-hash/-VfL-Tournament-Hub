@@ -14,6 +14,11 @@ export type ApplicationStatusRow =
   | "waiting-list"
   | "rejected"
   | "cancelled";
+export type PaymentStatusRow =
+  | "pending"
+  | "paid"
+  | "not_required"
+  | "waived";
 export type TournamentStatusRow = "coming-soon" | "active" | "full" | "completed";
 export type InternalCategoryRow = "S" | "A" | "B" | "C";
 export type ClubStatusRow = "active" | "inactive";
@@ -266,6 +271,10 @@ export type ApplicationRow = {
   staff_count: number | null;
   notes: string | null;
   status: ApplicationStatusRow;
+  payment_status: PaymentStatusRow;
+  participation_fee: number | null;
+  paid_at: string | null;
+  payment_note: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -764,6 +773,17 @@ export type Database = {
           tournament_date: string;
         }>;
       };
+      get_external_participation_payment_by_token: {
+        Args: {
+          p_token_hash: string;
+          p_purpose: "cancellation" | "communication_confirm";
+        };
+        Returns: Array<{
+          payment_status: PaymentStatusRow;
+          participation_fee: number | null;
+          paid_at: string | null;
+        }>;
+      };
       submit_cancellation_request_external: {
         Args: {
           p_token_hash: string;
@@ -798,6 +818,7 @@ export type Database = {
     Enums: {
       user_role: UserRoleRow;
       application_status: ApplicationStatusRow;
+      payment_status: PaymentStatusRow;
       tournament_status: TournamentStatusRow;
       internal_category: InternalCategoryRow;
       club_status: ClubStatusRow;

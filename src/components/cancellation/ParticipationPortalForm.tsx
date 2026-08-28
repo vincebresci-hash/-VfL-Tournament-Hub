@@ -6,6 +6,8 @@ import { TextAreaInput } from "@/components/apply/FormControls";
 import { cancellationDeadlineLabel } from "@/lib/cancellations/deadline";
 import { submitExternalCancellationRequestAction } from "@/lib/cancellations/actions";
 import { formatDateDe } from "@/lib/format";
+import { paymentStatusLabel } from "@/lib/payments/labels";
+import { formatCurrencyEur } from "@/lib/payments/format";
 import type { ParticipationPortalView } from "@/types/cancellation";
 
 type ParticipationPortalFormProps = {
@@ -66,6 +68,21 @@ export function ParticipationPortalForm({ token, portal }: ParticipationPortalFo
             </dd>
           </div>
         </dl>
+
+        <div className="mt-6 border border-line bg-surface px-4 py-4">
+          <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+            Teilnahme
+          </p>
+          <p className="mt-2 text-[14px] text-ink">Teilnahme bestätigt</p>
+          <p className="mt-2 text-[14px] text-muted">
+            Zahlungsstatus: {paymentStatusLabel[portal.paymentStatus]}
+          </p>
+          {portal.participationFee != null ? (
+            <p className="mt-2 text-[14px] text-muted">
+              Startgebühr: {formatCurrencyEur(portal.participationFee)}
+            </p>
+          ) : null}
+        </div>
 
         {submitted ? (
           <p className="mt-8 border border-line bg-surface px-4 py-3 text-[14px] leading-6 text-ink">

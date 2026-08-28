@@ -91,6 +91,10 @@ export const demoClubApplications: ClubApplicationView[] = [
     notes: null,
     applicationStatus: "under-review",
     createdAt: "2026-08-18T08:12:00.000Z",
+    paymentStatus: "pending",
+    participationFee: null,
+    paidAt: null,
+    paymentNote: null,
   },
   {
     id: "club-app-u11",
@@ -121,6 +125,10 @@ export const demoClubApplications: ClubApplicationView[] = [
     notes: null,
     applicationStatus: "accepted",
     createdAt: "2026-08-10T11:20:00.000Z",
+    paymentStatus: "pending",
+    participationFee: 100,
+    paidAt: null,
+    paymentNote: null,
   },
   {
     id: "club-app-u12",
@@ -151,5 +159,9 @@ export const demoClubApplications: ClubApplicationView[] = [
     notes: null,
     applicationStatus: "waiting-list",
     createdAt: "2026-07-22T16:05:00.000Z",
+    paymentStatus: "pending",
+    participationFee: null,
+    paidAt: null,
+    paymentNote: null,
   },
 ];

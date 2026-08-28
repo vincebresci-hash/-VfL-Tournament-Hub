@@ -10,6 +10,7 @@ import type {
 import type { ClubApplicationView } from "@/types/club";
 import type { ClubProfile, Team } from "@/types/auth";
 import type { AgeGroup } from "@/types/tournament";
+import { toApplicationPayment } from "@/lib/payments/mappers";
 import type { ApplicationWithRelations, ClubRow, TeamRow } from "@/lib/supabase/database";
 
 function asAgeGroup(value: string | null | undefined, fallback: AgeGroup = "U10"): AgeGroup {
@@ -134,6 +135,7 @@ function applicationBase(row: ApplicationWithRelations) {
     notes: row.notes,
     applicationStatus: asStatus(row.status),
     createdAt: row.created_at,
+    ...toApplicationPayment(row),
   };
 }
 
