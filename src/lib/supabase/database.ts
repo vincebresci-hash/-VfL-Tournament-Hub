@@ -416,6 +416,12 @@ export type CancellationRequestRow = {
   updated_at: string;
 };
 
+export type CancellationEmailSendKeyRow = {
+  cancellation_request_id: string;
+  template_type: EmailTemplateTypeRow;
+  created_at: string;
+};
+
 export type TournamentOccupancyRow = {
   slug: string;
   max_teams: number | null;
@@ -687,6 +693,23 @@ export type Database = {
           },
         ]
       >;
+      cancellation_email_send_keys: Table<
+        CancellationEmailSendKeyRow,
+        Partial<CancellationEmailSendKeyRow> & {
+          cancellation_request_id: string;
+          template_type: EmailTemplateTypeRow;
+        },
+        Partial<CancellationEmailSendKeyRow>,
+        [
+          {
+            foreignKeyName: "cancellation_email_send_keys_cancellation_request_id_fkey";
+            columns: ["cancellation_request_id"];
+            isOneToOne: false;
+            referencedRelation: "cancellation_requests";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
       tournament_groups: Table<
         TournamentGroupRow,
         Partial<TournamentGroupRow> & { tournament_id: string; name: string },
@@ -929,41 +952,6 @@ export type Database = {
           p_template_type: EmailTemplateTypeRow;
         };
         Returns: string;
-      };
-      insert_cancellation_email_log: {
-        Args: {
-          p_cancellation_request_id: string;
-          p_application_id: string;
-          p_template_id: string | null;
-          p_template_type: EmailTemplateTypeRow;
-          p_to_email: string;
-          p_subject: string | null;
-          p_body: string | null;
-          p_status: string;
-          p_error: string | null;
-          p_provider: string | null;
-          p_provider_message_id: string | null;
-          p_created_by: string | null;
-        };
-        Returns: undefined;
-      };
-      insert_external_cancellation_email_log: {
-        Args: {
-          p_token_hash: string;
-          p_cancellation_request_id: string;
-          p_application_id: string;
-          p_template_id: string | null;
-          p_template_type: EmailTemplateTypeRow;
-          p_to_email: string;
-          p_subject: string | null;
-          p_body: string | null;
-          p_status: string;
-          p_error: string | null;
-          p_provider: string | null;
-          p_provider_message_id: string | null;
-          p_created_by: string | null;
-        };
-        Returns: undefined;
       };
       preview_communication_recipients: {
         Args: {

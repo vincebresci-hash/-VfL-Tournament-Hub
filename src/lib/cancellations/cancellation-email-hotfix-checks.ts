@@ -35,6 +35,21 @@ function readMail() {
   return readFileSync(join(process.cwd(), "src/lib/cancellations/cancellation-mail.ts"), "utf8");
 }
 
+function readEmailLog() {
+  return readFileSync(
+    join(process.cwd(), "src/lib/cancellations/cancellation-email-log.ts"),
+    "utf8",
+  );
+}
+
+function readServiceRole() {
+  return readFileSync(join(process.cwd(), "src/lib/supabase/service-role.ts"), "utf8");
+}
+
+function readClient() {
+  return readFileSync(join(process.cwd(), "src/lib/supabase/client.ts"), "utf8");
+}
+
 function readCancellationMigration() {
   return readFileSync(
     join(process.cwd(), "supabase/migrations/20260829160000_cancellation_requests.sql"),
@@ -46,6 +61,9 @@ export function runCancellationEmailHotfixChecks() {
   const migration = readHotfixMigration();
   const actions = readActions();
   const mail = readMail();
+  const emailLog = readEmailLog();
+  const serviceRole = readServiceRole();
+  const client = readClient();
   const baseMigration = readCancellationMigration();
 
   // A: external submit uses dedicated reservation RPC
@@ -158,61 +176,58 @@ export function runCancellationEmailHotfixChecks() {
     "AUTH-01: admin OR authenticated club owner only",
   );
 
-  // CAN-02 email logging
+  // Server-only audit logging (no client-callable logging RPCs)
   assert(
-    migration.includes("insert_cancellation_email_log"),
-    "CAN-02: admin/club email log RPC exists",
+    !migration.includes("insert_cancellation_email_log"),
+    "no client-callable cancellation email log RPC in migration",
   );
   assert(
-    migration.includes("insert_external_cancellation_email_log"),
-    "CAN-02: external token-scoped email log RPC exists",
+    !migration.includes("insert_external_cancellation_email_log"),
+    "no client-callable external cancellation email log RPC in migration",
   );
   assert(
-    migration.includes("insert_cancellation_email_log_core"),
-    "CAN-02: internal email log core has no direct grants",
+    serviceRole.includes("SUPABASE_SERVICE_ROLE_KEY"),
+    "service role client exists",
   );
   assert(
-    migration.includes("reservation required"),
-    "CAN-02: email log requires prior reservation",
+    !serviceRole.includes("NEXT_PUBLIC"),
+    "service role key is server-only",
   );
   assert(
-    mail.includes("insert_cancellation_email_log"),
-    "CAN-02: mail layer uses admin/club email log RPC",
+    !client.includes("service-role"),
+    "browser client does not import service role",
   );
   assert(
-    mail.includes("insert_external_cancellation_email_log"),
-    "CAN-02: mail layer uses external email log RPC",
+    mail.includes("writeCancellationEmailLogServer"),
+    "mail layer uses server-only audit logger",
+  );
+  assert(
+    !mail.includes("insert_cancellation_email_log"),
+    "mail layer does not call client logging RPC",
+  );
+  assert(
+    !mail.includes("insert_external_cancellation_email_log"),
+    "mail layer does not call external client logging RPC",
   );
   assert(
     !mail.includes('.from("email_logs").insert'),
-    "CAN-02: direct email_logs insert removed from cancellation mail",
+    "mail layer does not insert email_logs directly with user client",
   );
   assert(
-    migration.includes(
-      "REVOKE ALL ON FUNCTION public.insert_cancellation_email_log",
-    ) && migration.includes("FROM PUBLIC, anon"),
-    "email log RPC revoked from anon",
+    emailLog.includes("createServiceRoleClient"),
+    "audit logger uses service role client",
   );
   assert(
-    migration.includes(
-      "GRANT EXECUTE ON FUNCTION public.insert_cancellation_email_log(\n  uuid,\n  uuid,\n  uuid,\n  public.email_template_type,\n  text,\n  text,\n  text,\n  text,\n  text,\n  text,\n  text,\n  uuid\n) TO authenticated;",
-    ),
-    "email log RPC granted to authenticated only",
+    emailLog.includes("cancellation_email_send_keys"),
+    "audit logger requires reservation key",
   );
   assert(
-    migration.includes(
-      "GRANT EXECUTE ON FUNCTION public.insert_external_cancellation_email_log",
-    ),
-    "external email log RPC granted to anon",
+    emailLog.includes("actorUserId"),
+    "audit logger uses trusted actor user id parameter",
   );
   assert(
-    migration.includes("PERFORM public.insert_cancellation_email_log_core"),
-    "public RPCs delegate to internal core writer",
-  );
-  assert(
-    migration.includes("RAISE EXCEPTION 'unauthorized'") &&
-      migration.includes("insert_cancellation_email_log("),
-    "admin/club email log enforces caller authorization",
+    mail.includes("actorUserId: input.actorId"),
+    "mail passes trusted actor id only from server workflow",
   );
 
   // External path template restriction
@@ -222,8 +237,7 @@ export function runCancellationEmailHotfixChecks() {
     "external RPC limited to submit workflow templates",
   );
   assert(
-    !migration.includes("GRANT EXECUTE") ||
-      migration.includes("is_cancellation_workflow_template"),
+    migration.includes("is_cancellation_workflow_template"),
     "shared cancellation template allow-list exists",
   );
 

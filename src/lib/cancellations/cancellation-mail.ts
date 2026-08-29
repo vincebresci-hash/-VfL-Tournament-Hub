@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
+import { writeCancellationEmailLogServer } from "@/lib/cancellations/cancellation-email-log";
 import { cancellationOnTimeLabel } from "@/lib/cancellations/deadline";
 import { publicContactEmail } from "@/lib/contact";
 import {
@@ -9,7 +10,7 @@ import {
 } from "@/lib/email/provider";
 import { formatDateDe } from "@/lib/format";
 import { getAppSettings } from "@/lib/settings";
-import type { EmailLogStatus, EmailTemplateType } from "@/types/admin";
+import type { EmailTemplateType } from "@/types/admin";
 
 type CancellationMailContext = {
   requestId: string;
@@ -134,67 +135,6 @@ async function reserveCancellationEmail(
   return data === "send" ? "send" : "skip";
 }
 
-async function writeCancellationEmailLog(entry: {
-  requestId: string;
-  applicationId: string;
-  templateId: string | null;
-  templateType: EmailTemplateType;
-  toEmail: string;
-  subject: string | null;
-  body: string | null;
-  status: EmailLogStatus;
-  error: string | null;
-  provider: string | null;
-  providerMessageId: string | null;
-  createdBy: string | null;
-  externalTokenHash?: string | null;
-}) {
-  const supabase = await createClient();
-
-  if (entry.externalTokenHash) {
-    const { error } = await supabase.rpc("insert_external_cancellation_email_log", {
-      p_token_hash: entry.externalTokenHash,
-      p_cancellation_request_id: entry.requestId,
-      p_application_id: entry.applicationId,
-      p_template_id: entry.templateId,
-      p_template_type: entry.templateType,
-      p_to_email: entry.toEmail,
-      p_subject: entry.subject,
-      p_body: entry.body,
-      p_status: entry.status,
-      p_error: entry.error,
-      p_provider: entry.provider,
-      p_provider_message_id: entry.providerMessageId,
-      p_created_by: entry.createdBy,
-    });
-
-    if (error && !isMissingRelationError(error)) {
-      console.error("insert_external_cancellation_email_log failed", error.message);
-    }
-
-    return;
-  }
-
-  const { error } = await supabase.rpc("insert_cancellation_email_log", {
-    p_cancellation_request_id: entry.requestId,
-    p_application_id: entry.applicationId,
-    p_template_id: entry.templateId,
-    p_template_type: entry.templateType,
-    p_to_email: entry.toEmail,
-    p_subject: entry.subject,
-    p_body: entry.body,
-    p_status: entry.status,
-    p_error: entry.error,
-    p_provider: entry.provider,
-    p_provider_message_id: entry.providerMessageId,
-    p_created_by: entry.createdBy,
-  });
-
-  if (error && !isMissingRelationError(error)) {
-    console.error("insert_cancellation_email_log failed", error.message);
-  }
-}
-
 async function sendTemplateEmail(input: {
   requestId: string;
   applicationId: string;
@@ -236,7 +176,7 @@ async function sendTemplateEmail(input: {
     templateId: template.id,
   });
 
-  await writeCancellationEmailLog({
+  await writeCancellationEmailLogServer({
     requestId: input.requestId,
     applicationId: input.applicationId,
     templateId: template.id,
@@ -248,8 +188,7 @@ async function sendTemplateEmail(input: {
     error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
     provider: result.provider,
     providerMessageId: result.providerMessageId ?? null,
-    createdBy: input.actorId,
-    externalTokenHash: input.externalTokenHash,
+    actorUserId: input.actorId,
   });
 }
 
