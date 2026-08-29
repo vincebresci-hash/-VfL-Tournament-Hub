@@ -11,6 +11,7 @@ import {
   buildCommunicationVariables,
   stripUnresolvedPlaceholders,
 } from "@/lib/communications/variables";
+import { resolveFinalizeCommunicationStatus } from "@/lib/communications/finalize-communication";
 import { renderEmailTemplate } from "@/lib/email/provider";
 
 function assert(condition: boolean, message: string) {
@@ -109,7 +110,16 @@ export function runCommunicationChecks() {
   assert(migration.includes("preview_communication_recipients"), "preview RPC");
   assert(migration.includes("initiate_communication_send"), "initiate RPC");
   assert(migration.includes("reserve_communication_email_send"), "reserve RPC");
-  assert(migration.includes("payment reminder cannot target waitlist"), "waitlist payment guard");
+  assert(migration.includes("complete_communication_recipient"), "complete RPC");
+  assert(migration.includes("finalize_communication"), "finalize RPC");
+  assert(
+    migration.includes("payment reminder only allows payment-pending or custom filter"),
+    "payment reminder filter enforcement",
+  );
+  assert(
+    migration.includes("v_pending = 0 AND v_sending = 0"),
+    "finalize incomplete recipient guard",
+  );
 
   assert(mail.includes("getEmailProvider"), "Resend from server module");
   assert(!mail.includes("resend.com"), "no direct Resend fetch in migration");
@@ -153,11 +163,27 @@ export function runCommunicationChecks() {
   // G/H: custom selection server validated via RPC
   assert(migration.includes("p_application_ids"), "custom application ids");
 
-  // I/J: waitlist rules
+  // I/J: waitlist and payment-reminder filter rules
   assert(isRecipientFilterAllowed({ type: "general", filter: "waitlist" }), "I waitlist general");
   assert(
     !isRecipientFilterAllowed({ type: "payment-reminder", filter: "waitlist" }),
     "J waitlist payment rejected",
+  );
+  assert(
+    !isRecipientFilterAllowed({ type: "payment-reminder", filter: "accepted" }),
+    "payment-reminder + accepted blocked",
+  );
+  assert(
+    !isRecipientFilterAllowed({ type: "payment-reminder", filter: "payment-paid" }),
+    "payment-reminder + payment-paid blocked",
+  );
+  assert(
+    isRecipientFilterAllowed({ type: "payment-reminder", filter: "payment-pending" }),
+    "payment-reminder + payment-pending allowed",
+  );
+  assert(
+    isRecipientFilterAllowed({ type: "payment-reminder", filter: "custom" }),
+    "payment-reminder + custom allowed",
   );
 
   // K: cancelled/rejected excluded
@@ -195,6 +221,33 @@ export function runCommunicationChecks() {
   assert(
     allowedRecipientFiltersForType("payment-reminder").includes("payment-pending"),
     "payment reminder filters",
+  );
+
+  const allSent = resolveFinalizeCommunicationStatus(["sent", "sent"]);
+  assert(allSent.status === "sent", "all sent => sent");
+  assert(allSent.sentCount === 2, "sent count exact");
+
+  const mixed = resolveFinalizeCommunicationStatus(["sent", "failed"]);
+  assert(mixed.status === "partially_sent", "sent + failed => partially_sent");
+
+  const allFailed = resolveFinalizeCommunicationStatus(["failed", "failed"]);
+  assert(allFailed.status === "failed", "all failed => failed");
+
+  const sentAndSending = resolveFinalizeCommunicationStatus(["sent", "sending"]);
+  assert(sentAndSending.status === "sending", "sent + sending => sending");
+  assert(sentAndSending.status !== "sent", "sent + sending must not be sent");
+
+  const sentAndPending = resolveFinalizeCommunicationStatus(["sent", "pending"]);
+  assert(sentAndPending.status === "sending", "sent + pending => sending");
+  assert(sentAndPending.status !== "sent", "sent + pending must not be sent");
+
+  assert(
+    readMail().includes("Versandstatus unvollständig") ||
+      readFileSync(
+        join(process.cwd(), "src/components/admin/CommunicationDetailView.tsx"),
+        "utf8",
+      ).includes("Versandstatus unvollständig"),
+    "incomplete send admin hint",
   );
 
   return "ok";

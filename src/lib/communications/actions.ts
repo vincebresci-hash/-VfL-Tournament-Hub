@@ -73,7 +73,8 @@ export async function previewCommunicationRecipientsAction(input: {
   if (!isRecipientFilterAllowed({ type, filter: recipientFilter })) {
     return {
       recipients: [],
-      error: "Zahlungserinnerungen können nicht an die Warteliste gesendet werden.",
+      error:
+        "Zahlungserinnerungen sind nur für ausstehende Zahlungen oder eine individuelle Auswahl erlaubt.",
     };
   }
 
@@ -129,7 +130,8 @@ export async function sendCommunicationAction(
 
   if (!isRecipientFilterAllowed({ type, filter: recipientFilter })) {
     return {
-      error: "Zahlungserinnerungen können nicht an die Warteliste gesendet werden.",
+      error:
+        "Zahlungserinnerungen sind nur für ausstehende Zahlungen oder eine individuelle Auswahl erlaubt.",
     };
   }
 

@@ -200,8 +200,9 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  IF p_communication_type = 'payment-reminder' AND p_recipient_filter = 'waitlist' THEN
-    RAISE EXCEPTION 'payment reminder cannot target waitlist';
+  IF p_communication_type = 'payment-reminder'
+     AND p_recipient_filter NOT IN ('payment-pending', 'custom') THEN
+    RAISE EXCEPTION 'payment reminder only allows payment-pending or custom filter';
   END IF;
 
   IF p_recipient_filter = 'custom' THEN
@@ -354,6 +355,11 @@ BEGIN
     SELECT 1 FROM public.tournaments WHERE id = p_tournament_id
   ) THEN
     RAISE EXCEPTION 'tournament not found';
+  END IF;
+
+  IF p_type = 'payment-reminder'
+     AND p_recipient_filter NOT IN ('payment-pending', 'custom') THEN
+    RAISE EXCEPTION 'payment reminder only allows payment-pending or custom filter';
   END IF;
 
   INSERT INTO public.tournament_communications (
@@ -518,8 +524,11 @@ AS $$
 DECLARE
   v_sent integer;
   v_failed integer;
+  v_pending integer;
+  v_sending integer;
   v_total integer;
   v_status text;
+  v_complete boolean;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'admin only';
@@ -528,16 +537,22 @@ BEGIN
   SELECT
     COUNT(*) FILTER (WHERE send_status = 'sent'),
     COUNT(*) FILTER (WHERE send_status = 'failed'),
+    COUNT(*) FILTER (WHERE send_status = 'pending'),
+    COUNT(*) FILTER (WHERE send_status = 'sending'),
     COUNT(*)
-  INTO v_sent, v_failed, v_total
+  INTO v_sent, v_failed, v_pending, v_sending, v_total
   FROM public.communication_recipients
   WHERE communication_id = p_communication_id;
 
+  v_complete := (v_pending = 0 AND v_sending = 0);
+
   IF v_total = 0 THEN
     v_status := 'failed';
-  ELSIF v_failed = 0 AND v_sent = v_total THEN
+  ELSIF NOT v_complete THEN
+    v_status := 'sending';
+  ELSIF v_sent = v_total THEN
     v_status := 'sent';
-  ELSIF v_sent = 0 AND v_failed > 0 THEN
+  ELSIF v_failed = v_total THEN
     v_status := 'failed';
   ELSIF v_sent > 0 AND v_failed > 0 THEN
     v_status := 'partially_sent';
@@ -552,7 +567,7 @@ BEGIN
     sent_count = v_sent,
     failed_count = v_failed,
     status = v_status,
-    sent_at = now(),
+    sent_at = CASE WHEN v_complete THEN now() ELSE sent_at END,
     updated_at = now()
   WHERE id = p_communication_id;
 END;

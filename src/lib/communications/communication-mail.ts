@@ -162,12 +162,16 @@ export async function sendTournamentCommunication(input: {
       };
     }
 
-    if (message.includes("payment reminder cannot target waitlist")) {
+    if (
+      message.includes("payment reminder only allows payment-pending or custom filter") ||
+      message.includes("payment reminder cannot target waitlist")
+    ) {
       return {
         communicationId: null,
         sentCount: 0,
         failedCount: 0,
-        error: "Zahlungserinnerungen können nicht an die Warteliste gesendet werden.",
+        error:
+          "Zahlungserinnerungen sind nur für ausstehende Zahlungen (payment-pending) oder eine individuelle Auswahl erlaubt.",
       };
     }
 

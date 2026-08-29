@@ -14,8 +14,8 @@ export function isRecipientFilterAllowed(input: {
   type: CommunicationType;
   filter: CommunicationRecipientFilter;
 }): boolean {
-  if (input.type === "payment-reminder" && input.filter === "waitlist") {
-    return false;
+  if (input.type === "payment-reminder") {
+    return input.filter === "payment-pending" || input.filter === "custom";
   }
 
   return true;

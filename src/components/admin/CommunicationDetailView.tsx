@@ -12,9 +12,23 @@ type CommunicationDetailViewProps = {
   communication: CommunicationDetail;
 };
 
+function isIncompleteRecipientStatus(status: string) {
+  return status === "pending" || status === "sending";
+}
+
 export function CommunicationDetailView({
   communication,
 }: CommunicationDetailViewProps) {
+  const incompleteRecipients = communication.recipients.filter((recipient) =>
+    isIncompleteRecipientStatus(recipient.sendStatus),
+  );
+  const pendingCount = communication.recipients.filter(
+    (recipient) => recipient.sendStatus === "pending",
+  ).length;
+  const sendingCount = communication.recipients.filter(
+    (recipient) => recipient.sendStatus === "sending",
+  ).length;
+
   return (
     <div className="mt-8 grid gap-6">
       <AdminCard title="Nachricht">
@@ -38,6 +52,12 @@ export function CommunicationDetailView({
             value={formatDateTimeDe(communication.sentAt ?? communication.createdAt)}
           />
         </dl>
+        {incompleteRecipients.length > 0 ? (
+          <p className="mt-4 border border-line bg-surface px-4 py-3 text-[14px] leading-6 text-[#9a2b2b]">
+            Versandstatus unvollständig ({pendingCount} ausstehend, {sendingCount}{" "}
+            in Bearbeitung). Bitte prüfen, bevor erneut gesendet wird.
+          </p>
+        ) : null}
         <div className="mt-6 border border-line bg-surface px-4 py-4">
           <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
             Nachrichtentext
@@ -49,7 +69,7 @@ export function CommunicationDetailView({
       </AdminCard>
 
       <AdminCard
-        title={`Empfänger (${communication.sentCount}/${communication.recipientCount} versendet${communication.failedCount > 0 ? `, ${communication.failedCount} fehlgeschlagen` : ""})`}
+        title={`Empfänger (${communication.sentCount} versendet, ${communication.failedCount} fehlgeschlagen, ${incompleteRecipients.length} unvollständig / ${communication.recipientCount} gesamt)`}
       >
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-[14px]">
@@ -64,24 +84,33 @@ export function CommunicationDetailView({
               </tr>
             </thead>
             <tbody>
-              {communication.recipients.map((recipient) => (
-                <tr key={recipient.id} className="border-b border-line last:border-b-0">
-                  <td className="px-3 py-2 text-ink">{recipient.recipientTeamName}</td>
-                  <td className="px-3 py-2 text-muted">
-                    {recipient.recipientClubName ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-muted">{recipient.recipientEmail}</td>
-                  <td className="px-3 py-2 text-muted">
-                    {communicationRecipientSendStatusLabel(recipient.sendStatus)}
-                  </td>
-                  <td className="px-3 py-2 text-muted">
-                    {recipient.sentAt ? formatDateTimeDe(recipient.sentAt) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-[#9a2b2b]">
-                    {recipient.errorMessage ?? "—"}
-                  </td>
-                </tr>
-              ))}
+              {communication.recipients.map((recipient) => {
+                const incomplete = isIncompleteRecipientStatus(recipient.sendStatus);
+
+                return (
+                  <tr
+                    key={recipient.id}
+                    className={`border-b border-line last:border-b-0 ${incomplete ? "bg-[#fff8f0]" : ""}`}
+                  >
+                    <td className="px-3 py-2 text-ink">{recipient.recipientTeamName}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {recipient.recipientClubName ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-muted">{recipient.recipientEmail}</td>
+                    <td
+                      className={`px-3 py-2 ${incomplete ? "font-semibold text-[#9a2b2b]" : "text-muted"}`}
+                    >
+                      {communicationRecipientSendStatusLabel(recipient.sendStatus)}
+                    </td>
+                    <td className="px-3 py-2 text-muted">
+                      {recipient.sentAt ? formatDateTimeDe(recipient.sentAt) : "—"}
+                    </td>
+                    <td className="px-3 py-2 text-[#9a2b2b]">
+                      {recipient.errorMessage ?? "—"}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
