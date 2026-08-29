@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { updatePersonalProfileAction } from "@/lib/auth/actions";
 import { updateClubProfileAction } from "@/lib/club/actions";
 import type { ClubWorkspace } from "@/lib/club/workspace";
@@ -19,6 +20,7 @@ export function ClubProfileForm({ workspace }: ClubProfileFormProps) {
   const [displayName, setDisplayName] = useState(workspace.user.displayName ?? "");
   const [phone, setPhone] = useState(workspace.user.phone ?? "");
   const [jobTitle, setJobTitle] = useState(workspace.user.jobTitle ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(workspace.user.avatarUrl);
   const [name, setName] = useState(workspace.club.name);
   const [city, setCity] = useState(workspace.club.city);
   const [website, setWebsite] = useState(workspace.club.website ?? "");
@@ -42,7 +44,7 @@ export function ClubProfileForm({ workspace }: ClubProfileFormProps) {
       displayName,
       phone,
       jobTitle,
-      avatarUrl: workspace.user.avatarUrl,
+      avatarUrl,
     });
 
     setSavingPersonal(false);
@@ -104,6 +106,13 @@ export function ClubProfileForm({ workspace }: ClubProfileFormProps) {
         <p className="mt-2 max-w-2xl text-[14px] leading-6 text-muted">
           Diese Angaben gelten für dein persönliches Benutzerkonto.
         </p>
+        <div className="mt-5">
+          <AvatarUpload
+            currentUrl={avatarUrl}
+            displayName={displayNameValue}
+            onUploaded={(url) => setAvatarUrl(url)}
+          />
+        </div>
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <Field id="personal-first-name" label="Vorname">
             <TextInput

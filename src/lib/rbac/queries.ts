@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
 import { mergePermissions } from "@/lib/rbac/permissions";
-import type { AdminUserSummary, Permission, RbacPermission, RbacRole, RbacRoleKey } from "@/types/rbac";
+import type { AdminUserSummary, Permission, RbacPermission, RbacRole, RbacRoleKey, UserInvitationSummary } from "@/types/rbac";
 import type { UserRole } from "@/types/auth";
 
 type ProfileAuthRow = {
@@ -156,6 +156,83 @@ export async function listRbacPermissions(): Promise<{
   };
 }
 
+export async function listPendingInvitations(): Promise<{
+  invitations: UserInvitationSummary[];
+  ready: boolean;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("user_invitations")
+    .select("id, email, status, invited_at, expires_at, last_sent_at, accepted_at, profile_id, metadata")
+    .in("status", ["pending", "expired"])
+    .order("invited_at", { ascending: false });
+
+  if (error) {
+    return { invitations: [], ready: !isMissingRelationError(error) };
+  }
+
+  const now = Date.now();
+  return {
+    ready: true,
+    invitations: (data ?? []).map((row) => {
+      let status = row.status as UserInvitationSummary["status"];
+      if (status === "pending" && new Date(row.expires_at).getTime() < now) {
+        status = "expired";
+      }
+      return {
+        id: row.id,
+        email: row.email,
+        status,
+        invitedAt: row.invited_at,
+        expiresAt: row.expires_at,
+        lastSentAt: row.last_sent_at,
+        acceptedAt: row.accepted_at,
+        profileId: row.profile_id,
+        metadata: (row.metadata ?? {}) as Record<string, unknown>,
+      };
+    }),
+  };
+}
+
+export async function listAdminClubsForSelect(): Promise<
+  Array<{ id: string; name: string }>
+> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("clubs").select("id, name").order("name");
+  return (data ?? []).map((row) => ({ id: row.id, name: row.name }));
+}
+
+export async function listAdminTeamsForSelect(clubId?: string | null): Promise<
+  Array<{ id: string; name: string; ageGroup: string | null; clubId: string; clubName: string }>
+> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("teams")
+    .select("id, name, age_group, club_id, clubs(name)")
+    .order("name");
+
+  if (clubId) {
+    query = query.eq("club_id", clubId);
+  }
+
+  const { data } = await query;
+  return (data ?? [])
+    .map((row) => {
+      const club = unwrapClub(row.clubs as { name: string } | { name: string }[] | null);
+      if (!row.club_id || !club?.name) {
+        return null;
+      }
+      return {
+        id: row.id,
+        name: row.name,
+        ageGroup: row.age_group,
+        clubId: row.club_id,
+        clubName: club.name,
+      };
+    })
+    .filter((value): value is NonNullable<typeof value> => value !== null);
+}
+
 export async function listAdminUsers(): Promise<{ users: AdminUserSummary[]; ready: boolean }> {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -169,6 +246,18 @@ export async function listAdminUsers(): Promise<{ users: AdminUserSummary[]; rea
     return { users: [], ready: !isMissingRelationError(error) };
   }
 
+  const { invitations: pendingInvitations } = await listPendingInvitations();
+  const pendingByProfileId = new Map(
+    pendingInvitations
+      .filter((inv) => inv.status === "pending" && inv.profileId)
+      .map((inv) => [inv.profileId!, inv]),
+  );
+  const pendingByEmail = new Map(
+    pendingInvitations
+      .filter((inv) => inv.status === "pending")
+      .map((inv) => [inv.email.toLowerCase(), inv]),
+  );
+
   const users = await Promise.all(
     (data as ProfileAuthRow[]).map(async (profile) => {
       const authorization = await loadUserAuthorization(profile.id);
@@ -181,8 +270,19 @@ export async function listAdminUsers(): Promise<{ users: AdminUserSummary[]; rea
 
       const { data: teamRows } = await supabase
         .from("rbac_user_team_assignments")
-        .select("team_id, teams(id, name, club_id)")
+        .select("team_id, teams(id, name, club_id, age_group, clubs(name))")
         .eq("user_id", profile.id);
+
+      const emailKey = (profile.email ?? "").toLowerCase();
+      const pendingInvite =
+        pendingByProfileId.get(profile.id) ?? pendingByEmail.get(emailKey) ?? null;
+
+      let accountStatus: AdminUserSummary["accountStatus"] = profile.is_active
+        ? "active"
+        : "inactive";
+      if (pendingInvite) {
+        accountStatus = "invitation_pending";
+      }
 
       return {
         id: profile.id,
@@ -199,6 +299,9 @@ export async function listAdminUsers(): Promise<{ users: AdminUserSummary[]; rea
         isActive: profile.is_active,
         createdAt: profile.created_at,
         updatedAt: profile.updated_at,
+        lastSignInAt: null,
+        accountStatus,
+        invitationId: pendingInvite?.id ?? null,
         roles: (roleRows ?? [])
           .map((row) => {
             const role = row.rbac_roles as { key?: string; name?: string } | null;
@@ -215,7 +318,14 @@ export async function listAdminUsers(): Promise<{ users: AdminUserSummary[]; rea
           .filter((value): value is NonNullable<typeof value> => value !== null),
         teamAssignments: (teamRows ?? [])
           .map((row) => {
-            const team = row.teams as { id?: string; name?: string; club_id?: string } | null;
+            const team = row.teams as {
+              id?: string;
+              name?: string;
+              club_id?: string;
+              age_group?: string | null;
+              clubs?: { name: string } | { name: string }[] | null;
+            } | null;
+            const teamClub = team?.clubs ? unwrapClub(team.clubs) : null;
             if (!team?.id || !team.name || !team.club_id) {
               return null;
             }
@@ -223,6 +333,8 @@ export async function listAdminUsers(): Promise<{ users: AdminUserSummary[]; rea
               teamId: team.id,
               teamName: team.name,
               clubId: team.club_id,
+              ageGroup: team.age_group ?? null,
+              clubName: teamClub?.name ?? null,
             };
           })
           .filter((value): value is NonNullable<typeof value> => value !== null),

@@ -20,6 +20,20 @@ export async function ClubDashboard({ workspace }: ClubDashboardProps) {
         {workspace.club.name} · {workspace.club.city}
       </p>
 
+      {workspace.roleKeys.length === 0 ? (
+        <p className="mt-6 border border-line bg-white px-5 py-6 text-[15px] text-muted">
+          Dein Konto wurde erstellt, aber dir wurde noch keine Rolle zugewiesen. Bitte wende
+          dich an einen Administrator.
+        </p>
+      ) : null}
+
+      {workspace.roleKeys.includes("TEAM_MANAGER") &&
+      workspace.assignedTeamIds.length === 0 ? (
+        <p className="mt-6 border border-line bg-white px-5 py-6 text-[15px] text-muted">
+          Dir ist aktuell noch keine Mannschaft zugewiesen.
+        </p>
+      ) : null}
+
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <AdminStatCard value={stats.activeApplications} label="Aktive Bewerbungen" />
         <AdminStatCard value={stats.accepted} label="Zusage" />

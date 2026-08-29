@@ -27,6 +27,8 @@ import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runTeamOperationsP2Checks } from "@/lib/team-operations-p2-checks";
 import { runRbacChecks } from "@/lib/rbac/rbac-checks";
+import { runUserManagementChecks } from "@/lib/rbac/user-management-checks";
+import { runInvitationChecks } from "@/lib/rbac/invitation-checks";
 import { runPaymentStatusChecks } from "@/lib/payments/payment-checks";
 import { runCommunicationChecks } from "@/lib/communications/communication-checks";
 import { runCommunicationReceiptChecks } from "@/lib/communications/communication-receipt-checks";
@@ -75,6 +77,8 @@ try {
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const teamOperationsP2Checks = runTeamOperationsP2Checks();
   const rbacChecks = runRbacChecks();
+  const userManagementChecks = runUserManagementChecks();
+  const invitationChecks = runInvitationChecks();
   const paymentStatusChecks = runPaymentStatusChecks();
   const communicationChecks = runCommunicationChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
@@ -115,6 +119,8 @@ try {
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
   console.log(`team-operations-p2-checks: ${teamOperationsP2Checks}`);
   console.log(`rbac-checks: ${rbacChecks}`);
+  console.log(`user-management-checks: ${userManagementChecks}`);
+  console.log(`invitation-checks: ${invitationChecks}`);
   console.log(`payment-status-checks: ${paymentStatusChecks}`);
   console.log(`communication-checks: ${communicationChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);

@@ -2,6 +2,7 @@ import type { ApplicationFormValues } from "@/lib/application";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
+import { loadUserAuthorization } from "@/lib/rbac/queries";
 import { listClubApplications, listClubTeams, getClubApplication, isClubDatabaseReady } from "@/lib/db/queries";
 import { getFeaturedTournaments } from "@/lib/db/tournament-queries";
 import type { AuthSession, ClubProfile, Team, UserProfile } from "@/types/auth";
@@ -9,6 +10,7 @@ import type { TournamentApplication } from "@/types/application";
 import type { ClubApplicationView } from "@/types/club";
 import type { PublicTournament } from "@/types/tournament";
 import type { AgeGroup } from "@/types/tournament";
+import type { RbacRoleKey } from "@/types/rbac";
 
 export function toClubApplicationView(
   application: TournamentApplication,
@@ -60,6 +62,8 @@ export type ClubWorkspace = {
   teams: Team[];
   applications: ClubApplicationView[];
   databaseReady: boolean;
+  roleKeys: RbacRoleKey[];
+  assignedTeamIds: string[];
 };
 
 function fallbackClub(session: AuthSession): ClubProfile {
@@ -85,12 +89,15 @@ export async function loadClubWorkspace(
 
   const ready = await isClubDatabaseReady();
   if (!ready) {
+    const authorization = await loadUserAuthorization(session.user.id);
     return {
       user: session.user,
       club: fallbackClub(session),
       teams: [],
       applications: [],
       databaseReady: false,
+      roleKeys: authorization.roleKeys,
+      assignedTeamIds: authorization.assignedTeamIds,
     };
   }
 
@@ -104,26 +111,45 @@ export async function loadClubWorkspace(
   const club = freshSession.club;
 
   if (!clubId || !club) {
+    const authorization = await loadUserAuthorization(freshSession.user.id);
     return {
       user: freshSession.user,
       club: fallbackClub(freshSession),
       teams: [],
       applications: [],
       databaseReady: true,
+      roleKeys: authorization.roleKeys,
+      assignedTeamIds: authorization.assignedTeamIds,
     };
   }
 
+  const authorization = await loadUserAuthorization(freshSession.user.id);
   const [teams, applications] = await Promise.all([
     listClubTeams(clubId),
     listClubApplications(clubId),
   ]);
 
+  const isTeamManagerOnly =
+    authorization.roleKeys.includes("TEAM_MANAGER") &&
+    !authorization.roleKeys.includes("CLUB_ADMIN");
+
+  const scopedTeams = isTeamManagerOnly
+    ? teams.filter((team) => authorization.assignedTeamIds.includes(team.id))
+    : teams;
+
+  const scopedTeamNames = new Set(scopedTeams.map((team) => team.name));
+  const scopedApplications = isTeamManagerOnly
+    ? applications.filter((application) => scopedTeamNames.has(application.teamName))
+    : applications;
+
   return {
     user: { ...freshSession.user, clubId },
     club,
-    teams,
-    applications,
+    teams: scopedTeams,
+    applications: scopedApplications,
     databaseReady: true,
+    roleKeys: authorization.roleKeys,
+    assignedTeamIds: authorization.assignedTeamIds,
   };
 }
 
