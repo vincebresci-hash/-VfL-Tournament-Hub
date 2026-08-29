@@ -5,6 +5,7 @@ import { getAuthSession } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/auth/roles";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
+  normalizePaymentAdminNote,
   normalizePaymentUpdate,
   parseParticipationFeeInput,
 } from "@/lib/payments/normalize";
@@ -61,9 +62,9 @@ export async function updateApplicationPaymentAction(input: {
     paymentStatus: input.paymentStatus,
     participationFee,
     paidAt: input.paymentStatus === "paid" ? paidAt : null,
-    paymentNote: input.paymentNote,
     existingPaidAt: application.paid_at,
   });
+  const paymentNote = normalizePaymentAdminNote(input.paymentNote);
 
   const { error } = await supabase
     .from("applications")
@@ -72,6 +73,26 @@ export async function updateApplicationPaymentAction(input: {
 
   if (error) {
     return { error: toUserFacingDbError("Zahlungsstatus konnte nicht gespeichert werden.", error) };
+  }
+
+  const { error: noteError } = paymentNote
+    ? await supabase.from("application_payment_admin_notes").upsert(
+        {
+          application_id: input.applicationId,
+          payment_note: paymentNote,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "application_id" },
+      )
+    : await supabase
+        .from("application_payment_admin_notes")
+        .delete()
+        .eq("application_id", input.applicationId);
+
+  if (noteError) {
+    return {
+      error: toUserFacingDbError("Zahlungsnotiz konnte nicht gespeichert werden.", noteError),
+    };
   }
 
   revalidatePath("/admin/bewerbungen");

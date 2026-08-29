@@ -1,7 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import {
-  secureAccessTokenExpiresAt,
-} from "@/lib/cancellations/deadline";
+import { secureAccessTokenExpiresAt } from "@/lib/cancellations/deadline";
 import {
   generateSecureAccessToken,
   hashSecureAccessToken,
@@ -12,28 +10,29 @@ export function buildParticipationUrl(token: string) {
   return `${getSiteUrl()}/teilnahme/${encodeURIComponent(token)}`;
 }
 
-export async function ensureParticipationCancellationToken(input: {
+async function revokeActiveParticipationTokens(applicationId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("secure_access_tokens")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("application_id", applicationId)
+    .eq("purpose", "cancellation")
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString());
+
+  if (error) {
+    console.error("revoke participation token failed", error.message);
+  }
+}
+
+async function issueParticipationCancellationToken(input: {
   applicationId: string;
   tournamentDate: string;
 }): Promise<string | null> {
-  const supabase = await createClient();
-
-  const { data: existing } = await supabase
-    .from("secure_access_tokens")
-    .select("id")
-    .eq("application_id", input.applicationId)
-    .eq("purpose", "cancellation")
-    .is("revoked_at", null)
-    .gt("expires_at", new Date().toISOString())
-    .maybeSingle();
-
-  if (existing) {
-    return null;
-  }
-
   const token = generateSecureAccessToken();
   const tokenHash = hashSecureAccessToken(token);
   const expiresAt = secureAccessTokenExpiresAt(input.tournamentDate);
+  const supabase = await createClient();
 
   const { error } = await supabase.rpc("store_secure_access_token", {
     p_application_id: input.applicationId,
@@ -50,44 +49,27 @@ export async function ensureParticipationCancellationToken(input: {
   return buildParticipationUrl(token);
 }
 
+export async function ensureParticipationCancellationToken(input: {
+  applicationId: string;
+  tournamentDate: string;
+}): Promise<string | null> {
+  await revokeActiveParticipationTokens(input.applicationId);
+  return issueParticipationCancellationToken(input);
+}
+
 export async function createParticipationCancellationTokenForAdmin(input: {
   applicationId: string;
   tournamentDate: string;
 }): Promise<{ url: string | null; error: string | null }> {
-  const token = generateSecureAccessToken();
-  const tokenHash = hashSecureAccessToken(token);
-  const expiresAt = secureAccessTokenExpiresAt(input.tournamentDate);
-  const supabase = await createClient();
+  await revokeActiveParticipationTokens(input.applicationId);
+  const url = await issueParticipationCancellationToken(input);
 
-  const { data: existing } = await supabase
-    .from("secure_access_tokens")
-    .select("id")
-    .eq("application_id", input.applicationId)
-    .eq("purpose", "cancellation")
-    .is("revoked_at", null)
-    .gt("expires_at", new Date().toISOString())
-    .maybeSingle();
-
-  if (existing) {
-    await supabase
-      .from("secure_access_tokens")
-      .update({ revoked_at: new Date().toISOString() })
-      .eq("id", existing.id);
-  }
-
-  const { error } = await supabase.rpc("store_secure_access_token", {
-    p_application_id: input.applicationId,
-    p_purpose: "cancellation",
-    p_token_hash: tokenHash,
-    p_expires_at: expiresAt,
-  });
-
-  if (error) {
+  if (!url) {
     return {
       url: null,
       error: "Teilnahme-Link konnte nicht erstellt werden.",
     };
   }
 
-  return { url: buildParticipationUrl(token), error: null };
+  return { url, error: null };
 }

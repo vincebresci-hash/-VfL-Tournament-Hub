@@ -144,6 +144,7 @@ export function toClubApplicationView(row: ApplicationWithRelations): ClubApplic
   return {
     ...base,
     clubId: base.clubId ?? "",
+    paymentNote: null,
   };
 }
 

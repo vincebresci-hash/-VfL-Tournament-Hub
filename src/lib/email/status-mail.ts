@@ -40,7 +40,6 @@ type StatusMailApplication = {
   participation_fee?: number | string | null;
   payment_status?: string | null;
   paid_at?: string | null;
-  payment_note?: string | null;
   clubs?: Pick<ClubRow, "name"> | Pick<ClubRow, "name">[] | null;
   teams?:
     | Pick<TeamRow, "name" | "age_group">
@@ -214,7 +213,7 @@ export async function sendApplicationStatusEmail(input: {
   const { data, error } = await supabase
     .from("applications")
     .select(
-      "id, status, contact_email, contact_first_name, contact_last_name, club_name, club_city, team_name, age_group, payment_status, participation_fee, paid_at, payment_note, clubs (name), teams (name, age_group), tournaments (name, date, location, age_group)",
+      "id, status, contact_email, contact_first_name, contact_last_name, club_name, club_city, team_name, age_group, payment_status, participation_fee, paid_at, clubs (name), teams (name, age_group), tournaments (name, date, location, age_group)",
     )
     .eq("id", input.applicationId)
     .maybeSingle();
@@ -333,6 +332,15 @@ export async function sendApplicationStatusEmail(input: {
           applicationId: input.applicationId,
           tournamentDate: tournament.date,
         })) ?? "";
+    }
+
+    if (!participationUrl) {
+      await releaseStatusEmailSend(input.applicationId, templateType);
+      return {
+        sent: false,
+        skipped: false,
+        error: "Teilnahme-Link konnte nicht erstellt werden.",
+      };
     }
   }
 

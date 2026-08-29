@@ -25,6 +25,7 @@ import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-applic
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
+import { runTeamOperationsP2Checks } from "@/lib/team-operations-p2-checks";
 import { runPaymentStatusChecks } from "@/lib/payments/payment-checks";
 import { runCommunicationChecks } from "@/lib/communications/communication-checks";
 import { runCommunicationReceiptChecks } from "@/lib/communications/communication-receipt-checks";
@@ -71,6 +72,7 @@ try {
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
+  const teamOperationsP2Checks = runTeamOperationsP2Checks();
   const paymentStatusChecks = runPaymentStatusChecks();
   const communicationChecks = runCommunicationChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
@@ -109,6 +111,7 @@ try {
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
+  console.log(`team-operations-p2-checks: ${teamOperationsP2Checks}`);
   console.log(`payment-status-checks: ${paymentStatusChecks}`);
   console.log(`communication-checks: ${communicationChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);

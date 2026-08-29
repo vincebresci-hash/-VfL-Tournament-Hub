@@ -1,4 +1,4 @@
-import type { ApplicationStatus } from "@/types/application";
+import type { ApplicationStatus, ManualAdminApplicationStatus } from "@/types/application";
 import type { AgeGroup, LiveDataSource } from "@/types/tournament";
 import type { UserRole } from "@/types/auth";
 
@@ -153,7 +153,7 @@ export type AppSettings = {
   waitlistEnabled: boolean;
   applicationConfirmationEnabled: boolean;
   dashboardShowNewApplications: boolean;
-  defaultApplicationStatus: ApplicationStatus;
+  defaultApplicationStatus: ManualAdminApplicationStatus;
 };
 
 export type AdminDashboardTournament = {
