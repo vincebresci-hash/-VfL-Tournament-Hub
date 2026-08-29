@@ -214,6 +214,7 @@ export async function submitExternalCancellationRequestAction(input: {
     requestId: String(requestId),
     applicationId: portal?.applicationId ?? "",
     actorId: null,
+    externalTokenHash: tokenHash,
   });
 
   return {

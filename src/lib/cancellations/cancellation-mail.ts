@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
+import { writeCancellationEmailLogServer } from "@/lib/cancellations/cancellation-email-log";
 import { cancellationOnTimeLabel } from "@/lib/cancellations/deadline";
 import { publicContactEmail } from "@/lib/contact";
 import {
@@ -9,12 +10,13 @@ import {
 } from "@/lib/email/provider";
 import { formatDateDe } from "@/lib/format";
 import { getAppSettings } from "@/lib/settings";
-import type { EmailLogStatus, EmailTemplateType } from "@/types/admin";
+import type { EmailTemplateType } from "@/types/admin";
 
 type CancellationMailContext = {
   requestId: string;
   applicationId: string;
   actorId: string | null;
+  externalTokenHash?: string | null;
   decision?: "confirmed" | "rejected";
   adminNote?: string;
 };
@@ -87,8 +89,35 @@ function buildVariables(
 async function reserveCancellationEmail(
   requestId: string,
   templateType: EmailTemplateType,
+  externalTokenHash?: string | null,
 ): Promise<"send" | "skip" | "error"> {
   const supabase = await createClient();
+
+  if (externalTokenHash) {
+    const { data, error } = await supabase.rpc(
+      "reserve_external_cancellation_email_send",
+      {
+        p_token_hash: externalTokenHash,
+        p_cancellation_request_id: requestId,
+        p_template_type: templateType,
+      },
+    );
+
+    if (error) {
+      if (isMissingRelationError(error)) {
+        return "error";
+      }
+
+      console.error(
+        "reserve_external_cancellation_email_send failed",
+        error.message,
+      );
+      return "error";
+    }
+
+    return data === "send" ? "send" : "skip";
+  }
+
   const { data, error } = await supabase.rpc("reserve_cancellation_email_send", {
     p_cancellation_request_id: requestId,
     p_template_type: templateType,
@@ -106,39 +135,6 @@ async function reserveCancellationEmail(
   return data === "send" ? "send" : "skip";
 }
 
-async function writeEmailLog(entry: {
-  applicationId: string;
-  templateId: string | null;
-  templateType: EmailTemplateType;
-  toEmail: string;
-  subject: string | null;
-  body: string | null;
-  status: EmailLogStatus;
-  error: string | null;
-  provider: string | null;
-  providerMessageId: string | null;
-  createdBy: string | null;
-}) {
-  const supabase = await createClient();
-  const { error } = await supabase.from("email_logs").insert({
-    application_id: entry.applicationId,
-    template_id: entry.templateId,
-    template_type: entry.templateType,
-    to_email: entry.toEmail,
-    subject: entry.subject,
-    body: entry.body,
-    status: entry.status,
-    error: entry.error,
-    provider: entry.provider,
-    provider_message_id: entry.providerMessageId,
-    created_by: entry.createdBy,
-  });
-
-  if (error && !isMissingRelationError(error)) {
-    console.error("email_logs insert failed", error.message);
-  }
-}
-
 async function sendTemplateEmail(input: {
   requestId: string;
   applicationId: string;
@@ -146,8 +142,13 @@ async function sendTemplateEmail(input: {
   toEmail: string;
   variables: Record<string, string>;
   actorId: string | null;
+  externalTokenHash?: string | null;
 }) {
-  const reservation = await reserveCancellationEmail(input.requestId, input.templateType);
+  const reservation = await reserveCancellationEmail(
+    input.requestId,
+    input.templateType,
+    input.externalTokenHash,
+  );
   if (reservation !== "send") {
     return;
   }
@@ -175,7 +176,8 @@ async function sendTemplateEmail(input: {
     templateId: template.id,
   });
 
-  await writeEmailLog({
+  await writeCancellationEmailLogServer({
+    requestId: input.requestId,
     applicationId: input.applicationId,
     templateId: template.id,
     templateType: input.templateType,
@@ -186,7 +188,7 @@ async function sendTemplateEmail(input: {
     error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
     provider: result.provider,
     providerMessageId: result.providerMessageId ?? null,
-    createdBy: input.actorId,
+    actorUserId: input.actorId,
   });
 }
 
@@ -228,6 +230,7 @@ export async function sendCancellationWorkflowEmails(
         toEmail: teamEmail,
         variables,
         actorId: input.actorId,
+        externalTokenHash: input.externalTokenHash,
       });
     }
     return;
@@ -242,6 +245,7 @@ export async function sendCancellationWorkflowEmails(
         toEmail: teamEmail,
         variables,
         actorId: input.actorId,
+        externalTokenHash: input.externalTokenHash,
       });
     }
     return;
@@ -257,6 +261,7 @@ export async function sendCancellationWorkflowEmails(
     toEmail: adminEmail,
     variables,
     actorId: input.actorId,
+    externalTokenHash: input.externalTokenHash,
   });
 
   if (teamEmail) {
@@ -267,6 +272,7 @@ export async function sendCancellationWorkflowEmails(
       toEmail: teamEmail,
       variables,
       actorId: input.actorId,
+      externalTokenHash: input.externalTokenHash,
     });
   }
 }

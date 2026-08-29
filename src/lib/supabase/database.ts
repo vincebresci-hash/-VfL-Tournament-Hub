@@ -416,6 +416,12 @@ export type CancellationRequestRow = {
   updated_at: string;
 };
 
+export type CancellationEmailSendKeyRow = {
+  cancellation_request_id: string;
+  template_type: EmailTemplateTypeRow;
+  created_at: string;
+};
+
 export type TournamentOccupancyRow = {
   slug: string;
   max_teams: number | null;
@@ -687,6 +693,23 @@ export type Database = {
           },
         ]
       >;
+      cancellation_email_send_keys: Table<
+        CancellationEmailSendKeyRow,
+        Partial<CancellationEmailSendKeyRow> & {
+          cancellation_request_id: string;
+          template_type: EmailTemplateTypeRow;
+        },
+        Partial<CancellationEmailSendKeyRow>,
+        [
+          {
+            foreignKeyName: "cancellation_email_send_keys_cancellation_request_id_fkey";
+            columns: ["cancellation_request_id"];
+            isOneToOne: false;
+            referencedRelation: "cancellation_requests";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
       tournament_groups: Table<
         TournamentGroupRow,
         Partial<TournamentGroupRow> & { tournament_id: string; name: string },
@@ -917,6 +940,14 @@ export type Database = {
       };
       reserve_cancellation_email_send: {
         Args: {
+          p_cancellation_request_id: string;
+          p_template_type: EmailTemplateTypeRow;
+        };
+        Returns: string;
+      };
+      reserve_external_cancellation_email_send: {
+        Args: {
+          p_token_hash: string;
           p_cancellation_request_id: string;
           p_template_type: EmailTemplateTypeRow;
         };
