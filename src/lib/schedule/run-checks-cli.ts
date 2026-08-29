@@ -25,6 +25,7 @@ import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-applic
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runPaymentStatusChecks } from "@/lib/payments/payment-checks";
+import { runCommunicationChecks } from "@/lib/communications/communication-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runNewsSelfChecks } from "@/lib/news-checks";
@@ -68,6 +69,7 @@ try {
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const paymentStatusChecks = runPaymentStatusChecks();
+  const communicationChecks = runCommunicationChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
   const newsSelfChecks = runNewsSelfChecks();
@@ -103,6 +105,7 @@ try {
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
   console.log(`payment-status-checks: ${paymentStatusChecks}`);
+  console.log(`communication-checks: ${communicationChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);
   console.log(`news-self-checks: ${newsSelfChecks}`);

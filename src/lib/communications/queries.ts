@@ -1,0 +1,216 @@
+import { createClient } from "@/lib/supabase/server";
+import { isMissingRelationError } from "@/lib/db/errors";
+import type {
+  CommunicationDetail,
+  CommunicationListItem,
+  CommunicationRecipientPreview,
+  CommunicationRecipientFilter,
+  CommunicationType,
+} from "@/types/communication";
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) {
+    return value[0] ?? null;
+  }
+
+  return value ?? null;
+}
+
+function asCommunicationType(value: string): CommunicationType {
+  const allowed: CommunicationType[] = [
+    "tournament-info",
+    "schedule",
+    "important-change",
+    "payment-reminder",
+    "general",
+  ];
+
+  return allowed.includes(value as CommunicationType)
+    ? (value as CommunicationType)
+    : "general";
+}
+
+function asRecipientFilter(value: string): CommunicationRecipientFilter {
+  const allowed: CommunicationRecipientFilter[] = [
+    "accepted",
+    "payment-paid",
+    "payment-pending",
+    "waitlist",
+    "custom",
+  ];
+
+  return allowed.includes(value as CommunicationRecipientFilter)
+    ? (value as CommunicationRecipientFilter)
+    : "accepted";
+}
+
+export async function previewCommunicationRecipients(input: {
+  tournamentId: string;
+  type: CommunicationType;
+  recipientFilter: CommunicationRecipientFilter;
+  applicationIds?: string[];
+}): Promise<{ recipients: CommunicationRecipientPreview[]; ready: boolean }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("preview_communication_recipients", {
+    p_tournament_id: input.tournamentId,
+    p_communication_type: input.type,
+    p_recipient_filter: input.recipientFilter,
+    p_application_ids:
+      input.applicationIds && input.applicationIds.length > 0
+        ? input.applicationIds
+        : null,
+  });
+
+  if (error || !data) {
+    return { recipients: [], ready: !isMissingRelationError(error) };
+  }
+
+  return {
+    ready: true,
+    recipients: data.map((row) => ({
+      applicationId: row.application_id,
+      recipientEmail: row.recipient_email,
+      recipientTeamName: row.recipient_team_name,
+      recipientClubName: row.recipient_club_name,
+    })),
+  };
+}
+
+export async function listCommunications(): Promise<{
+  communications: CommunicationListItem[];
+  ready: boolean;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_communications")
+    .select(
+      "id, tournament_id, type, subject, important, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug)",
+    )
+    .neq("status", "draft")
+    .order("created_at", { ascending: false });
+
+  if (error || !data) {
+    return { communications: [], ready: !isMissingRelationError(error) };
+  }
+
+  return {
+    ready: true,
+    communications: data.map((row) => {
+      const tournament = firstRelation(
+        row.tournaments as
+          | { id: string; name: string; slug: string }
+          | { id: string; name: string; slug: string }[]
+          | null,
+      );
+
+      return {
+        id: row.id,
+        tournamentId: row.tournament_id,
+        tournamentName: tournament?.name ?? "Turnier",
+        tournamentSlug: tournament?.slug ?? "",
+        type: asCommunicationType(row.type),
+        subject: row.subject,
+        important: row.important,
+        recipientFilter: asRecipientFilter(row.recipient_filter),
+        status: row.status as CommunicationListItem["status"],
+        recipientCount: row.recipient_count,
+        sentCount: row.sent_count,
+        failedCount: row.failed_count,
+        createdAt: row.created_at,
+        sentAt: row.sent_at,
+      };
+    }),
+  };
+}
+
+export async function getCommunicationDetail(
+  communicationId: string,
+): Promise<CommunicationDetail | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_communications")
+    .select(
+      "id, tournament_id, type, subject, body, important, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug), communication_recipients (id, application_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, error_message)",
+    )
+    .eq("id", communicationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const tournament = firstRelation(
+    data.tournaments as
+      | { id: string; name: string; slug: string }
+      | { id: string; name: string; slug: string }[]
+      | null,
+  );
+  const recipients = (data.communication_recipients ?? []) as Array<{
+    id: string;
+    application_id: string | null;
+    recipient_email: string;
+    recipient_team_name: string;
+    recipient_club_name: string | null;
+    send_status: string;
+    sent_at: string | null;
+    error_message: string | null;
+  }>;
+
+  return {
+    id: data.id,
+    tournamentId: data.tournament_id,
+    tournamentName: tournament?.name ?? "Turnier",
+    tournamentSlug: tournament?.slug ?? "",
+    type: asCommunicationType(data.type),
+    subject: data.subject,
+    body: data.body,
+    important: data.important,
+    recipientFilter: asRecipientFilter(data.recipient_filter),
+    status: data.status as CommunicationListItem["status"],
+    recipientCount: data.recipient_count,
+    sentCount: data.sent_count,
+    failedCount: data.failed_count,
+    createdAt: data.created_at,
+    sentAt: data.sent_at,
+    recipients: recipients
+      .map((recipient) => ({
+        id: recipient.id,
+        applicationId: recipient.application_id,
+        recipientEmail: recipient.recipient_email,
+        recipientTeamName: recipient.recipient_team_name,
+        recipientClubName: recipient.recipient_club_name,
+        sendStatus: recipient.send_status as CommunicationDetail["recipients"][number]["sendStatus"],
+        sentAt: recipient.sent_at,
+        errorMessage: recipient.error_message,
+      }))
+      .sort((a, b) => a.recipientTeamName.localeCompare(b.recipientTeamName, "de")),
+  };
+}
+
+export async function listEligibleApplicationsForTournament(tournamentId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("applications")
+    .select(
+      "id, status, contact_email, team_name, club_name, payment_status, participation_fee",
+    )
+    .eq("tournament_id", tournamentId)
+    .in("status", ["accepted", "waiting-list"])
+    .order("team_name", { ascending: true });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data
+    .filter((row) => row.contact_email?.trim())
+    .map((row) => ({
+      id: row.id,
+      status: row.status,
+      contactEmail: row.contact_email!.trim(),
+      teamName: row.team_name?.trim() || "Mannschaft",
+      clubName: row.club_name?.trim() || null,
+      paymentStatus: row.payment_status,
+      participationFee: row.participation_fee,
+    }));
+}

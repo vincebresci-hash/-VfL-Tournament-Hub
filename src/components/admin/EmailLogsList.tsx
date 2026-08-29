@@ -20,7 +20,7 @@ export function EmailLogsList({ logs }: EmailLogsListProps) {
         Versandprotokoll
       </h2>
       <p className="mt-2 max-w-2xl text-[14px] leading-6 text-muted">
-        Die letzten Status-Mails an contact_email.
+        Die letzten versendeten E-Mails (Status-Mails und Kommunikation).
       </p>
 
       {logs.length === 0 ? (
