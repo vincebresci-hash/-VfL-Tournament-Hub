@@ -8,6 +8,11 @@ import { isMissingRelationError } from "@/lib/db/errors";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAdminAuditLog } from "@/lib/rbac/audit";
+import {
+  buildInvitationRedirectUrl,
+  formatInvitationAuthFailure,
+  sanitizeInvitationAuthError,
+} from "@/lib/rbac/invitation-auth-errors";
 import { CLUB_ROLE_KEYS, PLATFORM_ROLE_KEYS } from "@/lib/rbac/permissions";
 import type { RbacRoleKey } from "@/types/rbac";
 
@@ -152,7 +157,7 @@ export async function inviteUserAction(
   }
 
   const siteUrl = getSiteUrl();
-  const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent("/verein/dashboard")}`;
+  const redirectTo = buildInvitationRedirectUrl(siteUrl);
 
   const { data: inviteData, error: inviteError } = await service.auth.admin.inviteUserByEmail(
     email,
@@ -167,13 +172,23 @@ export async function inviteUserAction(
   );
 
   if (inviteError || !inviteData.user) {
+    if (inviteData?.user?.id) {
+      await cleanupPendingAuthUser(service, inviteData.user.id);
+    }
+
     const message = inviteError?.message ?? "";
     if (message.toLowerCase().includes("already")) {
       return { error: "Diese E-Mail ist bereits registriert." };
     }
-    return {
-      error: toUserFacingDbError("Die Einladung konnte nicht versendet werden.", inviteError),
-    };
+
+    const diagnostic = sanitizeInvitationAuthError(inviteError, redirectTo);
+    console.error("[inviteUserAction] Supabase Auth invite failed", diagnostic);
+
+    if (inviteError) {
+      return { error: formatInvitationAuthFailure(diagnostic) };
+    }
+
+    return { error: "Die Einladung konnte nicht versendet werden. (Kein Auth-Benutzer zurückgegeben.)" };
   }
 
   const userId = inviteData.user.id;
@@ -314,15 +329,20 @@ export async function resendInvitationAction(
   }
 
   const siteUrl = getSiteUrl();
-  const redirectTo = `${siteUrl}/auth/callback?next=${encodeURIComponent("/verein/dashboard")}`;
+  const redirectTo = buildInvitationRedirectUrl(siteUrl);
 
   const { error: resendError } = await service.auth.admin.inviteUserByEmail(invitation.email, {
     redirectTo,
   });
 
   if (resendError) {
+    const diagnostic = sanitizeInvitationAuthError(resendError, redirectTo);
+    console.error("[resendInvitationAction] Supabase Auth invite failed", diagnostic);
     return {
-      error: toUserFacingDbError("Die Einladung konnte nicht erneut gesendet werden.", resendError),
+      error: formatInvitationAuthFailure(
+        diagnostic,
+        "Die Einladung konnte nicht erneut gesendet werden.",
+      ),
     };
   }
 

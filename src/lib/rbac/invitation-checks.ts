@@ -37,6 +37,8 @@ export function runInvitationChecks() {
   assert(actions.includes("hasEstablishedAuthUser"), "cancel checks acceptance");
   assert(actions.includes(".eq(\"status\", \"pending\")"), "cancel uses conditional pending update");
   assert(actions.includes("deleteUser"), "cancel removes pending auth user");
+  assert(actions.includes("buildInvitationRedirectUrl"), "invite redirect helper");
+  assert(actions.includes("sanitizeInvitationAuthError"), "invite auth error diagnostics");
   assert(actions.includes("cleanupPendingAuthUser"), "invite partial failure cleanup");
   assert(actions.includes("roleKeys"), "multi-role invite support");
   assert(actions.includes("teamIds"), "team invite support");
