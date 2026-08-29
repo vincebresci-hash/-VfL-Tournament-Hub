@@ -3,7 +3,9 @@ import { join } from "node:path";
 import {
   DEFAULT_PRODUCTION_SITE_URL,
   getContentSecurityPolicyHeaderValue,
+  getInviteRedirectSiteUrl,
   getSiteUrl,
+  isEphemeralVercelHost,
   MEIN_TURNIERPLAN_FRAME_SRC_HOSTS,
 } from "@/lib/site";
 
@@ -48,6 +50,28 @@ export function runSiteUrlAndCspChecks() {
     delete process.env.NEXT_PUBLIC_SITE_URL;
     assert(getSiteUrl() === "http://localhost:3000", "C: local fallback");
 
+    // Invite redirects must never use ephemeral Vercel preview hosts.
+    process.env.VERCEL = "1";
+    process.env.NEXT_PUBLIC_SITE_URL =
+      "https://vf-l-tournament-hub-cy1dkrg01-briefscan-s-projects.vercel.app";
+    assert(
+      getInviteRedirectSiteUrl() === DEFAULT_PRODUCTION_SITE_URL,
+      "invite redirect rejects ephemeral vercel preview host",
+    );
+    assert(
+      isEphemeralVercelHost("vf-l-tournament-hub-cy1dkrg01-briefscan-s-projects.vercel.app"),
+      "preview host detection",
+    );
+    assert(
+      !isEphemeralVercelHost(new URL(DEFAULT_PRODUCTION_SITE_URL).hostname),
+      "canonical production host is not ephemeral",
+    );
+    process.env.NEXT_PUBLIC_SITE_URL = DEFAULT_PRODUCTION_SITE_URL;
+    assert(
+      getInviteRedirectSiteUrl() === DEFAULT_PRODUCTION_SITE_URL,
+      "invite redirect accepts canonical NEXT_PUBLIC_SITE_URL",
+    );
+
     // Source inspection: sitemap/robots/layout use getSiteUrl only
     const sitemapSource = readFileSync(join(process.cwd(), "src/app/sitemap.ts"), "utf8");
     assert(sitemapSource.includes("getSiteUrl"), "D: sitemap uses getSiteUrl");
@@ -70,7 +94,8 @@ export function runSiteUrlAndCspChecks() {
     const siteSource = readFileSync(join(process.cwd(), "src/lib/site.ts"), "utf8");
     assert(siteSource.includes("NEXT_PUBLIC_SITE_URL"), "site helper reads SITE_URL");
     assert(siteSource.includes('process.env.VERCEL === "1"'), "site helper checks VERCEL");
-    assert(siteSource.includes("DEFAULT_PRODUCTION_SITE_URL"), "site helper has production default");
+    assert(siteSource.includes("getInviteRedirectSiteUrl"), "site helper exports invite redirect url");
+    assert(siteSource.includes("isEphemeralVercelHost"), "site helper detects preview hosts");
     assert(siteSource.includes("withCanonical"), "site helper exports withCanonical");
     assert(siteSource.includes("canonicalPath"), "site helper exports canonicalPath");
     assert(

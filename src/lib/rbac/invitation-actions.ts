@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSiteUrl } from "@/lib/site";
+import { getInviteRedirectSiteUrl } from "@/lib/site";
 import { requireSuperAdminSession } from "@/lib/auth/guards";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { isMissingRelationError } from "@/lib/db/errors";
@@ -171,7 +171,7 @@ export async function inviteUserAction(
     return { error: "Für diese E-Mail liegt bereits eine offene Einladung vor." };
   }
 
-  const siteUrl = getSiteUrl();
+  const siteUrl = getInviteRedirectSiteUrl();
   const redirectTo = buildInvitationRedirectUrl(siteUrl);
 
   const { data: inviteData, error: inviteError } = await service.auth.admin.inviteUserByEmail(
@@ -341,7 +341,7 @@ export async function resendInvitationAction(
     }
   }
 
-  const siteUrl = getSiteUrl();
+  const siteUrl = getInviteRedirectSiteUrl();
   const redirectTo = buildInvitationRedirectUrl(siteUrl);
 
   const { error: resendError } = await service.auth.admin.inviteUserByEmail(invitation.email, {
