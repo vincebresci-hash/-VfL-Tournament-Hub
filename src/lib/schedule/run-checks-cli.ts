@@ -24,6 +24,7 @@ import { runDuplicateApplicationChecks } from "@/lib/applications/duplicate-appl
 import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-application-fields-checks";
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
+import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runPaymentStatusChecks } from "@/lib/payments/payment-checks";
 import { runCommunicationChecks } from "@/lib/communications/communication-checks";
 import { runCommunicationReceiptChecks } from "@/lib/communications/communication-receipt-checks";
@@ -69,6 +70,7 @@ try {
   const guestApplicationFieldsChecks = runGuestApplicationFieldsChecks();
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
+  const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const paymentStatusChecks = runPaymentStatusChecks();
   const communicationChecks = runCommunicationChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
@@ -106,6 +108,7 @@ try {
   console.log(`guest-application-fields-checks: ${guestApplicationFieldsChecks}`);
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
+  console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
   console.log(`payment-status-checks: ${paymentStatusChecks}`);
   console.log(`communication-checks: ${communicationChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);
