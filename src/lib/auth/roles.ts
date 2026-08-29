@@ -5,11 +5,25 @@ export function isUserRole(value: unknown): value is UserRole {
   return typeof value === "string" && USER_ROLES.includes(value as UserRole);
 }
 
-export function canAccessAdmin(role: UserRole | null | undefined) {
+export function canAccessAdmin(
+  role: UserRole | null | undefined,
+  options?: { isActive?: boolean },
+) {
+  if (options?.isActive === false) {
+    return false;
+  }
+
   return role === "admin" || role === "super-admin";
 }
 
-export function canAccessClub(role: UserRole | null | undefined) {
+export function canAccessClub(
+  role: UserRole | null | undefined,
+  options?: { isActive?: boolean },
+) {
+  if (options?.isActive === false) {
+    return false;
+  }
+
   return role === "club";
 }
 

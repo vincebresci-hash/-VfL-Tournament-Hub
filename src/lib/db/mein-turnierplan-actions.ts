@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import {
+  requireScheduleManage,
+  requireTournamentsView,
+} from "@/lib/rbac/action-access";
 import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { createTournamentGroupAction, assignTeamToGroupAction } from "@/lib/db/schedule-actions";
@@ -23,15 +25,6 @@ import {
   validateMeinTurnierplanTournamentId,
 } from "@/lib/mein-turnierplan";
 import type { AdminTournamentRecord } from "@/types/admin";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
 
 async function loadTournament(tournamentId: string) {
   const supabase = await createClient();
@@ -109,7 +102,7 @@ export async function checkMeinTurnierplanConnectionAction(
     tableWidgetUrl?: string | null;
   },
 ): Promise<{ error: string | null; ok: boolean }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, ok: false };
   }
@@ -148,7 +141,7 @@ export async function loadMeinTurnierplanPreviewAction(
   mappingGroups: MeinTurnierplanImportGroup[] | null;
   meta: MeinTurnierplanPreview["meta"] | null;
 }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, preview: null, mappingGroups: null, meta: null };
   }
@@ -199,7 +192,7 @@ export async function loadMeinTurnierplanPreviewForTournamentAction(
   mappingGroups: MeinTurnierplanImportGroup[] | null;
   meta: MeinTurnierplanPreview["meta"] | null;
 }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, preview: null, mappingGroups: null, meta: null };
   }
@@ -240,7 +233,7 @@ export async function importMeinTurnierplanGroupsAction(
   tournamentId: string,
   groups: MeinTurnierplanImportGroup[],
 ): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }

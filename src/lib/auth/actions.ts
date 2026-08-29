@@ -13,9 +13,22 @@ export async function signOutAction() {
   redirect("/");
 }
 
-export async function updateAdminProfileAction(input: {
+const PERSONAL_PROFILE_FIELDS = [
+  "first_name",
+  "last_name",
+  "display_name",
+  "phone",
+  "job_title",
+  "avatar_url",
+] as const;
+
+async function updateOwnPersonalProfile(input: {
   firstName: string;
   lastName: string;
+  displayName?: string | null;
+  phone?: string | null;
+  jobTitle?: string | null;
+  avatarUrl?: string | null;
 }): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
@@ -38,6 +51,10 @@ export async function updateAdminProfileAction(input: {
     .update({
       first_name: firstName,
       last_name: lastName,
+      display_name: input.displayName?.trim() || null,
+      phone: input.phone?.trim() || null,
+      job_title: input.jobTitle?.trim() || null,
+      avatar_url: input.avatarUrl?.trim() || null,
     })
     .eq("id", user.id);
 
@@ -55,6 +72,27 @@ export async function updateAdminProfileAction(input: {
   });
 
   return { error: null };
+}
+
+export async function updateAdminProfileAction(input: {
+  firstName: string;
+  lastName: string;
+  displayName?: string | null;
+  phone?: string | null;
+  jobTitle?: string | null;
+}): Promise<{ error: string | null }> {
+  return updateOwnPersonalProfile(input);
+}
+
+export async function updatePersonalProfileAction(input: {
+  firstName: string;
+  lastName: string;
+  displayName?: string | null;
+  phone?: string | null;
+  jobTitle?: string | null;
+  avatarUrl?: string | null;
+}): Promise<{ error: string | null }> {
+  return updateOwnPersonalProfile(input);
 }
 
 export async function updatePasswordAction(input: {

@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import { requireResultsManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { addMinutes, datetimeLocalToIso } from "@/lib/schedule/datetime";
@@ -22,15 +21,6 @@ import { computeGroupStandings } from "@/lib/schedule/standings";
 import { buildTimetable } from "@/lib/schedule/timetable";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { DecidedBy, TournamentMatchRecord } from "@/types/schedule";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
 
 function revalidateStage(tournament: Pick<AdminTournamentRecord, "id" | "slug">) {
   revalidatePath("/admin");
@@ -86,7 +76,7 @@ export async function generateKnockoutAction(
     startAt: string;
   },
 ): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireResultsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -292,7 +282,7 @@ export async function saveKnockoutMatchAction(
     confirmCompletedChange: boolean;
   },
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireResultsManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -392,7 +382,7 @@ export async function saveKnockoutResultAction(
     awayPenalties: string;
   },
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireResultsManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -468,7 +458,7 @@ export async function saveKnockoutResultAction(
 export async function completeTournamentAction(
   tournamentId: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireResultsManage();
   if (access.error) {
     return { error: access.error };
   }

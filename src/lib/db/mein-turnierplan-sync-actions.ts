@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import {
+  requireTournamentsManage,
+  requireTournamentsView,
+} from "@/lib/rbac/action-access";
 import { listAdminApplications } from "@/lib/db/queries";
 import { fetchMeinTurnierplanJson } from "@/lib/mein-turnierplan-api";
 import { normalizeMeinTurnierplanSyncPayload } from "@/lib/mein-turnierplan-sync-normalize";
@@ -24,15 +26,6 @@ import {
 } from "@/lib/mein-turnierplan";
 import { applicationBelongsToTournament } from "@/lib/tournaments";
 import { shouldSkipMeinTurnierplanLogoSync } from "@/lib/tournament-participant-logos";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
 
 async function loadTournamentForSync(tournamentId: string) {
   const supabase = await createClient();
@@ -210,7 +203,7 @@ export async function previewMeinTurnierplanSyncAction(
     overridePolicy?: SyncOverridePolicy;
   },
 ): Promise<{ error: string | null; preview: MeinTurnierplanSyncPreview | null }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, preview: null };
   }
@@ -264,7 +257,7 @@ export async function confirmMeinTurnierplanSyncAction(input: {
   mappings: SyncTeamMapping[];
   overridePolicy: SyncOverridePolicy;
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -327,7 +320,7 @@ export async function confirmMeinTurnierplanSyncAction(input: {
 }
 
 export async function getMeinTurnierplanSyncStatusAction(tournamentId: string) {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, status: null };
   }

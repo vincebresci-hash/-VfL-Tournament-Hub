@@ -19,9 +19,14 @@ export type UserProfile = {
   id: string;
   firstName: string;
   lastName: string;
+  displayName: string | null;
   email: string;
+  phone: string | null;
+  jobTitle: string | null;
+  avatarUrl: string | null;
   role: UserRole;
   clubId: string | null;
+  isActive: boolean;
   contactRole?: ClubContactRole | null;
   createdAt: string;
   lastSignInAt: string | null;

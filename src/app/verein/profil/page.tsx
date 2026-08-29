@@ -5,7 +5,7 @@ import { CLUB_LOGIN } from "@/lib/auth/roles";
 import { getAuthSession } from "@/lib/auth/session";
 import { loadClubWorkspace } from "@/lib/club/workspace";
 
-export const metadata: Metadata = { title: "Vereinsprofil" };
+export const metadata: Metadata = { title: "Profil" };
 
 export default async function ClubProfilePage() {
   const session = await getAuthSession();

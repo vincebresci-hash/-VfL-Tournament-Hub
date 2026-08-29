@@ -1,4 +1,5 @@
 import {
+  IconCheckCircle,
   IconClipboard,
   IconClubs,
   IconGrid,
@@ -6,6 +7,7 @@ import {
   IconMessage,
   IconNews,
   IconSettings,
+  IconShield,
   IconTrophy,
   IconUser,
   IconUsers,
@@ -14,10 +16,13 @@ import {
 export const adminNavigation = [
   { href: "/admin", label: "Dashboard", icon: IconGrid, exact: true },
   { href: "/admin/bewerbungen", label: "Bewerbungen", icon: IconClipboard },
+  { href: "/admin/zahlungen", label: "Zahlungen", icon: IconCheckCircle },
   { href: "/admin/absagen", label: "Absagen", icon: IconClipboard },
   { href: "/admin/turniere", label: "Turniere", icon: IconTrophy },
   { href: "/admin/vereine", label: "Vereine", icon: IconClubs },
   { href: "/admin/teams", label: "Teams", icon: IconUsers },
+  { href: "/admin/benutzer", label: "Benutzer", icon: IconUsers },
+  { href: "/admin/rollen", label: "Rollen", icon: IconShield },
   { href: "/admin/news", label: "News", icon: IconNews },
   { href: "/admin/kommunikation", label: "Kommunikation", icon: IconMessage },
   { href: "/admin/emails", label: "E-Mails", icon: IconMail },

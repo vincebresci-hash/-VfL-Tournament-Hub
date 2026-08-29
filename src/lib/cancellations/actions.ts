@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin, canAccessClub } from "@/lib/auth/roles";
+import { canAccessClub } from "@/lib/auth/roles";
+import { requireCancellationsManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
   isLateCancellationRequest,
@@ -228,10 +229,12 @@ export async function decideCancellationRequestAction(input: {
   decision: "confirmed" | "rejected";
   adminNote?: string;
 }): Promise<ActionResult> {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { error: "Kein Adminzugang." };
+  const access = await requireCancellationsManage();
+  if (access.error || !access.session) {
+    return { error: access.error };
   }
+
+  const session = access.session;
 
   const supabase = await createClient();
   const { data: requestRow } = await supabase

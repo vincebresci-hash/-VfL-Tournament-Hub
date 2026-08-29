@@ -170,7 +170,7 @@ export function runNewsSelfChecks() {
   assert(migration.includes("public.is_admin()"), "RLS admin policy");
 
   // Admin guard
-  assert(newsActions.includes("requireAdmin()"), "Admin actions guarded");
+  assert(newsActions.includes("requireNewsManage()"), "Admin actions guarded");
 
   return "ok";
 }

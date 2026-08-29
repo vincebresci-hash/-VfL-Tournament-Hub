@@ -75,7 +75,9 @@ export function runPaymentStatusChecks() {
   assert(!migration.includes("DROP FUNCTION"), "no DROP FUNCTION in migration");
   assert(!migration.includes("tournament_occupancy"), "occupancy unchanged in migration");
 
-  assert(actions.includes("canAccessAdmin"), "admin-only payment updates");
+  assert(actions.includes("requirePaymentsManage"), "admin-only payment mutations");
+  assert(actions.includes("requirePaymentsView"), "payments.view read guard");
+  assert(actions.includes("loadAdminPaymentRecordsAction"), "standalone payment list action");
   assert(actions.includes("normalizePaymentUpdate"), "normalized payment update");
   assert(actions.includes("application_payment_admin_notes"), "admin notes table writes");
 

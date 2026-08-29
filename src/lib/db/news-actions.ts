@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import { requireNewsManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
   parsePublishedAtInput,
@@ -12,15 +11,6 @@ import {
   validateNewsPostInput,
 } from "@/lib/news";
 import type { NewsPostInput, NewsPostSaveMode } from "@/types/news";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
 
 function revalidateNewsPaths(slug?: string | null) {
   revalidatePath("/news");
@@ -74,7 +64,7 @@ export async function createNewsPostAction(
   input: NewsPostInput,
   mode: NewsPostSaveMode,
 ): Promise<{ error: string | null; id?: string }> {
-  const access = await requireAdmin();
+  const access = await requireNewsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -119,7 +109,7 @@ export async function updateNewsPostAction(
   input: NewsPostInput,
   mode: NewsPostSaveMode,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireNewsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -180,7 +170,7 @@ export async function updateNewsPostAction(
 }
 
 export async function archiveNewsPostAction(id: string): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireNewsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -215,7 +205,7 @@ export async function archiveNewsPostAction(id: string): Promise<{ error: string
 }
 
 export async function restoreNewsPostAction(id: string): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireNewsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }

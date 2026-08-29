@@ -129,7 +129,7 @@ export function runCommunicationChecks() {
 
   assert(actions.includes("previewCommunicationRecipientsAction"), "preview action");
   assert(actions.includes("sendCommunicationAction"), "send action");
-  assert(actions.includes("canAccessAdmin"), "admin-only actions");
+  assert(actions.includes("requireCommunicationsManage"), "admin-only actions");
 
   assert(faq.includes('id: "turnierkommunikation"'), "FAQ communication entry");
   assert(
