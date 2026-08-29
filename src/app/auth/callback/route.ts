@@ -19,6 +19,7 @@ export async function GET(request: Request) {
       await markInvitationAcceptedForAuthUser({
         userId: data.user.id,
         email: data.user.email,
+        source: "auth_callback",
       });
       return NextResponse.redirect(new URL(next, origin));
     }
