@@ -34,6 +34,25 @@ async function getServiceClient() {
   }
 }
 
+async function hasEstablishedAuthUser(
+  service: NonNullable<Awaited<ReturnType<typeof getServiceClient>>>,
+  authUserId: string,
+) {
+  const { data: authUser } = await service.auth.admin.getUserById(authUserId);
+  return Boolean(authUser.user?.last_sign_in_at);
+}
+
+async function cleanupPendingAuthUser(
+  service: NonNullable<Awaited<ReturnType<typeof getServiceClient>>>,
+  authUserId: string,
+) {
+  if (await hasEstablishedAuthUser(service, authUserId)) {
+    return;
+  }
+
+  await service.auth.admin.deleteUser(authUserId);
+}
+
 export type InviteUserInput = {
   email: string;
   firstName?: string;
@@ -178,6 +197,7 @@ export async function inviteUserAction(
     .eq("id", userId);
 
   if (profileError) {
+    await cleanupPendingAuthUser(service, userId);
     return {
       error: toUserFacingDbError("Das Benutzerprofil konnte nicht vorbereitet werden.", profileError),
     };
@@ -190,6 +210,7 @@ export async function inviteUserAction(
       p_club_id: CLUB_ROLE_KEYS.includes(roleKey) ? input.clubId ?? null : null,
     });
     if (roleError) {
+      await cleanupPendingAuthUser(service, userId);
       return {
         error: toUserFacingDbError(`Rolle ${roleKey} konnte nicht zugewiesen werden.`, roleError),
       };
@@ -202,6 +223,7 @@ export async function inviteUserAction(
       p_team_id: teamId,
     });
     if (teamError) {
+      await cleanupPendingAuthUser(service, userId);
       return {
         error: toUserFacingDbError("Teamzuweisung fehlgeschlagen.", teamError),
       };
@@ -230,6 +252,7 @@ export async function inviteUserAction(
     .single();
 
   if (invitationError) {
+    await cleanupPendingAuthUser(service, userId);
     if (isMissingRelationError(invitationError)) {
       return { error: "Einladungstabelle fehlt. Bitte PR28-Migration ausführen." };
     }
@@ -284,17 +307,9 @@ export async function resendInvitationAction(
     return { error: "Bitte eine Minute warten, bevor die Einladung erneut gesendet wird." };
   }
 
-  if (invitation.profile_id) {
-    const { data: profile } = await service
-      .from("profiles")
-      .select("is_active")
-      .eq("id", invitation.profile_id)
-      .maybeSingle();
-    if (profile?.is_active && invitation.auth_user_id) {
-      const { data: authUser } = await service.auth.admin.getUserById(invitation.auth_user_id);
-      if (authUser.user?.last_sign_in_at) {
-        return { error: "Der Benutzer hat die Einladung bereits angenommen." };
-      }
+  if (invitation.profile_id && invitation.auth_user_id) {
+    if (await hasEstablishedAuthUser(service, invitation.auth_user_id)) {
+      return { error: "Der Benutzer hat die Einladung bereits angenommen." };
     }
   }
 
@@ -363,49 +378,48 @@ export async function cancelInvitationAction(
     return { error: "Nur ausstehende Einladungen können abgebrochen werden." };
   }
 
-  if (invitation.auth_user_id) {
-    const { data: authUser } = await service.auth.admin.getUserById(invitation.auth_user_id);
-    if (authUser.user?.last_sign_in_at) {
-      return { error: "Der Benutzer hat die Einladung bereits angenommen." };
-    }
+  if (invitation.auth_user_id && (await hasEstablishedAuthUser(service, invitation.auth_user_id))) {
+    return { error: "Der Benutzer hat die Einladung bereits angenommen." };
   }
 
-  await service
+  const { data: cancelled, error: cancelError } = await service
     .from("user_invitations")
     .update({
       status: "cancelled",
       updated_at: new Date().toISOString(),
     })
-    .eq("id", invitationId);
+    .eq("id", invitationId)
+    .eq("status", "pending")
+    .select("auth_user_id, profile_id")
+    .maybeSingle();
 
-  if (invitation.auth_user_id) {
-    await service.auth.admin.deleteUser(invitation.auth_user_id);
+  if (cancelError || !cancelled) {
+    return { error: "Die Einladung ist nicht mehr ausstehend oder wurde bereits bearbeitet." };
+  }
+
+  if (cancelled.auth_user_id) {
+    if (await hasEstablishedAuthUser(service, cancelled.auth_user_id)) {
+      return { error: "Der Benutzer hat die Einladung bereits angenommen." };
+    }
+
+    const { error: deleteError } = await service.auth.admin.deleteUser(cancelled.auth_user_id);
+    if (deleteError) {
+      return {
+        error: toUserFacingDbError(
+          "Die Einladung wurde storniert, aber der Auth-Benutzer konnte nicht entfernt werden.",
+          deleteError,
+        ),
+      };
+    }
   }
 
   await writeAdminAuditLog({
     actorUserId: access.session.user.id,
-    targetUserId: invitation.profile_id,
+    targetUserId: cancelled.profile_id,
     action: "INVITATION_CANCELLED",
     metadata: { invitationId },
   });
 
   revalidateInvitationPaths();
   return { error: null };
-}
-
-export async function markInvitationAcceptedAction(userId: string) {
-  const service = await getServiceClient();
-  if (!service) {
-    return;
-  }
-
-  await service
-    .from("user_invitations")
-    .update({
-      status: "accepted",
-      accepted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("profile_id", userId)
-    .eq("status", "pending");
 }

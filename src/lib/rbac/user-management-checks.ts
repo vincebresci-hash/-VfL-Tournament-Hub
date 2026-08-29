@@ -52,6 +52,9 @@ export function runUserManagementChecks() {
   assert(migration.includes("admin_audit_log"), "admin_audit_log table");
   assert(migration.includes("'avatars'"), "avatars storage bucket");
   assert(migration.includes("is_super_admin()"), "invitation RLS super admin only");
+  assert(migration.includes("GRANT SELECT, INSERT ON TABLE public.admin_audit_log"), "audit log append-only grants");
+  assert(!migration.includes("UPDATE ON TABLE public.admin_audit_log"), "audit log no update grant");
+  assert(!migration.includes("DELETE ON TABLE public.admin_audit_log"), "audit log no delete grant");
 
   assert(invitationActions.includes("requireSuperAdminSession"), "invite super admin only");
   assert(invitationActions.includes("inviteUserAction"), "invite user action");
