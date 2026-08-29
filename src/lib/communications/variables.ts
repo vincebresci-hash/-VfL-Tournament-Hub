@@ -12,6 +12,7 @@ export type CommunicationVariableContext = {
   meinTurnierplanUrl: string | null;
   participationFee: number | null;
   paymentStatus: PaymentStatus | null;
+  confirmationUrl?: string;
 };
 
 function cleanOptional(value: string | null | undefined) {
@@ -48,6 +49,7 @@ export function buildCommunicationVariables(
     payment_status_label: context.paymentStatus
       ? paymentStatusLabel[context.paymentStatus]
       : "",
+    confirmation_url: cleanOptional(context.confirmationUrl),
   };
 }
 

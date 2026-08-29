@@ -1,6 +1,7 @@
 import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
 import {
   communicationRecipientFilterLabel,
+  communicationRecipientConfirmationStatusLabel,
   communicationRecipientSendStatusLabel,
   communicationStatusLabel,
   communicationTypeLabel,
@@ -28,6 +29,9 @@ export function CommunicationDetailView({
   const sendingCount = communication.recipients.filter(
     (recipient) => recipient.sendStatus === "sending",
   ).length;
+  const confirmedCount = communication.recipients.filter(
+    (recipient) => recipient.confirmedAt != null,
+  ).length;
 
   return (
     <div className="mt-8 grid gap-6">
@@ -51,6 +55,12 @@ export function CommunicationDetailView({
             label="Versendet"
             value={formatDateTimeDe(communication.sentAt ?? communication.createdAt)}
           />
+          {communication.requireConfirmation ? (
+            <AdminInfo
+              label="Empfangsbestätigungen"
+              value={`${confirmedCount} / ${communication.recipientCount} bestätigt`}
+            />
+          ) : null}
         </dl>
         {incompleteRecipients.length > 0 ? (
           <p className="mt-4 border border-line bg-surface px-4 py-3 text-[14px] leading-6 text-[#9a2b2b]">
@@ -79,6 +89,9 @@ export function CommunicationDetailView({
                 <th className="px-3 py-2">Verein</th>
                 <th className="px-3 py-2">E-Mail</th>
                 <th className="px-3 py-2">Status</th>
+                {communication.requireConfirmation ? (
+                  <th className="px-3 py-2">Empfang</th>
+                ) : null}
                 <th className="px-3 py-2">Gesendet</th>
                 <th className="px-3 py-2">Fehler</th>
               </tr>
@@ -102,6 +115,13 @@ export function CommunicationDetailView({
                     >
                       {communicationRecipientSendStatusLabel(recipient.sendStatus)}
                     </td>
+                    {communication.requireConfirmation ? (
+                      <td className="px-3 py-2 text-muted">
+                        {communicationRecipientConfirmationStatusLabel(
+                          recipient.confirmedAt,
+                        )}
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2 text-muted">
                       {recipient.sentAt ? formatDateTimeDe(recipient.sentAt) : "—"}
                     </td>

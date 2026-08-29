@@ -1,4 +1,5 @@
 import type { CommunicationType, CommunicationRecipientFilter } from "@/types/communication";
+import { formatDateTimeDe } from "@/lib/format";
 
 export function communicationTypeLabel(type: CommunicationType): string {
   const labels: Record<CommunicationType, string> = {
@@ -49,4 +50,14 @@ export function communicationRecipientSendStatusLabel(status: string): string {
   };
 
   return labels[status] ?? status;
+}
+
+export function communicationRecipientConfirmationStatusLabel(
+  confirmedAt: string | null,
+): string {
+  if (!confirmedAt) {
+    return "Ausstehend";
+  }
+
+  return `Bestätigt am ${formatDateTimeDe(confirmedAt)}`;
 }

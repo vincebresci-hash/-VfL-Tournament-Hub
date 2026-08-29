@@ -84,7 +84,7 @@ export async function listCommunications(): Promise<{
   const { data, error } = await supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, type, subject, important, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug)",
+      "id, tournament_id, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug)",
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false });
@@ -111,11 +111,13 @@ export async function listCommunications(): Promise<{
         type: asCommunicationType(row.type),
         subject: row.subject,
         important: row.important,
+        requireConfirmation: row.require_confirmation ?? false,
         recipientFilter: asRecipientFilter(row.recipient_filter),
         status: row.status as CommunicationListItem["status"],
         recipientCount: row.recipient_count,
         sentCount: row.sent_count,
         failedCount: row.failed_count,
+        confirmedCount: 0,
         createdAt: row.created_at,
         sentAt: row.sent_at,
       };
@@ -130,7 +132,7 @@ export async function getCommunicationDetail(
   const { data, error } = await supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, type, subject, body, important, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug), communication_recipients (id, application_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, error_message)",
+      "id, tournament_id, type, subject, body, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug), communication_recipients (id, application_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, confirmed_at, error_message)",
     )
     .eq("id", communicationId)
     .maybeSingle();
@@ -153,8 +155,11 @@ export async function getCommunicationDetail(
     recipient_club_name: string | null;
     send_status: string;
     sent_at: string | null;
+    confirmed_at: string | null;
     error_message: string | null;
   }>;
+
+  const confirmedCount = recipients.filter((recipient) => recipient.confirmed_at != null).length;
 
   return {
     id: data.id,
@@ -165,11 +170,13 @@ export async function getCommunicationDetail(
     subject: data.subject,
     body: data.body,
     important: data.important,
+    requireConfirmation: data.require_confirmation ?? false,
     recipientFilter: asRecipientFilter(data.recipient_filter),
     status: data.status as CommunicationListItem["status"],
     recipientCount: data.recipient_count,
     sentCount: data.sent_count,
     failedCount: data.failed_count,
+    confirmedCount,
     createdAt: data.created_at,
     sentAt: data.sent_at,
     recipients: recipients
@@ -181,6 +188,7 @@ export async function getCommunicationDetail(
         recipientClubName: recipient.recipient_club_name,
         sendStatus: recipient.send_status as CommunicationDetail["recipients"][number]["sendStatus"],
         sentAt: recipient.sent_at,
+        confirmedAt: recipient.confirmed_at,
         errorMessage: recipient.error_message,
       }))
       .sort((a, b) => a.recipientTeamName.localeCompare(b.recipientTeamName, "de")),

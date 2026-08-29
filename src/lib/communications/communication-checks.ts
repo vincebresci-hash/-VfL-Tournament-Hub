@@ -136,6 +136,10 @@ export function runCommunicationChecks() {
     faq.includes("Empfangsbestätigung angefordert werden"),
     "FAQ confirmation mention",
   );
+  assert(
+    faq.includes("dokumentiert ausschließlich den Erhalt der Information"),
+    "FAQ receipt disclaimer",
+  );
 
   // A: single recipient via custom filter support
   assert(requiresCustomApplicationIds("custom"), "custom filter exists");

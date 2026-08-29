@@ -97,6 +97,7 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState(defaultBodyByType["tournament-info"]);
   const [important, setImportant] = useState(false);
+  const [requireConfirmation, setRequireConfirmation] = useState(false);
   const [selectedApplicationIds, setSelectedApplicationIds] = useState<string[]>([]);
   const [eligibleApplications, setEligibleApplications] = useState<
     Awaited<ReturnType<typeof loadEligibleCommunicationApplicationsAction>>["applications"]
@@ -210,6 +211,7 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
       subject,
       body,
       important,
+      requireConfirmation,
       idempotencyKey,
     });
 
@@ -347,6 +349,21 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
               onChange={(event) => setImportant(event.target.checked)}
             />
             Wichtige Mitteilung
+          </label>
+          <label className="flex items-start gap-3 text-[14px] text-ink">
+            <input
+              type="checkbox"
+              checked={requireConfirmation}
+              onChange={(event) => setRequireConfirmation(event.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Empfangsbestätigung erforderlich
+              <span className="mt-1 block text-[12px] text-muted">
+                Empfänger erhalten einen persönlichen Link, über den sie den Erhalt der
+                Information bestätigen können.
+              </span>
+            </span>
           </label>
         </div>
       </AdminCard>
