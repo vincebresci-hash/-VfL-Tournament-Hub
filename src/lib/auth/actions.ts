@@ -1,11 +1,17 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { readUserMetadata } from "@/lib/auth/user";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/messages";
 import { validateNewPassword } from "@/lib/auth/validation";
 import { isMissingRelationError, toUserFacingDbError } from "@/lib/db/errors";
+import { getFormDataUploadFile } from "@/lib/storage/club-logos";
+import {
+  deleteManagedAvatarIfOwned,
+  uploadAvatarFile,
+} from "@/lib/storage/avatars";
 
 export async function signOutAction() {
   const supabase = await createClient();
@@ -190,4 +196,59 @@ export async function ensureClubForCurrentUser() {
   }
 
   return { clubId: clubId ?? null, error: null };
+}
+
+export async function uploadAvatarAction(
+  formData: FormData,
+): Promise<{ error: string | null; avatarUrl?: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Bitte zuerst anmelden." };
+  }
+
+  const { file } = getFormDataUploadFile(formData, "avatar");
+  if (!file) {
+    return { error: "Bitte eine Bilddatei auswählen." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { publicUrl, error: uploadError } = await uploadAvatarFile({
+    supabase,
+    userId: user.id,
+    file,
+  });
+
+  if (uploadError || !publicUrl) {
+    return { error: uploadError ?? "Upload fehlgeschlagen." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  if (updateError) {
+    return {
+      error: toUserFacingDbError("Profilbild konnte nicht gespeichert werden.", updateError),
+    };
+  }
+
+  await deleteManagedAvatarIfOwned({
+    supabase,
+    avatarUrl: profile?.avatar_url,
+    userId: user.id,
+  });
+
+  revalidatePath("/verein/profil");
+  revalidatePath("/admin/profil");
+  return { error: null, avatarUrl: publicUrl };
 }

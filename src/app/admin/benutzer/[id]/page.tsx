@@ -6,7 +6,13 @@ import { getAuthSession } from "@/lib/auth/session";
 import { canManageSystem } from "@/lib/auth/roles";
 import { requirePermission } from "@/lib/auth/guards";
 import { ADMIN_LOGIN } from "@/lib/auth/roles";
-import { getAdminUser, listRbacRoles } from "@/lib/rbac/queries";
+import { listAdminAuditLogForUser } from "@/lib/rbac/audit";
+import {
+  getAdminUser,
+  listAdminClubsForSelect,
+  listAdminTeamsForSelect,
+  listRbacRoles,
+} from "@/lib/rbac/queries";
 
 export const metadata: Metadata = { title: "Benutzer" };
 
@@ -28,8 +34,15 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
 
   const manageAccess = await requirePermission("users.manage");
   const rolesAccess = await requirePermission("roles.manage");
-  const user = await getAdminUser(id);
-  const { roles, ready } = await listRbacRoles();
+  const teamsAccess = await requirePermission("teams.manage");
+
+  const [user, { roles, ready }, clubs, teams, audit] = await Promise.all([
+    getAdminUser(id),
+    listRbacRoles(),
+    listAdminClubsForSelect(),
+    listAdminTeamsForSelect(),
+    listAdminAuditLogForUser(id),
+  ]);
 
   if (!ready) {
     return (
@@ -51,16 +64,20 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
     <div>
       <AdminPageHeader
         title={user.displayName || `${user.firstName} ${user.lastName}`.trim() || user.email}
-        description="Benutzerprofil, Rollen und effektive Berechtigungen."
+        description="Benutzerprofil, Rollen, Teams und Berechtigungen."
       />
       <AdminUserDetail
         user={user}
         roles={roles}
+        clubs={clubs}
+        teams={teams}
+        auditEntries={audit.entries}
         canManageUsers={!("error" in manageAccess && manageAccess.error)}
         canManageRoles={
           canManageSystem(session.user.role) &&
           !("error" in rolesAccess && rolesAccess.error)
         }
+        canManageTeams={!("error" in teamsAccess && teamsAccess.error)}
       />
     </div>
   );

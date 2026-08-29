@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSafeRedirect } from "@/lib/auth/redirects";
 import { createClient } from "@/lib/supabase/server";
+import { markInvitationAcceptedAction } from "@/lib/rbac/invitation-actions";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -12,9 +13,10 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error) {
+    if (!error && data.user) {
+      await markInvitationAcceptedAction(data.user.id);
       return NextResponse.redirect(new URL(next, origin));
     }
   }

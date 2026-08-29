@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toLoginErrorMessage } from "@/lib/auth/messages";
-import { getPostLoginRedirect } from "@/lib/auth/redirects";
+import { getLoginDestinationAction } from "@/lib/auth/login-destination-action";
 import { canAccessAdmin, isUserRole } from "@/lib/auth/roles";
 import {
   validateLoginCredentials,
@@ -66,7 +66,8 @@ export function LoginForm({ redirectTo, initialError }: LoginFormProps) {
         await ensureClubForCurrentUser();
       }
 
-      window.location.assign(getPostLoginRedirect(role, redirectTo));
+      const destination = await getLoginDestinationAction(redirectTo);
+      window.location.assign(destination);
     } catch {
       setFormError(AUTH_ERROR_MESSAGES.generic);
       setSubmitting(false);

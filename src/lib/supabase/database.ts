@@ -485,6 +485,31 @@ export type RbacUserPermissionOverrideRow = {
   assigned_at: string;
 };
 
+export type UserInvitationRow = {
+  id: string;
+  email: string;
+  invited_by: string | null;
+  invited_at: string;
+  accepted_at: string | null;
+  expires_at: string;
+  status: "pending" | "accepted" | "expired" | "cancelled";
+  auth_user_id: string | null;
+  profile_id: string | null;
+  last_sent_at: string;
+  metadata: Json;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminAuditLogRow = {
+  id: string;
+  actor_user_id: string | null;
+  target_user_id: string | null;
+  action: string;
+  metadata: Json;
+  created_at: string;
+};
+
 type ForeignKey = {
   foreignKeyName: string;
   columns: string[];
@@ -617,6 +642,16 @@ export type Database = {
           granted: boolean;
         },
         Partial<RbacUserPermissionOverrideRow>
+      >;
+      user_invitations: Table<
+        UserInvitationRow,
+        Partial<UserInvitationRow> & { email: string; status: UserInvitationRow["status"] },
+        Partial<UserInvitationRow>
+      >;
+      admin_audit_log: Table<
+        AdminAuditLogRow,
+        Partial<AdminAuditLogRow> & { action: string },
+        Partial<AdminAuditLogRow>
       >;
       application_reviews: Table<
         ApplicationReviewRow,

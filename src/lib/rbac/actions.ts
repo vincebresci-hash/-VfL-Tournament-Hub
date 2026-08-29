@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission, requireSuperAdminSession } from "@/lib/auth/guards";
 import { toUserFacingDbError } from "@/lib/db/errors";
+import { writeAdminAuditLog } from "@/lib/rbac/audit";
+import { CLUB_ROLE_KEYS } from "@/lib/rbac/permissions";
 import type { RbacRoleKey } from "@/types/rbac";
 
 function revalidateUserAdminPaths(userId?: string) {
@@ -22,6 +24,9 @@ export async function setUserActiveAction(
   if ("error" in access && access.error) {
     return { error: access.error };
   }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("rbac_set_user_active", {
@@ -35,6 +40,12 @@ export async function setUserActiveAction(
     };
   }
 
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: userId,
+    action: isActive ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+  });
+
   revalidateUserAdminPaths(userId);
   return { error: null };
 }
@@ -47,6 +58,9 @@ export async function assignUserRoleAction(input: {
   const access = await requireSuperAdminSession();
   if ("error" in access && access.error) {
     return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
   }
 
   const supabase = await createClient();
@@ -62,6 +76,13 @@ export async function assignUserRoleAction(input: {
     };
   }
 
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: input.userId,
+    action: "ROLE_ASSIGNED",
+    metadata: { roleKey: input.roleKey, clubId: input.clubId ?? null },
+  });
+
   revalidateUserAdminPaths(input.userId);
   return { error: null };
 }
@@ -74,6 +95,9 @@ export async function revokeUserRoleAction(input: {
   const access = await requireSuperAdminSession();
   if ("error" in access && access.error) {
     return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
   }
 
   const supabase = await createClient();
@@ -89,6 +113,13 @@ export async function revokeUserRoleAction(input: {
     };
   }
 
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: input.userId,
+    action: "ROLE_REVOKED",
+    metadata: { roleKey: input.roleKey, clubId: input.clubId ?? null },
+  });
+
   revalidateUserAdminPaths(input.userId);
   return { error: null };
 }
@@ -100,6 +131,9 @@ export async function assignTeamToUserAction(input: {
   const access = await requirePermission("teams.manage");
   if ("error" in access && access.error) {
     return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
   }
 
   const supabase = await createClient();
@@ -114,6 +148,13 @@ export async function assignTeamToUserAction(input: {
     };
   }
 
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: input.userId,
+    action: "TEAM_ASSIGNED",
+    metadata: { teamId: input.teamId },
+  });
+
   revalidateUserAdminPaths(input.userId);
   return { error: null };
 }
@@ -125,6 +166,9 @@ export async function revokeTeamFromUserAction(input: {
   const access = await requirePermission("teams.manage");
   if ("error" in access && access.error) {
     return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
   }
 
   const supabase = await createClient();
@@ -138,6 +182,13 @@ export async function revokeTeamFromUserAction(input: {
       error: toUserFacingDbError("Die Teamzuweisung konnte nicht entfernt werden.", error),
     };
   }
+
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: input.userId,
+    action: "TEAM_REVOKED",
+    metadata: { teamId: input.teamId },
+  });
 
   revalidateUserAdminPaths(input.userId);
   return { error: null };
@@ -154,6 +205,9 @@ export async function updateManagedUserProfileAction(input: {
   const access = await requirePermission("users.manage");
   if ("error" in access && access.error) {
     return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
   }
 
   const supabase = await createClient();
@@ -174,6 +228,92 @@ export async function updateManagedUserProfileAction(input: {
       error: toUserFacingDbError("Das Benutzerprofil konnte nicht gespeichert werden.", error),
     };
   }
+
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: input.userId,
+    action: "PROFILE_UPDATED",
+  });
+
+  revalidateUserAdminPaths(input.userId);
+  return { error: null };
+}
+
+export async function updateUserClubAssignmentAction(input: {
+  userId: string;
+  clubId: string | null;
+}): Promise<{ error: string | null }> {
+  const access = await requireSuperAdminSession();
+  if ("error" in access && access.error) {
+    return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
+  }
+
+  const supabase = await createClient();
+
+  if (input.clubId) {
+    const { data: club, error: clubError } = await supabase
+      .from("clubs")
+      .select("id")
+      .eq("id", input.clubId)
+      .maybeSingle();
+    if (clubError || !club) {
+      return { error: "Der ausgewählte Verein wurde nicht gefunden." };
+    }
+  }
+
+  const { data: userRoles } = await supabase
+    .from("rbac_user_roles")
+    .select("rbac_roles(key)")
+    .eq("user_id", input.userId);
+
+  const roleKeys = (userRoles ?? [])
+    .map((row) => (row.rbac_roles as { key?: string } | null)?.key)
+    .filter(Boolean) as RbacRoleKey[];
+
+  if (roleKeys.some((key) => CLUB_ROLE_KEYS.includes(key)) && !input.clubId) {
+    return { error: "Vereinsrollen erfordern eine Vereinszuordnung." };
+  }
+
+  const { data: teamRows } = await supabase
+    .from("rbac_user_team_assignments")
+    .select("team_id, teams(club_id)")
+    .eq("user_id", input.userId);
+
+  if (
+    input.clubId &&
+    (teamRows ?? []).some((row) => {
+      const team = row.teams as { club_id?: string } | null;
+      return team?.club_id && team.club_id !== input.clubId;
+    })
+  ) {
+    return {
+      error: "Der Benutzer ist Teams eines anderen Vereins zugeordnet. Bitte zuerst Teamzuweisungen entfernen.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      club_id: input.clubId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.userId);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Die Vereinszuordnung konnte nicht gespeichert werden.", error),
+    };
+  }
+
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: input.userId,
+    action: "CLUB_ASSIGNED",
+    metadata: { clubId: input.clubId },
+  });
 
   revalidateUserAdminPaths(input.userId);
   return { error: null };

@@ -7,7 +7,7 @@ import { Field, TextInput } from "@/components/apply/FormControls";
 import { Logo } from "@/components/brand/Logo";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES, toLoginErrorMessage } from "@/lib/auth/messages";
-import { getPostLoginRedirect } from "@/lib/auth/redirects";
+import { getLoginDestinationAction } from "@/lib/auth/login-destination-action";
 import { canAccessAdmin, isUserRole } from "@/lib/auth/roles";
 import {
   validateAdminLoginForm,
@@ -73,7 +73,8 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
       }
 
       router.refresh();
-      window.location.assign(getPostLoginRedirect(profile.role, redirectTo));
+      const destination = await getLoginDestinationAction(redirectTo);
+      window.location.assign(destination);
     } catch {
       setFormError(AUTH_ERROR_MESSAGES.generic);
       setSubmitting(false);

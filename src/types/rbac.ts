@@ -74,6 +74,9 @@ export type AdminUserSummary = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  lastSignInAt: string | null;
+  accountStatus: "active" | "inactive" | "invitation_pending";
+  invitationId: string | null;
   roles: Array<{
     key: RbacRoleKey;
     name: string;
@@ -83,8 +86,32 @@ export type AdminUserSummary = {
     teamId: string;
     teamName: string;
     clubId: string;
+    ageGroup?: string | null;
+    clubName?: string | null;
   }>;
   permissions: Permission[];
+};
+
+export type UserInvitationStatus = "pending" | "accepted" | "expired" | "cancelled";
+
+export type UserInvitationSummary = {
+  id: string;
+  email: string;
+  status: UserInvitationStatus;
+  invitedAt: string;
+  expiresAt: string;
+  lastSentAt: string;
+  acceptedAt: string | null;
+  profileId: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type AdminAuditEntry = {
+  id: string;
+  action: string;
+  actorUserId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
 };
 
 export type PermissionContext = {
