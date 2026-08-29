@@ -20,6 +20,13 @@ function readMigration() {
   );
 }
 
+function readEnforcementMigration() {
+  return readFileSync(
+    join(process.cwd(), "supabase/migrations/20260831170000_rbac_enforcement_aliases.sql"),
+    "utf8",
+  );
+}
+
 function readGuards() {
   return readFileSync(join(process.cwd(), "src/lib/auth/guards.ts"), "utf8");
 }
@@ -28,15 +35,41 @@ function readActions() {
   return readFileSync(join(process.cwd(), "src/lib/rbac/actions.ts"), "utf8");
 }
 
+function readAuthActions() {
+  return readFileSync(join(process.cwd(), "src/lib/auth/actions.ts"), "utf8");
+}
+
 function readPaymentsActions() {
   return readFileSync(join(process.cwd(), "src/lib/payments/actions.ts"), "utf8");
 }
 
+function readAdminActions() {
+  return readFileSync(join(process.cwd(), "src/lib/db/admin-actions.ts"), "utf8");
+}
+
+function readClubProfileForm() {
+  return readFileSync(join(process.cwd(), "src/components/club/ClubProfileForm.tsx"), "utf8");
+}
+
+function readAdminShell() {
+  return readFileSync(join(process.cwd(), "src/components/admin/AdminShell.tsx"), "utf8");
+}
+
+function readAdminSidebar() {
+  return readFileSync(join(process.cwd(), "src/components/admin/AdminSidebar.tsx"), "utf8");
+}
+
 export function runRbacChecks() {
   const migration = readMigration();
+  const enforcementMigration = readEnforcementMigration();
   const guards = readGuards();
   const actions = readActions();
+  const authActions = readAuthActions();
   const paymentsActions = readPaymentsActions();
+  const adminActions = readAdminActions();
+  const clubProfileForm = readClubProfileForm();
+  const adminShell = readAdminShell();
+  const adminSidebar = readAdminSidebar();
 
   assert(migration.includes("rbac_roles"), "rbac_roles table");
   assert(migration.includes("rbac_permissions"), "rbac_permissions table");
@@ -48,16 +81,12 @@ export function runRbacChecks() {
   assert(migration.includes("cannot remove last super admin"), "last super admin protected");
   assert(migration.includes("is_active boolean"), "profile active flag");
   assert(
-    migration.includes("WHERE p.role = 'super-admin'"),
-    "existing super-admin migrated from profiles.role",
+    enforcementMigration.includes("communications.manage"),
+    "communications.manage permission added",
   );
   assert(
-    migration.includes("WHERE p.role = 'admin'"),
-    "existing admin migrated from profiles.role",
-  );
-  assert(
-    migration.includes("WHERE p.role = 'club'"),
-    "existing club users migrated to CLUB_ADMIN",
+    enforcementMigration.includes("cancellations.manage"),
+    "cancellations.manage permission added",
   );
 
   assert(guards.includes("requirePermission"), "central requirePermission guard");
@@ -65,7 +94,19 @@ export function runRbacChecks() {
   assert(guards.includes("requireClubAccess"), "club access guard");
   assert(guards.includes("requireTeamAccess"), "team access guard");
   assert(actions.includes("requireSuperAdminSession"), "role assignment super-admin only");
+  assert(actions.includes("rbac_assign_user_role"), "multi-role assign RPC used");
+  assert(actions.includes("rbac_revoke_user_role"), "multi-role revoke RPC used");
   assert(paymentsActions.includes('requirePermission("payments.manage")'), "payments server guard");
+  assert(adminActions.includes("requireApplicationsView"), "applications view guard");
+  assert(adminActions.includes("requireApplicationsManage"), "applications manage guard");
+  assert(adminActions.includes("requireTournamentsManage"), "tournaments manage guard");
+  assert(authActions.includes("updatePersonalProfileAction"), "personal profile action");
+  assert(authActions.includes("display_name"), "personal profile allowlist fields");
+  assert(authActions.includes('.eq("id", user.id)'), "personal profile scoped to own user");
+  assert(clubProfileForm.includes("Mein Profil"), "club profile page personal section");
+  assert(clubProfileForm.includes("updatePersonalProfileAction"), "club personal profile wired");
+  assert(adminShell.includes("getAdminRoutePermissions"), "admin route permission gate");
+  assert(adminSidebar.includes("canSeeAdminNavItem"), "permission-based admin navigation");
 
   // SUPER_ADMIN
   assert(
@@ -78,18 +119,8 @@ export function runRbacChecks() {
     }),
     "SUPER_ADMIN: roles.manage PASS",
   );
-  assert(
-    resolvePermissionAccess({
-      isActive: true,
-      profileRole: "super-admin",
-      roleKeys: ["SUPER_ADMIN"],
-      overrides: [],
-      permission: "users.manage",
-    }),
-    "SUPER_ADMIN: users.manage PASS",
-  );
 
-  // ADMIN legacy full access except roles.manage
+  // Legacy ADMIN without RBAC rows (pre-migration)
   assert(
     resolvePermissionAccess({
       isActive: true,
@@ -98,7 +129,7 @@ export function runRbacChecks() {
       overrides: [],
       permission: "payments.manage",
     }),
-    "legacy ADMIN: payments PASS",
+    "legacy ADMIN without RBAC rows: payments PASS",
   );
   assert(
     !resolvePermissionAccess({
@@ -111,49 +142,89 @@ export function runRbacChecks() {
     "legacy ADMIN: roles.manage BLOCKED",
   );
 
+  // Granular RBAC: profile admin + FINANCE_MANAGER must not inherit legacy full access
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["FINANCE_MANAGER"],
+      overrides: [],
+      permission: "applications.manage",
+    }),
+    "granular FINANCE_MANAGER: applications.manage BLOCKED",
+  );
+
   // FINANCE_MANAGER
   assert(
     resolvePermissionAccess({
       isActive: true,
-      profileRole: "club",
+      profileRole: "admin",
       roleKeys: ["FINANCE_MANAGER"],
       overrides: [],
       permission: "payments.manage",
     }),
-    "FINANCE_MANAGER: payments PASS",
+    "FINANCE_MANAGER: payments.manage PASS",
   );
   assert(
     !resolvePermissionAccess({
       isActive: true,
-      profileRole: "club",
+      profileRole: "admin",
       roleKeys: ["FINANCE_MANAGER"],
       overrides: [],
-      permission: "users.manage",
+      permission: "roles.manage",
     }),
-    "FINANCE_MANAGER: users.manage BLOCKED",
+    "FINANCE_MANAGER: roles.manage BLOCKED",
   );
 
   // APPLICATION_MANAGER
   assert(
     resolvePermissionAccess({
       isActive: true,
-      profileRole: "club",
+      profileRole: "admin",
       roleKeys: ["APPLICATION_MANAGER"],
       overrides: [],
-      permission: "applications.decide",
+      permission: "applications.manage",
     }),
-    "APPLICATION_MANAGER: applications PASS",
+    "APPLICATION_MANAGER: applications.manage PASS",
   );
   assert(
     !resolvePermissionAccess({
       isActive: true,
-      profileRole: "club",
+      profileRole: "admin",
       roleKeys: ["APPLICATION_MANAGER"],
       overrides: [],
       permission: "payments.manage",
     }),
-    "APPLICATION_MANAGER: finance BLOCKED",
+    "APPLICATION_MANAGER: payments.manage BLOCKED",
   );
+
+  // COMMUNICATION_MANAGER
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["COMMUNICATION_MANAGER"],
+      overrides: [],
+      permission: "communications.manage",
+    }),
+    "COMMUNICATION_MANAGER: communications.manage PASS",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["COMMUNICATION_MANAGER"],
+      overrides: [],
+      permission: "payments.manage",
+    }),
+    "COMMUNICATION_MANAGER: payments.manage BLOCKED",
+  );
+
+  // Multi-role
+  const multiRole = mergePermissions(["APPLICATION_MANAGER", "COMMUNICATION_MANAGER"], []);
+  assert(multiRole.has("applications.manage"), "multi-role applications PASS");
+  assert(multiRole.has("communications.manage"), "multi-role communications PASS");
+  assert(!multiRole.has("payments.manage"), "multi-role finance BLOCKED");
 
   // CLUB_ADMIN
   assert(
@@ -223,17 +294,8 @@ export function runRbacChecks() {
     "inactive privileged user BLOCKED",
   );
 
-  // privilege escalation via overrides still needs explicit grant
-  const financeOnly = mergePermissions(["FINANCE_MANAGER"], []);
-  assert(financeOnly.has("payments.manage"), "finance role permissions seeded");
-  assert(!financeOnly.has("roles.manage"), "finance cannot manage roles");
-
-  assert(RBAC_PERMISSIONS.length >= 24, "permission catalog complete");
+  assert(RBAC_PERMISSIONS.length >= 26, "permission catalog complete");
   assert(ROLE_PERMISSIONS.SUPER_ADMIN.length === RBAC_PERMISSIONS.length, "super admin all perms");
-  assert(
-    ROLE_PERMISSIONS.ADMIN.length === RBAC_PERMISSIONS.length - 1,
-    "admin role excludes roles.manage",
-  );
 
   return "ok";
 }

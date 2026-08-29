@@ -11,6 +11,7 @@ export const RBAC_PERMISSIONS = [
   "payments.manage",
   "communications.view",
   "communications.send",
+  "communications.manage",
   "schedule.view",
   "schedule.manage",
   "results.view",
@@ -23,6 +24,7 @@ export const RBAC_PERMISSIONS = [
   "teams.manage",
   "cancellations.view",
   "cancellations.decide",
+  "cancellations.manage",
 ] as const;
 
 export type Permission = (typeof RBAC_PERMISSIONS)[number];

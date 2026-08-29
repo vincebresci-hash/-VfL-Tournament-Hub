@@ -56,7 +56,6 @@ export function AdminUserDetail({
       displayName,
       phone,
       jobTitle,
-      clubId: user.clubId,
     });
     setSaving(false);
     if (result.error) {
@@ -80,6 +79,14 @@ export function AdminUserDetail({
     setNotice(user.isActive ? "Benutzer deaktiviert." : "Benutzer aktiviert.");
     router.refresh();
   }
+
+  const assignedRoleKeys = new Set(
+    user.roles.map((role) => `${role.key}:${role.clubId ?? "platform"}`),
+  );
+  const assignableRoles = roles.filter((role) => {
+    const scope = role.isPlatformRole ? "platform" : user.clubId ?? "club-missing";
+    return !assignedRoleKeys.has(`${role.key}:${role.isPlatformRole ? "platform" : scope}`);
+  });
 
   async function handleAssignRole() {
     if (!selectedRole) {
@@ -205,6 +212,10 @@ export function AdminUserDetail({
       ) : null}
 
       <AdminCard title="Zugewiesene Rollen">
+        <p className="mb-3 text-[13px] text-muted">
+          Mehrere Rollen können gleichzeitig aktiv sein. Jede Rolle erweitert die effektiven
+          Berechtigungen.
+        </p>
         {user.roles.length === 0 ? (
           <p className="text-[14px] text-muted">Keine RBAC-Rollen zugewiesen.</p>
         ) : (
@@ -245,7 +256,7 @@ export function AdminUserDetail({
                 className="h-11 w-full border border-line bg-white px-3 text-[14px] text-ink"
               >
                 <option value="">Rolle wählen…</option>
-                {roles.map((role) => (
+                {assignableRoles.map((role) => (
                   <option key={role.id} value={role.key}>
                     {role.name}
                   </option>

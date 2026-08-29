@@ -29,11 +29,13 @@ export const ROLE_PERMISSIONS: Record<RbacRoleKey, readonly Permission[]> = {
     "applications.decide",
     "cancellations.view",
     "cancellations.decide",
+    "cancellations.manage",
   ],
   FINANCE_MANAGER: ["payments.view", "payments.manage"],
   COMMUNICATION_MANAGER: [
     "communications.view",
     "communications.send",
+    "communications.manage",
     "news.view",
     "news.manage",
   ],
@@ -98,11 +100,18 @@ export function resolvePermissionAccess(input: {
     return true;
   }
 
-  if (input.profileRole === "admin" && input.permission !== "roles.manage") {
+  const effective = mergePermissions(input.roleKeys, input.overrides);
+  const hasAssignedRbacRoles = input.roleKeys.length > 0;
+
+  // Legacy fallback only before RBAC role rows exist (pre-migration accounts).
+  if (
+    !hasAssignedRbacRoles &&
+    input.profileRole === "admin" &&
+    input.permission !== "roles.manage"
+  ) {
     return true;
   }
 
-  const effective = mergePermissions(input.roleKeys, input.overrides);
   if (!effective.has(input.permission)) {
     return false;
   }

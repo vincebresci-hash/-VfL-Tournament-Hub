@@ -6,13 +6,25 @@ import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/cn";
 import { CLUB_NAME, HUB_NAME } from "@/lib/constants";
 import { adminNavigation } from "@/lib/admin-navigation";
+import { canSeeAdminNavItem } from "@/lib/rbac/admin-access";
+import type { Permission } from "@/types/rbac";
 
 type AdminSidebarProps = {
   onNavigate?: () => void;
+  effectivePermissions: Permission[];
+  isSuperAdmin: boolean;
 };
 
-export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
+export function AdminSidebar({
+  onNavigate,
+  effectivePermissions,
+  isSuperAdmin,
+}: AdminSidebarProps) {
   const pathname = usePathname();
+  const permissionSet = new Set(effectivePermissions);
+  const visibleNavigation = adminNavigation.filter((item) =>
+    canSeeAdminNavItem(item.href, permissionSet, isSuperAdmin),
+  );
 
   return (
     <div className="flex h-full flex-col bg-navy text-white">
@@ -32,7 +44,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
 
       <nav aria-label="Admin" className="mt-2 flex-1 px-3">
         <ul className="space-y-1">
-          {adminNavigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const active =
               "exact" in item && item.exact
                 ? pathname === item.href

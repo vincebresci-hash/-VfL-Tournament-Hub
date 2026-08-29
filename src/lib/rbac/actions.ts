@@ -150,7 +150,6 @@ export async function updateManagedUserProfileAction(input: {
   displayName?: string | null;
   phone?: string | null;
   jobTitle?: string | null;
-  clubId?: string | null;
 }): Promise<{ error: string | null }> {
   const access = await requirePermission("users.manage");
   if ("error" in access && access.error) {
@@ -166,7 +165,6 @@ export async function updateManagedUserProfileAction(input: {
       display_name: input.displayName?.trim() || null,
       phone: input.phone?.trim() || null,
       job_title: input.jobTitle?.trim() || null,
-      club_id: input.clubId ?? undefined,
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.userId);

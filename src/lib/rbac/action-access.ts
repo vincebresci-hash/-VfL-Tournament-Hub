@@ -20,6 +20,10 @@ export async function requirePermissionAccess(
     return { session: access.session, error: access.error };
   }
 
+  if (!access.session) {
+    return { session: null, error: "Bitte zuerst anmelden." };
+  }
+
   return { session: access.session, error: null };
 }
 
@@ -28,7 +32,7 @@ export async function requireAnyPermissionAccess(
 ): Promise<ActionAccessSuccess | ActionAccessFailure> {
   for (const permission of permissions) {
     const access = await requirePermission(permission);
-    if (!("error" in access && access.error)) {
+    if (!("error" in access && access.error) && access.session) {
       return { session: access.session, error: null };
     }
   }
