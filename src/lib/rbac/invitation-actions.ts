@@ -10,8 +10,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAdminAuditLog } from "@/lib/rbac/audit";
 import {
   buildInvitationRedirectUrl,
-  formatInvitationAuthFailure,
-  sanitizeInvitationAuthError,
+  logInvitationAuthFailure,
+  resolveInvitationAuthUserMessage,
 } from "@/lib/rbac/invitation-auth-errors";
 import { CLUB_ROLE_KEYS, PLATFORM_ROLE_KEYS } from "@/lib/rbac/permissions";
 import type { RbacRoleKey } from "@/types/rbac";
@@ -142,7 +142,10 @@ export async function inviteUserAction(
     .maybeSingle();
 
   if (existingProfile) {
-    return { error: "Für diese E-Mail existiert bereits ein Benutzerkonto." };
+    return {
+      error:
+        "Für diese E-Mail existiert bereits ein Benutzerkonto. Bei einer fehlgeschlagenen Einladung bitte den bestehenden Eintrag in der Benutzerverwaltung prüfen.",
+    };
   }
 
   const { data: pendingInvite } = await service
@@ -172,23 +175,21 @@ export async function inviteUserAction(
   );
 
   if (inviteError || !inviteData.user) {
-    if (inviteData?.user?.id) {
-      await cleanupPendingAuthUser(service, inviteData.user.id);
-    }
-
     const message = inviteError?.message ?? "";
     if (message.toLowerCase().includes("already")) {
       return { error: "Diese E-Mail ist bereits registriert." };
     }
 
-    const diagnostic = sanitizeInvitationAuthError(inviteError, redirectTo);
-    console.error("[inviteUserAction] Supabase Auth invite failed", diagnostic);
-
     if (inviteError) {
-      return { error: formatInvitationAuthFailure(diagnostic) };
+      logInvitationAuthFailure("inviteUserAction", inviteError, redirectTo);
+      return {
+        error: resolveInvitationAuthUserMessage(inviteError, {
+          fallback: "Die Einladung konnte nicht versendet werden.",
+        }),
+      };
     }
 
-    return { error: "Die Einladung konnte nicht versendet werden. (Kein Auth-Benutzer zurückgegeben.)" };
+    return { error: "Die Einladung konnte nicht versendet werden." };
   }
 
   const userId = inviteData.user.id;
@@ -336,13 +337,11 @@ export async function resendInvitationAction(
   });
 
   if (resendError) {
-    const diagnostic = sanitizeInvitationAuthError(resendError, redirectTo);
-    console.error("[resendInvitationAction] Supabase Auth invite failed", diagnostic);
+    logInvitationAuthFailure("resendInvitationAction", resendError, redirectTo);
     return {
-      error: formatInvitationAuthFailure(
-        diagnostic,
-        "Die Einladung konnte nicht erneut gesendet werden.",
-      ),
+      error: resolveInvitationAuthUserMessage(resendError, {
+        fallback: "Die Einladung konnte nicht erneut gesendet werden.",
+      }),
     };
   }
 

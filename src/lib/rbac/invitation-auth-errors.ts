@@ -1,5 +1,8 @@
 import { isAuthError } from "@supabase/supabase-js";
 
+export const INVITATION_EMAIL_RATE_LIMIT_MESSAGE =
+  "Das E-Mail-Limit für Einladungen wurde vorübergehend erreicht. Bitte versuche es später erneut.";
+
 export type InvitationAuthErrorDiagnostic = {
   source: "supabase_auth_admin";
   status?: number;
@@ -12,6 +15,7 @@ const SECRET_PATTERNS = [
   /\bsk_[a-zA-Z0-9_]+/g,
   /\bsb_[a-zA-Z0-9_-]+/g,
   /\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/g,
+  /\bre_[a-zA-Z0-9_]+/g,
   /\bBearer\s+\S+/gi,
 ];
 
@@ -25,6 +29,19 @@ export function redactInvitationSecrets(value: string) {
 
 export function buildInvitationRedirectUrl(siteUrl: string) {
   return `${siteUrl.replace(/\/$/, "")}/auth/callback`;
+}
+
+export function isInvitationEmailRateLimitError(error: unknown) {
+  if (!isAuthError(error)) {
+    return false;
+  }
+
+  if (error.status === 429) {
+    return true;
+  }
+
+  const message = (error.message ?? "").toLowerCase();
+  return message.includes("rate limit") || message.includes("too many requests");
 }
 
 export function sanitizeInvitationAuthError(
@@ -43,14 +60,14 @@ export function sanitizeInvitationAuthError(
   const lower = message.toLowerCase();
 
   let hint = "Unbekannter Supabase-Auth-Fehler.";
-  if (lower.includes("redirect") || lower.includes("redirect_to")) {
+  if (isInvitationEmailRateLimitError(error)) {
+    hint = "Supabase Auth E-Mail-Rate-Limit erreicht.";
+  } else if (lower.includes("redirect") || lower.includes("redirect_to")) {
     hint = `Redirect-URL nicht erlaubt. In Supabase unter Authentication → URL Configuration eintragen: ${redirectTo}`;
   } else if (lower.includes("already") || lower.includes("registered") || status === 422) {
     hint = "Diese E-Mail ist bereits in Supabase Auth registriert.";
   } else if (
     lower.includes("smtp") ||
-    lower.includes("mail") ||
-    lower.includes("email") ||
     lower.includes("535") ||
     lower.includes("sending invite")
   ) {
@@ -58,8 +75,6 @@ export function sanitizeInvitationAuthError(
       "Supabase konnte die Einladungs-E-Mail nicht senden. SMTP-Einstellungen und Auth-Logs in Supabase prüfen.";
   } else if (status === 401 || status === 403) {
     hint = "Service-Role-Zugriff auf Supabase Auth fehlgeschlagen (Schlüssel oder Projekt prüfen).";
-  } else if (lower.includes("rate") || status === 429) {
-    hint = "Supabase Auth Rate-Limit erreicht. Kurz warten und erneut versuchen.";
   }
 
   return {
@@ -71,17 +86,31 @@ export function sanitizeInvitationAuthError(
   };
 }
 
-export function formatInvitationAuthFailure(
-  diagnostic: InvitationAuthErrorDiagnostic,
-  fallback = "Die Einladung konnte nicht versendet werden.",
+export function resolveInvitationAuthUserMessage(
+  error: unknown,
+  options: { fallback: string },
 ) {
-  const parts = [
-    fallback,
-    diagnostic.status ? `Auth-Status ${diagnostic.status}` : null,
-    diagnostic.code ? `Code ${diagnostic.code}` : null,
-    diagnostic.message !== "unknown_error" ? diagnostic.message : null,
-    diagnostic.hint,
-  ].filter(Boolean);
+  if (!error) {
+    return options.fallback;
+  }
 
-  return parts.join(" — ");
+  if (isInvitationEmailRateLimitError(error)) {
+    return INVITATION_EMAIL_RATE_LIMIT_MESSAGE;
+  }
+
+  const message = isAuthError(error) ? (error.message ?? "").toLowerCase() : "";
+  if (message.includes("already") || (isAuthError(error) && error.status === 422)) {
+    return "Diese E-Mail ist bereits registriert.";
+  }
+
+  return options.fallback;
+}
+
+export function logInvitationAuthFailure(
+  scope: string,
+  error: unknown,
+  redirectTo: string,
+) {
+  const diagnostic = sanitizeInvitationAuthError(error, redirectTo);
+  console.error(`[${scope}] Supabase Auth invite failed`, diagnostic);
 }

@@ -38,11 +38,13 @@ export function runInvitationChecks() {
   assert(actions.includes(".eq(\"status\", \"pending\")"), "cancel uses conditional pending update");
   assert(actions.includes("deleteUser"), "cancel removes pending auth user");
   assert(actions.includes("buildInvitationRedirectUrl"), "invite redirect helper");
-  assert(actions.includes("sanitizeInvitationAuthError"), "invite auth error diagnostics");
-  assert(actions.includes("cleanupPendingAuthUser"), "invite partial failure cleanup");
+  assert(actions.includes("resolveInvitationAuthUserMessage"), "invite auth user messages");
+  assert(actions.includes("logInvitationAuthFailure"), "invite auth server logging");
+  assert(!actions.includes("formatInvitationAuthFailure"), "no verbose auth failure formatting in UI");
   assert(actions.includes("roleKeys"), "multi-role invite support");
   assert(actions.includes("teamIds"), "team invite support");
   assert(actions.includes("gehört nicht zum ausgewählten Verein"), "team club mapping validation");
+  assert(actions.includes("cleanupPendingAuthUser"), "post-auth invite failure cleanup only");
   assert(!actions.includes("markInvitationAcceptedAction"), "acceptance not exposed as server action");
 
   assert(acceptance.includes("normalizeEmail"), "acceptance email normalization");
