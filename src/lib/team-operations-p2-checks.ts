@@ -99,6 +99,11 @@ export function runTeamOperationsP2Checks() {
     "PAY-01: payment_note removed from applications",
   );
   assert(
+    migration.includes("information_schema.columns") &&
+      migration.includes("column_name = 'payment_note'"),
+    "PAY-01: payment_note copy is conditional for rerun safety",
+  );
+  assert(
     migration.includes("public.is_admin()"),
     "PAY-01: admin-only RLS on payment notes",
   );

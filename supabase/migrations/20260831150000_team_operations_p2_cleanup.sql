@@ -29,15 +29,27 @@ REVOKE ALL ON TABLE public.application_payment_admin_notes FROM PUBLIC, anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.application_payment_admin_notes
   TO authenticated;
 
-INSERT INTO public.application_payment_admin_notes (application_id, payment_note)
-SELECT id, NULLIF(btrim(payment_note), '')
-FROM public.applications
-WHERE payment_note IS NOT NULL
-  AND btrim(payment_note) <> ''
-ON CONFLICT (application_id) DO UPDATE
-SET
-  payment_note = EXCLUDED.payment_note,
-  updated_at = now();
+DO $migrate_payment_notes$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'applications'
+      AND column_name = 'payment_note'
+  ) THEN
+    INSERT INTO public.application_payment_admin_notes (application_id, payment_note)
+    SELECT id, NULLIF(btrim(payment_note), '')
+    FROM public.applications
+    WHERE payment_note IS NOT NULL
+      AND btrim(payment_note) <> ''
+    ON CONFLICT (application_id) DO UPDATE
+    SET
+      payment_note = EXCLUDED.payment_note,
+      updated_at = now();
+  END IF;
+END
+$migrate_payment_notes$;
 
 CREATE OR REPLACE FUNCTION public.guard_application_payment_fields()
 RETURNS trigger
