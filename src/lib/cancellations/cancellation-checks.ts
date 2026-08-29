@@ -66,8 +66,8 @@ export function runCancellationRequestsChecks() {
   assert(actions.includes("submitClubCancellationRequestAction"), "club action exists");
   assert(actions.includes("submitExternalCancellationRequestAction"), "external action exists");
   assert(actions.includes("decideCancellationRequestAction"), "admin decide action exists");
-  assert(actions.includes("canAccessAdmin"), "admin authorization used");
-  assert(!actions.includes("decide_cancellation_request") || actions.includes("canAccessAdmin"), "club cannot decide");
+  assert(actions.includes("requireCancellationsManage"), "admin authorization used");
+  assert(!actions.includes("decide_cancellation_request") || actions.includes("requireCancellationsManage"), "club cannot decide");
 
   assert(mail.includes("reserve_cancellation_email_send"), "cancellation mail idempotency");
   assert(mail.includes("cancellation-request-received"), "admin notification template");
@@ -154,7 +154,7 @@ export function runCancellationRequestsChecks() {
   assert(mail.includes("cancellation_email_send_keys") || mail.includes("reserve_cancellation_email_send"), "P: idempotency");
 
   // R club cannot decide
-  assert(actions.includes("canAccessAdmin(session.user.role)"), "R: admin guard on decide");
+  assert(actions.includes("requireCancellationsManage"), "R: admin guard on decide");
 
   return "ok";
 }

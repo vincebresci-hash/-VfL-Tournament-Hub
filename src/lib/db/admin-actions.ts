@@ -2,8 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import {
+  requireAnyPermissionAccess,
+  requireApplicationsManage,
+  requireApplicationsView,
+  requireCommunicationsManage,
+  requireTournamentsManage,
+} from "@/lib/rbac/action-access";
 import { listAdminApplications } from "@/lib/db/queries";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
@@ -27,21 +32,12 @@ import { slugifyTournamentName } from "@/lib/tournaments";
 import { validateMeinTurnierplanInput } from "@/lib/mein-turnierplan";
 import { canAcceptApplicationIntoCapacity } from "@/lib/mein-turnierplan-participants";
 
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
-
 export async function loadAdminApplicationsAction(): Promise<{
   applications: AdminApplication[];
   ready: boolean;
   error: string | null;
 }> {
-  const access = await requireAdmin();
+  const access = await requireApplicationsView();
   if (access.error || !access.session) {
     return { applications: [], ready: false, error: access.error };
   }
@@ -54,7 +50,7 @@ export async function updateApplicationStatusAction(
   applicationId: string,
   status: ApplicationStatus,
 ): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireApplicationsManage();
   if (access.error || !access.session) {
     return { error: access.error, notice: null };
   }
@@ -184,7 +180,7 @@ export async function updateTournamentMaxTeamsAction(
   slug: string,
   maxTeams: number,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -221,7 +217,7 @@ export async function upsertApplicationReviewAction(
     internalNotes?: string | null;
   },
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireApplicationsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -291,7 +287,7 @@ function revalidateAdminAdminAreas() {
 export async function createEmailTemplateAction(
   input: EmailTemplateInput,
 ): Promise<{ error: string | null; id?: string }> {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -323,7 +319,7 @@ export async function updateEmailTemplateAction(
   id: string,
   input: EmailTemplateInput,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -353,7 +349,7 @@ export async function updateEmailTemplateAction(
 export async function deleteEmailTemplateAction(
   id: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -374,7 +370,7 @@ export async function deleteEmailTemplateAction(
 export async function saveAppSettingsAction(
   settings: AppSettings,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireAnyPermissionAccess(["users.manage", "tournaments.manage"]);
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -607,7 +603,7 @@ function parseTournamentInput(input: AdminTournamentInput): {
 export async function createTournamentAction(
   input: AdminTournamentInput,
 ): Promise<{ error: string | null; id?: string; slug?: string }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -642,7 +638,7 @@ export async function updateTournamentAction(
   id: string,
   input: AdminTournamentInput,
 ): Promise<{ error: string | null; slug?: string }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -677,7 +673,7 @@ export async function updateTournamentAction(
 export async function archiveTournamentAction(
   id: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -713,7 +709,7 @@ export async function archiveTournamentAction(
 export async function restoreTournamentAction(
   id: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -749,7 +745,7 @@ export async function restoreTournamentAction(
 export async function deleteTournamentAction(
   id: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }

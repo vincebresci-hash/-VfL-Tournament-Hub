@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import {
+  requireCommunicationsManage,
+  requireCommunicationsView,
+} from "@/lib/rbac/action-access";
 import {
   COMMUNICATION_RECIPIENT_FILTERS,
   COMMUNICATION_TYPES,
@@ -40,15 +42,6 @@ function parseRecipientFilter(value: string): CommunicationRecipientFilter | nul
     : null;
 }
 
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
-
 export async function previewCommunicationRecipientsAction(input: {
   tournamentId: string;
   type: string;
@@ -58,7 +51,7 @@ export async function previewCommunicationRecipientsAction(input: {
   recipients: Awaited<ReturnType<typeof previewCommunicationRecipients>>["recipients"];
   error: string | null;
 }> {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsView();
   if (access.error) {
     return { recipients: [], error: access.error };
   }
@@ -104,7 +97,7 @@ export async function previewCommunicationRecipientsAction(input: {
 export async function sendCommunicationAction(
   input: CommunicationComposeInput,
 ): Promise<CommunicationActionResult> {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsManage();
   if (access.error || !access.session) {
     return { error: access.error };
   }
@@ -183,7 +176,7 @@ export async function sendCommunicationAction(
 }
 
 export async function loadCommunicationsAction() {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsView();
   if (access.error) {
     return { communications: [], ready: false, error: access.error };
   }
@@ -193,7 +186,7 @@ export async function loadCommunicationsAction() {
 }
 
 export async function loadCommunicationDetailAction(communicationId: string) {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsView();
   if (access.error) {
     return { communication: null, error: access.error };
   }
@@ -207,7 +200,7 @@ export async function loadCommunicationDetailAction(communicationId: string) {
 }
 
 export async function loadEligibleCommunicationApplicationsAction(tournamentId: string) {
-  const access = await requireAdmin();
+  const access = await requireCommunicationsView();
   if (access.error) {
     return { applications: [], error: access.error };
   }

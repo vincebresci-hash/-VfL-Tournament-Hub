@@ -2,21 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import {
+  requireTeamsManage,
+  requireTournamentsView,
+} from "@/lib/rbac/action-access";
 import {
   canConfirmExternalTeams,
   countConfirmedParticipants,
   type ExternalTeamParticipationStatus,
 } from "@/lib/mein-turnierplan-participants";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { error: "Kein Adminzugang." as string };
-  }
-  return { error: null };
-}
 
 async function loadTournamentMeta(tournamentId: string) {
   const supabase = await createClient();
@@ -83,7 +77,7 @@ export async function listExternalTeamsForTournamentAction(tournamentId: string)
   error: string | null;
   teams: ExternalTeamAdminRow[];
 }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, teams: [] };
   }
@@ -155,7 +149,7 @@ async function setParticipationStatus(input: {
   teamIds: string[];
   status: ExternalTeamParticipationStatus;
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -253,7 +247,7 @@ export async function listAllExternalTeamsForAdminAction(): Promise<{
     externalActive: boolean;
   }>;
 }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { ready: false, teams: [] };
   }
@@ -279,7 +273,7 @@ export async function listAllExternalTeamsForAdminAction(): Promise<{
 }
 
 export async function confirmAllDetectedExternalTeamsAction(tournamentId: string) {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }

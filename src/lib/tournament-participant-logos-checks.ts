@@ -234,7 +234,7 @@ export function runTournamentParticipantLogoManagementChecks() {
     join(process.cwd(), "src/lib/db/tournament-participants-actions.ts"),
     "utf8",
   );
-  assert(actionsSource.includes("requireAdmin()"), "upload path requires admin");
+  assert(actionsSource.includes("requireTeamsManage()"), "upload path requires admin");
   assert(actionsSource.includes("getFormDataUploadFile"), "form data file helper used");
   assert(actionsSource.includes("auth.getUser()"), "upload verifies auth session for storage");
   assert(actionsSource.includes('mode: "upload"'), "upload mode present");

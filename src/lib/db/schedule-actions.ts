@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import { requireScheduleManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
@@ -23,15 +22,6 @@ import { buildTimetable } from "@/lib/schedule/timetable";
 import { berlinWallTimeToIso, datetimeLocalToIso, normalizeClock, wallTimeOnDate } from "@/lib/schedule/datetime";
 import { MATCH_STATUSES, type MatchStatus } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { session: null, error: "Kein Adminzugang." };
-  }
-
-  return { session, error: null };
-}
 
 function revalidateStage(tournament: Pick<AdminTournamentRecord, "id" | "slug">) {
   revalidatePath("/admin");
@@ -134,7 +124,7 @@ export async function createTournamentGroupAction(
   tournamentId: string,
   name?: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -176,7 +166,7 @@ export async function renameTournamentGroupAction(
   groupId: string,
   name: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -210,7 +200,7 @@ export async function deleteTournamentGroupAction(
   tournamentId: string,
   groupId: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -245,7 +235,7 @@ export async function assignTeamToGroupAction(
   participantId: string,
   groupId: string | null,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -300,7 +290,7 @@ export async function autoDistributeTeamsAction(
   groupCount: number,
   balanceStrength: boolean,
 ): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -445,7 +435,7 @@ export async function saveScheduleSettingsAction(
     fieldNames: string[];
   },
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -537,7 +527,7 @@ export async function saveScheduleSettingsAction(
 export async function generateTournamentScheduleAction(
   tournamentId: string,
 ): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -678,7 +668,7 @@ export async function saveTournamentMatchAction(
     status: MatchStatus;
   },
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -752,7 +742,7 @@ export async function deleteTournamentMatchAction(
   tournamentId: string,
   matchId: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -780,7 +770,7 @@ export async function deleteTournamentMatchAction(
 export async function deleteTournamentScheduleAction(
   tournamentId: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }
@@ -811,7 +801,7 @@ export async function saveMatchResultAction(
   homeScore: string,
   awayScore: string,
 ): Promise<{ error: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
   }

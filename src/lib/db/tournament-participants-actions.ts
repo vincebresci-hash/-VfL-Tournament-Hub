@@ -3,8 +3,10 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import {
+  requireTeamsManage,
+  requireTournamentsView,
+} from "@/lib/rbac/action-access";
 import {
   canConfirmExternalTeams,
   countConfirmedParticipants,
@@ -24,14 +26,6 @@ import {
   resolveClubLogoMimeType,
   uploadClubLogoFile,
 } from "@/lib/storage/club-logos";
-
-async function requireAdmin() {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { error: "Kein Adminzugang." as string };
-  }
-  return { error: null };
-}
 
 async function loadTournamentMeta(tournamentId: string) {
   const supabase = await createClient();
@@ -144,7 +138,7 @@ async function syncExternalTeamGroupMembership(
 export async function getTournamentParticipantsAction(
   tournamentId: string,
 ): Promise<{ error: string | null; participants: TournamentParticipant[] }> {
-  const access = await requireAdmin();
+  const access = await requireTournamentsView();
   if (access.error) {
     return { error: access.error, participants: [] };
   }
@@ -163,7 +157,7 @@ export async function addManualTournamentParticipantAction(input: {
   clubId?: string | null;
   logoUrl?: string | null;
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -262,7 +256,7 @@ export async function updateManualTournamentParticipantAction(input: {
   clubId?: string | null;
   logoUrl?: string | null;
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -344,7 +338,7 @@ export async function deactivateManualTournamentParticipantAction(input: {
   tournamentId: string;
   externalTeamId: string;
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -408,7 +402,7 @@ export async function updateExternalTeamLogoAction(input: {
   logoUrl?: string | null;
   logoFile?: File | null;
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
@@ -621,7 +615,7 @@ export async function applyExternalTeamLogoToSelectedTeamsAction(input: {
   sourceExternalTeamId: string;
   selectedExternalTeamIds: string[];
 }): Promise<{ error: string | null; notice: string | null }> {
-  const access = await requireAdmin();
+  const access = await requireTeamsManage();
   if (access.error) {
     return { error: access.error, notice: null };
   }
