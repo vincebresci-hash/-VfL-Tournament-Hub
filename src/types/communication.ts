@@ -56,11 +56,13 @@ export type CommunicationListItem = {
   type: CommunicationType;
   subject: string;
   important: boolean;
+  requireConfirmation: boolean;
   recipientFilter: CommunicationRecipientFilter;
   status: CommunicationStatus;
   recipientCount: number;
   sentCount: number;
   failedCount: number;
+  confirmedCount: number;
   createdAt: string;
   sentAt: string | null;
 };
@@ -73,6 +75,7 @@ export type CommunicationRecipientDetail = {
   recipientClubName: string | null;
   sendStatus: CommunicationRecipientSendStatus;
   sentAt: string | null;
+  confirmedAt: string | null;
   errorMessage: string | null;
 };
 
@@ -89,5 +92,14 @@ export type CommunicationComposeInput = {
   subject: string;
   body: string;
   important: boolean;
+  requireConfirmation: boolean;
   idempotencyKey: string;
+};
+
+export type CommunicationReceiptView = {
+  subject: string;
+  body: string;
+  tournamentName: string;
+  teamName: string;
+  confirmedAt: string | null;
 };

@@ -9,6 +9,12 @@ import {
   buildCommunicationVariables,
   stripUnresolvedPlaceholders,
 } from "@/lib/communications/variables";
+import {
+  buildCommunicationReceiptEmailAppendix,
+  buildCommunicationReceiptUrl,
+  communicationReceiptTokenExpiresAt,
+  createCommunicationReceiptTokenPair,
+} from "@/lib/communications/communication-receipt-token";
 import type { PaymentStatus } from "@/types/payment";
 import type { CommunicationComposeInput } from "@/types/communication";
 
@@ -115,11 +121,32 @@ async function loadTournamentContext(tournamentId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("tournaments")
-    .select("name, slug, mein_turnierplan_url")
+    .select("name, slug, mein_turnierplan_url, date")
     .eq("id", tournamentId)
     .maybeSingle();
 
   return data;
+}
+
+async function issueCommunicationConfirmationToken(input: {
+  recipientId: string;
+  tokenHash: string;
+  expiresAt: string;
+}) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("issue_communication_confirmation_token", {
+    p_communication_recipient_id: input.recipientId,
+    p_token_hash: input.tokenHash,
+    p_expires_at: input.expiresAt,
+  });
+
+  if (error) {
+    return "error" as const;
+  }
+
+  return data === "created" || data === "replaced"
+    ? (data as "created" | "replaced")
+    : ("error" as const);
 }
 
 export async function sendTournamentCommunication(input: {
@@ -148,6 +175,7 @@ export async function sendTournamentCommunication(input: {
           ? compose.applicationIds
           : null,
       p_idempotency_key: compose.idempotencyKey,
+      p_require_confirmation: compose.requireConfirmation,
     },
   );
 
@@ -233,6 +261,9 @@ export async function sendTournamentCommunication(input: {
   const provider = getEmailProvider();
   let sentCount = 0;
   let failedCount = 0;
+  const tokenExpiresAt = communicationReceiptTokenExpiresAt(
+    tournament?.date ?? null,
+  );
 
   for (const recipient of recipients as RecipientSendRow[]) {
     const reservation = await reserveCommunicationEmailSend(recipient.id);
@@ -246,6 +277,29 @@ export async function sendTournamentCommunication(input: {
         ? Number(application.participation_fee)
         : null;
 
+    let confirmationUrl = "";
+    if (compose.requireConfirmation) {
+      const tokenPair = createCommunicationReceiptTokenPair();
+      const issueResult = await issueCommunicationConfirmationToken({
+        recipientId: recipient.id,
+        tokenHash: tokenPair.tokenHash,
+        expiresAt: tokenExpiresAt,
+      });
+
+      if (issueResult === "created" || issueResult === "replaced") {
+        confirmationUrl = buildCommunicationReceiptUrl(tokenPair.token);
+      } else {
+        await completeCommunicationRecipient({
+          recipientId: recipient.id,
+          sendStatus: "failed",
+          emailLogId: null,
+          errorMessage: "Bestätigungstoken konnte nicht erstellt werden.",
+        });
+        failedCount += 1;
+        continue;
+      }
+    }
+
     const variables = buildCommunicationVariables({
       contactFirstName: application?.contact_first_name ?? "",
       teamName: recipient.recipient_team_name,
@@ -255,14 +309,19 @@ export async function sendTournamentCommunication(input: {
       meinTurnierplanUrl: tournament?.mein_turnierplan_url ?? null,
       participationFee: Number.isFinite(participationFee) ? participationFee : null,
       paymentStatus: application?.payment_status ?? null,
+      confirmationUrl,
     });
 
     const renderedSubject = stripUnresolvedPlaceholders(
       renderEmailTemplate(compose.subject, variables),
     );
-    const renderedBody = stripUnresolvedPlaceholders(
+    let renderedBody = stripUnresolvedPlaceholders(
       renderEmailTemplate(compose.body, variables),
     );
+
+    if (compose.requireConfirmation && confirmationUrl) {
+      renderedBody += buildCommunicationReceiptEmailAppendix(confirmationUrl);
+    }
 
     const sendResult = await provider.send({
       to: recipient.recipient_email,

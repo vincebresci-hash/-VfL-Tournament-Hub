@@ -351,6 +351,7 @@ export type TournamentCommunicationRow = {
   subject: string;
   body: string;
   important: boolean;
+  require_confirmation: boolean;
   recipient_filter: string;
   status: string;
   recipient_count: number;
@@ -373,8 +374,18 @@ export type CommunicationRecipientRow = {
   recipient_club_name: string | null;
   send_status: string;
   sent_at: string | null;
+  confirmed_at: string | null;
   email_log_id: string | null;
   error_message: string | null;
+  created_at: string;
+};
+
+export type CommunicationConfirmationTokenRow = {
+  id: string;
+  communication_recipient_id: string;
+  token_hash: string;
+  expires_at: string;
+  revoked_at: string | null;
   created_at: string;
 };
 
@@ -618,6 +629,24 @@ export type Database = {
             columns: ["application_id"];
             isOneToOne: false;
             referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      communication_confirmation_tokens: Table<
+        CommunicationConfirmationTokenRow,
+        Partial<CommunicationConfirmationTokenRow> & {
+          communication_recipient_id: string;
+          token_hash: string;
+          expires_at: string;
+        },
+        Partial<CommunicationConfirmationTokenRow>,
+        [
+          {
+            foreignKeyName: "communication_confirmation_tokens_communication_recipient_id_fkey";
+            columns: ["communication_recipient_id"];
+            isOneToOne: true;
+            referencedRelation: "communication_recipients";
             referencedColumns: ["id"];
           },
         ]
@@ -917,8 +946,39 @@ export type Database = {
           p_recipient_filter: string;
           p_application_ids?: string[] | null;
           p_idempotency_key?: string | null;
+          p_require_confirmation?: boolean;
         };
         Returns: string;
+      };
+      issue_communication_confirmation_token: {
+        Args: {
+          p_communication_recipient_id: string;
+          p_token_hash: string;
+          p_expires_at: string;
+        };
+        Returns: string;
+      };
+      get_communication_receipt_context: {
+        Args: {
+          p_token_hash: string;
+        };
+        Returns: Array<{
+          subject: string;
+          body: string;
+          tournament_name: string;
+          team_name: string;
+          confirmation_required: boolean;
+          confirmed_at: string | null;
+        }>;
+      };
+      confirm_communication_receipt: {
+        Args: {
+          p_token_hash: string;
+        };
+        Returns: Array<{
+          confirmed_at: string;
+          already_confirmed: boolean;
+        }>;
       };
       reserve_communication_email_send: {
         Args: {

@@ -177,7 +177,9 @@ export function getFaqItems(settings?: AppSettings): FaqItem[] {
         <>
           Turnierinformationen, Spielpläne und wichtige Änderungen können per E-Mail
           bzw. über den Tournament Hub übermittelt werden. Bei wichtigen Informationen
-          kann eine Empfangsbestätigung angefordert werden.
+          kann eine Empfangsbestätigung angefordert werden. Die Empfangsbestätigung
+          dokumentiert ausschließlich den Erhalt der Information und stellt keine
+          Vertrags-, Teilnahme- oder Zahlungsbestätigung dar.
         </>
       ),
     },
