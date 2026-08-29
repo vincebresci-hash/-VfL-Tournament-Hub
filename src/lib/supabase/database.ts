@@ -947,6 +947,24 @@ export type Database = {
         };
         Returns: undefined;
       };
+      insert_external_cancellation_email_log: {
+        Args: {
+          p_token_hash: string;
+          p_cancellation_request_id: string;
+          p_application_id: string;
+          p_template_id: string | null;
+          p_template_type: EmailTemplateTypeRow;
+          p_to_email: string;
+          p_subject: string | null;
+          p_body: string | null;
+          p_status: string;
+          p_error: string | null;
+          p_provider: string | null;
+          p_provider_message_id: string | null;
+          p_created_by: string | null;
+        };
+        Returns: undefined;
+      };
       preview_communication_recipients: {
         Args: {
           p_tournament_id: string;

@@ -161,7 +161,15 @@ export function runCancellationEmailHotfixChecks() {
   // CAN-02 email logging
   assert(
     migration.includes("insert_cancellation_email_log"),
-    "CAN-02: system email log RPC exists",
+    "CAN-02: admin/club email log RPC exists",
+  );
+  assert(
+    migration.includes("insert_external_cancellation_email_log"),
+    "CAN-02: external token-scoped email log RPC exists",
+  );
+  assert(
+    migration.includes("insert_cancellation_email_log_core"),
+    "CAN-02: internal email log core has no direct grants",
   );
   assert(
     migration.includes("reservation required"),
@@ -169,11 +177,42 @@ export function runCancellationEmailHotfixChecks() {
   );
   assert(
     mail.includes("insert_cancellation_email_log"),
-    "CAN-02: mail layer uses system email log RPC",
+    "CAN-02: mail layer uses admin/club email log RPC",
+  );
+  assert(
+    mail.includes("insert_external_cancellation_email_log"),
+    "CAN-02: mail layer uses external email log RPC",
   );
   assert(
     !mail.includes('.from("email_logs").insert'),
     "CAN-02: direct email_logs insert removed from cancellation mail",
+  );
+  assert(
+    migration.includes(
+      "REVOKE ALL ON FUNCTION public.insert_cancellation_email_log",
+    ) && migration.includes("FROM PUBLIC, anon"),
+    "email log RPC revoked from anon",
+  );
+  assert(
+    migration.includes(
+      "GRANT EXECUTE ON FUNCTION public.insert_cancellation_email_log(\n  uuid,\n  uuid,\n  uuid,\n  public.email_template_type,\n  text,\n  text,\n  text,\n  text,\n  text,\n  text,\n  text,\n  uuid\n) TO authenticated;",
+    ),
+    "email log RPC granted to authenticated only",
+  );
+  assert(
+    migration.includes(
+      "GRANT EXECUTE ON FUNCTION public.insert_external_cancellation_email_log",
+    ),
+    "external email log RPC granted to anon",
+  );
+  assert(
+    migration.includes("PERFORM public.insert_cancellation_email_log_core"),
+    "public RPCs delegate to internal core writer",
+  );
+  assert(
+    migration.includes("RAISE EXCEPTION 'unauthorized'") &&
+      migration.includes("insert_cancellation_email_log("),
+    "admin/club email log enforces caller authorization",
   );
 
   // External path template restriction
