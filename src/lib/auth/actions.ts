@@ -16,6 +16,9 @@ export async function signOutAction() {
 export async function updateAdminProfileAction(input: {
   firstName: string;
   lastName: string;
+  displayName?: string | null;
+  phone?: string | null;
+  jobTitle?: string | null;
 }): Promise<{ error: string | null }> {
   const supabase = await createClient();
   const {
@@ -38,6 +41,9 @@ export async function updateAdminProfileAction(input: {
     .update({
       first_name: firstName,
       last_name: lastName,
+      display_name: input.displayName?.trim() || null,
+      phone: input.phone?.trim() || null,
+      job_title: input.jobTitle?.trim() || null,
     })
     .eq("id", user.id);
 

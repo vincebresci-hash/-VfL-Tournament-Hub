@@ -1,8 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getAuthSession } from "@/lib/auth/session";
-import { canAccessAdmin } from "@/lib/auth/roles";
+import { requirePermission } from "@/lib/auth/guards";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import {
   normalizePaymentAdminNote,
@@ -24,9 +23,9 @@ export async function updateApplicationPaymentAction(input: {
   paidAtInput: string;
   paymentNote: string;
 }): Promise<PaymentActionResult> {
-  const session = await getAuthSession();
-  if (!session || !canAccessAdmin(session.user.role)) {
-    return { error: "Kein Admin-Zugang." };
+  const access = await requirePermission("payments.manage");
+  if ("error" in access && access.error) {
+    return { error: access.error };
   }
 
   const participationFee = parseParticipationFeeInput(input.participationFeeInput);

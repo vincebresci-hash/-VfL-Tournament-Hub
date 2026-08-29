@@ -39,9 +39,14 @@ export type ProfileRow = {
   id: string;
   first_name: string | null;
   last_name: string | null;
+  display_name: string | null;
   email: string | null;
+  phone: string | null;
+  job_title: string | null;
+  avatar_url: string | null;
   role: UserRoleRow;
   club_id: string | null;
+  is_active: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -436,6 +441,50 @@ export type TournamentOccupancyRow = {
   new_count: number;
 };
 
+export type RbacRoleRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  is_platform_role: boolean;
+  is_system: boolean;
+  created_at: string;
+};
+
+export type RbacPermissionRow = {
+  id: string;
+  key: string;
+  name: string;
+  description: string | null;
+  category: string;
+  created_at: string;
+};
+
+export type RbacUserRoleRow = {
+  id: string;
+  user_id: string;
+  role_id: string;
+  club_id: string | null;
+  assigned_by: string | null;
+  assigned_at: string;
+};
+
+export type RbacUserTeamAssignmentRow = {
+  id: string;
+  user_id: string;
+  team_id: string;
+  assigned_by: string | null;
+  assigned_at: string;
+};
+
+export type RbacUserPermissionOverrideRow = {
+  user_id: string;
+  permission_id: string;
+  granted: boolean;
+  assigned_by: string | null;
+  assigned_at: string;
+};
+
 type ForeignKey = {
   foreignKeyName: string;
   columns: string[];
@@ -538,6 +587,36 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ]
+      >;
+      rbac_roles: Table<RbacRoleRow, Partial<RbacRoleRow> & { key: string; name: string }, Partial<RbacRoleRow>>;
+      rbac_permissions: Table<
+        RbacPermissionRow,
+        Partial<RbacPermissionRow> & { key: string; name: string; category: string },
+        Partial<RbacPermissionRow>
+      >;
+      rbac_role_permissions: Table<
+        { role_id: string; permission_id: string },
+        { role_id: string; permission_id: string },
+        { role_id?: string; permission_id?: string }
+      >;
+      rbac_user_roles: Table<
+        RbacUserRoleRow,
+        Partial<RbacUserRoleRow> & { user_id: string; role_id: string },
+        Partial<RbacUserRoleRow>
+      >;
+      rbac_user_team_assignments: Table<
+        RbacUserTeamAssignmentRow,
+        Partial<RbacUserTeamAssignmentRow> & { user_id: string; team_id: string },
+        Partial<RbacUserTeamAssignmentRow>
+      >;
+      rbac_user_permission_overrides: Table<
+        RbacUserPermissionOverrideRow,
+        Partial<RbacUserPermissionOverrideRow> & {
+          user_id: string;
+          permission_id: string;
+          granted: boolean;
+        },
+        Partial<RbacUserPermissionOverrideRow>
       >;
       application_reviews: Table<
         ApplicationReviewRow,
@@ -855,6 +934,35 @@ export type Database = {
       current_profile_role: { Args: Record<string, never>; Returns: UserRoleRow };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_super_admin: { Args: Record<string, never>; Returns: boolean };
+      is_profile_active: { Args: Record<string, never>; Returns: boolean };
+      has_rbac_permission: {
+        Args: { p_permission: string; p_club_id?: string | null; p_team_id?: string | null };
+        Returns: boolean;
+      };
+      count_active_super_admins: {
+        Args: { p_exclude_user_id?: string | null };
+        Returns: number;
+      };
+      rbac_set_user_active: {
+        Args: { p_user_id: string; p_is_active: boolean };
+        Returns: undefined;
+      };
+      rbac_assign_user_role: {
+        Args: { p_user_id: string; p_role_key: string; p_club_id?: string | null };
+        Returns: undefined;
+      };
+      rbac_revoke_user_role: {
+        Args: { p_user_id: string; p_role_key: string; p_club_id?: string | null };
+        Returns: undefined;
+      };
+      rbac_assign_team: {
+        Args: { p_user_id: string; p_team_id: string };
+        Returns: undefined;
+      };
+      rbac_revoke_team: {
+        Args: { p_user_id: string; p_team_id: string };
+        Returns: undefined;
+      };
       ensure_own_club: {
         Args: { p_name: string; p_city?: string | null; p_website?: string | null };
         Returns: string;

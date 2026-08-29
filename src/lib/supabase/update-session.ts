@@ -45,11 +45,15 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, is_active")
       .eq("id", user.id)
       .maybeSingle();
 
-    role = isUserRole(profile?.role) ? profile.role : "club";
+    if (profile?.is_active === false) {
+      role = null;
+    } else {
+      role = isUserRole(profile?.role) ? profile.role : "club";
+    }
   }
 
   if (user) {

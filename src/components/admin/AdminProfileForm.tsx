@@ -20,6 +20,9 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
   const router = useRouter();
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
+  const [displayName, setDisplayName] = useState(profile.displayName ?? "");
+  const [phone, setPhone] = useState(profile.phone ?? "");
+  const [jobTitle, setJobTitle] = useState(profile.jobTitle ?? "");
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -31,7 +34,8 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
   const [passwordNotice, setPasswordNotice] = useState<string | null>(null);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  const displayName = `${firstName} ${lastName}`.trim();
+  const displayNameValue =
+    displayName.trim() || `${firstName} ${lastName}`.trim();
 
   async function handleProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,7 +43,13 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
     setProfileError(null);
     setProfileNotice(null);
 
-    const result = await updateAdminProfileAction({ firstName, lastName });
+    const result = await updateAdminProfileAction({
+      firstName,
+      lastName,
+      displayName,
+      phone,
+      jobTitle,
+    });
     setSavingProfile(false);
 
     if (result.error) {
@@ -79,15 +89,17 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
     <div className="grid gap-6">
       <AdminCard title="Konto">
         <dl className="grid gap-4 sm:grid-cols-2">
-          <AdminInfo label="Name" value={displayValue(displayName)} />
+          <AdminInfo label="Name" value={displayValue(displayNameValue)} />
           <AdminInfo label="E-Mail" value={profile.email} />
           <AdminInfo label="Rolle" value={userRoleLabel[profile.role]} />
+          <AdminInfo label="Funktion" value={displayValue(jobTitle)} />
+          <AdminInfo label="Telefon" value={displayValue(phone)} />
           <AdminInfo label="Account seit" value={formatDateDe(profile.createdAt.slice(0, 10))} />
           <AdminInfo
             label="Letzter Login"
             value={profile.lastSignInAt ? formatDateTimeDe(profile.lastSignInAt) : "—"}
           />
-          <AdminInfo label="Anzeigename" value={displayValue(displayName)} />
+          <AdminInfo label="Anzeigename" value={displayValue(displayNameValue)} />
         </dl>
       </AdminCard>
 
@@ -116,6 +128,27 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
               id="admin-last-name"
               value={lastName}
               onChange={(event) => setLastName(event.target.value)}
+            />
+          </Field>
+          <Field id="admin-display-name" label="Anzeigename">
+            <TextInput
+              id="admin-display-name"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+            />
+          </Field>
+          <Field id="admin-job-title" label="Funktion">
+            <TextInput
+              id="admin-job-title"
+              value={jobTitle}
+              onChange={(event) => setJobTitle(event.target.value)}
+            />
+          </Field>
+          <Field id="admin-phone" label="Telefon">
+            <TextInput
+              id="admin-phone"
+              value={phone}
+              onChange={(event) => setPhone(event.target.value)}
             />
           </Field>
         </div>
