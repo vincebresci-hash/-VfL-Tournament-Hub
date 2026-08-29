@@ -1,3 +1,5 @@
+import type { ApplicationStatus } from "@/types/application";
+
 export const PAYMENT_STATUSES = [
   "pending",
   "paid",
@@ -12,4 +14,13 @@ export type ApplicationPayment = {
   participationFee: number | null;
   paidAt: string | null;
   paymentNote: string | null;
+};
+
+export type AdminPaymentRecord = ApplicationPayment & {
+  applicationId: string;
+  applicationStatus: ApplicationStatus;
+  clubName: string;
+  teamName: string;
+  tournamentName: string;
+  tournamentDate: string;
 };

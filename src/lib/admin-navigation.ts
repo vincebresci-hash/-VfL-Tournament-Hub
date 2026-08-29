@@ -1,4 +1,5 @@
 import {
+  IconCheckCircle,
   IconClipboard,
   IconClubs,
   IconGrid,
@@ -15,6 +16,7 @@ import {
 export const adminNavigation = [
   { href: "/admin", label: "Dashboard", icon: IconGrid, exact: true },
   { href: "/admin/bewerbungen", label: "Bewerbungen", icon: IconClipboard },
+  { href: "/admin/zahlungen", label: "Zahlungen", icon: IconCheckCircle },
   { href: "/admin/absagen", label: "Absagen", icon: IconClipboard },
   { href: "/admin/turniere", label: "Turniere", icon: IconTrophy },
   { href: "/admin/vereine", label: "Vereine", icon: IconClubs },

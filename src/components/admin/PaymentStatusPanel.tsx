@@ -15,12 +15,14 @@ type PaymentStatusPanelProps = {
   applicationId: string;
   applicationStatus: string;
   payment: ApplicationPayment;
+  canManage?: boolean;
 };
 
 export function PaymentStatusPanel({
   applicationId,
   applicationStatus,
   payment,
+  canManage = true,
 }: PaymentStatusPanelProps) {
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
     payment.paymentStatus,
@@ -36,6 +38,32 @@ export function PaymentStatusPanel({
 
   if (applicationStatus !== "accepted") {
     return null;
+  }
+
+  if (!canManage) {
+    return (
+      <section className="border border-line bg-white p-5">
+        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+          Zahlungsstatus
+        </h2>
+        <p className="mt-3 text-[14px] text-muted">
+          Status: {paymentStatusAdminOptions.find((o) => o.value === payment.paymentStatus)?.label}
+        </p>
+        {payment.participationFee != null ? (
+          <p className="mt-2 text-[14px] text-muted">
+            Startgebühr: {formatCurrencyEur(payment.participationFee)}
+          </p>
+        ) : null}
+        {payment.paidAt ? (
+          <p className="mt-2 text-[14px] text-muted">
+            Bezahlt am: {formatPaidAtInput(payment.paidAt)}
+          </p>
+        ) : null}
+        {payment.paymentNote ? (
+          <p className="mt-2 text-[14px] text-muted">Notiz: {payment.paymentNote}</p>
+        ) : null}
+      </section>
+    );
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {

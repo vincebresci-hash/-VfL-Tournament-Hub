@@ -66,6 +66,10 @@ export function requirePaymentsManage() {
   return requirePermissionAccess("payments.manage");
 }
 
+export function requirePaymentsView() {
+  return requirePermissionAccess("payments.view");
+}
+
 export function requireCommunicationsView() {
   return requirePermissionAccess("communications.view");
 }

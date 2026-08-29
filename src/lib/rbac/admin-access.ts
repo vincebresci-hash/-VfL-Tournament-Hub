@@ -5,6 +5,7 @@ export const ADMIN_ROUTE_PERMISSIONS: Array<{
   permissions: Permission[];
 }> = [
   { prefix: "/admin/bewerbungen", permissions: ["applications.view"] },
+  { prefix: "/admin/zahlungen", permissions: ["payments.view", "payments.manage"] },
   { prefix: "/admin/absagen", permissions: ["cancellations.view"] },
   { prefix: "/admin/turniere", permissions: ["tournaments.view"] },
   { prefix: "/admin/vereine", permissions: ["clubs.view"] },
@@ -20,6 +21,7 @@ export const ADMIN_ROUTE_PERMISSIONS: Array<{
 const NAV_PERMISSIONS: Record<string, Permission[]> = {
   "/admin": [],
   "/admin/bewerbungen": ["applications.view"],
+  "/admin/zahlungen": ["payments.view", "payments.manage"],
   "/admin/absagen": ["cancellations.view"],
   "/admin/turniere": ["tournaments.view"],
   "/admin/vereine": ["clubs.view"],

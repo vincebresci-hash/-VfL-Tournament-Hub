@@ -59,6 +59,14 @@ function readAdminSidebar() {
   return readFileSync(join(process.cwd(), "src/components/admin/AdminSidebar.tsx"), "utf8");
 }
 
+function readAdminAccess() {
+  return readFileSync(join(process.cwd(), "src/lib/rbac/admin-access.ts"), "utf8");
+}
+
+function readPaymentsQueries() {
+  return readFileSync(join(process.cwd(), "src/lib/payments/queries.ts"), "utf8");
+}
+
 export function runRbacChecks() {
   const migration = readMigration();
   const enforcementMigration = readEnforcementMigration();
@@ -70,6 +78,8 @@ export function runRbacChecks() {
   const clubProfileForm = readClubProfileForm();
   const adminShell = readAdminShell();
   const adminSidebar = readAdminSidebar();
+  const adminAccess = readAdminAccess();
+  const paymentsQueries = readPaymentsQueries();
 
   assert(migration.includes("rbac_roles"), "rbac_roles table");
   assert(migration.includes("rbac_permissions"), "rbac_permissions table");
@@ -96,7 +106,12 @@ export function runRbacChecks() {
   assert(actions.includes("requireSuperAdminSession"), "role assignment super-admin only");
   assert(actions.includes("rbac_assign_user_role"), "multi-role assign RPC used");
   assert(actions.includes("rbac_revoke_user_role"), "multi-role revoke RPC used");
-  assert(paymentsActions.includes('requirePermission("payments.manage")'), "payments server guard");
+  assert(paymentsActions.includes("requirePaymentsManage"), "payments manage guard");
+  assert(paymentsActions.includes("requirePaymentsView"), "payments view guard");
+  assert(paymentsActions.includes("loadAdminPaymentRecordsAction"), "standalone payment read action");
+  assert(adminAccess.includes('"/admin/zahlungen"'), "payments admin route registered");
+  assert(paymentsQueries.includes("listAdminPaymentRecords"), "payment list query");
+  assert(paymentsQueries.includes("getAdminPaymentRecord"), "payment detail query");
   assert(adminActions.includes("requireApplicationsView"), "applications view guard");
   assert(adminActions.includes("requireApplicationsManage"), "applications manage guard");
   assert(adminActions.includes("requireTournamentsManage"), "tournaments manage guard");
@@ -118,6 +133,26 @@ export function runRbacChecks() {
       permission: "roles.manage",
     }),
     "SUPER_ADMIN: roles.manage PASS",
+  );
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "super-admin",
+      roleKeys: ["SUPER_ADMIN"],
+      overrides: [],
+      permission: "payments.view",
+    }),
+    "SUPER_ADMIN: payments.view PASS",
+  );
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "super-admin",
+      roleKeys: ["SUPER_ADMIN"],
+      overrides: [],
+      permission: "payments.manage",
+    }),
+    "SUPER_ADMIN: payments.manage PASS",
   );
 
   // Legacy ADMIN without RBAC rows (pre-migration)
@@ -161,6 +196,16 @@ export function runRbacChecks() {
       profileRole: "admin",
       roleKeys: ["FINANCE_MANAGER"],
       overrides: [],
+      permission: "payments.view",
+    }),
+    "FINANCE_MANAGER: payments.view PASS",
+  );
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["FINANCE_MANAGER"],
+      overrides: [],
       permission: "payments.manage",
     }),
     "FINANCE_MANAGER: payments.manage PASS",
@@ -176,6 +221,28 @@ export function runRbacChecks() {
     "FINANCE_MANAGER: roles.manage BLOCKED",
   );
 
+  // READ-ONLY PAYMENT USER (payments.view without payments.manage)
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["APPLICATION_MANAGER"],
+      overrides: [{ permission: "payments.view", granted: true }],
+      permission: "payments.view",
+    }),
+    "read-only payment user: payments.view PASS",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["APPLICATION_MANAGER"],
+      overrides: [{ permission: "payments.view", granted: true }],
+      permission: "payments.manage",
+    }),
+    "read-only payment user: payments.manage BLOCKED",
+  );
+
   // APPLICATION_MANAGER
   assert(
     resolvePermissionAccess({
@@ -186,6 +253,16 @@ export function runRbacChecks() {
       permission: "applications.manage",
     }),
     "APPLICATION_MANAGER: applications.manage PASS",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["APPLICATION_MANAGER"],
+      overrides: [],
+      permission: "payments.view",
+    }),
+    "APPLICATION_MANAGER: payments.view BLOCKED",
   );
   assert(
     !resolvePermissionAccess({

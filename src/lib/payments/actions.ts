@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth/guards";
+import {
+  requirePaymentsManage,
+  requirePaymentsView,
+} from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
+import {
+  getAdminPaymentRecord,
+  listAdminPaymentRecords,
+} from "@/lib/payments/queries";
 import {
   normalizePaymentAdminNote,
   normalizePaymentUpdate,
@@ -16,6 +23,42 @@ export type PaymentActionResult = {
   notice?: string | null;
 };
 
+export async function loadAdminPaymentRecordsAction(): Promise<{
+  records: Awaited<ReturnType<typeof listAdminPaymentRecords>>["records"];
+  ready: boolean;
+  error: string | null;
+}> {
+  const access = await requirePaymentsView();
+  if (access.error || !access.session) {
+    return { records: [], ready: false, error: access.error };
+  }
+
+  const result = await listAdminPaymentRecords();
+  return { ...result, error: null };
+}
+
+export async function loadAdminPaymentRecordAction(applicationId: string): Promise<{
+  record: Awaited<ReturnType<typeof getAdminPaymentRecord>>;
+  error: string | null;
+}> {
+  const access = await requirePaymentsView();
+  if (access.error || !access.session) {
+    return { record: null, error: access.error };
+  }
+
+  const record = await getAdminPaymentRecord(applicationId);
+  if (!record) {
+    return { record: null, error: "Zahlungsdatensatz nicht gefunden." };
+  }
+
+  return { record, error: null };
+}
+
+export async function canManagePaymentsAction(): Promise<boolean> {
+  const access = await requirePaymentsManage();
+  return !access.error && access.session !== null;
+}
+
 export async function updateApplicationPaymentAction(input: {
   applicationId: string;
   paymentStatus: PaymentStatus;
@@ -23,8 +66,8 @@ export async function updateApplicationPaymentAction(input: {
   paidAtInput: string;
   paymentNote: string;
 }): Promise<PaymentActionResult> {
-  const access = await requirePermission("payments.manage");
-  if ("error" in access && access.error) {
+  const access = await requirePaymentsManage();
+  if (access.error || !access.session) {
     return { error: access.error };
   }
 
@@ -96,6 +139,8 @@ export async function updateApplicationPaymentAction(input: {
 
   revalidatePath("/admin/bewerbungen");
   revalidatePath(`/admin/bewerbungen/${input.applicationId}`);
+  revalidatePath("/admin/zahlungen");
+  revalidatePath(`/admin/zahlungen/${input.applicationId}`);
   revalidatePath("/verein/bewerbungen");
   revalidatePath(`/verein/bewerbungen/${input.applicationId}`);
   revalidatePath("/teilnahme");
