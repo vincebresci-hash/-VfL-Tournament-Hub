@@ -78,6 +78,11 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
           !("error" in rolesAccess && rolesAccess.error)
         }
         canManageTeams={!("error" in teamsAccess && teamsAccess.error)}
+        canDeleteUser={
+          canManageSystem(session.user.role) &&
+          !("error" in manageAccess && manageAccess.error)
+        }
+        currentUserId={session.user.id}
       />
     </div>
   );

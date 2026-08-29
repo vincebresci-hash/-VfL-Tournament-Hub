@@ -14,6 +14,7 @@ export const AUDIT_ACTIONS = [
   "TEAM_REVOKED",
   "CLUB_ASSIGNED",
   "PROFILE_UPDATED",
+  "USER_DELETED",
 ] as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

@@ -6,6 +6,7 @@ import { requirePermission, requireSuperAdminSession } from "@/lib/auth/guards";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { writeAdminAuditLog } from "@/lib/rbac/audit";
 import { CLUB_ROLE_KEYS } from "@/lib/rbac/permissions";
+import { deleteManagedUserRecords } from "@/lib/rbac/user-delete";
 import type { RbacRoleKey } from "@/types/rbac";
 
 function revalidateUserAdminPaths(userId?: string) {
@@ -316,5 +317,82 @@ export async function updateUserClubAssignmentAction(input: {
   });
 
   revalidateUserAdminPaths(input.userId);
+  return { error: null };
+}
+
+export async function deleteManagedUserAction(
+  userId: string,
+): Promise<{ error: string | null }> {
+  const access = await requireSuperAdminSession();
+  if ("error" in access && access.error) {
+    return { error: access.error };
+  }
+  if (!access.session) {
+    return { error: "Bitte zuerst anmelden." };
+  }
+
+  const manageAccess = await requirePermission("users.manage");
+  if ("error" in manageAccess && manageAccess.error) {
+    return { error: manageAccess.error };
+  }
+
+  const trimmedUserId = userId.trim();
+  if (!trimmedUserId) {
+    return { error: "Benutzer nicht gefunden." };
+  }
+
+  if (trimmedUserId === access.session.user.id) {
+    return { error: "Du kannst dein eigenes Konto nicht löschen." };
+  }
+
+  const supabase = await createClient();
+  const { data: targetProfile, error: targetProfileError } = await supabase
+    .from("profiles")
+    .select("id, role, is_active")
+    .eq("id", trimmedUserId)
+    .maybeSingle();
+
+  if (targetProfileError) {
+    return {
+      error: toUserFacingDbError("Das Benutzerprofil konnte nicht geladen werden.", targetProfileError),
+    };
+  }
+
+  if (!targetProfile) {
+    return { error: "Benutzer nicht gefunden." };
+  }
+
+  if (targetProfile.role === "super-admin" && targetProfile.is_active) {
+    const { data: activeSuperAdminCount, error: superAdminCountError } = await supabase.rpc(
+      "count_active_super_admins",
+      { p_exclude_user_id: trimmedUserId },
+    );
+
+    if (superAdminCountError) {
+      return {
+        error: toUserFacingDbError(
+          "Der Super-Admin-Status konnte nicht geprüft werden.",
+          superAdminCountError,
+        ),
+      };
+    }
+
+    if ((activeSuperAdminCount ?? 0) < 1) {
+      return { error: "Der letzte aktive Super-Admin kann nicht gelöscht werden." };
+    }
+  }
+
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: trimmedUserId,
+    action: "USER_DELETED",
+  });
+
+  const result = await deleteManagedUserRecords(trimmedUserId);
+  if (!result.ok) {
+    return { error: result.error };
+  }
+
+  revalidateUserAdminPaths(trimmedUserId);
   return { error: null };
 }

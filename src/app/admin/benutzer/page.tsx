@@ -16,7 +16,12 @@ import {
 
 export const metadata: Metadata = { title: "Benutzer" };
 
-export default async function AdminUsersPage() {
+type PageProps = {
+  searchParams: Promise<{ deleted?: string }>;
+};
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
+  const params = await searchParams;
   const session = await getAuthSession();
   if (!session) {
     redirect(ADMIN_LOGIN);
@@ -47,6 +52,9 @@ export default async function AdminUsersPage() {
           <AdminInviteUserDialog roles={roles} clubs={clubs} teams={teams} />
         ) : null}
       </div>
+      {params.deleted === "1" ? (
+        <AdminNotice>Der Benutzer wurde erfolgreich gelöscht.</AdminNotice>
+      ) : null}
       {!ready ? (
         <AdminNotice>
           Die Benutzerverwaltung steht bereit, sobald die RBAC-Migration im Supabase SQL

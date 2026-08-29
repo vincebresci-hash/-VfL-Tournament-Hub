@@ -20,6 +20,7 @@ import {
 import {
   assignTeamToUserAction,
   assignUserRoleAction,
+  deleteManagedUserAction,
   revokeTeamFromUserAction,
   revokeUserRoleAction,
   setUserActiveAction,
@@ -27,6 +28,7 @@ import {
   updateUserClubAssignmentAction,
 } from "@/lib/rbac/actions";
 import { ROLE_EXPLANATIONS } from "@/lib/rbac/role-labels";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import type { AdminAuditEntry, AdminUserSummary } from "@/types/rbac";
 import type { RbacRole, RbacRoleKey } from "@/types/rbac";
 
@@ -48,6 +50,8 @@ type AdminUserDetailProps = {
   canManageUsers: boolean;
   canManageRoles: boolean;
   canManageTeams: boolean;
+  canDeleteUser: boolean;
+  currentUserId: string;
 };
 
 function accountStatusLabel(status: AdminUserSummary["accountStatus"]) {
@@ -70,11 +74,14 @@ export function AdminUserDetail({
   canManageUsers,
   canManageRoles,
   canManageTeams,
+  canDeleteUser,
+  currentUserId,
 }: AdminUserDetailProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [deleteStep, setDeleteStep] = useState<"warning" | "confirm" | null>(null);
   const [firstName, setFirstName] = useState(user.firstName);
   const [lastName, setLastName] = useState(user.lastName);
   const [displayName, setDisplayName] = useState(user.displayName ?? "");
@@ -112,6 +119,23 @@ export function AdminUserDetail({
       return;
     }
     setNotice(success);
+    router.refresh();
+  }
+
+  async function handleDeleteUser() {
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    const result = await deleteManagedUserAction(user.id);
+    setSaving(false);
+    setDeleteStep(null);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    router.push("/admin/benutzer?deleted=1");
     router.refresh();
   }
 
@@ -496,6 +520,50 @@ export function AdminUserDetail({
           </button>
         </AdminCard>
       ) : null}
+
+      {canDeleteUser && user.id !== currentUserId ? (
+        <AdminCard title="Gefahrenzone">
+          <p className="mb-4 text-[14px] text-muted">
+            Löscht das Benutzerkonto vollständig, damit die Person bei Bedarf neu eingeladen
+            werden kann.
+          </p>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => setDeleteStep("warning")}
+            className="inline-flex h-11 items-center border border-[#d8b4b4] px-4 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:bg-[#fff5f5] disabled:opacity-70"
+          >
+            Benutzer löschen
+          </button>
+        </AdminCard>
+      ) : null}
+
+      <ConfirmModal
+        open={deleteStep === "warning"}
+        title="Benutzer wirklich löschen?"
+        confirmLabel="Weiter"
+        onCancel={() => setDeleteStep(null)}
+        onConfirm={() => setDeleteStep("confirm")}
+      >
+        <p className="text-[14px] leading-relaxed text-ink">
+          Benutzer wirklich löschen? Das Benutzerkonto, die Einladung sowie Rollen- und
+          Teamzuordnungen werden entfernt. Diese Aktion kann nicht rückgängig gemacht werden.
+        </p>
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={deleteStep === "confirm"}
+        title="Löschung endgültig bestätigen"
+        confirmLabel={saving ? "Wird gelöscht…" : "Benutzer endgültig löschen"}
+        onCancel={() => setDeleteStep(null)}
+        onConfirm={() => void handleDeleteUser()}
+      >
+        <p className="text-[14px] leading-relaxed text-ink">
+          Möchtest du{" "}
+          <span className="font-medium">{displayNameValue}</span> ({user.email}) unwiderruflich
+          löschen?
+        </p>
+      </ConfirmModal>
 
       <AdminUserPermissionsCard user={user} />
 
