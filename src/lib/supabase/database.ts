@@ -986,6 +986,10 @@ export type Database = {
         Args: { p_user_id: string; p_role_key: string; p_club_id?: string | null };
         Returns: undefined;
       };
+      rbac_accept_pending_invitation: {
+        Args: Record<string, never>;
+        Returns: Array<{ invitation_id: string | null; outcome: string }>;
+      };
       rbac_revoke_user_role: {
         Args: { p_user_id: string; p_role_key: string; p_club_id?: string | null };
         Returns: undefined;

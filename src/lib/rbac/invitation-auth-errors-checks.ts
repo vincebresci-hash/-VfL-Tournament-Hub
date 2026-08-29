@@ -23,15 +23,15 @@ function readInvitationActions() {
 
 export function runInvitationAuthErrorChecks() {
   const actions = readInvitationActions();
+  const expectedRedirect =
+    "https://vf-l-tournament-hub.vercel.app/auth/callback?next=%2Fpasswort-zuruecksetzen";
 
   assert(
-    buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app") ===
-      "https://vf-l-tournament-hub.vercel.app/auth/callback",
-    "invite redirect uses callback without query params",
+    buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app") === expectedRedirect,
+    "invite redirect uses callback with password-setup next param",
   );
   assert(
-    buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app/") ===
-      "https://vf-l-tournament-hub.vercel.app/auth/callback",
+    buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app/") === expectedRedirect,
     "invite redirect strips trailing slash",
   );
 

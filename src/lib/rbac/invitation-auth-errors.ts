@@ -27,8 +27,13 @@ export function redactInvitationSecrets(value: string) {
   return sanitized;
 }
 
+export const INVITE_PASSWORD_SETUP_PATH = "/passwort-zuruecksetzen";
+
 export function buildInvitationRedirectUrl(siteUrl: string) {
-  return `${siteUrl.replace(/\/$/, "")}/auth/callback`;
+  const base = `${siteUrl.replace(/\/$/, "")}/auth/callback`;
+  const params = new URLSearchParams();
+  params.set("next", INVITE_PASSWORD_SETUP_PATH);
+  return `${base}?${params.toString()}`;
 }
 
 export function isInvitationEmailRateLimitError(error: unknown) {

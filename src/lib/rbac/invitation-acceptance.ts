@@ -1,5 +1,7 @@
+import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { redactInvitationSecrets } from "@/lib/rbac/invitation-auth-errors";
+import { isMissingRelationError } from "@/lib/db/errors";
 
 export type InvitationAcceptanceOutcome =
   | "accepted"
@@ -15,10 +17,15 @@ export type InvitationAcceptanceOutcome =
 export type InvitationAcceptanceResult = {
   outcome: InvitationAcceptanceOutcome;
   invitationId?: string;
-  lookupStrategy?: "profile_id" | "auth_user_id" | "email";
+  lookupStrategy?: "rpc" | "profile_id" | "auth_user_id" | "email";
   updatedRows?: number;
   errorCode?: string;
   errorMessage?: string;
+};
+
+type RpcAcceptRow = {
+  invitation_id: string | null;
+  outcome: string;
 };
 
 function normalizeEmail(email: string) {
@@ -47,6 +54,93 @@ function logInvitationAcceptance(
   }
 
   console.info("[invitation_acceptance]", payload);
+}
+
+function mapRpcOutcome(row: RpcAcceptRow | undefined): InvitationAcceptanceResult | null {
+  if (!row) {
+    return { outcome: "not_found", lookupStrategy: "rpc" };
+  }
+
+  if (row.outcome === "accepted") {
+    return {
+      outcome: "accepted",
+      invitationId: row.invitation_id ?? undefined,
+      lookupStrategy: "rpc",
+      updatedRows: 1,
+    };
+  }
+
+  if (row.outcome === "already_accepted") {
+    return {
+      outcome: "already_accepted",
+      invitationId: row.invitation_id ?? undefined,
+      lookupStrategy: "rpc",
+      updatedRows: 0,
+    };
+  }
+
+  if (row.outcome === "not_found") {
+    return { outcome: "not_found", lookupStrategy: "rpc" };
+  }
+
+  return null;
+}
+
+async function acceptPendingInvitationViaRpc(
+  source: string,
+  userId: string,
+): Promise<InvitationAcceptanceResult | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("rbac_accept_pending_invitation");
+
+  if (error) {
+    if (isMissingRelationError(error) || error.code === "42883" || error.code === "PGRST202") {
+      logInvitationAcceptance("info", "acceptance rpc unavailable, using service-role fallback", {
+        source,
+        userId,
+        errorCode: error.code,
+      });
+      return null;
+    }
+
+    logInvitationAcceptance("error", "acceptance rpc failed", {
+      source,
+      userId,
+      outcome: "lookup_failed",
+      errorCode: error.code,
+      errorMessage: redactInvitationSecrets(error.message),
+    });
+    return {
+      outcome: "lookup_failed",
+      lookupStrategy: "rpc",
+      errorCode: error.code,
+      errorMessage: error.message,
+    };
+  }
+
+  const rows = (data ?? []) as RpcAcceptRow[];
+  const mapped = mapRpcOutcome(rows[0]);
+  if (!mapped) {
+    logInvitationAcceptance("warn", "acceptance rpc returned unexpected outcome", {
+      source,
+      userId,
+      outcome: rows[0]?.outcome,
+    });
+    return { outcome: "lookup_failed", lookupStrategy: "rpc" };
+  }
+
+  logInvitationAcceptance(
+    mapped.outcome === "accepted" ? "info" : "warn",
+    `acceptance rpc ${mapped.outcome}`,
+    {
+      source,
+      userId,
+      invitationId: mapped.invitationId,
+      outcome: mapped.outcome,
+    },
+  );
+
+  return mapped;
 }
 
 async function findPendingInvitation(
@@ -103,32 +197,25 @@ async function findPendingInvitation(
   }
 
   if (byEmail.data) {
-    return {
-      invitation: byEmail.data,
-      lookupError: null,
-      lookupStrategy: "email" as const,
-    };
+    const invitation = byEmail.data;
+    const profileMatches = !invitation.profile_id || invitation.profile_id === input.userId;
+    const authMatches = !invitation.auth_user_id || invitation.auth_user_id === input.userId;
+    if (profileMatches && authMatches) {
+      return {
+        invitation,
+        lookupError: null,
+        lookupStrategy: "email" as const,
+      };
+    }
   }
 
   return { invitation: null, lookupError: null, lookupStrategy: null };
 }
 
-export async function markInvitationAcceptedForAuthUser(input: {
-  userId: string;
-  email: string | undefined;
-  source?: string;
-}): Promise<InvitationAcceptanceResult> {
-  const source = input.source ?? "unknown";
-
-  if (!input.email?.trim()) {
-    logInvitationAcceptance("warn", "missing auth email", {
-      source,
-      userId: input.userId,
-      outcome: "missing_email",
-    });
-    return { outcome: "missing_email" };
-  }
-
+async function acceptPendingInvitationViaServiceRole(
+  input: { userId: string; email: string; source: string },
+): Promise<InvitationAcceptanceResult> {
+  const { userId, email, source } = input;
   let service: ReturnType<typeof createServiceRoleClient>;
   try {
     service = createServiceRoleClient();
@@ -136,7 +223,7 @@ export async function markInvitationAcceptedForAuthUser(input: {
     const message = error instanceof Error ? error.message : "service_role_unavailable";
     logInvitationAcceptance("error", "service role client unavailable", {
       source,
-      userId: input.userId,
+      userId,
       outcome: "service_unavailable",
       errorMessage: redactInvitationSecrets(message),
     });
@@ -146,16 +233,16 @@ export async function markInvitationAcceptedForAuthUser(input: {
     };
   }
 
-  const normalizedEmail = normalizeEmail(input.email);
+  const normalizedEmail = normalizeEmail(email);
   const { invitation, lookupError, lookupStrategy } = await findPendingInvitation(service, {
-    userId: input.userId,
+    userId,
     normalizedEmail,
   });
 
   if (lookupError) {
     logInvitationAcceptance("error", "pending invitation lookup failed", {
       source,
-      userId: input.userId,
+      userId,
       outcome: "lookup_failed",
       errorCode: lookupError.code,
       errorMessage: redactInvitationSecrets(lookupError.message),
@@ -170,7 +257,7 @@ export async function markInvitationAcceptedForAuthUser(input: {
   if (!invitation) {
     logInvitationAcceptance("info", "no pending invitation found", {
       source,
-      userId: input.userId,
+      userId,
       outcome: "not_found",
     });
     return { outcome: "not_found" };
@@ -179,7 +266,7 @@ export async function markInvitationAcceptedForAuthUser(input: {
   if (normalizeEmail(invitation.email) !== normalizedEmail) {
     logInvitationAcceptance("warn", "invitation email mismatch", {
       source,
-      userId: input.userId,
+      userId,
       invitationId: invitation.id,
       lookupStrategy,
       outcome: "email_mismatch",
@@ -205,7 +292,7 @@ export async function markInvitationAcceptedForAuthUser(input: {
   if (updateError) {
     logInvitationAcceptance("error", "invitation accept update failed", {
       source,
-      userId: input.userId,
+      userId,
       invitationId: invitation.id,
       lookupStrategy,
       outcome: "update_failed",
@@ -225,7 +312,7 @@ export async function markInvitationAcceptedForAuthUser(input: {
   if (affected === 0) {
     logInvitationAcceptance("warn", "invitation accept update affected zero rows", {
       source,
-      userId: input.userId,
+      userId,
       invitationId: invitation.id,
       lookupStrategy,
       outcome: "no_rows_updated",
@@ -240,7 +327,7 @@ export async function markInvitationAcceptedForAuthUser(input: {
 
   logInvitationAcceptance("info", "invitation accepted", {
     source,
-    userId: input.userId,
+    userId,
     invitationId: invitation.id,
     lookupStrategy,
     outcome: "accepted",
@@ -253,4 +340,47 @@ export async function markInvitationAcceptedForAuthUser(input: {
     lookupStrategy: lookupStrategy ?? undefined,
     updatedRows: affected,
   };
+}
+
+export async function markInvitationAcceptedForAuthUser(input: {
+  userId: string;
+  email: string | undefined;
+  source?: string;
+}): Promise<InvitationAcceptanceResult> {
+  const source = input.source ?? "unknown";
+
+  if (!input.email?.trim()) {
+    logInvitationAcceptance("warn", "missing auth email", {
+      source,
+      userId: input.userId,
+      outcome: "missing_email",
+    });
+    return { outcome: "missing_email" };
+  }
+
+  const rpcResult = await acceptPendingInvitationViaRpc(source, input.userId);
+  if (rpcResult) {
+    if (rpcResult.outcome === "lookup_failed" && rpcResult.lookupStrategy === "rpc") {
+      return acceptPendingInvitationViaServiceRole({
+        userId: input.userId,
+        email: input.email,
+        source,
+      });
+    }
+
+    if (
+      rpcResult.outcome === "accepted" ||
+      rpcResult.outcome === "already_accepted" ||
+      rpcResult.outcome === "not_found" ||
+      rpcResult.outcome === "email_mismatch"
+    ) {
+      return rpcResult;
+    }
+  }
+
+  return acceptPendingInvitationViaServiceRole({
+    userId: input.userId,
+    email: input.email,
+    source,
+  });
 }

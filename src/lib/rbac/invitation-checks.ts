@@ -34,7 +34,8 @@ export function runInvitationChecks() {
   assert(actions.includes("existingProfile"), "existing user protection");
   assert(actions.includes("RESEND_COOLDOWN_MS"), "resend rate limit");
   assert(actions.includes("status !== \"pending\""), "resend pending only");
-  assert(actions.includes("hasEstablishedAuthUser"), "cancel checks acceptance");
+  assert(actions.includes("reconcileAcceptedInvitationIfNeeded"), "resend/cancel reconcile accepted invitations");
+  assert(actions.includes("markInvitationAcceptedForAuthUser"), "invitation actions sync acceptance");
   assert(actions.includes(".eq(\"status\", \"pending\")"), "cancel uses conditional pending update");
   assert(actions.includes("deleteUser"), "cancel removes pending auth user");
   assert(actions.includes("getInviteRedirectSiteUrl"), "invite uses stable redirect site url");

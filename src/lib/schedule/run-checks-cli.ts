@@ -34,6 +34,7 @@ import { runInvitationServiceGrantsChecks } from "@/lib/rbac/invitation-service-
 import {
   runInvitationAcceptanceChecks,
 } from "@/lib/rbac/invitation-acceptance-checks";
+import { runInvitationAcceptanceRpcChecks } from "@/lib/rbac/invitation-acceptance-rpc-checks";
 import { runPaymentStatusChecks } from "@/lib/payments/payment-checks";
 import { runCommunicationChecks } from "@/lib/communications/communication-checks";
 import { runCommunicationReceiptChecks } from "@/lib/communications/communication-receipt-checks";
@@ -87,6 +88,7 @@ try {
   const invitationAuthErrorChecks = runInvitationAuthErrorChecks();
   const invitationServiceGrantsChecks = runInvitationServiceGrantsChecks();
   const invitationAcceptanceChecks = runInvitationAcceptanceChecks();
+  const invitationAcceptanceRpcChecks = runInvitationAcceptanceRpcChecks();
   const paymentStatusChecks = runPaymentStatusChecks();
   const communicationChecks = runCommunicationChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
@@ -132,6 +134,7 @@ try {
   console.log(`invitation-auth-error-checks: ${invitationAuthErrorChecks}`);
   console.log(`invitation-service-grants-checks: ${invitationServiceGrantsChecks}`);
   console.log(`invitation-acceptance-checks: ${invitationAcceptanceChecks}`);
+  console.log(`invitation-acceptance-rpc-checks: ${invitationAcceptanceRpcChecks}`);
   console.log(`payment-status-checks: ${paymentStatusChecks}`);
   console.log(`communication-checks: ${communicationChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);

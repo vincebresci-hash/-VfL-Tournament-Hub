@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AUTH_ERROR_MESSAGES } from "@/lib/auth/messages";
-import { CLUB_HOME } from "@/lib/auth/roles";
+import { getLoginDestinationAction } from "@/lib/auth/login-destination-action";
 import { validateNewPassword } from "@/lib/auth/validation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,7 +46,8 @@ export function ResetPasswordForm() {
         return;
       }
 
-      router.push(CLUB_HOME);
+      const destination = await getLoginDestinationAction();
+      router.push(destination);
       router.refresh();
     } catch {
       setError(AUTH_ERROR_MESSAGES.updatePasswordGeneric);

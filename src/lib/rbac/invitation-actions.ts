@@ -13,6 +13,7 @@ import {
   logInvitationAuthFailure,
   resolveInvitationAuthUserMessage,
 } from "@/lib/rbac/invitation-auth-errors";
+import { markInvitationAcceptedForAuthUser } from "@/lib/rbac/invitation-acceptance";
 import { CLUB_ROLE_KEYS, PLATFORM_ROLE_KEYS } from "@/lib/rbac/permissions";
 import type { RbacRoleKey } from "@/types/rbac";
 
@@ -45,6 +46,31 @@ async function hasEstablishedAuthUser(
 ) {
   const { data: authUser } = await service.auth.admin.getUserById(authUserId);
   return Boolean(authUser.user?.last_sign_in_at);
+}
+
+async function reconcileAcceptedInvitationIfNeeded(
+  service: NonNullable<Awaited<ReturnType<typeof getServiceClient>>>,
+  invitation: {
+    auth_user_id: string | null;
+    email?: string;
+    profile_id?: string | null;
+  },
+) {
+  if (!invitation.auth_user_id) {
+    return false;
+  }
+
+  if (!(await hasEstablishedAuthUser(service, invitation.auth_user_id))) {
+    return false;
+  }
+
+  const { data: authUser } = await service.auth.admin.getUserById(invitation.auth_user_id);
+  await markInvitationAcceptedForAuthUser({
+    userId: invitation.auth_user_id,
+    email: authUser.user?.email ?? invitation.email,
+    source: "invitation_reconcile",
+  });
+  return true;
 }
 
 async function cleanupPendingAuthUser(
@@ -330,15 +356,14 @@ export async function resendInvitationAction(
     return { error: "Nur ausstehende Einladungen können erneut gesendet werden." };
   }
 
+  if (await reconcileAcceptedInvitationIfNeeded(service, invitation)) {
+    revalidateInvitationPaths();
+    return { error: "Der Benutzer hat die Einladung bereits angenommen." };
+  }
+
   const lastSent = new Date(invitation.last_sent_at).getTime();
   if (Date.now() - lastSent < RESEND_COOLDOWN_MS) {
     return { error: "Bitte eine Minute warten, bevor die Einladung erneut gesendet wird." };
-  }
-
-  if (invitation.profile_id && invitation.auth_user_id) {
-    if (await hasEstablishedAuthUser(service, invitation.auth_user_id)) {
-      return { error: "Der Benutzer hat die Einladung bereits angenommen." };
-    }
   }
 
   const siteUrl = getInviteRedirectSiteUrl();
@@ -397,7 +422,7 @@ export async function cancelInvitationAction(
 
   const { data: invitation, error: loadError } = await service
     .from("user_invitations")
-    .select("id, status, auth_user_id, profile_id")
+    .select("id, status, email, auth_user_id, profile_id")
     .eq("id", invitationId)
     .maybeSingle();
 
@@ -409,7 +434,8 @@ export async function cancelInvitationAction(
     return { error: "Nur ausstehende Einladungen können abgebrochen werden." };
   }
 
-  if (invitation.auth_user_id && (await hasEstablishedAuthUser(service, invitation.auth_user_id))) {
+  if (await reconcileAcceptedInvitationIfNeeded(service, invitation)) {
+    revalidateInvitationPaths();
     return { error: "Der Benutzer hat die Einladung bereits angenommen." };
   }
 
