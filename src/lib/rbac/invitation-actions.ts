@@ -135,11 +135,17 @@ export async function inviteUserAction(
     }
   }
 
-  const { data: existingProfile } = await service
+  const { data: existingProfile, error: existingProfileError } = await service
     .from("profiles")
     .select("id, email")
     .ilike("email", email)
     .maybeSingle();
+
+  if (existingProfileError) {
+    return {
+      error: toUserFacingDbError("Das Benutzerkonto konnte nicht geprüft werden.", existingProfileError),
+    };
+  }
 
   if (existingProfile) {
     return {
@@ -148,12 +154,18 @@ export async function inviteUserAction(
     };
   }
 
-  const { data: pendingInvite } = await service
+  const { data: pendingInvite, error: pendingInviteError } = await service
     .from("user_invitations")
     .select("id")
     .eq("status", "pending")
     .ilike("email", email)
     .maybeSingle();
+
+  if (pendingInviteError) {
+    return {
+      error: toUserFacingDbError("Offene Einladungen konnten nicht geprüft werden.", pendingInviteError),
+    };
+  }
 
   if (pendingInvite) {
     return { error: "Für diese E-Mail liegt bereits eine offene Einladung vor." };
