@@ -339,7 +339,42 @@ export type EmailLogRow = {
   error: string | null;
   provider: string | null;
   provider_message_id: string | null;
+  communication_recipient_id: string | null;
   created_by: string | null;
+  created_at: string;
+};
+
+export type TournamentCommunicationRow = {
+  id: string;
+  tournament_id: string;
+  type: string;
+  subject: string;
+  body: string;
+  important: boolean;
+  recipient_filter: string;
+  status: string;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  idempotency_key: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
+  archived_at: string | null;
+};
+
+export type CommunicationRecipientRow = {
+  id: string;
+  communication_id: string;
+  application_id: string | null;
+  recipient_email: string;
+  recipient_team_name: string;
+  recipient_club_name: string | null;
+  send_status: string;
+  sent_at: string | null;
+  email_log_id: string | null;
+  error_message: string | null;
   created_at: string;
 };
 
@@ -531,6 +566,58 @@ export type Database = {
             columns: ["template_id"];
             isOneToOne: false;
             referencedRelation: "email_templates";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "email_logs_communication_recipient_id_fkey";
+            columns: ["communication_recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "communication_recipients";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      tournament_communications: Table<
+        TournamentCommunicationRow,
+        Partial<TournamentCommunicationRow> & {
+          tournament_id: string;
+          type: string;
+          subject: string;
+          body: string;
+          recipient_filter: string;
+        },
+        Partial<TournamentCommunicationRow>,
+        [
+          {
+            foreignKeyName: "tournament_communications_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      communication_recipients: Table<
+        CommunicationRecipientRow,
+        Partial<CommunicationRecipientRow> & {
+          communication_id: string;
+          recipient_email: string;
+          recipient_team_name: string;
+        },
+        Partial<CommunicationRecipientRow>,
+        [
+          {
+            foreignKeyName: "communication_recipients_communication_id_fkey";
+            columns: ["communication_id"];
+            isOneToOne: false;
+            referencedRelation: "tournament_communications";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "communication_recipients_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
             referencedColumns: ["id"];
           },
         ]
@@ -805,6 +892,54 @@ export type Database = {
           p_template_type: EmailTemplateTypeRow;
         };
         Returns: string;
+      };
+      preview_communication_recipients: {
+        Args: {
+          p_tournament_id: string;
+          p_communication_type: string;
+          p_recipient_filter: string;
+          p_application_ids?: string[] | null;
+        };
+        Returns: Array<{
+          application_id: string;
+          recipient_email: string;
+          recipient_team_name: string;
+          recipient_club_name: string | null;
+        }>;
+      };
+      initiate_communication_send: {
+        Args: {
+          p_tournament_id: string;
+          p_type: string;
+          p_subject: string;
+          p_body: string;
+          p_important: boolean;
+          p_recipient_filter: string;
+          p_application_ids?: string[] | null;
+          p_idempotency_key?: string | null;
+        };
+        Returns: string;
+      };
+      reserve_communication_email_send: {
+        Args: {
+          p_communication_recipient_id: string;
+        };
+        Returns: string;
+      };
+      complete_communication_recipient: {
+        Args: {
+          p_recipient_id: string;
+          p_send_status: string;
+          p_email_log_id?: string | null;
+          p_error_message?: string | null;
+        };
+        Returns: undefined;
+      };
+      finalize_communication: {
+        Args: {
+          p_communication_id: string;
+        };
+        Returns: undefined;
       };
       sync_mein_turnierplan_tournament: {
         Args: {

@@ -171,6 +171,17 @@ export function getFaqItems(settings?: AppSettings): FaqItem[] {
       ),
     },
     {
+      id: "turnierkommunikation",
+      question: "Wie erhalten wir Turnierinformationen und Spielpläne?",
+      answer: (
+        <>
+          Turnierinformationen, Spielpläne und wichtige Änderungen können per E-Mail
+          bzw. über den Tournament Hub übermittelt werden. Bei wichtigen Informationen
+          kann eine Empfangsbestätigung angefordert werden.
+        </>
+      ),
+    },
+    {
       id: "kontakt",
       question: "An wen wende ich mich bei Fragen?",
       answer: (

@@ -2,6 +2,7 @@ import {
   IconClipboard,
   IconClubs,
   IconGrid,
+  IconMail,
   IconMessage,
   IconNews,
   IconSettings,
@@ -18,7 +19,8 @@ export const adminNavigation = [
   { href: "/admin/vereine", label: "Vereine", icon: IconClubs },
   { href: "/admin/teams", label: "Teams", icon: IconUsers },
   { href: "/admin/news", label: "News", icon: IconNews },
-  { href: "/admin/emails", label: "E-Mails", icon: IconMessage },
+  { href: "/admin/kommunikation", label: "Kommunikation", icon: IconMessage },
+  { href: "/admin/emails", label: "E-Mails", icon: IconMail },
   { href: "/admin/profil", label: "Profil", icon: IconUser },
   { href: "/admin/einstellungen", label: "Einstellungen", icon: IconSettings },
 ] as const;
