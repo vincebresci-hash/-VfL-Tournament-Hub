@@ -20,11 +20,8 @@ export function normalizePaymentUpdate(input: {
   paymentStatus: PaymentStatus;
   participationFee: number | null;
   paidAt: string | null;
-  paymentNote: string | null;
   existingPaidAt?: string | null;
 }) {
-  const paymentNote = input.paymentNote?.trim() || null;
-
   if (input.paymentStatus === "paid") {
     return {
       payment_status: input.paymentStatus,
@@ -33,7 +30,6 @@ export function normalizePaymentUpdate(input: {
         input.paidAt ??
         input.existingPaidAt ??
         new Date().toISOString(),
-      payment_note: paymentNote,
     };
   }
 
@@ -41,6 +37,9 @@ export function normalizePaymentUpdate(input: {
     payment_status: input.paymentStatus,
     participation_fee: input.participationFee,
     paid_at: null,
-    payment_note: paymentNote,
   };
+}
+
+export function normalizePaymentAdminNote(value: string | null | undefined) {
+  return value?.trim() || null;
 }

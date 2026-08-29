@@ -77,6 +77,7 @@ export function runPaymentStatusChecks() {
 
   assert(actions.includes("canAccessAdmin"), "admin-only payment updates");
   assert(actions.includes("normalizePaymentUpdate"), "normalized payment update");
+  assert(actions.includes("application_payment_admin_notes"), "admin notes table writes");
 
   assert(statusMail.includes("participation_fee_line"), "accepted mail fee line");
   assert(statusMail.includes("payment_binding_notice"), "accepted mail binding notice");
@@ -98,7 +99,6 @@ export function runPaymentStatusChecks() {
     paymentStatus: "paid",
     participationFee: 100,
     paidAt: null,
-    paymentNote: null,
   });
   assert(paidUpdate.payment_status === "paid", "pending -> paid");
   assert(paidUpdate.paid_at !== null, "paid_at auto set");
@@ -107,7 +107,6 @@ export function runPaymentStatusChecks() {
     paymentStatus: "paid",
     participationFee: 100,
     paidAt: null,
-    paymentNote: null,
     existingPaidAt: "2026-01-15T10:00:00.000Z",
   });
   assert(
@@ -120,7 +119,6 @@ export function runPaymentStatusChecks() {
     paymentStatus: "pending",
     participationFee: 100,
     paidAt: "2026-01-01T00:00:00.000Z",
-    paymentNote: null,
   });
   assert(backToPending.paid_at === null, "paid -> pending clears paid_at");
 
@@ -129,7 +127,6 @@ export function runPaymentStatusChecks() {
     paymentStatus: "waived",
     participationFee: 100,
     paidAt: null,
-    paymentNote: "Erlassen",
   });
   assert(waived.payment_status === "waived", "pending -> waived");
 
@@ -138,7 +135,6 @@ export function runPaymentStatusChecks() {
     paymentStatus: "not_required",
     participationFee: null,
     paidAt: null,
-    paymentNote: null,
   });
   assert(notRequired.payment_status === "not_required", "pending -> not_required");
 

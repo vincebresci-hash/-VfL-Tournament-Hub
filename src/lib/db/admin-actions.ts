@@ -6,7 +6,13 @@ import { getAuthSession } from "@/lib/auth/session";
 import { canAccessAdmin } from "@/lib/auth/roles";
 import { listAdminApplications } from "@/lib/db/queries";
 import { toUserFacingDbError } from "@/lib/db/errors";
-import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS } from "@/types/application";
+import {
+  APPLICATION_STATUSES,
+  INTERNAL_CATEGORIES,
+  TEAM_STRENGTHS,
+  isManualAdminApplicationStatus,
+  MANUAL_ADMIN_APPLICATION_STATUSES,
+} from "@/types/application";
 import type {
   AdminApplication,
   ApplicationStatus,
@@ -55,6 +61,13 @@ export async function updateApplicationStatusAction(
 
   if (!APPLICATION_STATUSES.includes(status)) {
     return { error: "Ungültiger Status.", notice: null };
+  }
+
+  if (!isManualAdminApplicationStatus(status)) {
+    return {
+      error: "Absagen erfolgt ausschließlich über den Absage-Workflow.",
+      notice: null,
+    };
   }
 
   const supabase = await createClient();
@@ -367,7 +380,7 @@ export async function saveAppSettingsAction(
   }
 
   if (
-    !APPLICATION_STATUSES.includes(settings.defaultApplicationStatus)
+    !MANUAL_ADMIN_APPLICATION_STATUSES.includes(settings.defaultApplicationStatus)
   ) {
     return { error: "Ungültiger Standardstatus." };
   }

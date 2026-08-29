@@ -8,7 +8,10 @@ import type { ClubApplicationView } from "@/types/club";
 import type { Team } from "@/types/auth";
 
 const clubApplicationSelect = `
-  *,
+  id, club_id, tournament_id, team_id, submitted_by, status, club_name, club_city, website,
+  team_name, age_group, birth_year, league, division, self_rated_strength, team_description,
+  club_type, contact_first_name, contact_last_name, contact_role, contact_email, contact_phone,
+  alternative_phone, staff_count, notes, payment_status, participation_fee, paid_at, created_at, updated_at,
   clubs (id, name, city, website, contact_phone),
   teams (id, name, age_group, birth_year, league, division, self_rated_strength, trainer_name),
   tournaments (id, slug, name, age_group, date, location, status, max_teams)
@@ -18,6 +21,36 @@ const adminApplicationSelect = `
   ${clubApplicationSelect},
   application_reviews (internal_category, internal_strength, internal_note, reviewed_by)
 `;
+
+async function attachPaymentAdminNotes<T extends { id: string }>(
+  rows: T[],
+): Promise<Array<T & { payment_note?: string | null }>> {
+  if (rows.length === 0) {
+    return rows;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("application_payment_admin_notes")
+    .select("application_id, payment_note")
+    .in(
+      "application_id",
+      rows.map((row) => row.id),
+    );
+
+  if (error || !data) {
+    return rows.map((row) => ({ ...row, payment_note: null }));
+  }
+
+  const notesByApplicationId = new Map(
+    data.map((row) => [row.application_id, row.payment_note]),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    payment_note: notesByApplicationId.get(row.id) ?? null,
+  }));
+}
 
 export async function listClubTeams(clubId: string): Promise<Team[]> {
   const supabase = await createClient();
@@ -88,8 +121,14 @@ export async function listAdminApplications(): Promise<{
     return { applications: [], ready: !isMissingRelationError(error) };
   }
 
+  const rows = await attachPaymentAdminNotes(
+    (data ?? []) as Array<{ id: string } & ApplicationWithRelations>,
+  );
+
   return {
-    applications: (data as unknown as ApplicationWithRelations[]).map(toAdminApplication),
+    applications: rows.map((row) =>
+      toAdminApplication(row as unknown as ApplicationWithRelations),
+    ),
     ready: true,
   };
 }
@@ -108,7 +147,8 @@ export async function getAdminApplication(
     return null;
   }
 
-  return toAdminApplication(data as unknown as ApplicationWithRelations);
+  const [row] = await attachPaymentAdminNotes([data as { id: string }]);
+  return toAdminApplication(row as unknown as ApplicationWithRelations);
 }
 
 export async function getTournamentIdBySlug(slug: string) {

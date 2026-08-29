@@ -1,7 +1,10 @@
 import { APP_NAME, CLUB_NAME } from "@/lib/constants";
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
-import { APPLICATION_STATUSES, type ApplicationStatus } from "@/types/application";
+import {
+  MANUAL_ADMIN_APPLICATION_STATUSES,
+  type ManualAdminApplicationStatus,
+} from "@/types/application";
 import type { AppSettings } from "@/types/admin";
 import type { Json } from "@/lib/supabase/database";
 
@@ -38,9 +41,12 @@ function asBoolean(value: Json | undefined, fallback: boolean) {
   return typeof value === "boolean" ? value : fallback;
 }
 
-function asApplicationStatus(value: Json | undefined): ApplicationStatus {
-  if (typeof value === "string" && APPLICATION_STATUSES.includes(value as ApplicationStatus)) {
-    return value as ApplicationStatus;
+function asApplicationStatus(value: Json | undefined): ManualAdminApplicationStatus {
+  if (
+    typeof value === "string" &&
+    MANUAL_ADMIN_APPLICATION_STATUSES.includes(value as ManualAdminApplicationStatus)
+  ) {
+    return value as ManualAdminApplicationStatus;
   }
 
   return defaultAppSettings.defaultApplicationStatus;

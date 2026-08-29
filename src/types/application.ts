@@ -12,6 +12,25 @@ export const APPLICATION_STATUSES = [
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
 
+export const MANUAL_ADMIN_APPLICATION_STATUSES = [
+  "new",
+  "under-review",
+  "accepted",
+  "waiting-list",
+  "rejected",
+] as const satisfies ReadonlyArray<ApplicationStatus>;
+
+export type ManualAdminApplicationStatus =
+  (typeof MANUAL_ADMIN_APPLICATION_STATUSES)[number];
+
+export function isManualAdminApplicationStatus(
+  status: ApplicationStatus,
+): status is ManualAdminApplicationStatus {
+  return (MANUAL_ADMIN_APPLICATION_STATUSES as readonly ApplicationStatus[]).includes(
+    status,
+  );
+}
+
 export const CLUB_TYPES = [
   "amateur",
   "performance",

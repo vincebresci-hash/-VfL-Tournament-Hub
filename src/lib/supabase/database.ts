@@ -274,8 +274,13 @@ export type ApplicationRow = {
   payment_status: PaymentStatusRow;
   participation_fee: number | null;
   paid_at: string | null;
-  payment_note: string | null;
   created_at: string;
+  updated_at: string;
+};
+
+export type ApplicationPaymentAdminNoteRow = {
+  application_id: string;
+  payment_note: string | null;
   updated_at: string;
 };
 
@@ -514,6 +519,22 @@ export type Database = {
             columns: ["tournament_id"];
             isOneToOne: false;
             referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      application_payment_admin_notes: Table<
+        ApplicationPaymentAdminNoteRow,
+        Partial<ApplicationPaymentAdminNoteRow> & {
+          application_id: string;
+        },
+        Partial<ApplicationPaymentAdminNoteRow>,
+        [
+          {
+            foreignKeyName: "application_payment_admin_notes_application_id_fkey";
+            columns: ["application_id"];
+            isOneToOne: true;
+            referencedRelation: "applications";
             referencedColumns: ["id"];
           },
         ]

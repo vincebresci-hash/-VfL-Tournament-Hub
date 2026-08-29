@@ -5,7 +5,7 @@ import { useState, type FormEvent } from "react";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import { applicationStatusLabel } from "@/lib/admin";
 import { saveAppSettingsAction } from "@/lib/db/admin-actions";
-import { APPLICATION_STATUSES } from "@/types/application";
+import { MANUAL_ADMIN_APPLICATION_STATUSES } from "@/types/application";
 import type { AppSettings } from "@/types/admin";
 
 type AdminSettingsFormProps = {
@@ -166,7 +166,7 @@ export function AdminSettingsForm({ settings }: AdminSettingsFormProps) {
                 }))
               }
             >
-              {APPLICATION_STATUSES.map((status) => (
+              {MANUAL_ADMIN_APPLICATION_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {applicationStatusLabel[status]}
                 </option>
