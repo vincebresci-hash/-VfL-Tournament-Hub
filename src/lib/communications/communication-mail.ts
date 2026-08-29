@@ -144,7 +144,9 @@ async function issueCommunicationConfirmationToken(input: {
     return "error" as const;
   }
 
-  return data === "created" ? ("created" as const) : ("exists" as const);
+  return data === "created" || data === "replaced"
+    ? (data as "created" | "replaced")
+    : ("error" as const);
 }
 
 export async function sendTournamentCommunication(input: {
@@ -284,8 +286,17 @@ export async function sendTournamentCommunication(input: {
         expiresAt: tokenExpiresAt,
       });
 
-      if (issueResult === "created") {
+      if (issueResult === "created" || issueResult === "replaced") {
         confirmationUrl = buildCommunicationReceiptUrl(tokenPair.token);
+      } else {
+        await completeCommunicationRecipient({
+          recipientId: recipient.id,
+          sendStatus: "failed",
+          emailLogId: null,
+          errorMessage: "Bestätigungstoken konnte nicht erstellt werden.",
+        });
+        failedCount += 1;
+        continue;
       }
     }
 

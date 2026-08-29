@@ -162,15 +162,42 @@ export function runCommunicationReceiptChecks() {
     "9 second confirmation idempotent",
   );
 
-  // 10-11 require_confirmation flow
+  // RPC overload safety
   assert(
-    migration.includes("p_require_confirmation boolean DEFAULT false"),
-    "10 default false",
+    migration.includes(
+      "DROP FUNCTION IF EXISTS public.initiate_communication_send(\n  uuid, text, text, text, boolean, text, uuid[], text\n)",
+    ) || migration.includes(
+      "DROP FUNCTION IF EXISTS public.initiate_communication_send(uuid, text, text, text, boolean, text, uuid[], text)",
+    ),
+    "C1 initiate overload dropped before C2 create",
   );
   assert(
-    mail.includes("compose.requireConfirmation") &&
-      mail.includes("buildCommunicationReceiptUrl"),
-    "11 confirmation link in email flow",
+    migration.includes("p_require_confirmation boolean DEFAULT false"),
+    "C2 initiate signature present",
+  );
+  assert(
+    migration.includes("GRANT EXECUTE ON FUNCTION public.initiate_communication_send") &&
+      migration.includes("p_require_confirmation boolean"),
+    "C2 initiate grant present",
+  );
+  assert(
+    !migration.includes("CREATE OR REPLACE FUNCTION public.validate_secure_access_token"),
+    "validate_secure_access_token unchanged",
+  );
+  assert(
+    !paymentMigration.includes("DROP FUNCTION public.get_external_participation_payment_by_token"),
+    "payment RPC unchanged",
+  );
+
+  // Token rotation on retry
+  assert(migration.includes("RETURN 'replaced'"), "token rotation on re-issue");
+  assert(
+    mail.includes('issueResult === "created" || issueResult === "replaced"'),
+    "email retry uses rotated token link",
+  );
+  assert(
+    !mail.includes('issueResult === "exists"'),
+    "no stale exists-only retry path",
   );
 
   // 12-15 regressions
@@ -263,8 +290,9 @@ export function runCommunicationReceiptChecks() {
     "email token issuance RPC",
   );
   assert(
-    mail.includes("issueResult === \"created\""),
-    "retry skips new token when exists",
+    mail.includes("compose.requireConfirmation") &&
+      mail.includes("buildCommunicationReceiptUrl"),
+    "confirmation link in email flow",
   );
   assert(
     buildCommunicationReceiptEmailAppendix("https://example.test/mitteilung/abc").includes(

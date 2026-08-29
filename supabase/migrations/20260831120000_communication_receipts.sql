@@ -73,6 +73,12 @@ CREATE POLICY communication_confirmation_tokens_admin_select
 -- -----------------------------------------------------------------------------
 -- initiate_communication_send (add require_confirmation)
 -- -----------------------------------------------------------------------------
+-- PostgreSQL treats functions with different argument lists as separate overloads.
+-- DROP the exact C1 signature before creating the C2 version to avoid RPC ambiguity.
+
+DROP FUNCTION IF EXISTS public.initiate_communication_send(
+  uuid, text, text, text, boolean, text, uuid[], text
+);
 
 CREATE OR REPLACE FUNCTION public.initiate_communication_send(
   p_tournament_id uuid,
@@ -201,6 +207,8 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_existing_id uuid;
 BEGIN
   IF NOT public.is_admin() THEN
     RAISE EXCEPTION 'admin only';
@@ -214,14 +222,20 @@ BEGIN
     RAISE EXCEPTION 'invalid expiry';
   END IF;
 
-  IF EXISTS (
-    SELECT 1
-    FROM public.communication_confirmation_tokens cct
-    WHERE cct.communication_recipient_id = p_communication_recipient_id
-      AND cct.revoked_at IS NULL
-      AND cct.expires_at > now()
-  ) THEN
-    RETURN 'exists';
+  SELECT id INTO v_existing_id
+  FROM public.communication_confirmation_tokens
+  WHERE communication_recipient_id = p_communication_recipient_id
+  LIMIT 1;
+
+  IF FOUND THEN
+    UPDATE public.communication_confirmation_tokens
+    SET
+      token_hash = p_token_hash,
+      expires_at = p_expires_at,
+      revoked_at = NULL
+    WHERE communication_recipient_id = p_communication_recipient_id;
+
+    RETURN 'replaced';
   END IF;
 
   INSERT INTO public.communication_confirmation_tokens (
@@ -238,7 +252,14 @@ BEGIN
   RETURN 'created';
 EXCEPTION
   WHEN unique_violation THEN
-    RETURN 'exists';
+    UPDATE public.communication_confirmation_tokens
+    SET
+      token_hash = p_token_hash,
+      expires_at = p_expires_at,
+      revoked_at = NULL
+    WHERE communication_recipient_id = p_communication_recipient_id;
+
+    RETURN 'replaced';
 END;
 $$;
 
@@ -373,6 +394,13 @@ $$;
 -- -----------------------------------------------------------------------------
 -- Grants
 -- -----------------------------------------------------------------------------
+
+REVOKE ALL ON FUNCTION public.initiate_communication_send(
+  uuid, text, text, text, boolean, text, uuid[], text, boolean
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.initiate_communication_send(
+  uuid, text, text, text, boolean, text, uuid[], text, boolean
+) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.issue_communication_confirmation_token(
   uuid, text, timestamptz
