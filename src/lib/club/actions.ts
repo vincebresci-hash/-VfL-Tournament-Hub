@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { ensureClubForCurrentUser } from "@/lib/auth/actions";
+import { requirePermission } from "@/lib/auth/guards";
 import { getAuthSession } from "@/lib/auth/session";
 import { canAccessClub } from "@/lib/auth/roles";
 import { toUserFacingDbError } from "@/lib/db/errors";
@@ -33,6 +34,20 @@ async function requireClubId() {
   return { clubId: session.user.clubId, error: null };
 }
 
+async function requireClubTeamManage() {
+  const access = await requireClubId();
+  if (access.error || !access.clubId) {
+    return access;
+  }
+
+  const permission = await requirePermission("teams.manage", { clubId: access.clubId });
+  if ("error" in permission && permission.error) {
+    return { clubId: null, error: permission.error };
+  }
+
+  return { clubId: access.clubId, error: null };
+}
+
 export async function createClubTeamAction(input: {
   name: string;
   ageGroup: string;
@@ -42,7 +57,7 @@ export async function createClubTeamAction(input: {
   strength: number;
   coach: string;
 }): Promise<ClubActionResult> {
-  const access = await requireClubId();
+  const access = await requireClubTeamManage();
   if (access.error || !access.clubId) {
     return { error: access.error ?? "Bitte zuerst anmelden." };
   }
@@ -79,7 +94,7 @@ export async function createClubTeamAction(input: {
 }
 
 export async function deleteClubTeamAction(teamId: string): Promise<ClubActionResult> {
-  const access = await requireClubId();
+  const access = await requireClubTeamManage();
   if (access.error || !access.clubId) {
     return { error: access.error ?? "Bitte zuerst anmelden." };
   }

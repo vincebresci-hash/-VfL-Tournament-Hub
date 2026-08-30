@@ -103,7 +103,8 @@ export function resolvePermissionAccess(input: {
   const effective = mergePermissions(input.roleKeys, input.overrides);
   const hasAssignedRbacRoles = input.roleKeys.length > 0;
 
-  // Legacy fallback only before RBAC role rows exist (pre-migration accounts).
+  // Legacy fallback only before RBAC role rows exist (pre-backfill accounts).
+  // Mirrors public.has_rbac_permission() in 20260831210000_rbac_domain_rls_enforcement.sql.
   if (
     !hasAssignedRbacRoles &&
     input.profileRole === "admin" &&
