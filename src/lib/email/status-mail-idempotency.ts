@@ -76,11 +76,12 @@ export type StatusEmailReservationV2Result = {
 export function parseStatusEmailReservationV2(
   value: unknown,
 ): StatusEmailReservationV2Result | null {
-  if (!value || typeof value !== "object") {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row || typeof row !== "object") {
     return null;
   }
 
-  const record = value as {
+  const record = row as {
     decision?: unknown;
     reservation_id?: unknown;
   };

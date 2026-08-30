@@ -1056,7 +1056,10 @@ export type Database = {
           p_application_id: string;
           p_template_type: EmailTemplateTypeRow;
         };
-        Returns: Json;
+        Returns: {
+          decision: string;
+          reservation_id: string | null;
+        }[];
       };
       release_application_status_email_send: {
         Args: {

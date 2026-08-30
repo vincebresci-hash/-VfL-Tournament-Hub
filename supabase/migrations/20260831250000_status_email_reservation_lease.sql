@@ -6,7 +6,7 @@
 -- V1 reserve/release RPCs from 20260831220000 remain unchanged so migration can
 -- run before PR37 code while production still executes f093eb9.
 --
--- V2 returns jsonb: { "decision": "send"|"skip", "reservation_id": "<uuid>"|null }
+-- V2 returns TABLE(decision text, reservation_id uuid).
 -- claim/release v2 require reservation_id so stale takeovers cannot be mutated
 -- by the previous lease owner.
 -- =============================================================================
@@ -27,7 +27,7 @@ CREATE OR REPLACE FUNCTION public.reserve_application_status_email_send_v2(
   p_application_id uuid,
   p_template_type public.email_template_type
 )
-RETURNS jsonb
+RETURNS TABLE(decision text, reservation_id uuid)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -51,7 +51,8 @@ BEGIN
       AND template_type = p_template_type
       AND status = 'sent'
   ) THEN
-    RETURN jsonb_build_object('decision', 'skip', 'reservation_id', NULL);
+    RETURN QUERY SELECT 'skip'::text, NULL::uuid;
+    RETURN;
   END IF;
 
   v_reservation_id := gen_random_uuid();
@@ -67,13 +68,11 @@ BEGIN
     v_reservation_id
   )
   ON CONFLICT (application_id, template_type) DO NOTHING
-  RETURNING reservation_id INTO v_reservation_id;
+  RETURNING status_email_send_keys.reservation_id INTO v_reservation_id;
 
   IF v_reservation_id IS NOT NULL THEN
-    RETURN jsonb_build_object(
-      'decision', 'send',
-      'reservation_id', v_reservation_id
-    );
+    RETURN QUERY SELECT 'send'::text, v_reservation_id;
+    RETURN;
   END IF;
 
   DELETE FROM public.status_email_send_keys
@@ -85,7 +84,8 @@ BEGIN
   GET DIAGNOSTICS v_deleted = ROW_COUNT;
 
   IF v_deleted = 0 THEN
-    RETURN jsonb_build_object('decision', 'skip', 'reservation_id', NULL);
+    RETURN QUERY SELECT 'skip'::text, NULL::uuid;
+    RETURN;
   END IF;
 
   v_reservation_id := gen_random_uuid();
@@ -101,16 +101,14 @@ BEGIN
     v_reservation_id
   )
   ON CONFLICT (application_id, template_type) DO NOTHING
-  RETURNING reservation_id INTO v_reservation_id;
+  RETURNING status_email_send_keys.reservation_id INTO v_reservation_id;
 
   IF v_reservation_id IS NULL THEN
-    RETURN jsonb_build_object('decision', 'skip', 'reservation_id', NULL);
+    RETURN QUERY SELECT 'skip'::text, NULL::uuid;
+    RETURN;
   END IF;
 
-  RETURN jsonb_build_object(
-    'decision', 'send',
-    'reservation_id', v_reservation_id
-  );
+  RETURN QUERY SELECT 'send'::text, v_reservation_id;
 END;
 $$;
 

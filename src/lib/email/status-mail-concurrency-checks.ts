@@ -22,9 +22,9 @@ function assert(condition: boolean, message: string) {
 
 export function runStatusEmailConcurrencySelfChecks() {
   assert(
-    parseStatusEmailReservationV2({ decision: "send", reservation_id: "abc" })
+    parseStatusEmailReservationV2([{ decision: "send", reservation_id: "abc" }])
       ?.reservationId === "abc",
-    "parse v2 send payload",
+    "parse v2 send payload from table row array",
   );
   assert(
     parseStatusEmailReservationV2({ decision: "skip", reservation_id: null })?.decision ===
@@ -269,6 +269,10 @@ export function runStatusEmailConcurrencySelfChecks() {
   assert(
     !leaseMigration.includes("CREATE OR REPLACE FUNCTION public.release_application_status_email_send("),
     "lease migration must not modify v1 release RPC",
+  );
+  assert(
+    leaseMigration.includes("RETURNS TABLE(decision text, reservation_id uuid)"),
+    "v2 reserve returns decision + reservation_id table",
   );
   assert(
     leaseMigration.includes("reservation_id = p_reservation_id"),
