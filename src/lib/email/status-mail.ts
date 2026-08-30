@@ -4,7 +4,7 @@ import { applicationStatusLabel } from "@/lib/admin";
 import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
 import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
 import {
-  parseStatusEmailReservation,
+  parseStatusEmailReservationV2,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
@@ -114,53 +114,86 @@ function applicationVariables(
 async function reserveStatusEmailSend(
   applicationId: string,
   templateType: EmailTemplateType,
-): Promise<"send" | "skip" | "error"> {
+): Promise<{ decision: "send" | "skip" | "error"; reservationId: string | null }> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("reserve_application_status_email_send", {
+  const { data, error } = await supabase.rpc("reserve_application_status_email_send_v2", {
     p_application_id: applicationId,
     p_template_type: templateType,
   });
 
   if (error) {
     console.error(
-      "reserve_application_status_email_send failed",
+      "reserve_application_status_email_send_v2 failed",
       error.message,
       error.code ?? "",
     );
-    return "error";
+    return { decision: "error", reservationId: null };
   }
 
-  const reservation = parseStatusEmailReservation(
-    typeof data === "string" ? data : null,
-  );
+  const reservation = parseStatusEmailReservationV2(data);
   if (!reservation) {
     console.error(
-      "reserve_application_status_email_send returned unexpected value",
+      "reserve_application_status_email_send_v2 returned unexpected value",
       data,
     );
-    return "error";
+    return { decision: "error", reservationId: null };
   }
 
-  return reservation;
+  return {
+    decision: reservation.decision,
+    reservationId: reservation.reservationId,
+  };
 }
 
 async function releaseStatusEmailSend(
   applicationId: string,
   templateType: EmailTemplateType,
+  reservationId: string,
 ) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("release_application_status_email_send", {
+  const { error } = await supabase.rpc("release_application_status_email_send_v2", {
     p_application_id: applicationId,
     p_template_type: templateType,
+    p_reservation_id: reservationId,
   });
 
   if (error) {
     console.error(
-      "release_application_status_email_send failed",
+      "release_application_status_email_send_v2 failed",
       error.message,
       error.code ?? "",
     );
   }
+}
+
+async function claimStatusEmailSend(
+  applicationId: string,
+  templateType: EmailTemplateType,
+  reservationId: string,
+  providerMessageId: string | null,
+): Promise<boolean> {
+  if (!providerMessageId?.trim()) {
+    return false;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("claim_application_status_email_send_v2", {
+    p_application_id: applicationId,
+    p_template_type: templateType,
+    p_reservation_id: reservationId,
+    p_provider_message_id: providerMessageId,
+  });
+
+  if (error) {
+    console.error(
+      "claim_application_status_email_send_v2 failed",
+      error.message,
+      error.code ?? "",
+    );
+    return false;
+  }
+
+  return data === true;
 }
 
 async function writeEmailLog(entry: {
@@ -305,7 +338,7 @@ export async function sendApplicationStatusEmail(input: {
   }
 
   const reservation = await reserveStatusEmailSend(input.applicationId, templateType);
-  const decision = resolveStatusEmailSendDecision(reservation);
+  const decision = resolveStatusEmailSendDecision(reservation.decision);
 
   if (decision.action === "fail_closed") {
     console.error(decision.error);
@@ -316,9 +349,11 @@ export async function sendApplicationStatusEmail(input: {
     };
   }
 
-  if (decision.action === "skip") {
+  if (decision.action === "skip" || !reservation.reservationId) {
     return { sent: false, skipped: true, error: null };
   }
+
+  const reservationId = reservation.reservationId;
 
   let participationUrl = "";
   if (input.status === "accepted") {
@@ -332,7 +367,7 @@ export async function sendApplicationStatusEmail(input: {
     }
 
     if (!participationUrl) {
-      await releaseStatusEmailSend(input.applicationId, templateType);
+      await releaseStatusEmailSend(input.applicationId, templateType, reservationId);
       return {
         sent: false,
         skipped: false,
@@ -344,63 +379,104 @@ export async function sendApplicationStatusEmail(input: {
   const variables = applicationVariables(application, input.status, participationUrl);
   const subject = renderEmailTemplate(template.subject, variables);
   const body = renderEmailTemplate(template.body, variables);
-  const emailContent = buildTournamentHubEmailFromTemplate({
-    subject,
-    bodyText: body,
-    variables,
-  });
-  const result = await getEmailProvider().send({
-    to,
-    subject,
-    text: emailContent.text,
-    html: emailContent.html,
-    templateId: template.id,
-  });
 
-  const logStatus: EmailLogStatus = result.ok
-    ? "sent"
-    : result.skipped
-      ? "skipped"
-      : "failed";
+  let keepReservation = false;
+  let claimedReservation = false;
+  const ownsReservation = true;
+  try {
+    const emailContent = buildTournamentHubEmailFromTemplate({
+      subject,
+      bodyText: body,
+      variables,
+    });
+    const result = await getEmailProvider().send({
+      to,
+      subject,
+      text: emailContent.text,
+      html: emailContent.html,
+      templateId: template.id,
+    });
 
-  await writeEmailLog({
-    applicationId: input.applicationId,
-    templateId: template.id,
-    templateType,
-    toEmail: to,
-    subject,
-    body,
-    status: logStatus,
-    error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
-    provider: result.provider,
-    providerMessageId: result.providerMessageId ?? null,
-    createdBy: input.actorId,
-  });
+    if (result.ok) {
+      claimedReservation = await claimStatusEmailSend(
+        input.applicationId,
+        templateType,
+        reservationId,
+        result.providerMessageId ?? null,
+      );
+    }
 
-  if (
-    shouldReleaseStatusEmailReservation({
+    const logStatus: EmailLogStatus = result.ok
+      ? "sent"
+      : result.skipped
+        ? "skipped"
+        : "failed";
+
+    await writeEmailLog({
+      applicationId: input.applicationId,
+      templateId: template.id,
+      templateType,
+      toEmail: to,
+      subject,
+      body,
+      status: logStatus,
+      error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
+      provider: result.provider,
+      providerMessageId: result.providerMessageId ?? null,
+      createdBy: input.actorId,
+    });
+
+    keepReservation = !shouldReleaseStatusEmailReservation({
       sendOk: result.ok,
       logStatus,
-    })
-  ) {
-    await releaseStatusEmailSend(input.applicationId, templateType);
-  }
+      claimed: claimedReservation,
+    });
 
-  if (result.ok) {
-    return { sent: true, skipped: false, error: null };
-  }
+    if (result.ok) {
+      return { sent: true, skipped: false, error: null };
+    }
 
-  if (result.skipped) {
+    if (result.skipped) {
+      return {
+        sent: false,
+        skipped: false,
+        error: result.error ?? "E-Mail-Versand fehlgeschlagen.",
+      };
+    }
+
     return {
       sent: false,
       skipped: false,
       error: result.error ?? "E-Mail-Versand fehlgeschlagen.",
     };
-  }
+  } catch (error) {
+    console.error(
+      "sendApplicationStatusEmail failed",
+      error instanceof Error ? error.message : error,
+    );
 
-  return {
-    sent: false,
-    skipped: false,
-    error: result.error ?? "E-Mail-Versand fehlgeschlagen.",
-  };
+    await writeEmailLog({
+      applicationId: input.applicationId,
+      templateId: template.id,
+      templateType,
+      toEmail: to,
+      subject,
+      body,
+      status: "failed",
+      error: "E-Mail-Versand fehlgeschlagen.",
+      provider: null,
+      providerMessageId: null,
+      createdBy: input.actorId,
+    });
+
+    return {
+      sent: false,
+      skipped: false,
+      error: "E-Mail-Versand fehlgeschlagen.",
+    };
+  } finally {
+    if (ownsReservation && !keepReservation) {
+      await releaseStatusEmailSend(input.applicationId, templateType, reservationId);
+    }
+  }
 }

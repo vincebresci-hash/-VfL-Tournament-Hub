@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   isStatusEmailReservationError,
   parseStatusEmailReservation,
+  parseStatusEmailReservationV2,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   shouldSkipStatusEmailAfterReservation,
@@ -64,6 +65,14 @@ export function runStatusEmailIdempotencySelfChecks() {
     !shouldReleaseStatusEmailReservation({ sendOk: true, logStatus: "sent" }),
     "successful sent must keep reservation",
   );
+  assert(
+    !shouldReleaseStatusEmailReservation({
+      sendOk: true,
+      logStatus: "failed",
+      claimed: true,
+    }),
+    "claimed successful resend must keep reservation even if logging fails",
+  );
 
   assert(
     isStatusEmailReservationError("error"),
@@ -88,6 +97,38 @@ export function runStatusEmailIdempotencySelfChecks() {
       statusMailSource,
     ),
     "status-mail must not fall back to send when migration/RPC is missing",
+  );
+  assert(
+    statusMailSource.includes("finally") &&
+      statusMailSource.includes("releaseStatusEmailSend"),
+    "status-mail must release reservations in finally on failure",
+  );
+  assert(
+    !statusMailSource.includes("resolveStatusEmailReservationWithRecovery"),
+    "status-mail must not use client-side skip recovery",
+  );
+  assert(
+    parseStatusEmailReservationV2({ decision: "send", reservation_id: "id-1" }) !==
+      null,
+    "status-mail v2 reservation parser available",
+  );
+
+  const participationTokenSource = readFileSync(
+    join(process.cwd(), "src/lib/cancellations/participation-token.ts"),
+    "utf8",
+  );
+  assert(
+    participationTokenSource.includes("getEmailSiteUrl"),
+    "participation links must use canonical email site url",
+  );
+
+  const applicationsActionsSource = readFileSync(
+    join(process.cwd(), "src/lib/applications/actions.ts"),
+    "utf8",
+  );
+  assert(
+    applicationsActionsSource.includes("sendApplicationReceivedEmail failed"),
+    "public application submit must not fail when received email throws",
   );
 
   const migration = readFileSync(

@@ -1051,12 +1051,39 @@ export type Database = {
         };
         Returns: string;
       };
+      reserve_application_status_email_send_v2: {
+        Args: {
+          p_application_id: string;
+          p_template_type: EmailTemplateTypeRow;
+        };
+        Returns: {
+          decision: string;
+          reservation_id: string | null;
+        }[];
+      };
       release_application_status_email_send: {
         Args: {
           p_application_id: string;
           p_template_type: EmailTemplateTypeRow;
         };
         Returns: undefined;
+      };
+      release_application_status_email_send_v2: {
+        Args: {
+          p_application_id: string;
+          p_template_type: EmailTemplateTypeRow;
+          p_reservation_id: string;
+        };
+        Returns: undefined;
+      };
+      claim_application_status_email_send_v2: {
+        Args: {
+          p_application_id: string;
+          p_template_type: EmailTemplateTypeRow;
+          p_reservation_id: string;
+          p_provider_message_id: string;
+        };
+        Returns: boolean;
       };
       store_secure_access_token: {
         Args: {

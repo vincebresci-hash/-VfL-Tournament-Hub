@@ -87,14 +87,21 @@ export async function submitTournamentApplicationAction(input: {
   }
 
   if (settings.applicationConfirmationEnabled && result.applicationId) {
-    await sendApplicationReceivedEmail({
-      applicationId: result.applicationId,
-      contactEmail: input.values.contactEmail,
-      contactFirstName: input.values.contactFirstName,
-      clubName: input.values.clubName,
-      teamName: input.values.teamName,
-      tournament,
-    });
+    try {
+      await sendApplicationReceivedEmail({
+        applicationId: result.applicationId,
+        contactEmail: input.values.contactEmail,
+        contactFirstName: input.values.contactFirstName,
+        clubName: input.values.clubName,
+        teamName: input.values.teamName,
+        tournament,
+      });
+    } catch (error) {
+      console.error(
+        "sendApplicationReceivedEmail failed",
+        error instanceof Error ? error.message : error,
+      );
+    }
   }
 
   revalidatePath("/verein/bewerbungen");

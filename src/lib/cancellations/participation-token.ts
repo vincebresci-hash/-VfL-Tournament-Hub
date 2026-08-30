@@ -4,10 +4,10 @@ import {
   generateSecureAccessToken,
   hashSecureAccessToken,
 } from "@/lib/cancellations/tokens";
-import { getSiteUrl } from "@/lib/site";
+import { getEmailSiteUrl } from "@/lib/site";
 
 export function buildParticipationUrl(token: string) {
-  return `${getSiteUrl()}/teilnahme/${encodeURIComponent(token)}`;
+  return `${getEmailSiteUrl()}/teilnahme/${encodeURIComponent(token)}`;
 }
 
 async function revokeActiveParticipationTokens(applicationId: string) {

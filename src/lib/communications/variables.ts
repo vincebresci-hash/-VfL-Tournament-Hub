@@ -1,4 +1,4 @@
-import { getSiteUrl } from "@/lib/site";
+import { getEmailSiteUrl } from "@/lib/site";
 import { formatCurrencyEur } from "@/lib/payments/format";
 import { paymentStatusLabel } from "@/lib/payments/labels";
 import type { PaymentStatus } from "@/types/payment";
@@ -23,7 +23,7 @@ function cleanOptional(value: string | null | undefined) {
 export function buildCommunicationVariables(
   context: CommunicationVariableContext,
 ): Record<string, string> {
-  const siteUrl = getSiteUrl();
+  const siteUrl = getEmailSiteUrl();
   const tournamentUrl = context.tournamentSlug
     ? `${siteUrl}/turniere/${encodeURIComponent(context.tournamentSlug)}`
     : "";
