@@ -5,12 +5,14 @@ import type { CommunicationRecipientPreviewRow } from "@/lib/communications/reci
 
 type CommunicationRecipientPreviewProps = {
   recipients: CommunicationRecipientPreviewRow[];
+  selectedTeamCount?: number | null;
 };
 
 export function CommunicationRecipientPreview({
   recipients,
+  selectedTeamCount = null,
 }: CommunicationRecipientPreviewProps) {
-  const summary = summarizeRecipientPreview(recipients);
+  const summary = summarizeRecipientPreview(recipients, selectedTeamCount);
 
   return (
     <div className="mt-6 border border-line bg-surface px-4 py-4">
@@ -18,7 +20,7 @@ export function CommunicationRecipientPreview({
         Versand-Zusammenfassung
       </p>
 
-      {summary.teamCount === 0 ? (
+      {summary.actualRecipientCount === 0 ? (
         <p className="mt-3 text-[14px] text-muted">
           Keine berechtigten Empfänger für die aktuelle Auswahl.
         </p>

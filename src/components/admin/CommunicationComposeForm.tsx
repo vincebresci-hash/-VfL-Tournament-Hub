@@ -315,7 +315,12 @@ export function CommunicationComposeForm({
           />
         ) : null}
 
-        <CommunicationRecipientPreview recipients={previewRecipients} />
+        <CommunicationRecipientPreview
+          recipients={previewRecipients}
+          selectedTeamCount={
+            customSelectionActive ? selectedApplicationIds.length : null
+          }
+        />
       </AdminCard>
 
       <AdminCard title="Nachricht">

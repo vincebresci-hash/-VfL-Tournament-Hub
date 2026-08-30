@@ -174,6 +174,7 @@ export function runCommunicationRecipientPickerChecks() {
   ]);
   assert(summary.teamCount === 2, "team count preserved");
   assert(summary.uniqueEmailCount === 2, "unique email count exact");
+  assert(summary.actualRecipientCount === 2, "actual recipient count exact");
 
   const hiddenSelection = filterVisibleRecipientApplications(
     [hubApplication, externalApplication],

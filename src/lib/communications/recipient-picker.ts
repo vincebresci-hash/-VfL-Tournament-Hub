@@ -41,6 +41,10 @@ export type CommunicationRecipientPreviewRow = {
   recipientClubName: string | null;
 };
 
+export function normalizeRecipientEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export function isHubApplication(application: Pick<CommunicationEligibleApplication, "isHubTeam">) {
   return application.isHubTeam;
 }
@@ -134,7 +138,7 @@ export function deduplicateRecipientsByEmail(
   const unique: CommunicationRecipientPreviewRow[] = [];
 
   for (const recipient of recipients) {
-    const normalized = recipient.recipientEmail.trim().toLowerCase();
+    const normalized = normalizeRecipientEmail(recipient.recipientEmail);
     if (!normalized || seen.has(normalized)) {
       continue;
     }
@@ -146,12 +150,22 @@ export function deduplicateRecipientsByEmail(
   return unique;
 }
 
-export function summarizeRecipientPreview(recipients: CommunicationRecipientPreviewRow[]) {
+export function summarizeRecipientPreview(
+  recipients: CommunicationRecipientPreviewRow[],
+  selectedTeamCount?: number | null,
+) {
   const uniqueRecipients = deduplicateRecipientsByEmail(recipients);
+  const actualRecipientCount = recipients.length;
+  const teamCount =
+    selectedTeamCount != null && selectedTeamCount > 0
+      ? selectedTeamCount
+      : actualRecipientCount;
 
   return {
-    teamCount: recipients.length,
-    uniqueEmailCount: uniqueRecipients.length,
-    uniqueRecipients,
+    teamCount,
+    uniqueEmailCount: actualRecipientCount,
+    actualRecipientCount,
+    uniqueRecipients:
+      recipients.length > 0 ? recipients : uniqueRecipients,
   };
 }
