@@ -68,6 +68,46 @@ export function shouldReleaseStatusEmailReservation(input: {
   return !input.sendOk || input.logStatus !== "sent";
 }
 
+export type StatusEmailReservationV2Result = {
+  decision: StatusEmailReservation | "error";
+  reservationId: string | null;
+};
+
+export function parseStatusEmailReservationV2(
+  value: unknown,
+): StatusEmailReservationV2Result | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as {
+    decision?: unknown;
+    reservation_id?: unknown;
+  };
+
+  if (record.decision !== "send" && record.decision !== "skip") {
+    return null;
+  }
+
+  const reservationId =
+    typeof record.reservation_id === "string" && record.reservation_id.trim()
+      ? record.reservation_id.trim()
+      : null;
+
+  if (record.decision === "send" && !reservationId) {
+    return null;
+  }
+
+  if (record.decision === "skip" && reservationId !== null) {
+    return null;
+  }
+
+  return {
+    decision: record.decision,
+    reservationId,
+  };
+}
+
 export type StatusEmailScenario = {
   id: string;
   priorSentTemplates: EmailTemplateType[];

@@ -92,14 +92,29 @@ export function runRbacSecurityDefinerChecks() {
     "utf8",
   );
   assert(
-    leaseMigration.includes("claim_application_status_email_send") &&
+    leaseMigration.includes("claim_application_status_email_send_v2") &&
       leaseMigration.includes("applications.decide") &&
       leaseMigration.includes("applications.manage"),
-    "status email claim uses application permissions",
+    "status email v2 claim uses application permissions",
+  );
+  assert(
+    leaseMigration.includes("reserve_application_status_email_send_v2") &&
+      leaseMigration.includes("release_application_status_email_send_v2"),
+    "status email v2 reserve/release present",
   );
   assert(
     leaseMigration.includes("provider_message_id IS NULL"),
     "release/lease must not delete claimed reservations",
+  );
+  assert(
+    leaseMigration.includes("reservation_id = p_reservation_id"),
+    "v2 claim/release must require reservation ownership",
+  );
+  assert(
+    !leaseMigration.includes(
+      "CREATE OR REPLACE FUNCTION public.reserve_application_status_email_send(",
+    ),
+    "lease migration must not alter v1 reserve RPC",
   );
 
   assert(

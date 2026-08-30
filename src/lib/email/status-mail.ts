@@ -4,7 +4,7 @@ import { applicationStatusLabel } from "@/lib/admin";
 import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
 import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
 import {
-  parseStatusEmailReservation,
+  parseStatusEmailReservationV2,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
@@ -114,49 +114,52 @@ function applicationVariables(
 async function reserveStatusEmailSend(
   applicationId: string,
   templateType: EmailTemplateType,
-): Promise<"send" | "skip" | "error"> {
+): Promise<{ decision: "send" | "skip" | "error"; reservationId: string | null }> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("reserve_application_status_email_send", {
+  const { data, error } = await supabase.rpc("reserve_application_status_email_send_v2", {
     p_application_id: applicationId,
     p_template_type: templateType,
   });
 
   if (error) {
     console.error(
-      "reserve_application_status_email_send failed",
+      "reserve_application_status_email_send_v2 failed",
       error.message,
       error.code ?? "",
     );
-    return "error";
+    return { decision: "error", reservationId: null };
   }
 
-  const reservation = parseStatusEmailReservation(
-    typeof data === "string" ? data : null,
-  );
+  const reservation = parseStatusEmailReservationV2(data);
   if (!reservation) {
     console.error(
-      "reserve_application_status_email_send returned unexpected value",
+      "reserve_application_status_email_send_v2 returned unexpected value",
       data,
     );
-    return "error";
+    return { decision: "error", reservationId: null };
   }
 
-  return reservation;
+  return {
+    decision: reservation.decision,
+    reservationId: reservation.reservationId,
+  };
 }
 
 async function releaseStatusEmailSend(
   applicationId: string,
   templateType: EmailTemplateType,
+  reservationId: string,
 ) {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("release_application_status_email_send", {
+  const { error } = await supabase.rpc("release_application_status_email_send_v2", {
     p_application_id: applicationId,
     p_template_type: templateType,
+    p_reservation_id: reservationId,
   });
 
   if (error) {
     console.error(
-      "release_application_status_email_send failed",
+      "release_application_status_email_send_v2 failed",
       error.message,
       error.code ?? "",
     );
@@ -166,6 +169,7 @@ async function releaseStatusEmailSend(
 async function claimStatusEmailSend(
   applicationId: string,
   templateType: EmailTemplateType,
+  reservationId: string,
   providerMessageId: string | null,
 ): Promise<boolean> {
   if (!providerMessageId?.trim()) {
@@ -173,15 +177,16 @@ async function claimStatusEmailSend(
   }
 
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("claim_application_status_email_send", {
+  const { data, error } = await supabase.rpc("claim_application_status_email_send_v2", {
     p_application_id: applicationId,
     p_template_type: templateType,
+    p_reservation_id: reservationId,
     p_provider_message_id: providerMessageId,
   });
 
   if (error) {
     console.error(
-      "claim_application_status_email_send failed",
+      "claim_application_status_email_send_v2 failed",
       error.message,
       error.code ?? "",
     );
@@ -333,7 +338,7 @@ export async function sendApplicationStatusEmail(input: {
   }
 
   const reservation = await reserveStatusEmailSend(input.applicationId, templateType);
-  const decision = resolveStatusEmailSendDecision(reservation);
+  const decision = resolveStatusEmailSendDecision(reservation.decision);
 
   if (decision.action === "fail_closed") {
     console.error(decision.error);
@@ -344,9 +349,11 @@ export async function sendApplicationStatusEmail(input: {
     };
   }
 
-  if (decision.action === "skip") {
+  if (decision.action === "skip" || !reservation.reservationId) {
     return { sent: false, skipped: true, error: null };
   }
+
+  const reservationId = reservation.reservationId;
 
   let participationUrl = "";
   if (input.status === "accepted") {
@@ -360,7 +367,7 @@ export async function sendApplicationStatusEmail(input: {
     }
 
     if (!participationUrl) {
-      await releaseStatusEmailSend(input.applicationId, templateType);
+      await releaseStatusEmailSend(input.applicationId, templateType, reservationId);
       return {
         sent: false,
         skipped: false,
@@ -375,7 +382,7 @@ export async function sendApplicationStatusEmail(input: {
 
   let keepReservation = false;
   let claimedReservation = false;
-  const ownsReservation = decision.action === "send";
+  const ownsReservation = true;
   try {
     const emailContent = buildTournamentHubEmailFromTemplate({
       subject,
@@ -394,6 +401,7 @@ export async function sendApplicationStatusEmail(input: {
       claimedReservation = await claimStatusEmailSend(
         input.applicationId,
         templateType,
+        reservationId,
         result.providerMessageId ?? null,
       );
     }
@@ -468,7 +476,7 @@ export async function sendApplicationStatusEmail(input: {
     };
   } finally {
     if (ownsReservation && !keepReservation) {
-      await releaseStatusEmailSend(input.applicationId, templateType);
+      await releaseStatusEmailSend(input.applicationId, templateType, reservationId);
     }
   }
 }

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   isStatusEmailReservationError,
   parseStatusEmailReservation,
+  parseStatusEmailReservationV2,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   shouldSkipStatusEmailAfterReservation,
@@ -105,6 +106,11 @@ export function runStatusEmailIdempotencySelfChecks() {
   assert(
     !statusMailSource.includes("resolveStatusEmailReservationWithRecovery"),
     "status-mail must not use client-side skip recovery",
+  );
+  assert(
+    parseStatusEmailReservationV2({ decision: "send", reservation_id: "id-1" }) !==
+      null,
+    "status-mail v2 reservation parser available",
   );
 
   const participationTokenSource = readFileSync(

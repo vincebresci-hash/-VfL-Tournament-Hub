@@ -3,7 +3,13 @@ import type { EmailTemplateType } from "@/types/admin";
 /** Must match `interval '10 minutes'` in status email lease migration. */
 export const STATUS_EMAIL_RESERVATION_LEASE_MS = 10 * 60 * 1000;
 
+export type StatusEmailReservationV2 = {
+  decision: "send" | "skip";
+  reservationId: string | null;
+};
+
 export type SimulatedReservationKey = {
+  reservationId: string;
   createdAtMs: number;
   providerMessageId: string | null;
 };
@@ -13,7 +19,14 @@ export type SimulatedStatusEmailStore = {
   keys: Map<EmailTemplateType, SimulatedReservationKey>;
 };
 
-function key(templateType: EmailTemplateType) {
+let simulatedReservationCounter = 0;
+
+function nextReservationId() {
+  simulatedReservationCounter += 1;
+  return `reservation-${simulatedReservationCounter}`;
+}
+
+function templateKey(templateType: EmailTemplateType) {
   return templateType;
 }
 
@@ -24,50 +37,58 @@ export function createSimulatedStatusEmailStore(): SimulatedStatusEmailStore {
   };
 }
 
-export function simulateReserveStatusEmailSendWithLease(input: {
+export function simulateReserveStatusEmailSendV2(input: {
   store: SimulatedStatusEmailStore;
   templateType: EmailTemplateType;
   nowMs: number;
   leaseMs?: number;
-}): "send" | "skip" {
+}): StatusEmailReservationV2 {
   const leaseMs = input.leaseMs ?? STATUS_EMAIL_RESERVATION_LEASE_MS;
 
   if (input.store.sentLogs.has(input.templateType)) {
-    return "skip";
+    return { decision: "skip", reservationId: null };
   }
 
-  if (!input.store.keys.has(key(input.templateType))) {
-    input.store.keys.set(key(input.templateType), {
+  const existing = input.store.keys.get(templateKey(input.templateType));
+  if (!existing) {
+    const reservationId = nextReservationId();
+    input.store.keys.set(templateKey(input.templateType), {
+      reservationId,
       createdAtMs: input.nowMs,
       providerMessageId: null,
     });
-    return "send";
+    return { decision: "send", reservationId };
   }
 
-  const existing = input.store.keys.get(key(input.templateType))!;
   const staleThreshold = input.nowMs - leaseMs;
   const canTakeOver =
     existing.providerMessageId === null && existing.createdAtMs < staleThreshold;
 
   if (!canTakeOver) {
-    return "skip";
+    return { decision: "skip", reservationId: null };
   }
 
-  input.store.keys.delete(key(input.templateType));
-  input.store.keys.set(key(input.templateType), {
+  const reservationId = nextReservationId();
+  input.store.keys.set(templateKey(input.templateType), {
+    reservationId,
     createdAtMs: input.nowMs,
     providerMessageId: null,
   });
-  return "send";
+  return { decision: "send", reservationId };
 }
 
-export function simulateClaimStatusEmailSend(input: {
+export function simulateClaimStatusEmailSendV2(input: {
   store: SimulatedStatusEmailStore;
   templateType: EmailTemplateType;
+  reservationId: string;
   providerMessageId: string;
 }): boolean {
-  const existing = input.store.keys.get(key(input.templateType));
-  if (!existing || existing.providerMessageId !== null) {
+  const existing = input.store.keys.get(templateKey(input.templateType));
+  if (
+    !existing ||
+    existing.reservationId !== input.reservationId ||
+    existing.providerMessageId !== null
+  ) {
     return false;
   }
 
@@ -75,20 +96,25 @@ export function simulateClaimStatusEmailSend(input: {
   return true;
 }
 
-export function simulateReleaseStatusEmailSend(input: {
+export function simulateReleaseStatusEmailSendV2(input: {
   store: SimulatedStatusEmailStore;
   templateType: EmailTemplateType;
+  reservationId: string;
 }): void {
   if (input.store.sentLogs.has(input.templateType)) {
     return;
   }
 
-  const existing = input.store.keys.get(key(input.templateType));
-  if (!existing || existing.providerMessageId !== null) {
+  const existing = input.store.keys.get(templateKey(input.templateType));
+  if (
+    !existing ||
+    existing.reservationId !== input.reservationId ||
+    existing.providerMessageId !== null
+  ) {
     return;
   }
 
-  input.store.keys.delete(key(input.templateType));
+  input.store.keys.delete(templateKey(input.templateType));
 }
 
 export function simulateWriteSentLog(input: {
@@ -98,78 +124,9 @@ export function simulateWriteSentLog(input: {
   input.store.sentLogs.add(input.templateType);
 }
 
-export type SimulatedSendRequest = {
-  id: "A" | "B";
-  reserved: boolean;
-  claimed: boolean;
-  sent: boolean;
-};
-
-export function simulateConcurrentStatusEmailSends(input: {
-  store: SimulatedStatusEmailStore;
-  templateType: EmailTemplateType;
-  startMs: number;
-  requestBDelayMs: number;
-  requestASendCompletesMs: number;
-}): { requestA: SimulatedSendRequest; requestB: SimulatedSendRequest; totalSends: number } {
-  const requestA: SimulatedSendRequest = {
-    id: "A",
-    reserved: false,
-    claimed: false,
-    sent: false,
-  };
-  const requestB: SimulatedSendRequest = {
-    id: "B",
-    reserved: false,
-    claimed: false,
-    sent: false,
-  };
-
-  const reserveA = simulateReserveStatusEmailSendWithLease({
-    store: input.store,
-    templateType: input.templateType,
-    nowMs: input.startMs,
-  });
-  requestA.reserved = reserveA === "send";
-
-  const reserveB = simulateReserveStatusEmailSendWithLease({
-    store: input.store,
-    templateType: input.templateType,
-    nowMs: input.startMs + input.requestBDelayMs,
-  });
-  requestB.reserved = reserveB === "send";
-
-  if (requestA.reserved) {
-    requestA.claimed = simulateClaimStatusEmailSend({
-      store: input.store,
-      templateType: input.templateType,
-      providerMessageId: "resend-a",
-    });
-    requestA.sent = requestA.claimed;
-    simulateWriteSentLog({
-      store: input.store,
-      templateType: input.templateType,
-    });
-  }
-
-  if (requestB.reserved) {
-    requestB.claimed = simulateClaimStatusEmailSend({
-      store: input.store,
-      templateType: input.templateType,
-      providerMessageId: "resend-b",
-    });
-    requestB.sent = requestB.claimed;
-    simulateWriteSentLog({
-      store: input.store,
-      templateType: input.templateType,
-    });
-  }
-
-  void input.requestASendCompletesMs;
-
-  return {
-    requestA,
-    requestB,
-    totalSends: Number(requestA.sent) + Number(requestB.sent),
-  };
+export function getCurrentReservationId(
+  store: SimulatedStatusEmailStore,
+  templateType: EmailTemplateType,
+): string | null {
+  return store.keys.get(templateKey(templateType))?.reservationId ?? null;
 }

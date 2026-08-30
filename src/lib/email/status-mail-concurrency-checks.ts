@@ -2,12 +2,17 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   createSimulatedStatusEmailStore,
-  simulateConcurrentStatusEmailSends,
-  simulateReleaseStatusEmailSend,
-  simulateReserveStatusEmailSendWithLease,
+  getCurrentReservationId,
+  simulateClaimStatusEmailSendV2,
+  simulateReleaseStatusEmailSendV2,
+  simulateReserveStatusEmailSendV2,
+  simulateWriteSentLog,
   STATUS_EMAIL_RESERVATION_LEASE_MS,
 } from "@/lib/email/status-mail-concurrency";
-import { shouldReleaseStatusEmailReservation } from "@/lib/email/status-mail-idempotency";
+import {
+  parseStatusEmailReservationV2,
+  shouldReleaseStatusEmailReservation,
+} from "@/lib/email/status-mail-idempotency";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -16,159 +21,212 @@ function assert(condition: boolean, message: string) {
 }
 
 export function runStatusEmailConcurrencySelfChecks() {
-  // A) Two parallel reservations → at most one sender
+  assert(
+    parseStatusEmailReservationV2({ decision: "send", reservation_id: "abc" })
+      ?.reservationId === "abc",
+    "parse v2 send payload",
+  );
+  assert(
+    parseStatusEmailReservationV2({ decision: "skip", reservation_id: null })?.decision ===
+      "skip",
+    "parse v2 skip payload",
+  );
+
+  // TEST 1 — Old Owner Release
   {
     const store = createSimulatedStatusEmailStore();
-    const result = simulateConcurrentStatusEmailSends({
+    const reserveA = simulateReserveStatusEmailSendV2({
       store,
       templateType: "application-accepted",
-      startMs: 1_000,
-      requestBDelayMs: 5,
-      requestASendCompletesMs: 50,
+      nowMs: 0,
     });
-    assert(result.requestA.reserved, "A: first request reserves");
-    assert(!result.requestB.reserved, "A: second concurrent request must not reserve");
-    assert(result.totalSends === 1, "A: only one real send allowed");
+    const tokenA = reserveA.reservationId!;
+    const reserveB = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-accepted",
+      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 1,
+    });
+    const tokenB = reserveB.reservationId!;
+    simulateReleaseStatusEmailSendV2({
+      store,
+      templateType: "application-accepted",
+      reservationId: tokenA,
+    });
+    assert(
+      getCurrentReservationId(store, "application-accepted") === tokenB,
+      "TEST 1: old owner release must not delete new lease",
+    );
   }
 
-  // B) Active in-flight key must not be taken over before lease expiry
+  // TEST 2 — Old Owner Claim
   {
     const store = createSimulatedStatusEmailStore();
-    const first = simulateReserveStatusEmailSendWithLease({
+    const reserveA = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "waiting-list",
+      nowMs: 0,
+    });
+    const tokenA = reserveA.reservationId!;
+    simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "waiting-list",
+      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 1,
+    });
+    const claimed = simulateClaimStatusEmailSendV2({
+      store,
+      templateType: "waiting-list",
+      reservationId: tokenA,
+      providerMessageId: "provider-a",
+    });
+    assert(!claimed, "TEST 2: old owner claim must fail");
+    assert(
+      store.keys.get("waiting-list")?.providerMessageId === null,
+      "TEST 2: current lease remains unclaimed",
+    );
+  }
+
+  // TEST 3 — Correct Owner Claim
+  {
+    const store = createSimulatedStatusEmailStore();
+    const reserveB = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-rejected",
+      nowMs: 0,
+    });
+    const tokenB = reserveB.reservationId!;
+    const claimed = simulateClaimStatusEmailSendV2({
+      store,
+      templateType: "application-rejected",
+      reservationId: tokenB,
+      providerMessageId: "provider-b",
+    });
+    assert(claimed, "TEST 3: correct owner claim succeeds");
+  }
+
+  // TEST 4 — Correct Owner Release
+  {
+    const store = createSimulatedStatusEmailStore();
+    const reserveB = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-under-review",
+      nowMs: 0,
+    });
+    const tokenB = reserveB.reservationId!;
+    simulateReleaseStatusEmailSendV2({
+      store,
+      templateType: "application-under-review",
+      reservationId: tokenB,
+    });
+    assert(
+      !store.keys.has("application-under-review"),
+      "TEST 4: correct owner release deletes only owned lease",
+    );
+  }
+
+  // TEST 5 — Parallel stale takeover (simulated race resolution)
+  {
+    const store = createSimulatedStatusEmailStore();
+    simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-accepted",
+      nowMs: 0,
+    });
+    const takeoverB = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-accepted",
+      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 1,
+    });
+    const takeoverC = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-accepted",
+      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 2,
+    });
+    const sendCount = Number(takeoverB.decision === "send") + Number(takeoverC.decision === "send");
+    assert(sendCount === 1, "TEST 5: only one stale takeover may win");
+  }
+
+  // TEST 6 — Claimed reservation never stale-takeover
+  {
+    const store = createSimulatedStatusEmailStore();
+    const reserve = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "waiting-list",
+      nowMs: 0,
+    });
+    simulateClaimStatusEmailSendV2({
+      store,
+      templateType: "waiting-list",
+      reservationId: reserve.reservationId!,
+      providerMessageId: "provider-claimed",
+    });
+    const retry = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "waiting-list",
+      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 10_000,
+    });
+    assert(retry.decision === "skip", "TEST 6: claimed reservation blocks stale takeover");
+  }
+
+  // TEST 7 — sent email_log blocks new send
+  {
+    const store = createSimulatedStatusEmailStore();
+    simulateWriteSentLog({
+      store,
+      templateType: "application-accepted",
+    });
+    const reserve = simulateReserveStatusEmailSendV2({
+      store,
+      templateType: "application-accepted",
+      nowMs: 99_999,
+    });
+    assert(reserve.decision === "skip", "TEST 7: sent log blocks reserve");
+  }
+
+  // Active in-flight lease blocks concurrent reserve
+  {
+    const store = createSimulatedStatusEmailStore();
+    const first = simulateReserveStatusEmailSendV2({
       store,
       templateType: "waiting-list",
       nowMs: 10_000,
     });
-    const second = simulateReserveStatusEmailSendWithLease({
+    const second = simulateReserveStatusEmailSendV2({
       store,
       templateType: "waiting-list",
       nowMs: 10_500,
     });
-    assert(first === "send" && second === "skip", "B: active key blocks second reserve");
-    assert(store.keys.size === 1, "B: in-flight key still held");
-    assert(
-      store.keys.get("waiting-list")!.providerMessageId === null,
-      "B: in-flight key remains unclaimed",
-    );
+    assert(first.decision === "send" && second.decision === "skip", "active lease blocks second reserve");
   }
 
-  // C) Stale orphaned key becomes recoverable only after lease TTL
-  {
-    const store = createSimulatedStatusEmailStore();
-    simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-rejected",
-      nowMs: 0,
-    });
-    const beforeLease = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-rejected",
-      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS - 1,
-    });
-    assert(beforeLease === "skip", "C: fresh orphan remains in-flight");
-    const afterLease = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-rejected",
-      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 1,
-    });
-    assert(afterLease === "send", "C: stale orphan can be atomically recovered");
-  }
-
-  // D) Sent log present → never resend
-  {
-    const store = createSimulatedStatusEmailStore();
-    store.sentLogs.add("application-under-review");
-    const reserve = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-under-review",
-      nowMs: 99_999,
-    });
-    assert(reserve === "skip", "D: sent log blocks reserve");
-  }
-
-  // E) Resend success + logging failure must not enable immediate aggressive resend
-  {
-    assert(
-      !shouldReleaseStatusEmailReservation({
-        sendOk: true,
-        logStatus: "failed",
-        claimed: true,
-      }),
-      "E: claimed reservation must not be released after log failure",
-    );
-    const store = createSimulatedStatusEmailStore();
-    simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-accepted",
-      nowMs: 0,
-    });
-    store.keys.get("application-accepted")!.providerMessageId = "resend-123";
-    const retry = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-accepted",
-      nowMs: STATUS_EMAIL_RESERVATION_LEASE_MS + 5_000,
-    });
-    assert(retry === "skip", "E: claimed key must not be taken over by stale recovery");
-  }
-
-  // F) Renderer exception path releases only owning failed request
-  {
-    assert(
-      shouldReleaseStatusEmailReservation({
-        sendOk: false,
-        logStatus: "failed",
-        claimed: false,
-      }),
-      "F: failed unclaimed send releases reservation",
-    );
-  }
-
-  // G) Resend timeout / failure allows retry after release
-  {
-    const store = createSimulatedStatusEmailStore();
-    simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "waiting-list",
-      nowMs: 1_000,
-    });
-    simulateReleaseStatusEmailSend({
-      store,
-      templateType: "waiting-list",
-    });
-    const retry = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "waiting-list",
-      nowMs: 2_000,
-    });
-    assert(retry === "send", "G: released failure can reserve again");
-  }
-
-  // H) Normal status change → exactly one send
-  {
-    const store = createSimulatedStatusEmailStore();
-    const reserve = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-accepted",
-      nowMs: 5_000,
-    });
-    assert(reserve === "send", "H: normal flow reserves once");
-    store.keys.get("application-accepted")!.providerMessageId = "resend-normal";
-    store.sentLogs.add("application-accepted");
-    const second = simulateReserveStatusEmailSendWithLease({
-      store,
-      templateType: "application-accepted",
-      nowMs: 6_000,
-    });
-    assert(second === "skip", "H: subsequent reserve is blocked after sent log");
-  }
+  // Resend success + log failure keeps claimed lease from release
+  assert(
+    !shouldReleaseStatusEmailReservation({
+      sendOk: true,
+      logStatus: "failed",
+      claimed: true,
+    }),
+    "claimed successful resend must not release on log failure",
+  );
 
   const statusMailSource = readFileSync(
     join(process.cwd(), "src/lib/email/status-mail.ts"),
     "utf8",
   );
   assert(
-    !statusMailSource.includes("resolveStatusEmailReservationWithRecovery"),
-    "status-mail must not use client-side skip release/recovery",
+    statusMailSource.includes("reserve_application_status_email_send_v2"),
+    "status-mail must use v2 reserve RPC",
+  );
+  assert(
+    statusMailSource.includes("claim_application_status_email_send_v2"),
+    "status-mail must use v2 claim RPC",
+  );
+  assert(
+    statusMailSource.includes("release_application_status_email_send_v2"),
+    "status-mail must use v2 release RPC",
+  );
+  assert(
+    !statusMailSource.includes('rpc("reserve_application_status_email_send"'),
+    "status-mail must not call v1 reserve RPC",
   );
   assert(
     !/decision\.action === "skip"[\s\S]{0,120}releaseStatusEmailSend/.test(
@@ -177,12 +235,8 @@ export function runStatusEmailConcurrencySelfChecks() {
     "status-mail must not release on skip",
   );
   assert(
-    statusMailSource.includes("claim_application_status_email_send"),
-    "status-mail must claim reservation after successful resend",
-  );
-  assert(
-    statusMailSource.includes("ownsReservation"),
-    "status-mail must only release keys owned by this request",
+    statusMailSource.includes("p_reservation_id"),
+    "status-mail must pass reservation ownership token",
   );
 
   const leaseMigration = readFileSync(
@@ -193,24 +247,36 @@ export function runStatusEmailConcurrencySelfChecks() {
     "utf8",
   );
   assert(
-    leaseMigration.includes("provider_message_id"),
-    "lease migration adds provider_message_id",
+    leaseMigration.includes("reservation_id"),
+    "lease migration adds reservation_id",
   );
   assert(
-    leaseMigration.includes("claim_application_status_email_send"),
-    "lease migration defines claim RPC",
+    leaseMigration.includes("reserve_application_status_email_send_v2"),
+    "lease migration defines v2 reserve RPC",
+  );
+  assert(
+    leaseMigration.includes("claim_application_status_email_send_v2"),
+    "lease migration defines v2 claim RPC",
+  );
+  assert(
+    leaseMigration.includes("release_application_status_email_send_v2"),
+    "lease migration defines v2 release RPC",
+  );
+  assert(
+    !leaseMigration.includes("CREATE OR REPLACE FUNCTION public.reserve_application_status_email_send("),
+    "lease migration must not modify v1 reserve RPC",
+  );
+  assert(
+    !leaseMigration.includes("CREATE OR REPLACE FUNCTION public.release_application_status_email_send("),
+    "lease migration must not modify v1 release RPC",
+  );
+  assert(
+    leaseMigration.includes("reservation_id = p_reservation_id"),
+    "v2 claim/release must scope by reservation_id",
   );
   assert(
     leaseMigration.includes("interval '10 minutes'"),
     "lease migration defines 10 minute lease",
-  );
-  assert(
-    leaseMigration.includes("created_at < v_stale_threshold"),
-    "lease migration uses created_at stale detection",
-  );
-  assert(
-    leaseMigration.includes("applications.decide"),
-    "lease migration preserves RBAC guards",
   );
 
   return "ok";
