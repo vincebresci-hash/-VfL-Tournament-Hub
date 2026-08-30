@@ -2,13 +2,13 @@
 -- Status-E-Mail Reservation Lease / Claim (V2 ownership-aware RPCs)
 -- =============================================================================
 --
--- Adds lease/claim columns and NEW v2 RPCs only.
--- V1 reserve/release RPCs from 20260831220000 remain unchanged so migration can
--- run before PR37 code while production still executes f093eb9.
+-- Adds lease/claim columns, reservation_version compatibility guard, and NEW v2
+-- RPCs. V1 reserve RPC from 20260831220000 stays unchanged (INSERT gets
+-- reservation_version DEFAULT 1). V1 release is tightened to delete only
+-- reservation_version = 1 rows so rolling deploy cannot wipe V2 leases.
 --
 -- V2 returns TABLE(decision text, reservation_id uuid).
--- claim/release v2 require reservation_id so stale takeovers cannot be mutated
--- by the previous lease owner.
+-- claim/release v2 require reservation_id + reservation_version = 2.
 -- =============================================================================
 
 ALTER TABLE public.status_email_send_keys
@@ -17,11 +17,52 @@ ALTER TABLE public.status_email_send_keys
 ALTER TABLE public.status_email_send_keys
   ADD COLUMN IF NOT EXISTS reservation_id uuid NOT NULL DEFAULT gen_random_uuid();
 
+ALTER TABLE public.status_email_send_keys
+  ADD COLUMN IF NOT EXISTS reservation_version smallint NOT NULL DEFAULT 1;
+
 COMMENT ON COLUMN public.status_email_send_keys.provider_message_id IS
   'Set after Resend accepts the message. Blocks stale orphan recovery to avoid duplicate sends.';
 
 COMMENT ON COLUMN public.status_email_send_keys.reservation_id IS
   'Unique lease ownership token regenerated on each successful reservation / stale takeover.';
+
+COMMENT ON COLUMN public.status_email_send_keys.reservation_version IS
+  '1 = legacy V1 reserve/release (f093eb9). 2 = ownership-aware V2 lease. V1 release may only delete version 1.';
+
+-- V1 release: same signature, only deletes legacy (version 1) leases.
+CREATE OR REPLACE FUNCTION public.release_application_status_email_send(
+  p_application_id uuid,
+  p_template_type public.email_template_type
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT (
+    public.has_rbac_permission('applications.decide')
+    OR public.has_rbac_permission('applications.manage')
+  ) THEN
+    RAISE EXCEPTION 'Nicht autorisiert.';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.email_logs
+    WHERE application_id = p_application_id
+      AND template_type = p_template_type
+      AND status = 'sent'
+  ) THEN
+    RETURN;
+  END IF;
+
+  DELETE FROM public.status_email_send_keys
+  WHERE application_id = p_application_id
+    AND template_type = p_template_type
+    AND reservation_version = 1;
+END;
+$$;
 
 CREATE OR REPLACE FUNCTION public.reserve_application_status_email_send_v2(
   p_application_id uuid,
@@ -60,12 +101,14 @@ BEGIN
   INSERT INTO public.status_email_send_keys (
     application_id,
     template_type,
-    reservation_id
+    reservation_id,
+    reservation_version
   )
   VALUES (
     p_application_id,
     p_template_type,
-    v_reservation_id
+    v_reservation_id,
+    2
   )
   ON CONFLICT (application_id, template_type) DO NOTHING
   RETURNING status_email_send_keys.reservation_id INTO v_reservation_id;
@@ -93,12 +136,14 @@ BEGIN
   INSERT INTO public.status_email_send_keys (
     application_id,
     template_type,
-    reservation_id
+    reservation_id,
+    reservation_version
   )
   VALUES (
     p_application_id,
     p_template_type,
-    v_reservation_id
+    v_reservation_id,
+    2
   )
   ON CONFLICT (application_id, template_type) DO NOTHING
   RETURNING status_email_send_keys.reservation_id INTO v_reservation_id;
@@ -146,6 +191,7 @@ BEGIN
   WHERE application_id = p_application_id
     AND template_type = p_template_type
     AND reservation_id = p_reservation_id
+    AND reservation_version = 2
     AND provider_message_id IS NULL;
 
   GET DIAGNOSTICS v_claimed = ROW_COUNT;
@@ -189,9 +235,17 @@ BEGIN
   WHERE application_id = p_application_id
     AND template_type = p_template_type
     AND reservation_id = p_reservation_id
+    AND reservation_version = 2
     AND provider_message_id IS NULL;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.release_application_status_email_send(
+  uuid, public.email_template_type
+) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.release_application_status_email_send(
+  uuid, public.email_template_type
+) TO authenticated;
 
 REVOKE ALL ON FUNCTION public.reserve_application_status_email_send_v2(
   uuid, public.email_template_type

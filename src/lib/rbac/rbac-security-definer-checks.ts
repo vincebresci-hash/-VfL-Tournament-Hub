@@ -111,10 +111,24 @@ export function runRbacSecurityDefinerChecks() {
     "v2 claim/release must require reservation ownership",
   );
   assert(
+    leaseMigration.includes("reservation_version = 2"),
+    "v2 claim/release must scope to version 2 leases",
+  );
+  assert(
+    leaseMigration.includes("reservation_version = 1"),
+    "v1 release must only delete version 1 leases",
+  );
+  assert(
     !leaseMigration.includes(
       "CREATE OR REPLACE FUNCTION public.reserve_application_status_email_send(",
     ),
     "lease migration must not alter v1 reserve RPC",
+  );
+  assert(
+    leaseMigration.includes(
+      "CREATE OR REPLACE FUNCTION public.release_application_status_email_send(",
+    ),
+    "lease migration tightens v1 release for rolling deploy safety",
   );
 
   assert(
