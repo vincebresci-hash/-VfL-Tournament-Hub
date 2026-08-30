@@ -169,11 +169,20 @@ export function runCancellationEmailHotfixChecks() {
   );
   assert(!migration.includes("payment"), "H: no payment changes");
 
-  // AUTH-01 hardening
+  const hardeningMigration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+    ),
+    "utf8",
+  );
+
+  // AUTH-01 hardening (RBAC cancellation permissions OR club owner)
   assert(
-    migration.includes("IF public.is_admin() THEN") &&
-      migration.includes("ELSIF auth.uid() IS NOT NULL"),
-    "AUTH-01: admin OR authenticated club owner only",
+    hardeningMigration.includes("reserve_cancellation_email_send") &&
+      hardeningMigration.includes("has_rbac_permission('cancellations.manage')") &&
+      hardeningMigration.includes("current_club_id()"),
+    "AUTH-01: cancellation RBAC OR authenticated club owner only",
   );
 
   // Server-only audit logging (no client-callable logging RPCs)

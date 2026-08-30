@@ -97,6 +97,13 @@ export function runStatusEmailIdempotencySelfChecks() {
     ),
     "utf8",
   );
+  const hardeningMigration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+    ),
+    "utf8",
+  );
   assert(
     migration.includes("status_email_send_keys"),
     "migration must create status_email_send_keys",
@@ -116,6 +123,12 @@ export function runStatusEmailIdempotencySelfChecks() {
   assert(
     migration.includes("ON CONFLICT (application_id, template_type) DO NOTHING"),
     "reserve must use atomic insert for race protection",
+  );
+  assert(
+    hardeningMigration.includes("applications.decide") &&
+      hardeningMigration.includes("applications.manage") &&
+      !hardeningMigration.includes("is_admin()"),
+    "status email RPC guards use application permissions",
   );
 
   const scenarioMap = Object.fromEntries(

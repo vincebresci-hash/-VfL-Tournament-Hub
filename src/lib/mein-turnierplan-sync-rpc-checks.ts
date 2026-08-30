@@ -91,12 +91,21 @@ export function runMeinTurnierplanSyncRpcSecurityChecks() {
     ),
     "utf8",
   );
+  const hardeningMigration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+    ),
+    "utf8",
+  );
 
   assert(migration.includes("SECURITY DEFINER"), "RPC must be SECURITY DEFINER");
   assert(migration.includes("SET search_path = public"), "RPC must pin search_path");
   assert(
-    migration.includes("IF auth.uid() IS NULL OR NOT public.is_admin()"),
-    "RPC must require admin",
+    hardeningMigration.includes("has_rbac_permission('tournaments.manage')") &&
+      hardeningMigration.includes("has_rbac_permission('schedule.manage')") &&
+      hardeningMigration.includes("has_rbac_permission('results.manage')"),
+    "RPC must require tournament/schedule/results manage permissions",
   );
   assert(
     migration.includes(

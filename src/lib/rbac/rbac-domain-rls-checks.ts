@@ -55,6 +55,17 @@ export function runRbacDomainRlsChecks() {
   assert(migration.includes("preview_communication_recipients"), "communication preview rpc");
   assert(migration.includes("communications.send required"), "communication send rpc guard");
 
+  assert(
+    readFileSync(
+      join(
+        process.cwd(),
+        "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+      ),
+      "utf8",
+    ).includes("sync_mein_turnierplan_tournament"),
+    "security definer hardening migration present",
+  );
+
   assert(clubActions.includes("requireClubTeamManage"), "club team manage guard");
   assert(clubActions.includes('requirePermission("teams.manage"'), "teams.manage required for mutations");
   assert(clubActions.includes("createClubTeamAction"), "create team action");
