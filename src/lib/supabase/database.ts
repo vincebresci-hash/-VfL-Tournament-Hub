@@ -78,6 +78,41 @@ export type TeamRow = {
   updated_at: string;
 };
 
+export type TeamDirectorySourceRow = "application" | "manual";
+
+export type TeamDirectoryEntryRow = {
+  id: string;
+  club_name: string;
+  team_name: string;
+  age_group: string | null;
+  contact_first_name: string | null;
+  contact_last_name: string | null;
+  contact_role: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  website: string | null;
+  league: string | null;
+  birth_year: number | null;
+  division: string | null;
+  self_rated_strength: number | null;
+  internal_category: string | null;
+  internal_strength: number | null;
+  internal_notes: string | null;
+  source: TeamDirectorySourceRow;
+  source_application_id: string | null;
+  club_id: string | null;
+  team_id: string | null;
+  norm_club_name: string;
+  norm_team_name: string;
+  norm_age_group: string;
+  norm_contact_email: string | null;
+  archived_at: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type TournamentRow = {
   id: string;
   slug: string;
@@ -692,6 +727,40 @@ export type Database = {
             columns: ["tournament_id"];
             isOneToOne: false;
             referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      team_directory_entries: Table<
+        TeamDirectoryEntryRow,
+        Partial<TeamDirectoryEntryRow> & {
+          club_name: string;
+          team_name: string;
+          norm_club_name: string;
+          norm_team_name: string;
+          norm_age_group: string;
+        },
+        Partial<TeamDirectoryEntryRow>,
+        [
+          {
+            foreignKeyName: "team_directory_entries_source_application_id_fkey";
+            columns: ["source_application_id"];
+            isOneToOne: false;
+            referencedRelation: "applications";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "team_directory_entries_club_id_fkey";
+            columns: ["club_id"];
+            isOneToOne: false;
+            referencedRelation: "clubs";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "team_directory_entries_team_id_fkey";
+            columns: ["team_id"];
+            isOneToOne: false;
+            referencedRelation: "teams";
             referencedColumns: ["id"];
           },
         ]
