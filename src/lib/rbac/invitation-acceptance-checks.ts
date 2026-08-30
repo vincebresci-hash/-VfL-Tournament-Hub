@@ -52,6 +52,14 @@ export function runInvitationAcceptanceChecks() {
 
   assert(callbackRoute.includes('source: "auth_callback"'), "callback tags acceptance source");
   assert(
+    callbackRoute.includes("establishInviteSessionFromTokenHash"),
+    "callback establishes invite session via token_hash",
+  );
+  assert(
+    callbackRoute.includes("isInviteTokenHashCallback"),
+    "callback separates invite token_hash flow",
+  );
+  assert(
     callbackRoute.includes("clearLocalAuthSessionOnFailure"),
     "callback clears foreign session on failed exchange",
   );
@@ -59,7 +67,6 @@ export function runInvitationAcceptanceChecks() {
     !callbackRoute.includes("clearSessionBeforeAuthExchange"),
     "callback preserves PKCE verifier until exchange",
   );
-  assert(callbackRoute.includes("establishAuthSessionFromCallback"), "callback establishes invite session");
   assert(callbackRoute.includes("INVITE_PASSWORD_SETUP_PATH"), "callback routes invitees to password setup");
 
   assert(loginDestinationAction.includes("markInvitationAcceptedForAuthUser"), "login path triggers acceptance");

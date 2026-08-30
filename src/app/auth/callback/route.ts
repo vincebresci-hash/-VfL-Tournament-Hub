@@ -4,8 +4,11 @@ import {
   authCallbackFailurePath,
   clearLocalAuthSessionOnFailure,
   establishAuthSessionFromCallback,
+  establishInviteSessionFromTokenHash,
   isInviteAuthType,
   isInviteCallback,
+  isInviteTokenHashCallback,
+  logAuthCallbackFailure,
   resolveAuthCallbackDestination,
 } from "@/lib/auth/auth-callback";
 import { INVITE_PASSWORD_SETUP_PATH } from "@/lib/rbac/invitation-auth-errors";
@@ -17,29 +20,39 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const authType = searchParams.get("type");
+  const inviteTokenHashFlow = isInviteTokenHashCallback({ tokenHash, authType });
   const inviteFlow = isInviteAuthType(authType);
   const next = getSafeRedirect(
     searchParams.get("next") ?? searchParams.get("redirect"),
-    inviteFlow ? INVITE_PASSWORD_SETUP_PATH : "/verein/dashboard",
+    inviteFlow || inviteTokenHashFlow ? INVITE_PASSWORD_SETUP_PATH : "/verein/dashboard",
   );
-  const inviteCallback = isInviteCallback({ authType, next });
+  const inviteCallback = isInviteCallback({ authType, next, tokenHash });
 
   const supabase = await createClient();
 
-  const user = await establishAuthSessionFromCallback(supabase, {
-    code,
-    tokenHash,
-    authType,
-  });
+  const establishment = inviteTokenHashFlow
+    ? await establishInviteSessionFromTokenHash(supabase, tokenHash!)
+    : await establishAuthSessionFromCallback(supabase, {
+        code,
+        tokenHash,
+        authType,
+      });
 
-  if (!user) {
+  if (!establishment.user) {
+    logAuthCallbackFailure({
+      flow: establishment.flow ?? "unknown",
+      error: establishment.error,
+      hasCode: Boolean(code),
+      hasTokenHash: Boolean(tokenHash),
+      authType,
+    });
     await clearLocalAuthSessionOnFailure(supabase);
     return NextResponse.redirect(new URL(authCallbackFailurePath(inviteCallback), origin));
   }
 
   await markInvitationAcceptedForAuthUser({
-    userId: user.id,
-    email: user.email,
+    userId: establishment.user.id,
+    email: establishment.user.email,
     source: "auth_callback",
   });
 
