@@ -22,9 +22,16 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const errorParam = readRedirectParam(params.error);
   const session = await getAuthSession();
 
-  if (session) {
+  if (session && !errorParam) {
     redirect(getPostLoginRedirect(session.user.role, redirectTo));
   }
+
+  const initialError =
+    errorParam === "invite_auth"
+      ? AUTH_ERROR_MESSAGES.inviteCallbackFailed
+      : errorParam
+        ? AUTH_ERROR_MESSAGES.callbackFailed
+        : null;
 
   return (
     <AuthShell>
@@ -32,7 +39,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       <AuthCard>
         <LoginForm
           redirectTo={redirectTo}
-          initialError={errorParam ? AUTH_ERROR_MESSAGES.callbackFailed : null}
+          initialError={initialError}
         />
       </AuthCard>
       <Link

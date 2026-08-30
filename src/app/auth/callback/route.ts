@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
-import type { EmailOtpType } from "@supabase/supabase-js";
 import { getSafeRedirect } from "@/lib/auth/redirects";
+import {
+  authCallbackFailurePath,
+  clearSessionBeforeAuthExchange,
+  establishAuthSessionFromCallback,
+  isInviteAuthType,
+  isInviteCallback,
+  resolveAuthCallbackDestination,
+} from "@/lib/auth/auth-callback";
 import { INVITE_PASSWORD_SETUP_PATH } from "@/lib/rbac/invitation-auth-errors";
 import { markInvitationAcceptedForAuthUser } from "@/lib/rbac/invitation-acceptance";
 import { createClient } from "@/lib/supabase/server";
-
-function isInviteAuthType(type: string | null) {
-  return type === "invite" || type === "signup";
-}
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -19,27 +22,20 @@ export async function GET(request: Request) {
     searchParams.get("next") ?? searchParams.get("redirect"),
     inviteFlow ? INVITE_PASSWORD_SETUP_PATH : "/verein/dashboard",
   );
+  const inviteCallback = isInviteCallback({ authType, next });
 
   const supabase = await createClient();
-  let user: { id: string; email?: string } | null = null;
+  await clearSessionBeforeAuthExchange(supabase);
 
-  if (code) {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error && data.user) {
-      user = data.user;
-    }
-  } else if (tokenHash && authType) {
-    const { data, error } = await supabase.auth.verifyOtp({
-      token_hash: tokenHash,
-      type: authType as EmailOtpType,
-    });
-    if (!error && data.user) {
-      user = data.user;
-    }
-  }
+  const user = await establishAuthSessionFromCallback(supabase, {
+    code,
+    tokenHash,
+    authType,
+  });
 
   if (!user) {
-    return NextResponse.redirect(new URL("/login?error=auth", origin));
+    await clearSessionBeforeAuthExchange(supabase);
+    return NextResponse.redirect(new URL(authCallbackFailurePath(inviteCallback), origin));
   }
 
   await markInvitationAcceptedForAuthUser({
@@ -48,8 +44,10 @@ export async function GET(request: Request) {
     source: "auth_callback",
   });
 
-  const destination =
-    inviteFlow || next === INVITE_PASSWORD_SETUP_PATH ? INVITE_PASSWORD_SETUP_PATH : next;
+  const destination = resolveAuthCallbackDestination({
+    isInvite: inviteCallback,
+    next,
+  });
 
   return NextResponse.redirect(new URL(destination, origin));
 }

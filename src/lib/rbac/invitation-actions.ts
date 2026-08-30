@@ -9,7 +9,6 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAdminAuditLog } from "@/lib/rbac/audit";
 import {
-  buildInvitationRedirectUrl,
   logInvitationAuthFailure,
   logInvitationRedirect,
   resolveInvitationAuthUserMessage,

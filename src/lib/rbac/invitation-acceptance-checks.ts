@@ -51,8 +51,8 @@ export function runInvitationAcceptanceChecks() {
   assert(!acceptanceSource.includes("} catch {\n    return;"), "acceptance no longer swallows service errors silently");
 
   assert(callbackRoute.includes('source: "auth_callback"'), "callback tags acceptance source");
-  assert(callbackRoute.includes("exchangeCodeForSession"), "callback handles pkce code");
-  assert(callbackRoute.includes("verifyOtp"), "callback handles token_hash invite flow");
+  assert(callbackRoute.includes("clearSessionBeforeAuthExchange"), "callback clears foreign session");
+  assert(callbackRoute.includes("establishAuthSessionFromCallback"), "callback establishes invite session");
   assert(callbackRoute.includes("INVITE_PASSWORD_SETUP_PATH"), "callback routes invitees to password setup");
 
   assert(loginDestinationAction.includes("markInvitationAcceptedForAuthUser"), "login path triggers acceptance");

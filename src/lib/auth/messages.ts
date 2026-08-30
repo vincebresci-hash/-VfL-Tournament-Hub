@@ -13,6 +13,8 @@ export const AUTH_ERROR_MESSAGES = {
   updatePasswordGeneric:
     "Das Passwort konnte nicht gespeichert werden. Bitte fordere einen neuen Link an.",
   callbackFailed: "Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.",
+  inviteCallbackFailed:
+    "Die Einladung konnte nicht abgeschlossen werden. Bitte melde dich ab und öffne den Einladungslink erneut.",
   adminNotReady:
     "Der Adminbereich ist noch nicht freigeschaltet. Vereinskonten verwenden den Vereins-Login.",
 } as const;
