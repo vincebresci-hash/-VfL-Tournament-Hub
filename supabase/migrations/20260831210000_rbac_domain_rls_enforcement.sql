@@ -226,8 +226,7 @@ BEGIN
 
   IF NEW.payment_status IS DISTINCT FROM OLD.payment_status
      OR NEW.participation_fee IS DISTINCT FROM OLD.participation_fee
-     OR NEW.paid_at IS DISTINCT FROM OLD.paid_at
-     OR NEW.payment_note IS DISTINCT FROM OLD.payment_note THEN
+     OR NEW.paid_at IS DISTINCT FROM OLD.paid_at THEN
     RAISE EXCEPTION 'payment fields admin only';
   END IF;
 
