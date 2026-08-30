@@ -30,6 +30,16 @@ function readMigration() {
   );
 }
 
+function readHardeningMigration() {
+  return readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+    ),
+    "utf8",
+  );
+}
+
 function readC1Migration() {
   return readFileSync(
     join(process.cwd(), "supabase/migrations/20260830120000_communication_center.sql"),
@@ -99,6 +109,7 @@ function readFaq() {
 
 export function runCommunicationReceiptChecks() {
   const migration = readMigration();
+  const hardeningMigration = readHardeningMigration();
   const c1Migration = readC1Migration();
   const cancellationMigration = readCancellationMigration();
   const paymentMigration = readPaymentMigration();
@@ -109,6 +120,27 @@ export function runCommunicationReceiptChecks() {
   const composeForm = readComposeForm();
   const detailView = readDetailView();
   const faq = readFaq();
+
+  assert(
+    hardeningMigration.includes("issue_communication_confirmation_token") &&
+      hardeningMigration.includes("communications.send required"),
+    "receipt token issuance RBAC hardened",
+  );
+  assert(
+    hardeningMigration.includes("p_require_confirmation") &&
+      hardeningMigration.includes("communications.send required"),
+    "C2 initiate send RBAC hardened",
+  );
+  assert(
+    hardeningMigration.includes("communication_confirmation_tokens_admin_select") &&
+      hardeningMigration.includes("communications.view"),
+    "confirmation token admin select RBAC hardened",
+  );
+  assert(
+    !hardeningMigration.includes("get_communication_receipt_context") &&
+      !hardeningMigration.includes("confirm_communication_receipt"),
+    "public receipt RPCs left token-scoped",
+  );
 
   // Schema
   assert(

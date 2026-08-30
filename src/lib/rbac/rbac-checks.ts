@@ -374,5 +374,59 @@ export function runRbacChecks() {
   assert(RBAC_PERMISSIONS.length >= 26, "permission catalog complete");
   assert(ROLE_PERMISSIONS.SUPER_ADMIN.length === RBAC_PERMISSIONS.length, "super admin all perms");
 
+  // TOURNAMENT_MANAGER
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["TOURNAMENT_MANAGER"],
+      overrides: [],
+      permission: "tournaments.manage",
+    }),
+    "TOURNAMENT_MANAGER: tournaments.manage PASS",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["TOURNAMENT_MANAGER"],
+      overrides: [],
+      permission: "payments.manage",
+    }),
+    "TOURNAMENT_MANAGER: payments.manage BLOCKED",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["TOURNAMENT_MANAGER"],
+      overrides: [],
+      permission: "users.manage",
+    }),
+    "TOURNAMENT_MANAGER: users.manage BLOCKED",
+  );
+
+  // ADMIN
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["ADMIN"],
+      overrides: [],
+      permission: "users.manage",
+    }),
+    "ADMIN: users.manage PASS",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["ADMIN"],
+      overrides: [],
+      permission: "roles.manage",
+    }),
+    "ADMIN: roles.manage BLOCKED",
+  );
+
   return "ok";
 }

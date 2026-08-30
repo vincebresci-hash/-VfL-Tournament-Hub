@@ -28,6 +28,8 @@ import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runTeamOperationsP2Checks } from "@/lib/team-operations-p2-checks";
 import { runRbacChecks } from "@/lib/rbac/rbac-checks";
+import { runRbacDomainRlsChecks } from "@/lib/rbac/rbac-domain-rls-checks";
+import { runRbacSecurityDefinerChecks } from "@/lib/rbac/rbac-security-definer-checks";
 import { runUserManagementChecks } from "@/lib/rbac/user-management-checks";
 import { runInvitationChecks } from "@/lib/rbac/invitation-checks";
 import { runInvitationAuthErrorChecks } from "@/lib/rbac/invitation-auth-errors-checks";
@@ -86,6 +88,8 @@ try {
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const teamOperationsP2Checks = runTeamOperationsP2Checks();
   const rbacChecks = runRbacChecks();
+  const rbacDomainRlsChecks = runRbacDomainRlsChecks();
+  const rbacSecurityDefinerChecks = runRbacSecurityDefinerChecks();
   const userManagementChecks = runUserManagementChecks();
   const invitationChecks = runInvitationChecks();
   const invitationAuthErrorChecks = runInvitationAuthErrorChecks();
@@ -134,6 +138,8 @@ try {
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
   console.log(`team-operations-p2-checks: ${teamOperationsP2Checks}`);
   console.log(`rbac-checks: ${rbacChecks}`);
+  console.log(`rbac-domain-rls-checks: ${rbacDomainRlsChecks}`);
+  console.log(`rbac-security-definer-checks: ${rbacSecurityDefinerChecks}`);
   console.log(`user-management-checks: ${userManagementChecks}`);
   console.log(`invitation-checks: ${invitationChecks}`);
   console.log(`invitation-auth-error-checks: ${invitationAuthErrorChecks}`);
