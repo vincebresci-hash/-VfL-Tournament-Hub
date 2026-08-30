@@ -1,4 +1,8 @@
-import { DEFAULT_PRODUCTION_SITE_URL, getSiteUrl } from "@/lib/site";
+import {
+  CANONICAL_PRODUCTION_HOST,
+  DEFAULT_PRODUCTION_SITE_URL,
+  isEphemeralVercelHost,
+} from "@/lib/site";
 
 export type TournamentHubEmailTournament = {
   name?: string;
@@ -61,12 +65,45 @@ export function escapeHtml(value: string) {
 }
 
 export function isValidHttpsUrl(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed || !trimmed.startsWith("https://")) {
+    return false;
+  }
+
+  if (trimmed.startsWith("//")) {
+    return false;
+  }
+
   try {
-    const url = new URL(value.trim());
-    return url.protocol === "https:";
+    const url = new URL(trimmed);
+    if (url.protocol !== "https:") {
+      return false;
+    }
+
+    const hostname = url.hostname.toLowerCase();
+    if (
+      !hostname ||
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      isEphemeralVercelHost(hostname) ||
+      hostname.includes("blim")
+    ) {
+      return false;
+    }
+
+    return true;
   } catch {
     return false;
   }
+}
+
+export function resolveEmailLogoUrl() {
+  return `${DEFAULT_PRODUCTION_SITE_URL}/vfl-logo-transparent.png`;
+}
+
+function assertCanonicalEmailAssetHost(url: string) {
+  const parsed = new URL(url);
+  return parsed.protocol === "https:" && parsed.hostname === CANONICAL_PRODUCTION_HOST;
 }
 
 export function resolveEmailCta(
@@ -89,11 +126,12 @@ export function resolveEmailCta(
 }
 
 function resolveLogoUrl() {
-  const siteUrl =
-    process.env.VERCEL === "1" || process.env.NODE_ENV === "production"
-      ? getSiteUrl()
-      : DEFAULT_PRODUCTION_SITE_URL;
-  return `${siteUrl}/vfl-logo-transparent.png`;
+  const logoUrl = resolveEmailLogoUrl();
+  if (!assertCanonicalEmailAssetHost(logoUrl)) {
+    return null;
+  }
+
+  return logoUrl;
 }
 
 function plainTextToHtmlParagraphs(text: string) {
@@ -175,6 +213,13 @@ export function renderTournamentHubEmailHtml(options: TournamentHubEmailOptions)
   const cta = options.cta ?? null;
   const ctaHtml = cta ? renderCtaButton(cta) : "";
   const logoUrl = resolveLogoUrl();
+  const logoHtml = logoUrl
+    ? `<tr>
+                    <td align="center" style="padding:0 0 10px 0;">
+                      <img src="${escapeHtml(logoUrl)}" width="56" height="56" alt="VfL Kirchheim" style="display:block;border:0;outline:none;text-decoration:none;width:56px;height:56px;" />
+                    </td>
+                  </tr>`
+    : "";
 
   return `<!DOCTYPE html>
 <html lang="de">
@@ -192,11 +237,7 @@ export function renderTournamentHubEmailHtml(options: TournamentHubEmailOptions)
             <tr>
               <td style="padding:0 0 16px 0;text-align:center;">
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-                  <tr>
-                    <td align="center" style="padding:0 0 10px 0;">
-                      <img src="${escapeHtml(logoUrl)}" width="56" height="56" alt="VfL Kirchheim" style="display:block;border:0;outline:none;text-decoration:none;width:56px;height:56px;" />
-                    </td>
-                  </tr>
+                  ${logoHtml}
                   <tr>
                     <td align="center" style="font-size:22px;line-height:1.2;font-weight:700;color:#0f4c2a;letter-spacing:0.02em;">VfL Kirchheim</td>
                   </tr>

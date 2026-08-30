@@ -169,6 +169,7 @@ async function sendTemplateEmail(input: {
     subject,
     bodyText: body,
     variables: input.variables,
+    cta: null,
   });
   const result = await getEmailProvider().send({
     to: input.toEmail,

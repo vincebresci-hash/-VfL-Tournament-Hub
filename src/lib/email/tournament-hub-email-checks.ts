@@ -6,7 +6,9 @@ import {
   escapeHtml,
   isValidHttpsUrl,
   resolveEmailCta,
+  resolveEmailLogoUrl,
 } from "@/lib/email/tournament-hub-email";
+import { DEFAULT_PRODUCTION_SITE_URL } from "@/lib/site";
 import { buildCommunicationReceiptEmailAppendix } from "@/lib/communications/communication-receipt-token";
 import { renderEmailTemplate } from "@/lib/email/provider";
 
@@ -341,6 +343,100 @@ export function runTournamentHubEmailDesignChecks() {
   );
   assert(rbacMigration.includes("communications.view"), "rbac view unchanged");
   assert(rbacMigration.includes("communications.send"), "rbac send unchanged");
+
+  const logoUrl = resolveEmailLogoUrl();
+  assert(logoUrl === `${DEFAULT_PRODUCTION_SITE_URL}/vfl-logo-transparent.png`, "canonical logo url");
+  assert(logoUrl.startsWith("https://"), "logo url is https");
+  assert(!logoUrl.includes("localhost"), "logo url no localhost");
+  assert(!logoUrl.includes("blim"), "logo url no blim domain");
+  assert(!logoUrl.includes("vf-l-tournament-hub-blim"), "logo url no preview domain");
+
+  const logoHtml = buildTournamentHubEmail({ title: "Logo", bodyText: "Test" }).html;
+  assert(!logoHtml.includes('src="/'), "final html has no relative image src");
+  assert(!logoHtml.includes("data:image"), "no base64 logo");
+  assert(logoHtml.includes(`src="${logoUrl}"`), "logo src is absolute https url");
+  assert(logoHtml.includes("VfL Kirchheim"), "text branding present without image");
+
+  assert(!isValidHttpsUrl("/teilnahme/token"), "reject relative url");
+  assert(!isValidHttpsUrl("//vf-l-tournament-hub.vercel.app/live"), "reject protocol-relative url");
+  assert(!isValidHttpsUrl("data:text/html,test"), "reject data url");
+  assert(!isValidHttpsUrl("http://vf-l-tournament-hub.vercel.app/live"), "reject http url");
+  assert(!isValidHttpsUrl("https://localhost/teilnahme/token"), "reject localhost https");
+  assert(
+    !isValidHttpsUrl("https://vf-l-tournament-hub-blim.vercel.app/live"),
+    "reject ephemeral vercel host",
+  );
+  assert(!isValidHttpsUrl("not-a-url"), "reject malformed url");
+  assert(
+    isValidHttpsUrl("https://vf-l-tournament-hub.vercel.app/teilnahme/a?b=1&c=2"),
+    "accept canonical https url with query",
+  );
+
+  const ctaWithQuery = buildTournamentHubEmailFromTemplate({
+    subject: "CTA Query",
+    bodyText: "Text",
+    variables: {
+      confirmation_url: "https://vf-l-tournament-hub.vercel.app/mitteilung/a?b=1&c=2",
+    },
+  });
+  assert(
+    ctaWithQuery.html.includes(
+      'href="https://vf-l-tournament-hub.vercel.app/mitteilung/a?b=1&amp;c=2"',
+    ),
+    "ampersand escaped safely in cta href",
+  );
+
+  const injectionBody = `<script>alert(1)</script>
+<img src=x onerror=alert(1)>
+<a href="javascript:alert(1)">Test</a>
+Tom & Jerry
+"VfL" <Team>`;
+  const injectionEmail = buildTournamentHubEmailFromTemplate({
+    subject: injectionBody,
+    bodyText: injectionBody,
+    variables: {
+      team_name: injectionBody,
+      club_name: injectionBody,
+      tournament_name: injectionBody,
+      contact_first_name: "Tom",
+    },
+    cta: {
+      label: `Tom & Jerry "CTA"`,
+      url: "https://vf-l-tournament-hub.vercel.app/turniere/test",
+    },
+  });
+  assert(!injectionEmail.html.includes("<script>"), "subject/body script escaped");
+  assert(!injectionEmail.html.includes("<img src=x"), "img injection escaped");
+  assert(!injectionEmail.html.includes('href="javascript:'), "javascript href escaped in body");
+  assert(injectionEmail.html.includes("Tom &amp; Jerry"), "ampersand escaped in body");
+  assert(injectionEmail.html.includes("&quot;VfL&quot;"), "quotes escaped in body");
+  assert(injectionEmail.html.includes("Tom &amp; Jerry &quot;CTA&quot;"), "cta label escaped");
+  assert(injectionEmail.html.includes("<title>&lt;script&gt;"), "subject escaped in title tag");
+
+  const cancellationVariables = {
+    contact_first_name: "Max",
+    contact_last_name: "Mustermann",
+    club_name: "SV Beispiel",
+    team_name: "U13",
+    tournament_name: "Cup",
+    tournament_date: "12.09.2026",
+    location: "Kirchheim",
+    contact_email: "team@example.com",
+    cancellation_reason: "Verletzung",
+    cancellation_on_time_label: "Fristgerecht",
+    cancellation_admin_note: "Keine Begründung",
+  };
+  assert(resolveEmailCta(cancellationVariables) === null, "cancellation variables have no cta");
+  assert(cancellationMail.includes("cta: null"), "cancellation mails explicitly disable cta");
+
+  assert(receivedMail.includes("text: emailContent.text"), "received mail sends text");
+  assert(receivedMail.includes("html: emailContent.html"), "received mail sends html");
+  assert(statusMail.includes("text: emailContent.text"), "status mail sends text");
+  assert(statusMail.includes("html: emailContent.html"), "status mail sends html");
+  assert(cancellationMail.includes("text: emailContent.text"), "cancellation mail sends text");
+  assert(cancellationMail.includes("html: emailContent.html"), "cancellation mail sends html");
+  assert(communicationMail.includes("text: emailContent.text"), "communication mail sends text");
+  assert(communicationMail.includes("html: emailContent.html"), "communication mail sends html");
 
   return "ok";
 }
