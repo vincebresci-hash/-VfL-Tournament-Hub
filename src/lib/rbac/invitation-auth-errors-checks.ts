@@ -1,7 +1,9 @@
 import {
   CANONICAL_INVITE_REDIRECT_URL,
   INVITATION_EMAIL_RATE_LIMIT_MESSAGE,
+  INVITE_EMAIL_CALLBACK_URL_TEMPLATE,
   buildInvitationRedirectUrl,
+  buildInviteEmailCallbackUrl,
   isInvitationEmailRateLimitError,
   logInvitationAuthFailure,
   redactInvitationSecrets,
@@ -28,8 +30,19 @@ export function runInvitationAuthErrorChecks() {
   const actions = readInvitationActions();
   const expectedRedirect =
     "https://vf-l-tournament-hub.vercel.app/auth/callback?next=%2Fpasswort-zuruecksetzen";
+  const expectedInviteEmailCallback =
+    "https://vf-l-tournament-hub.vercel.app/auth/callback?token_hash={{ .TokenHash }}&type=invite&next=%2Fpasswort-zuruecksetzen";
 
   assert(CANONICAL_INVITE_REDIRECT_URL === expectedRedirect, "canonical invite redirect constant");
+  assert(
+    INVITE_EMAIL_CALLBACK_URL_TEMPLATE === expectedInviteEmailCallback,
+    "invite email callback template",
+  );
+  assert(
+    buildInviteEmailCallbackUrl("https://vf-l-tournament-hub.vercel.app") ===
+      expectedInviteEmailCallback,
+    "invite email callback url builder",
+  );
 
   assert(
     buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app") === expectedRedirect,

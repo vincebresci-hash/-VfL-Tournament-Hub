@@ -31,7 +31,13 @@ import { CANONICAL_PRODUCTION_HOST, DEFAULT_PRODUCTION_SITE_URL } from "@/lib/si
 
 export const INVITE_PASSWORD_SETUP_PATH = "/passwort-zuruecksetzen";
 
-export const CANONICAL_INVITE_REDIRECT_URL = `${DEFAULT_PRODUCTION_SITE_URL}/auth/callback?next=${encodeURIComponent(INVITE_PASSWORD_SETUP_PATH)}`;
+export const INVITE_EMAIL_CALLBACK_URL_TEMPLATE =
+  `${DEFAULT_PRODUCTION_SITE_URL}/auth/callback?token_hash={{ .TokenHash }}&type=invite&next=${encodeURIComponent(INVITE_PASSWORD_SETUP_PATH)}`;
+
+export function buildInviteEmailCallbackUrl(siteUrl: string) {
+  const base = `${siteUrl.replace(/\/$/, "")}/auth/callback`;
+  return `${base}?token_hash={{ .TokenHash }}&type=invite&next=${encodeURIComponent(INVITE_PASSWORD_SETUP_PATH)}`;
+}
 
 export function buildInvitationRedirectUrl(siteUrl: string) {
   const base = `${siteUrl.replace(/\/$/, "")}/auth/callback`;
@@ -39,6 +45,8 @@ export function buildInvitationRedirectUrl(siteUrl: string) {
   params.set("next", INVITE_PASSWORD_SETUP_PATH);
   return `${base}?${params.toString()}`;
 }
+
+export const CANONICAL_INVITE_REDIRECT_URL = buildInvitationRedirectUrl(DEFAULT_PRODUCTION_SITE_URL);
 
 export function resolveInvitationRedirectTo(siteUrl: string) {
   const redirectTo = buildInvitationRedirectUrl(siteUrl);

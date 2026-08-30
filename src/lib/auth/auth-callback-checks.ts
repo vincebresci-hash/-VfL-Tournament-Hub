@@ -25,26 +25,53 @@ export function runAuthCallbackChecks() {
     "documents PKCE verifier deletion on signOut",
   );
   assert(
-    authCallback.includes("establishAuthSessionFromCallback"),
-    "auth callback helper exchanges code",
+    authCallback.includes("establishInviteSessionFromTokenHash"),
+    "invite token_hash session helper",
   );
+  assert(
+    authCallback.includes('type: "invite"'),
+    "invite flow uses verifyOtp type invite",
+  );
+  assert(
+    authCallback.includes("getUser()"),
+    "invite flow confirms authenticated user",
+  );
+  assert(
+    authCallback.includes("establishAuthSessionFromCallback"),
+    "auth callback helper handles pkce code",
+  );
+  assert(
+    authCallback.includes('input.authType !== "invite"'),
+    "pkce exchange skips admin invite codes",
+  );
+  assert(authCallback.includes("logAuthCallbackFailure"), "callback logs sanitized failures");
   assert(authCallback.includes("resolveAuthCallbackDestination"), "invite destination resolver");
   assert(authCallback.includes("authCallbackFailurePath"), "invite failure path");
 
   const callbackBody = callbackRoute.slice(callbackRoute.indexOf("export async function GET"));
   assert(
-    callbackBody.includes("establishAuthSessionFromCallback"),
-    "callback exchanges code before any session teardown",
+    callbackBody.includes("isInviteTokenHashCallback"),
+    "callback detects invite token_hash flow",
+  );
+  assert(
+    callbackBody.includes("establishInviteSessionFromTokenHash"),
+    "callback routes invite token_hash before pkce exchange",
+  );
+  assert(
+    callbackBody.indexOf("establishInviteSessionFromTokenHash") <
+      callbackBody.indexOf("establishAuthSessionFromCallback"),
+    "invite token_hash handled before pkce exchange",
   );
   assert(
     !callbackBody.includes("clearSessionBeforeAuthExchange"),
     "callback does not clear session before exchange",
   );
   assert(
-    callbackBody.indexOf("establishAuthSessionFromCallback") <
+    callbackBody.indexOf("establishInviteSessionFromTokenHash") <
       callbackBody.indexOf("clearLocalAuthSessionOnFailure"),
     "session cleared only after failed exchange",
   );
+  assert(callbackRoute.includes("logAuthCallbackFailure"), "callback logs failures");
   assert(callbackRoute.includes("authCallbackFailurePath"), "callback uses invite failure path");
   assert(callbackRoute.includes("resolveAuthCallbackDestination"), "callback forces invite destination");
 
