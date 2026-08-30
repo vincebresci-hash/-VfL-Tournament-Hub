@@ -59,23 +59,13 @@ export function resolveStatusEmailSendDecision(
 export function shouldReleaseStatusEmailReservation(input: {
   sendOk: boolean;
   logStatus: "sent" | "failed" | "skipped";
+  claimed?: boolean;
 }): boolean {
-  return !input.sendOk || input.logStatus !== "sent";
-}
-
-export function resolveStatusEmailReservationWithRecovery(
-  reservation: StatusEmailReservationOutcome,
-  retryReservation: StatusEmailReservationOutcome,
-): {
-  action: "send" | "skip" | "fail_closed";
-  error: string | null;
-} {
-  const initial = resolveStatusEmailSendDecision(reservation);
-  if (initial.action === "send" || initial.action === "fail_closed") {
-    return initial;
+  if (input.claimed) {
+    return false;
   }
 
-  return resolveStatusEmailSendDecision(retryReservation);
+  return !input.sendOk || input.logStatus !== "sent";
 }
 
 export type StatusEmailScenario = {

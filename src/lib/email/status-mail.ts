@@ -5,7 +5,6 @@ import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
 import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
 import {
   parseStatusEmailReservation,
-  resolveStatusEmailReservationWithRecovery,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
@@ -164,6 +163,34 @@ async function releaseStatusEmailSend(
   }
 }
 
+async function claimStatusEmailSend(
+  applicationId: string,
+  templateType: EmailTemplateType,
+  providerMessageId: string | null,
+): Promise<boolean> {
+  if (!providerMessageId?.trim()) {
+    return false;
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("claim_application_status_email_send", {
+    p_application_id: applicationId,
+    p_template_type: templateType,
+    p_provider_message_id: providerMessageId,
+  });
+
+  if (error) {
+    console.error(
+      "claim_application_status_email_send failed",
+      error.message,
+      error.code ?? "",
+    );
+    return false;
+  }
+
+  return data === true;
+}
+
 async function writeEmailLog(entry: {
   applicationId: string;
   templateId: string | null;
@@ -306,19 +333,7 @@ export async function sendApplicationStatusEmail(input: {
   }
 
   const reservation = await reserveStatusEmailSend(input.applicationId, templateType);
-  let decision = resolveStatusEmailSendDecision(reservation);
-
-  if (decision.action === "skip") {
-    await releaseStatusEmailSend(input.applicationId, templateType);
-    const retryReservation = await reserveStatusEmailSend(
-      input.applicationId,
-      templateType,
-    );
-    decision = resolveStatusEmailReservationWithRecovery(
-      reservation,
-      retryReservation,
-    );
-  }
+  const decision = resolveStatusEmailSendDecision(reservation);
 
   if (decision.action === "fail_closed") {
     console.error(decision.error);
@@ -359,6 +374,8 @@ export async function sendApplicationStatusEmail(input: {
   const body = renderEmailTemplate(template.body, variables);
 
   let keepReservation = false;
+  let claimedReservation = false;
+  const ownsReservation = decision.action === "send";
   try {
     const emailContent = buildTournamentHubEmailFromTemplate({
       subject,
@@ -372,6 +389,14 @@ export async function sendApplicationStatusEmail(input: {
       html: emailContent.html,
       templateId: template.id,
     });
+
+    if (result.ok) {
+      claimedReservation = await claimStatusEmailSend(
+        input.applicationId,
+        templateType,
+        result.providerMessageId ?? null,
+      );
+    }
 
     const logStatus: EmailLogStatus = result.ok
       ? "sent"
@@ -396,6 +421,7 @@ export async function sendApplicationStatusEmail(input: {
     keepReservation = !shouldReleaseStatusEmailReservation({
       sendOk: result.ok,
       logStatus,
+      claimed: claimedReservation,
     });
 
     if (result.ok) {
@@ -441,7 +467,7 @@ export async function sendApplicationStatusEmail(input: {
       error: "E-Mail-Versand fehlgeschlagen.",
     };
   } finally {
-    if (!keepReservation) {
+    if (ownsReservation && !keepReservation) {
       await releaseStatusEmailSend(input.applicationId, templateType);
     }
   }

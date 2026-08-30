@@ -1058,6 +1058,14 @@ export type Database = {
         };
         Returns: undefined;
       };
+      claim_application_status_email_send: {
+        Args: {
+          p_application_id: string;
+          p_template_type: EmailTemplateTypeRow;
+          p_provider_message_id: string;
+        };
+        Returns: boolean;
+      };
       store_secure_access_token: {
         Args: {
           p_application_id: string;

@@ -1,4 +1,5 @@
 import { runStatusEmailIdempotencySelfChecks } from "@/lib/email/status-mail-idempotency-checks";
+import { runStatusEmailConcurrencySelfChecks } from "@/lib/email/status-mail-concurrency-checks";
 import { runTournamentHubEmailDesignChecks } from "@/lib/email/tournament-hub-email-checks";
 import { runScheduleSelfChecks } from "./run-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
@@ -110,6 +111,7 @@ try {
   const newsSelfChecks = runNewsSelfChecks();
   const adminScheduleParticipantChecks = runAdminScheduleParticipantChecks();
   const statusEmailIdempotencyChecks = runStatusEmailIdempotencySelfChecks();
+  const statusEmailConcurrencyChecks = runStatusEmailConcurrencySelfChecks();
   const tournamentHubEmailDesignChecks = runTournamentHubEmailDesignChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
@@ -163,6 +165,7 @@ try {
   console.log(`news-self-checks: ${newsSelfChecks}`);
   console.log(`admin-schedule-participant-checks: ${adminScheduleParticipantChecks}`);
   console.log(`status-email-idempotency-checks: ${statusEmailIdempotencyChecks}`);
+  console.log(`status-email-concurrency-checks: ${statusEmailConcurrencyChecks}`);
   console.log(`tournament-hub-email-design-checks: ${tournamentHubEmailDesignChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

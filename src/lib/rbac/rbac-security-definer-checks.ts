@@ -84,6 +84,24 @@ export function runRbacSecurityDefinerChecks() {
     "status email release hardened",
   );
 
+  const leaseMigration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831250000_status_email_reservation_lease.sql",
+    ),
+    "utf8",
+  );
+  assert(
+    leaseMigration.includes("claim_application_status_email_send") &&
+      leaseMigration.includes("applications.decide") &&
+      leaseMigration.includes("applications.manage"),
+    "status email claim uses application permissions",
+  );
+  assert(
+    leaseMigration.includes("provider_message_id IS NULL"),
+    "release/lease must not delete claimed reservations",
+  );
+
   assert(
     migration.includes("store_secure_access_token") &&
       migration.includes("cancellations.manage") &&
