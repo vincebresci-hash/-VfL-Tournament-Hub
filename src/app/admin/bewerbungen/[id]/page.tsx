@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ApplicationDetail } from "@/components/admin/ApplicationDetail";
+import { getTeamDirectoryAccessFlags } from "@/lib/team-directory/access";
 import { getAdminApplication, getTournamentOccupancy, isClubDatabaseReady } from "@/lib/db/queries";
 import { getTournamentBySlugOrId } from "@/lib/db/tournament-queries";
 
@@ -44,6 +45,7 @@ export default async function AdminApplicationDetailPage({
   }
 
   const occupancy = await getTournamentOccupancy(tournament.slug);
+  const teamDirectoryAccess = await getTeamDirectoryAccessFlags();
   const tournamentWithCapacity = occupancy
     ? {
         ...tournament,
@@ -53,5 +55,11 @@ export default async function AdminApplicationDetailPage({
       }
     : tournament;
 
-  return <ApplicationDetail applicationId={id} tournament={tournamentWithCapacity} />;
+  return (
+    <ApplicationDetail
+      applicationId={id}
+      tournament={tournamentWithCapacity}
+      canManageTeamDirectory={teamDirectoryAccess.canManage}
+    />
+  );
 }

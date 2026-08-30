@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { PaymentStatusPanel } from "@/components/admin/PaymentStatusPanel";
+import { TeamDirectorySavePanel } from "@/components/admin/TeamDirectorySavePanel";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { InternalRating } from "@/components/admin/InternalRating";
@@ -20,6 +21,7 @@ import type { Tournament } from "@/types/tournament";
 type ApplicationDetailProps = {
   applicationId: string;
   tournament: Tournament;
+  canManageTeamDirectory?: boolean;
 };
 
 const decisions: Array<{ status: ApplicationStatus; label: string }> = [
@@ -32,6 +34,7 @@ const decisions: Array<{ status: ApplicationStatus; label: string }> = [
 export function ApplicationDetail({
   applicationId,
   tournament,
+  canManageTeamDirectory = false,
 }: ApplicationDetailProps) {
   const { getApplication, updateStatus, updateInternalRating, applications, externalTeams } =
     useAdminData();
@@ -158,6 +161,11 @@ export function ApplicationDetail({
               paidAt: application.paidAt,
               paymentNote: application.paymentNote,
             }}
+          />
+
+          <TeamDirectorySavePanel
+            applicationId={application.id}
+            canManage={canManageTeamDirectory}
           />
 
           <InternalRating

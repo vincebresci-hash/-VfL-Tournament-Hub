@@ -1,6 +1,7 @@
 import { runStatusEmailIdempotencySelfChecks } from "@/lib/email/status-mail-idempotency-checks";
 import { runStatusEmailConcurrencySelfChecks } from "@/lib/email/status-mail-concurrency-checks";
 import { runTournamentHubEmailDesignChecks } from "@/lib/email/tournament-hub-email-checks";
+import { runTeamDirectoryChecks } from "@/lib/team-directory/team-directory-checks";
 import { runScheduleSelfChecks } from "./run-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
@@ -115,6 +116,7 @@ try {
   const statusEmailIdempotencyChecks = runStatusEmailIdempotencySelfChecks();
   const statusEmailConcurrencyChecks = runStatusEmailConcurrencySelfChecks();
   const tournamentHubEmailDesignChecks = runTournamentHubEmailDesignChecks();
+  const teamDirectoryChecks = runTeamDirectoryChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -170,6 +172,7 @@ try {
   console.log(`status-email-idempotency-checks: ${statusEmailIdempotencyChecks}`);
   console.log(`status-email-concurrency-checks: ${statusEmailConcurrencyChecks}`);
   console.log(`tournament-hub-email-design-checks: ${tournamentHubEmailDesignChecks}`);
+  console.log(`team-directory-checks: ${teamDirectoryChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
