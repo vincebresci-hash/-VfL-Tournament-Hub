@@ -256,11 +256,18 @@ export function ApplicationDetail({
           setNotice(null);
           setStatusError(null);
 
-          void updateStatus(application.id, nextStatus).then((result) => {
-            setNotice(result.notice);
-            setStatusError(result.error);
-            setSaving(false);
-          });
+          void updateStatus(application.id, nextStatus)
+            .then((result) => {
+              setNotice(result.notice);
+              setStatusError(result.error);
+              setSaving(false);
+            })
+            .catch(() => {
+              setStatusError(
+                "Der Status wurde gespeichert, aber die Rückmeldung konnte nicht abgeschlossen werden. Bitte Seite neu laden.",
+              );
+              setSaving(false);
+            });
         }}
       />
     </div>

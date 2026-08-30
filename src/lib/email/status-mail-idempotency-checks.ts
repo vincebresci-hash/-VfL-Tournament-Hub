@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   isStatusEmailReservationError,
   parseStatusEmailReservation,
+  resolveStatusEmailReservationWithRecovery,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   shouldSkipStatusEmailAfterReservation,
@@ -78,6 +79,18 @@ export function runStatusEmailIdempotencySelfChecks() {
       STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
     "error reservation must return idempotency unavailable message",
   );
+  assert(
+    resolveStatusEmailReservationWithRecovery("skip", "send").action === "send",
+    "orphaned reservation recovery must retry send after release",
+  );
+  assert(
+    resolveStatusEmailReservationWithRecovery("skip", "skip").action === "skip",
+    "already-sent reservation must remain skipped after recovery",
+  );
+  assert(
+    resolveStatusEmailReservationWithRecovery("send", "skip").action === "send",
+    "initial send reservation must not be overridden by unused retry",
+  );
 
   const statusMailSource = readFileSync(
     join(process.cwd(), "src/lib/email/status-mail.ts"),
@@ -88,6 +101,33 @@ export function runStatusEmailIdempotencySelfChecks() {
       statusMailSource,
     ),
     "status-mail must not fall back to send when migration/RPC is missing",
+  );
+  assert(
+    statusMailSource.includes("resolveStatusEmailReservationWithRecovery"),
+    "status-mail must recover orphaned reservations",
+  );
+  assert(
+    statusMailSource.includes("finally") &&
+      statusMailSource.includes("releaseStatusEmailSend"),
+    "status-mail must release reservations in finally on failure",
+  );
+
+  const participationTokenSource = readFileSync(
+    join(process.cwd(), "src/lib/cancellations/participation-token.ts"),
+    "utf8",
+  );
+  assert(
+    participationTokenSource.includes("getEmailSiteUrl"),
+    "participation links must use canonical email site url",
+  );
+
+  const applicationsActionsSource = readFileSync(
+    join(process.cwd(), "src/lib/applications/actions.ts"),
+    "utf8",
+  );
+  assert(
+    applicationsActionsSource.includes("sendApplicationReceivedEmail failed"),
+    "public application submit must not fail when received email throws",
   );
 
   const migration = readFileSync(

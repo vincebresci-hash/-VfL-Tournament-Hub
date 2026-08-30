@@ -5,6 +5,7 @@ import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
 import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
 import {
   parseStatusEmailReservation,
+  resolveStatusEmailReservationWithRecovery,
   resolveStatusEmailSendDecision,
   shouldReleaseStatusEmailReservation,
   STATUS_EMAIL_IDEMPOTENCY_UNAVAILABLE_ERROR,
@@ -305,7 +306,19 @@ export async function sendApplicationStatusEmail(input: {
   }
 
   const reservation = await reserveStatusEmailSend(input.applicationId, templateType);
-  const decision = resolveStatusEmailSendDecision(reservation);
+  let decision = resolveStatusEmailSendDecision(reservation);
+
+  if (decision.action === "skip") {
+    await releaseStatusEmailSend(input.applicationId, templateType);
+    const retryReservation = await reserveStatusEmailSend(
+      input.applicationId,
+      templateType,
+    );
+    decision = resolveStatusEmailReservationWithRecovery(
+      reservation,
+      retryReservation,
+    );
+  }
 
   if (decision.action === "fail_closed") {
     console.error(decision.error);
@@ -344,63 +357,92 @@ export async function sendApplicationStatusEmail(input: {
   const variables = applicationVariables(application, input.status, participationUrl);
   const subject = renderEmailTemplate(template.subject, variables);
   const body = renderEmailTemplate(template.body, variables);
-  const emailContent = buildTournamentHubEmailFromTemplate({
-    subject,
-    bodyText: body,
-    variables,
-  });
-  const result = await getEmailProvider().send({
-    to,
-    subject,
-    text: emailContent.text,
-    html: emailContent.html,
-    templateId: template.id,
-  });
 
-  const logStatus: EmailLogStatus = result.ok
-    ? "sent"
-    : result.skipped
-      ? "skipped"
-      : "failed";
+  let keepReservation = false;
+  try {
+    const emailContent = buildTournamentHubEmailFromTemplate({
+      subject,
+      bodyText: body,
+      variables,
+    });
+    const result = await getEmailProvider().send({
+      to,
+      subject,
+      text: emailContent.text,
+      html: emailContent.html,
+      templateId: template.id,
+    });
 
-  await writeEmailLog({
-    applicationId: input.applicationId,
-    templateId: template.id,
-    templateType,
-    toEmail: to,
-    subject,
-    body,
-    status: logStatus,
-    error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
-    provider: result.provider,
-    providerMessageId: result.providerMessageId ?? null,
-    createdBy: input.actorId,
-  });
+    const logStatus: EmailLogStatus = result.ok
+      ? "sent"
+      : result.skipped
+        ? "skipped"
+        : "failed";
 
-  if (
-    shouldReleaseStatusEmailReservation({
+    await writeEmailLog({
+      applicationId: input.applicationId,
+      templateId: template.id,
+      templateType,
+      toEmail: to,
+      subject,
+      body,
+      status: logStatus,
+      error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
+      provider: result.provider,
+      providerMessageId: result.providerMessageId ?? null,
+      createdBy: input.actorId,
+    });
+
+    keepReservation = !shouldReleaseStatusEmailReservation({
       sendOk: result.ok,
       logStatus,
-    })
-  ) {
-    await releaseStatusEmailSend(input.applicationId, templateType);
-  }
+    });
 
-  if (result.ok) {
-    return { sent: true, skipped: false, error: null };
-  }
+    if (result.ok) {
+      return { sent: true, skipped: false, error: null };
+    }
 
-  if (result.skipped) {
+    if (result.skipped) {
+      return {
+        sent: false,
+        skipped: false,
+        error: result.error ?? "E-Mail-Versand fehlgeschlagen.",
+      };
+    }
+
     return {
       sent: false,
       skipped: false,
       error: result.error ?? "E-Mail-Versand fehlgeschlagen.",
     };
-  }
+  } catch (error) {
+    console.error(
+      "sendApplicationStatusEmail failed",
+      error instanceof Error ? error.message : error,
+    );
 
-  return {
-    sent: false,
-    skipped: false,
-    error: result.error ?? "E-Mail-Versand fehlgeschlagen.",
-  };
+    await writeEmailLog({
+      applicationId: input.applicationId,
+      templateId: template.id,
+      templateType,
+      toEmail: to,
+      subject,
+      body,
+      status: "failed",
+      error: "E-Mail-Versand fehlgeschlagen.",
+      provider: null,
+      providerMessageId: null,
+      createdBy: input.actorId,
+    });
+
+    return {
+      sent: false,
+      skipped: false,
+      error: "E-Mail-Versand fehlgeschlagen.",
+    };
+  } finally {
+    if (!keepReservation) {
+      await releaseStatusEmailSend(input.applicationId, templateType);
+    }
+  }
 }

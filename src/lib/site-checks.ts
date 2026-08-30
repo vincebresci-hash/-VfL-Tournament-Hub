@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   DEFAULT_PRODUCTION_SITE_URL,
   getContentSecurityPolicyHeaderValue,
+  getEmailSiteUrl,
   getInviteRedirectSiteUrl,
   getSiteUrl,
   isEphemeralVercelHost,
@@ -64,6 +65,10 @@ export function runSiteUrlAndCspChecks() {
       "invite redirect rejects branch preview host blim",
     );
     assert(
+      getEmailSiteUrl() === DEFAULT_PRODUCTION_SITE_URL,
+      "email site url rejects preview host on vercel",
+    );
+    assert(
       isEphemeralVercelHost("vf-l-tournament-hub-cy1dkrg01-briefscan-s-projects.vercel.app"),
       "preview host detection",
     );
@@ -100,6 +105,7 @@ export function runSiteUrlAndCspChecks() {
     assert(siteSource.includes("NEXT_PUBLIC_SITE_URL"), "site helper reads SITE_URL");
     assert(siteSource.includes('process.env.VERCEL === "1"'), "site helper checks VERCEL");
     assert(siteSource.includes("getInviteRedirectSiteUrl"), "site helper exports invite redirect url");
+    assert(siteSource.includes("getEmailSiteUrl"), "site helper exports email site url");
     assert(siteSource.includes("isEphemeralVercelHost"), "site helper detects preview hosts");
     assert(siteSource.includes("withCanonical"), "site helper exports withCanonical");
     assert(siteSource.includes("canonicalPath"), "site helper exports canonicalPath");

@@ -272,7 +272,9 @@ export function renderTournamentHubEmailHtml(options: TournamentHubEmailOptions)
 }
 
 export function renderTournamentHubEmailText(options: TournamentHubEmailOptions) {
-  const body = options.bodyText.replace(/\r\n/g, "\n").trim();
+  const body = String(options.bodyText ?? "")
+    .replace(/\r\n/g, "\n")
+    .trim();
   if (!body) {
     return FOOTER_TEXT;
   }
@@ -318,7 +320,7 @@ export function buildTournamentHubEmailFromTemplate(input: {
 
   return buildTournamentHubEmail({
     title: input.subject,
-    bodyText: input.bodyText,
+    bodyText: String(input.bodyText ?? ""),
     recipientFirstName,
     tournament: hasTournamentInfo ? tournament : undefined,
     cta: input.cta === undefined ? resolveEmailCta(input.variables) : input.cta,

@@ -63,6 +63,21 @@ export function shouldReleaseStatusEmailReservation(input: {
   return !input.sendOk || input.logStatus !== "sent";
 }
 
+export function resolveStatusEmailReservationWithRecovery(
+  reservation: StatusEmailReservationOutcome,
+  retryReservation: StatusEmailReservationOutcome,
+): {
+  action: "send" | "skip" | "fail_closed";
+  error: string | null;
+} {
+  const initial = resolveStatusEmailSendDecision(reservation);
+  if (initial.action === "send" || initial.action === "fail_closed") {
+    return initial;
+  }
+
+  return resolveStatusEmailSendDecision(retryReservation);
+}
+
 export type StatusEmailScenario = {
   id: string;
   priorSentTemplates: EmailTemplateType[];

@@ -23,6 +23,7 @@ export class NoopEmailProvider implements EmailProvider {
 
 export class ResendEmailProvider implements EmailProvider {
   readonly id = "resend";
+  private static readonly FETCH_TIMEOUT_MS = 15_000;
 
   async send(input: SendEmailInput): Promise<SendEmailResult> {
     const apiKey = process.env.RESEND_API_KEY;
@@ -61,6 +62,7 @@ export class ResendEmailProvider implements EmailProvider {
           html: input.html ?? undefined,
           reply_to: input.replyTo ?? undefined,
         }),
+        signal: AbortSignal.timeout(ResendEmailProvider.FETCH_TIMEOUT_MS),
       });
 
       const payload = (await response.json().catch(() => null)) as {

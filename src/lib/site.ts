@@ -62,6 +62,19 @@ export function getSiteUrl() {
 }
 
 /**
+ * Stable origin for transactional email links (participation, CTAs).
+ * On Vercel always uses the canonical production host so preview/blim URLs
+ * never leak into Resend payloads after PR35 URL validation.
+ */
+export function getEmailSiteUrl() {
+  if (process.env.VERCEL === "1") {
+    return DEFAULT_PRODUCTION_SITE_URL;
+  }
+
+  return getSiteUrl();
+}
+
+/**
  * Pathname for Metadata `alternates.canonical` (resolved via metadataBase).
  * Pass "/" for the homepage or a rooted path like "/turniere".
  */
