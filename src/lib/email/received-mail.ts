@@ -1,10 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
-import {
-  emailTextToHtml,
-  getEmailProvider,
-  renderEmailTemplate,
-} from "@/lib/email/provider";
+import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
+import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
 import { formatDateDe } from "@/lib/format";
 import type { PublicTournament } from "@/types/tournament";
 import type { ActiveEmailTemplateRow } from "@/lib/supabase/database";
@@ -63,11 +60,16 @@ export async function sendApplicationReceivedEmail(input: ReceivedEmailInput) {
   };
   const subject = renderEmailTemplate(template.subject, variables);
   const body = renderEmailTemplate(template.body, variables);
+  const emailContent = buildTournamentHubEmailFromTemplate({
+    subject,
+    bodyText: body,
+    variables,
+  });
   const result = await getEmailProvider().send({
     to,
     subject,
-    text: body,
-    html: emailTextToHtml(body),
+    text: emailContent.text,
+    html: emailContent.html,
     templateId: template.id,
   });
 
