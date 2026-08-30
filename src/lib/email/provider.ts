@@ -112,14 +112,4 @@ export function renderEmailTemplate(
   });
 }
 
-export function emailTextToHtml(text: string) {
-  const escaped = text
-    .split("&")
-    .join("&amp;")
-    .split("<")
-    .join("&lt;")
-    .split(">")
-    .join("&gt;");
-
-  return `<div style="white-space:pre-wrap;font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#10141c">${escaped}</div>`;
-}
+export { emailTextToHtml } from "@/lib/email/tournament-hub-email";

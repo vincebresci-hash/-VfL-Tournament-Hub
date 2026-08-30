@@ -3,11 +3,8 @@ import { isMissingRelationError } from "@/lib/db/errors";
 import { writeCancellationEmailLogServer } from "@/lib/cancellations/cancellation-email-log";
 import { cancellationOnTimeLabel } from "@/lib/cancellations/deadline";
 import { publicContactEmail } from "@/lib/contact";
-import {
-  emailTextToHtml,
-  getEmailProvider,
-  renderEmailTemplate,
-} from "@/lib/email/provider";
+import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
+import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
 import { formatDateDe } from "@/lib/format";
 import { getAppSettings } from "@/lib/settings";
 import type { EmailTemplateType } from "@/types/admin";
@@ -168,11 +165,17 @@ async function sendTemplateEmail(input: {
 
   const subject = renderEmailTemplate(template.subject, input.variables);
   const body = renderEmailTemplate(template.body, input.variables);
+  const emailContent = buildTournamentHubEmailFromTemplate({
+    subject,
+    bodyText: body,
+    variables: input.variables,
+    cta: null,
+  });
   const result = await getEmailProvider().send({
     to: input.toEmail,
     subject,
-    text: body,
-    html: emailTextToHtml(body),
+    text: emailContent.text,
+    html: emailContent.html,
     templateId: template.id,
   });
 

@@ -1,10 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
-import {
-  emailTextToHtml,
-  getEmailProvider,
-  renderEmailTemplate,
-} from "@/lib/email/provider";
+import { getEmailProvider, renderEmailTemplate } from "@/lib/email/provider";
+import { buildTournamentHubEmailFromTemplate } from "@/lib/email/tournament-hub-email";
+import { formatDateDe } from "@/lib/format";
 import {
   buildCommunicationVariables,
   stripUnresolvedPlaceholders,
@@ -323,11 +321,21 @@ export async function sendTournamentCommunication(input: {
       renderedBody += buildCommunicationReceiptEmailAppendix(confirmationUrl);
     }
 
+    const emailContent = buildTournamentHubEmailFromTemplate({
+      subject: renderedSubject,
+      bodyText: renderedBody,
+      variables,
+      tournament: {
+        name: tournament?.name ?? variables.tournament_name,
+        date: tournament?.date ? formatDateDe(tournament.date) : variables.tournament_date,
+      },
+    });
+
     const sendResult = await provider.send({
       to: recipient.recipient_email,
       subject: renderedSubject,
-      text: renderedBody,
-      html: emailTextToHtml(renderedBody),
+      text: emailContent.text,
+      html: emailContent.html,
     });
 
     const logStatus = sendResult.ok ? "sent" : "failed";
