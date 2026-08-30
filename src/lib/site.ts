@@ -9,34 +9,40 @@ import type { Metadata } from "next";
  */
 export const DEFAULT_PRODUCTION_SITE_URL = "https://vf-l-tournament-hub.vercel.app";
 
-const CANONICAL_PRODUCTION_HOST = new URL(DEFAULT_PRODUCTION_SITE_URL).hostname;
+export const CANONICAL_PRODUCTION_HOST = new URL(DEFAULT_PRODUCTION_SITE_URL).hostname;
 
 /** Ephemeral Vercel preview deployments must never be baked into auth invite emails. */
 export function isEphemeralVercelHost(hostname: string) {
   return hostname.endsWith(".vercel.app") && hostname !== CANONICAL_PRODUCTION_HOST;
 }
 
+function isLocalDevHost(hostname: string) {
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
 /**
  * Stable origin for Supabase Auth invite / resend redirectTo.
- * Never uses VERCEL_URL. Rejects ephemeral *.vercel.app preview hosts even when
- * NEXT_PUBLIC_SITE_URL points at a preview deployment.
+ *
+ * On any Vercel runtime (Production or Preview), invites always use the canonical
+ * production host. Preview/branch hosts such as vf-l-tournament-hub-blim.vercel.app
+ * must never be passed to inviteUserByEmail, even when NEXT_PUBLIC_SITE_URL points
+ * at them.
  */
 export function getInviteRedirectSiteUrl() {
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
+  if (process.env.VERCEL === "1") {
+    return DEFAULT_PRODUCTION_SITE_URL;
+  }
 
+  const explicit = process.env.NEXT_PUBLIC_SITE_URL?.trim().replace(/\/$/, "");
   if (explicit) {
     try {
       const hostname = new URL(explicit).hostname;
-      if (!isEphemeralVercelHost(hostname)) {
+      if (hostname === CANONICAL_PRODUCTION_HOST || isLocalDevHost(hostname)) {
         return explicit;
       }
     } catch {
-      // Invalid URL — fall through to stable defaults below.
+      // Invalid URL — fall through to local fallback below.
     }
-  }
-
-  if (process.env.VERCEL === "1") {
-    return DEFAULT_PRODUCTION_SITE_URL;
   }
 
   return explicit ?? "http://localhost:3000";

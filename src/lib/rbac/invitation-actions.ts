@@ -9,9 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { writeAdminAuditLog } from "@/lib/rbac/audit";
 import {
-  buildInvitationRedirectUrl,
   logInvitationAuthFailure,
+  logInvitationRedirect,
   resolveInvitationAuthUserMessage,
+  resolveInvitationRedirectTo,
 } from "@/lib/rbac/invitation-auth-errors";
 import { markInvitationAcceptedForAuthUser } from "@/lib/rbac/invitation-acceptance";
 import { CLUB_ROLE_KEYS, PLATFORM_ROLE_KEYS } from "@/lib/rbac/permissions";
@@ -198,7 +199,8 @@ export async function inviteUserAction(
   }
 
   const siteUrl = getInviteRedirectSiteUrl();
-  const redirectTo = buildInvitationRedirectUrl(siteUrl);
+  const redirectTo = resolveInvitationRedirectTo(siteUrl);
+  logInvitationRedirect("inviteUserAction", redirectTo);
 
   const { data: inviteData, error: inviteError } = await service.auth.admin.inviteUserByEmail(
     email,
@@ -367,7 +369,8 @@ export async function resendInvitationAction(
   }
 
   const siteUrl = getInviteRedirectSiteUrl();
-  const redirectTo = buildInvitationRedirectUrl(siteUrl);
+  const redirectTo = resolveInvitationRedirectTo(siteUrl);
+  logInvitationRedirect("resendInvitationAction", redirectTo);
 
   const { error: resendError } = await service.auth.admin.inviteUserByEmail(invitation.email, {
     redirectTo,

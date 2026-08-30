@@ -19,6 +19,7 @@ import {
 import { runTournamentStatusCapacityChecks } from "@/lib/tournament-status-checks";
 import { runSiteUrlAndCspChecks } from "@/lib/site-checks";
 import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-checks";
+import { runAuthCallbackChecks } from "@/lib/auth/auth-callback-checks";
 import { runClubProfileSecurityChecks } from "@/lib/auth/club-profile-security-checks";
 import { runDuplicateApplicationChecks } from "@/lib/applications/duplicate-application-checks";
 import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-application-fields-checks";
@@ -76,6 +77,7 @@ try {
   const tournamentStatusCapacityChecks = runTournamentStatusCapacityChecks();
   const siteUrlAndCspChecks = runSiteUrlAndCspChecks();
   const authLoginValidationChecks = runAuthLoginValidationChecks();
+  const authCallbackChecks = runAuthCallbackChecks();
   const clubProfileSecurityChecks = runClubProfileSecurityChecks();
   const duplicateApplicationChecks = runDuplicateApplicationChecks();
   const guestApplicationFieldsChecks = runGuestApplicationFieldsChecks();
@@ -123,6 +125,7 @@ try {
   console.log(`tournament-status-capacity-checks: ${tournamentStatusCapacityChecks}`);
   console.log(`site-url-csp-checks: ${siteUrlAndCspChecks}`);
   console.log(`auth-login-validation-checks: ${authLoginValidationChecks}`);
+  console.log(`auth-callback-checks: ${authCallbackChecks}`);
   console.log(`club-profile-security-checks: ${clubProfileSecurityChecks}`);
   console.log(`duplicate-application-checks: ${duplicateApplicationChecks}`);
   console.log(`guest-application-fields-checks: ${guestApplicationFieldsChecks}`);
