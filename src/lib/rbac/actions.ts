@@ -382,16 +382,17 @@ export async function deleteManagedUserAction(
     }
   }
 
-  await writeAdminAuditLog({
-    actorUserId: access.session.user.id,
-    targetUserId: trimmedUserId,
-    action: "USER_DELETED",
-  });
-
   const result = await deleteManagedUserRecords(trimmedUserId);
   if (!result.ok) {
     return { error: result.error };
   }
+
+  await writeAdminAuditLog({
+    actorUserId: access.session.user.id,
+    targetUserId: null,
+    action: "USER_DELETED",
+    metadata: { deletedUserId: trimmedUserId, email: result.email },
+  });
 
   revalidateUserAdminPaths(trimmedUserId);
   return { error: null };

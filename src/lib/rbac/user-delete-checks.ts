@@ -28,16 +28,26 @@ export function runUserDeleteChecks() {
   );
   assert(actions.includes("count_active_super_admins"), "last super admin count rpc");
   assert(actions.includes("deleteManagedUserRecords"), "delete delegates to server module");
+  assert(
+    actions.indexOf("deleteManagedUserRecords") > actions.indexOf("count_active_super_admins"),
+    "delete runs after safeguards",
+  );
+  assert(
+    actions.indexOf("writeAdminAuditLog") > actions.indexOf("deleteManagedUserRecords"),
+    "audit written only after successful delete",
+  );
 
   assert(userDelete.includes('import "server-only"'), "user delete module is server-only");
   assert(userDelete.includes("auth.admin.deleteUser"), "auth user deleted");
   assert(
-    userDelete.indexOf("auth.admin.deleteUser") > userDelete.indexOf("user_invitations"),
-    "auth user deleted after invitation cleanup",
+    userDelete.indexOf("auth.admin.deleteUser") < userDelete.indexOf("deleteUserInvitations"),
+    "auth user deleted before invitation cleanup",
   );
-  assert(userDelete.includes("rbac_user_roles"), "role assignments removed");
-  assert(userDelete.includes("rbac_user_team_assignments"), "team assignments removed");
-  assert(userDelete.includes("rbac_user_permission_overrides"), "permission overrides removed");
+  assert(
+    !userDelete.includes('.from("rbac_user_roles")\n    .delete()'),
+    "rbac roles rely on auth/profile cascade instead of pre-delete",
+  );
+  assert(userDelete.includes("user_invitations"), "invitation cleanup remains");
   assert(userDelete.includes("redactInvitationSecrets"), "delete logs sanitized");
   assert(!userDelete.includes("applications"), "delete does not touch applications");
   assert(!userDelete.includes("tournaments"), "delete does not touch tournaments");

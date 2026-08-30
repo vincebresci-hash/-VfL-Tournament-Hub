@@ -23,6 +23,60 @@ function normalizeEmail(email: string | null | undefined) {
   return email?.trim().toLowerCase() ?? "";
 }
 
+async function deleteUserInvitations(
+  service: ReturnType<typeof createServiceRoleClient>,
+  input: { userId: string; normalizedEmail: string },
+): Promise<DeleteManagedUserResult | null> {
+  const { userId, normalizedEmail } = input;
+
+  const { error: invitationByUserError } = await service
+    .from("user_invitations")
+    .delete()
+    .or(`profile_id.eq.${userId},auth_user_id.eq.${userId}`);
+
+  if (invitationByUserError) {
+    logUserDeleteFailure("deleteManagedUserRecords", {
+      userId,
+      step: "delete_invitations_by_user",
+      errorCode: invitationByUserError.code,
+      errorMessage: redactInvitationSecrets(invitationByUserError.message),
+    });
+    return {
+      ok: false,
+      error: toUserFacingDbError("Die Benutzereinladungen konnten nicht entfernt werden.", invitationByUserError),
+      logMessage: invitationByUserError.message,
+    };
+  }
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const { error: invitationByEmailError } = await service
+    .from("user_invitations")
+    .delete()
+    .ilike("email", normalizedEmail);
+
+  if (invitationByEmailError) {
+    logUserDeleteFailure("deleteManagedUserRecords", {
+      userId,
+      step: "delete_invitations_by_email",
+      errorCode: invitationByEmailError.code,
+      errorMessage: redactInvitationSecrets(invitationByEmailError.message),
+    });
+    return {
+      ok: false,
+      error: toUserFacingDbError(
+        "Die Benutzereinladungen konnten nicht entfernt werden.",
+        invitationByEmailError,
+      ),
+      logMessage: invitationByEmailError.message,
+    };
+  }
+
+  return null;
+}
+
 export async function deleteManagedUserRecords(userId: string): Promise<DeleteManagedUserResult> {
   let service;
   try {
@@ -66,115 +120,37 @@ export async function deleteManagedUserRecords(userId: string): Promise<DeleteMa
   }
 
   const normalizedEmail = normalizeEmail(profile.email);
+  const avatarUrl = profile.avatar_url;
 
-  const { error: invitationByUserError } = await service
-    .from("user_invitations")
-    .delete()
-    .or(`profile_id.eq.${userId},auth_user_id.eq.${userId}`);
+  // Delete auth user first so RBAC rows cascade via profiles FK. If this fails, nothing else changes.
+  const { error: authDeleteError } = await service.auth.admin.deleteUser(userId);
 
-  if (invitationByUserError) {
+  if (authDeleteError) {
     logUserDeleteFailure("deleteManagedUserRecords", {
       userId,
-      step: "delete_invitations_by_user",
-      errorCode: invitationByUserError.code,
-      errorMessage: redactInvitationSecrets(invitationByUserError.message),
+      step: "delete_auth_user",
+      errorMessage: redactInvitationSecrets(authDeleteError.message),
     });
     return {
       ok: false,
-      error: toUserFacingDbError("Die Benutzereinladungen konnten nicht entfernt werden.", invitationByUserError),
-      logMessage: invitationByUserError.message,
+      error: toUserFacingDbError("Der Auth-Benutzer konnte nicht gelöscht werden.", authDeleteError),
+      logMessage: authDeleteError.message,
     };
   }
 
-  if (normalizedEmail) {
-    const { error: invitationByEmailError } = await service
-      .from("user_invitations")
-      .delete()
-      .ilike("email", normalizedEmail);
-
-    if (invitationByEmailError) {
-      logUserDeleteFailure("deleteManagedUserRecords", {
-        userId,
-        step: "delete_invitations_by_email",
-        errorCode: invitationByEmailError.code,
-        errorMessage: redactInvitationSecrets(invitationByEmailError.message),
-      });
-      return {
-        ok: false,
-        error: toUserFacingDbError(
-          "Die Benutzereinladungen konnten nicht entfernt werden.",
-          invitationByEmailError,
-        ),
-        logMessage: invitationByEmailError.message,
-      };
-    }
+  const invitationCleanupError = await deleteUserInvitations(service, {
+    userId,
+    normalizedEmail,
+  });
+  if (invitationCleanupError) {
+    return invitationCleanupError;
   }
 
-  const { error: permissionOverridesError } = await service
-    .from("rbac_user_permission_overrides")
-    .delete()
-    .eq("user_id", userId);
-
-  if (permissionOverridesError) {
-    logUserDeleteFailure("deleteManagedUserRecords", {
-      userId,
-      step: "delete_permission_overrides",
-      errorCode: permissionOverridesError.code,
-      errorMessage: redactInvitationSecrets(permissionOverridesError.message),
-    });
-    return {
-      ok: false,
-      error: toUserFacingDbError(
-        "Die Berechtigungsüberschreibungen konnten nicht entfernt werden.",
-        permissionOverridesError,
-      ),
-      logMessage: permissionOverridesError.message,
-    };
-  }
-
-  const { error: teamAssignmentsError } = await service
-    .from("rbac_user_team_assignments")
-    .delete()
-    .eq("user_id", userId);
-
-  if (teamAssignmentsError) {
-    logUserDeleteFailure("deleteManagedUserRecords", {
-      userId,
-      step: "delete_team_assignments",
-      errorCode: teamAssignmentsError.code,
-      errorMessage: redactInvitationSecrets(teamAssignmentsError.message),
-    });
-    return {
-      ok: false,
-      error: toUserFacingDbError("Die Teamzuordnungen konnten nicht entfernt werden.", teamAssignmentsError),
-      logMessage: teamAssignmentsError.message,
-    };
-  }
-
-  const { error: roleAssignmentsError } = await service
-    .from("rbac_user_roles")
-    .delete()
-    .eq("user_id", userId);
-
-  if (roleAssignmentsError) {
-    logUserDeleteFailure("deleteManagedUserRecords", {
-      userId,
-      step: "delete_role_assignments",
-      errorCode: roleAssignmentsError.code,
-      errorMessage: redactInvitationSecrets(roleAssignmentsError.message),
-    });
-    return {
-      ok: false,
-      error: toUserFacingDbError("Die Rollenzuordnungen konnten nicht entfernt werden.", roleAssignmentsError),
-      logMessage: roleAssignmentsError.message,
-    };
-  }
-
-  if (isManagedAvatarUrl(profile.avatar_url)) {
+  if (isManagedAvatarUrl(avatarUrl)) {
     try {
       await deleteManagedAvatarIfOwned({
         supabase: service,
-        avatarUrl: profile.avatar_url,
+        avatarUrl,
         userId,
       });
     } catch (error) {
@@ -190,21 +166,6 @@ export async function deleteManagedUserRecords(userId: string): Promise<DeleteMa
         logMessage: message,
       };
     }
-  }
-
-  const { error: authDeleteError } = await service.auth.admin.deleteUser(userId);
-
-  if (authDeleteError) {
-    logUserDeleteFailure("deleteManagedUserRecords", {
-      userId,
-      step: "delete_auth_user",
-      errorMessage: redactInvitationSecrets(authDeleteError.message),
-    });
-    return {
-      ok: false,
-      error: toUserFacingDbError("Der Auth-Benutzer konnte nicht gelöscht werden.", authDeleteError),
-      logMessage: authDeleteError.message,
-    };
   }
 
   const { data: remainingProfile } = await service
