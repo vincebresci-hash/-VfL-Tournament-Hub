@@ -16,17 +16,34 @@ export function runAuthCallbackChecks() {
   const authCallback = read("src/lib/auth/auth-callback.ts");
   const loginPage = read("src/app/login/page.tsx");
 
-  assert(authCallback.includes("clearSessionBeforeAuthExchange"), "auth callback helper clears session");
-  assert(authCallback.includes('signOut({ scope: "local" })'), "foreign session cleared locally");
-  assert(authCallback.includes("establishAuthSessionFromCallback"), "auth callback helper exchanges code");
+  assert(
+    authCallback.includes("clearLocalAuthSessionOnFailure"),
+    "auth callback helper clears session on failure",
+  );
+  assert(
+    authCallback.includes("removeAllPKCEVerifiers"),
+    "documents PKCE verifier deletion on signOut",
+  );
+  assert(
+    authCallback.includes("establishAuthSessionFromCallback"),
+    "auth callback helper exchanges code",
+  );
   assert(authCallback.includes("resolveAuthCallbackDestination"), "invite destination resolver");
   assert(authCallback.includes("authCallbackFailurePath"), "invite failure path");
 
-  assert(callbackRoute.includes("clearSessionBeforeAuthExchange"), "callback clears session before exchange");
+  const callbackBody = callbackRoute.slice(callbackRoute.indexOf("export async function GET"));
   assert(
-    callbackRoute.indexOf("clearSessionBeforeAuthExchange") <
-      callbackRoute.indexOf("establishAuthSessionFromCallback"),
-    "session cleared before code exchange",
+    callbackBody.includes("establishAuthSessionFromCallback"),
+    "callback exchanges code before any session teardown",
+  );
+  assert(
+    !callbackBody.includes("clearSessionBeforeAuthExchange"),
+    "callback does not clear session before exchange",
+  );
+  assert(
+    callbackBody.indexOf("establishAuthSessionFromCallback") <
+      callbackBody.indexOf("clearLocalAuthSessionOnFailure"),
+    "session cleared only after failed exchange",
   );
   assert(callbackRoute.includes("authCallbackFailurePath"), "callback uses invite failure path");
   assert(callbackRoute.includes("resolveAuthCallbackDestination"), "callback forces invite destination");

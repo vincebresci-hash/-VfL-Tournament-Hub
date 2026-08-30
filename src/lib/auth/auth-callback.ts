@@ -14,11 +14,13 @@ export function isInviteCallback(input: {
 }
 
 /**
- * Remove any existing browser session before exchanging an invite/recovery code.
- * Without this, a logged-in foreign account can keep its cookies when the code
- * exchange fails and the user is bounced to /login with an active session.
+ * Clear the local auth session after a failed callback exchange.
+ *
+ * Must NOT run before `exchangeCodeForSession`: Supabase `signOut` tears down
+ * storage via `_removeSession`, which calls `removeAllPKCEVerifiers` and
+ * deletes the PKCE `code_verifier` cookie required for the callback.
  */
-export async function clearSessionBeforeAuthExchange(
+export async function clearLocalAuthSessionOnFailure(
   supabase: SupabaseClient<Database>,
 ) {
   await supabase.auth.signOut({ scope: "local" });

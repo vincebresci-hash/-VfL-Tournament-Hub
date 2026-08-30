@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSafeRedirect } from "@/lib/auth/redirects";
 import {
   authCallbackFailurePath,
-  clearSessionBeforeAuthExchange,
+  clearLocalAuthSessionOnFailure,
   establishAuthSessionFromCallback,
   isInviteAuthType,
   isInviteCallback,
@@ -25,7 +25,6 @@ export async function GET(request: Request) {
   const inviteCallback = isInviteCallback({ authType, next });
 
   const supabase = await createClient();
-  await clearSessionBeforeAuthExchange(supabase);
 
   const user = await establishAuthSessionFromCallback(supabase, {
     code,
@@ -34,7 +33,7 @@ export async function GET(request: Request) {
   });
 
   if (!user) {
-    await clearSessionBeforeAuthExchange(supabase);
+    await clearLocalAuthSessionOnFailure(supabase);
     return NextResponse.redirect(new URL(authCallbackFailurePath(inviteCallback), origin));
   }
 
