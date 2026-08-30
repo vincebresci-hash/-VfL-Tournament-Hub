@@ -28,19 +28,21 @@ export function runUserDeleteChecks() {
   );
   assert(actions.includes("count_active_super_admins"), "last super admin count rpc");
   assert(actions.includes("deleteManagedUserRecords"), "delete delegates to server module");
+  const deleteActionBody = actions.slice(actions.indexOf("export async function deleteManagedUserAction"));
   assert(
-    actions.indexOf("deleteManagedUserRecords") > actions.indexOf("count_active_super_admins"),
+    deleteActionBody.indexOf("deleteManagedUserRecords") > deleteActionBody.indexOf("count_active_super_admins"),
     "delete runs after safeguards",
   );
   assert(
-    actions.indexOf("writeAdminAuditLog") > actions.indexOf("deleteManagedUserRecords"),
+    deleteActionBody.indexOf("writeAdminAuditLog") > deleteActionBody.indexOf("deleteManagedUserRecords"),
     "audit written only after successful delete",
   );
 
   assert(userDelete.includes('import "server-only"'), "user delete module is server-only");
   assert(userDelete.includes("auth.admin.deleteUser"), "auth user deleted");
+  const deleteRecordsBody = userDelete.slice(userDelete.indexOf("export async function deleteManagedUserRecords"));
   assert(
-    userDelete.indexOf("auth.admin.deleteUser") < userDelete.indexOf("deleteUserInvitations"),
+    deleteRecordsBody.indexOf("auth.admin.deleteUser") < deleteRecordsBody.indexOf("deleteUserInvitations(service"),
     "auth user deleted before invitation cleanup",
   );
   assert(
