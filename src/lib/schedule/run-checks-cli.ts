@@ -42,6 +42,8 @@ import { runUserDeleteChecks } from "@/lib/rbac/user-delete-checks";
 import { runPaymentStatusChecks } from "@/lib/payments/payment-checks";
 import { runCommunicationChecks } from "@/lib/communications/communication-checks";
 import { runCommunicationReceiptChecks } from "@/lib/communications/communication-receipt-checks";
+import { runCommunicationRecipientPickerChecks } from "@/lib/communications/recipient-picker-checks";
+import { runCommunicationRecipientDedupChecks } from "@/lib/communications/recipient-dedup-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runNewsSelfChecks } from "@/lib/news-checks";
@@ -99,6 +101,8 @@ try {
   const userDeleteChecks = runUserDeleteChecks();
   const paymentStatusChecks = runPaymentStatusChecks();
   const communicationChecks = runCommunicationChecks();
+  const communicationRecipientPickerChecks = runCommunicationRecipientPickerChecks();
+  const communicationRecipientDedupChecks = runCommunicationRecipientDedupChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
@@ -149,6 +153,8 @@ try {
   console.log(`user-delete-checks: ${userDeleteChecks}`);
   console.log(`payment-status-checks: ${paymentStatusChecks}`);
   console.log(`communication-checks: ${communicationChecks}`);
+  console.log(`communication-recipient-picker-checks: ${communicationRecipientPickerChecks}`);
+  console.log(`communication-recipient-dedup-checks: ${communicationRecipientDedupChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);
