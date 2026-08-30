@@ -39,6 +39,8 @@ export function runInvitationChecks() {
   assert(actions.includes(".eq(\"status\", \"pending\")"), "cancel uses conditional pending update");
   assert(actions.includes("deleteUser"), "cancel removes pending auth user");
   assert(actions.includes("getInviteRedirectSiteUrl"), "invite uses stable redirect site url");
+  assert(actions.includes("resolveInvitationRedirectTo"), "invite validates redirect host");
+  assert(actions.includes("logInvitationRedirect"), "invite logs redirect diagnostics");
   assert(actions.includes("resolveInvitationAuthUserMessage"), "invite auth user messages");
   assert(actions.includes("logInvitationAuthFailure"), "invite auth server logging");
   assert(!actions.includes("formatInvitationAuthFailure"), "no verbose auth failure formatting in UI");

@@ -27,13 +27,40 @@ export function redactInvitationSecrets(value: string) {
   return sanitized;
 }
 
+import { CANONICAL_PRODUCTION_HOST, DEFAULT_PRODUCTION_SITE_URL } from "@/lib/site";
+
 export const INVITE_PASSWORD_SETUP_PATH = "/passwort-zuruecksetzen";
+
+export const CANONICAL_INVITE_REDIRECT_URL = `${DEFAULT_PRODUCTION_SITE_URL}/auth/callback?next=${encodeURIComponent(INVITE_PASSWORD_SETUP_PATH)}`;
 
 export function buildInvitationRedirectUrl(siteUrl: string) {
   const base = `${siteUrl.replace(/\/$/, "")}/auth/callback`;
   const params = new URLSearchParams();
   params.set("next", INVITE_PASSWORD_SETUP_PATH);
   return `${base}?${params.toString()}`;
+}
+
+export function resolveInvitationRedirectTo(siteUrl: string) {
+  const redirectTo = buildInvitationRedirectUrl(siteUrl);
+  const hostname = new URL(redirectTo).hostname;
+
+  if (process.env.VERCEL === "1" && hostname !== CANONICAL_PRODUCTION_HOST) {
+    throw new Error(
+      `invite redirect host must be ${CANONICAL_PRODUCTION_HOST}, got ${hostname}`,
+    );
+  }
+
+  return redirectTo;
+}
+
+export function logInvitationRedirect(scope: string, redirectTo: string) {
+  const hostname = new URL(redirectTo).hostname;
+  console.info(`[${scope}] invite redirect`, {
+    scope: "invitation_redirect",
+    host: hostname,
+    path: new URL(redirectTo).pathname,
+    hasPasswordSetupNext: redirectTo.includes(`next=${encodeURIComponent(INVITE_PASSWORD_SETUP_PATH)}`),
+  });
 }
 
 export function isInvitationEmailRateLimitError(error: unknown) {

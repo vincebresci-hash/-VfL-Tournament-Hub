@@ -1,12 +1,15 @@
 import {
+  CANONICAL_INVITE_REDIRECT_URL,
   INVITATION_EMAIL_RATE_LIMIT_MESSAGE,
   buildInvitationRedirectUrl,
   isInvitationEmailRateLimitError,
   logInvitationAuthFailure,
   redactInvitationSecrets,
   resolveInvitationAuthUserMessage,
+  resolveInvitationRedirectTo,
   sanitizeInvitationAuthError,
 } from "@/lib/rbac/invitation-auth-errors";
+import { DEFAULT_PRODUCTION_SITE_URL } from "@/lib/site";
 import { AuthApiError } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -26,6 +29,8 @@ export function runInvitationAuthErrorChecks() {
   const expectedRedirect =
     "https://vf-l-tournament-hub.vercel.app/auth/callback?next=%2Fpasswort-zuruecksetzen";
 
+  assert(CANONICAL_INVITE_REDIRECT_URL === expectedRedirect, "canonical invite redirect constant");
+
   assert(
     buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app") === expectedRedirect,
     "invite redirect uses callback with password-setup next param",
@@ -34,6 +39,31 @@ export function runInvitationAuthErrorChecks() {
     buildInvitationRedirectUrl("https://vf-l-tournament-hub.vercel.app/") === expectedRedirect,
     "invite redirect strips trailing slash",
   );
+
+  const previousVercel = process.env.VERCEL;
+  const previousSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  try {
+    process.env.VERCEL = "1";
+    process.env.NEXT_PUBLIC_SITE_URL = "https://vf-l-tournament-hub-blim.vercel.app";
+    assert(
+      resolveInvitationRedirectTo(DEFAULT_PRODUCTION_SITE_URL) === expectedRedirect,
+      "vercel runtime forces canonical invite redirect",
+    );
+  } finally {
+    if (previousVercel === undefined) {
+      delete process.env.VERCEL;
+    } else {
+      process.env.VERCEL = previousVercel;
+    }
+    if (previousSiteUrl === undefined) {
+      delete process.env.NEXT_PUBLIC_SITE_URL;
+    } else {
+      process.env.NEXT_PUBLIC_SITE_URL = previousSiteUrl;
+    }
+  }
+
+  assert(actions.includes("resolveInvitationRedirectTo"), "invite actions validate redirect");
+  assert(actions.includes("logInvitationRedirect"), "invite actions log redirect host");
 
   const rateLimitError = new AuthApiError("email rate limit exceeded", 429, "over_email_send_rate_limit");
   assert(isInvitationEmailRateLimitError(rateLimitError), "429 rate limit detection");

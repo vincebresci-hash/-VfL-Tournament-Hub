@@ -58,6 +58,11 @@ export function runSiteUrlAndCspChecks() {
       getInviteRedirectSiteUrl() === DEFAULT_PRODUCTION_SITE_URL,
       "invite redirect rejects ephemeral vercel preview host",
     );
+    process.env.NEXT_PUBLIC_SITE_URL = "https://vf-l-tournament-hub-blim.vercel.app";
+    assert(
+      getInviteRedirectSiteUrl() === DEFAULT_PRODUCTION_SITE_URL,
+      "invite redirect rejects branch preview host blim",
+    );
     assert(
       isEphemeralVercelHost("vf-l-tournament-hub-cy1dkrg01-briefscan-s-projects.vercel.app"),
       "preview host detection",
