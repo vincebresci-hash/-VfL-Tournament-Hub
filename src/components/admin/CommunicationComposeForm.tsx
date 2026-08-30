@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { AdminCard } from "@/components/admin/AdminPanel";
+import { CommunicationRecipientPicker } from "@/components/admin/CommunicationRecipientPicker";
+import { CommunicationRecipientPreview } from "@/components/admin/CommunicationRecipientPreview";
 import {
   previewCommunicationRecipientsAction,
   sendCommunicationAction,
@@ -18,6 +20,10 @@ import {
   allowedRecipientFiltersForType,
   defaultRecipientFilterForType,
 } from "@/lib/communications/recipient-filters";
+import {
+  DEFAULT_RECIPIENT_PICKER_FILTERS,
+  type RecipientPickerFilters,
+} from "@/lib/communications/recipient-picker";
 import { buildCommunicationVariables, stripUnresolvedPlaceholders } from "@/lib/communications/variables";
 import { renderEmailTemplate } from "@/lib/email/provider";
 import {
@@ -29,6 +35,7 @@ import type { AdminTournamentOption } from "@/types/admin";
 
 type CommunicationComposeFormProps = {
   tournaments: AdminTournamentOption[];
+  canSend: boolean;
 };
 
 const defaultBodyByType: Record<CommunicationType, string> = {
@@ -87,7 +94,10 @@ function createIdempotencyKey() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export function CommunicationComposeForm({ tournaments }: CommunicationComposeFormProps) {
+export function CommunicationComposeForm({
+  tournaments,
+  canSend,
+}: CommunicationComposeFormProps) {
   const router = useRouter();
   const [tournamentId, setTournamentId] = useState(tournaments[0]?.id ?? "");
   const [type, setType] = useState<CommunicationType>("tournament-info");
@@ -99,6 +109,8 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
   const [important, setImportant] = useState(false);
   const [requireConfirmation, setRequireConfirmation] = useState(false);
   const [selectedApplicationIds, setSelectedApplicationIds] = useState<string[]>([]);
+  const [pickerFilters, setPickerFilters] =
+    useState<RecipientPickerFilters>(DEFAULT_RECIPIENT_PICKER_FILTERS);
   const [eligibleApplications, setEligibleApplications] = useState<
     Awaited<ReturnType<typeof loadEligibleCommunicationApplicationsAction>>["applications"]
   >([]);
@@ -114,6 +126,7 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
   const effectiveRecipientFilter = allowedFilters.includes(recipientFilter)
     ? recipientFilter
     : defaultRecipientFilterForType(type);
+  const customSelectionActive = effectiveRecipientFilter === "custom";
 
   useEffect(() => {
     if (!tournamentId) {
@@ -125,6 +138,7 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
       if (!cancelled) {
         setEligibleApplications(result.applications);
         setSelectedApplicationIds([]);
+        setPickerFilters(DEFAULT_RECIPIENT_PICKER_FILTERS);
       }
     });
 
@@ -170,12 +184,18 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
     }
   }
 
-  function toggleApplication(applicationId: string) {
-    setSelectedApplicationIds((current) =>
-      current.includes(applicationId)
-        ? current.filter((id) => id !== applicationId)
-        : [...current, applicationId],
-    );
+  function handleRecipientFilterChange(nextFilter: CommunicationRecipientFilter) {
+    setRecipientFilter(nextFilter);
+    if (nextFilter !== "custom") {
+      setSelectedApplicationIds([]);
+    }
+  }
+
+  function handleSelectionChange(applicationIds: string[]) {
+    setSelectedApplicationIds(applicationIds);
+    if (applicationIds.length > 0 && effectiveRecipientFilter !== "custom") {
+      setRecipientFilter("custom");
+    }
   }
 
   const previewSample = useMemo(() => {
@@ -199,6 +219,11 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSend) {
+      setError("Keine Berechtigung zum Versenden.");
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -264,7 +289,9 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
             <SelectInput
               value={effectiveRecipientFilter}
               onChange={(event) =>
-                setRecipientFilter(event.target.value as CommunicationRecipientFilter)
+                handleRecipientFilterChange(
+                  event.target.value as CommunicationRecipientFilter,
+                )
               }
             >
               {allowedFilters.map((item) => (
@@ -276,58 +303,19 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
           </Field>
         </div>
 
-        {effectiveRecipientFilter === "custom" ? (
-          <div className="mt-6 border border-line bg-surface px-4 py-4">
-            <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
-              Teams auswählen
-            </p>
-            <div className="mt-3 grid gap-2">
-              {eligibleApplications.map((application) => (
-                <label
-                  key={application.id}
-                  className="flex items-start gap-3 text-[14px] text-ink"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedApplicationIds.includes(application.id)}
-                    onChange={() => toggleApplication(application.id)}
-                    className="mt-1"
-                  />
-                  <span>
-                    {application.teamName}
-                    {application.clubName ? ` · ${application.clubName}` : ""}
-                    <span className="block text-[12px] text-muted">
-                      {application.contactEmail} · {application.status}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </div>
+        {tournamentId ? (
+          <CommunicationRecipientPicker
+            applications={eligibleApplications}
+            communicationType={type}
+            filters={pickerFilters}
+            onFiltersChange={setPickerFilters}
+            selectedApplicationIds={selectedApplicationIds}
+            onSelectionChange={handleSelectionChange}
+            selectionEnabled={customSelectionActive}
+          />
         ) : null}
 
-        <div className="mt-6 border border-line bg-surface px-4 py-4">
-          <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
-            Empfängervorschau ({previewRecipients.length})
-          </p>
-          {previewRecipients.length === 0 ? (
-            <p className="mt-3 text-[14px] text-muted">
-              Keine berechtigten Empfänger für die aktuelle Auswahl.
-            </p>
-          ) : (
-            <ul className="mt-3 grid gap-2 text-[14px] text-ink">
-              {previewRecipients.map((recipient) => (
-                <li key={recipient.applicationId}>
-                  {recipient.recipientTeamName}
-                  {recipient.recipientClubName ? ` · ${recipient.recipientClubName}` : ""}
-                  <span className="block text-[12px] text-muted">
-                    {recipient.recipientEmail}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <CommunicationRecipientPreview recipients={previewRecipients} />
       </AdminCard>
 
       <AdminCard title="Nachricht">
@@ -381,10 +369,17 @@ export function CommunicationComposeForm({ tournaments }: CommunicationComposeFo
         </p>
       ) : null}
 
+      {!canSend ? (
+        <p className="text-[14px] text-muted">
+          Sie können Empfänger und Vorschau sehen, aber nicht versenden. Dafür ist die
+          Berechtigung „Kommunikation senden“ erforderlich.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-4">
         <button
           type="submit"
-          disabled={submitting || previewRecipients.length === 0}
+          disabled={!canSend || submitting || previewRecipients.length === 0}
           className="inline-flex h-11 items-center justify-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-70"
         >
           {submitting ? "Wird gesendet…" : "Jetzt senden"}

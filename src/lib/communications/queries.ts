@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
+import type { CommunicationEligibleApplication } from "@/lib/communications/recipient-picker";
 import type {
   CommunicationDetail,
   CommunicationListItem,
@@ -195,15 +196,17 @@ export async function getCommunicationDetail(
   };
 }
 
-export async function listEligibleApplicationsForTournament(tournamentId: string) {
+export async function listEligibleApplicationsForTournament(
+  tournamentId: string,
+): Promise<CommunicationEligibleApplication[]> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("applications")
     .select(
-      "id, status, contact_email, team_name, club_name, payment_status, participation_fee",
+      "id, status, contact_email, team_name, club_name, payment_status, participation_fee, age_group, club_id, team_id",
     )
     .eq("tournament_id", tournamentId)
-    .in("status", ["accepted", "waiting-list"])
+    .not("status", "in", '("cancelled","rejected")')
     .order("team_name", { ascending: true });
 
   if (error || !data) {
@@ -218,6 +221,8 @@ export async function listEligibleApplicationsForTournament(tournamentId: string
       contactEmail: row.contact_email!.trim(),
       teamName: row.team_name?.trim() || "Mannschaft",
       clubName: row.club_name?.trim() || null,
+      ageGroup: row.age_group?.trim() || null,
+      isHubTeam: row.club_id != null && row.team_id != null,
       paymentStatus: row.payment_status,
       participationFee: row.participation_fee,
     }));
