@@ -48,7 +48,13 @@ export function CommunicationRecipientPreview({
 
           <ul className="mt-4 grid gap-2 text-[14px] text-ink">
             {summary.uniqueRecipients.map((recipient) => (
-              <li key={recipient.applicationId}>
+              <li
+                key={
+                  recipient.teamDirectoryEntryId ??
+                  recipient.applicationId ??
+                  recipient.recipientEmail
+                }
+              >
                 {recipient.recipientTeamName}
                 {recipient.recipientClubName ? ` · ${recipient.recipientClubName}` : ""}
                 <span className="block text-[12px] text-muted">

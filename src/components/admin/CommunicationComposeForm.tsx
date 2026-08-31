@@ -6,17 +6,21 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { AdminCard } from "@/components/admin/AdminPanel";
 import { CommunicationRecipientPicker } from "@/components/admin/CommunicationRecipientPicker";
+import { CommunicationTeamDirectoryRecipientPicker } from "@/components/admin/CommunicationTeamDirectoryRecipientPicker";
 import { CommunicationRecipientPreview } from "@/components/admin/CommunicationRecipientPreview";
 import {
   previewCommunicationRecipientsAction,
   sendCommunicationAction,
   loadEligibleCommunicationApplicationsAction,
+  loadEligibleCommunicationDirectoryEntriesAction,
 } from "@/lib/communications/actions";
 import {
   communicationRecipientFilterLabel,
+  communicationRecipientSourceLabel,
   communicationTypeLabel,
 } from "@/lib/communications/labels";
 import {
+  allowedCommunicationTypesForSource,
   allowedRecipientFiltersForType,
   defaultRecipientFilterForType,
 } from "@/lib/communications/recipient-filters";
@@ -24,10 +28,14 @@ import {
   DEFAULT_RECIPIENT_PICKER_FILTERS,
   type RecipientPickerFilters,
 } from "@/lib/communications/recipient-picker";
+import {
+  DEFAULT_DIRECTORY_RECIPIENT_PICKER_FILTERS,
+  type DirectoryRecipientPickerFilters,
+} from "@/lib/communications/team-directory-recipient-picker";
 import { buildCommunicationVariables, stripUnresolvedPlaceholders } from "@/lib/communications/variables";
 import { renderEmailTemplate } from "@/lib/email/provider";
 import {
-  COMMUNICATION_TYPES,
+  type CommunicationRecipientSource,
   type CommunicationType,
   type CommunicationRecipientFilter,
 } from "@/types/communication";
@@ -36,6 +44,7 @@ import type { AdminTournamentOption } from "@/types/admin";
 type CommunicationComposeFormProps = {
   tournaments: AdminTournamentOption[];
   canSend: boolean;
+  canUseTeamDirectorySource: boolean;
 };
 
 const defaultBodyByType: Record<CommunicationType, string> = {
@@ -97,9 +106,12 @@ function createIdempotencyKey() {
 export function CommunicationComposeForm({
   tournaments,
   canSend,
+  canUseTeamDirectorySource,
 }: CommunicationComposeFormProps) {
   const router = useRouter();
   const [tournamentId, setTournamentId] = useState(tournaments[0]?.id ?? "");
+  const [recipientSource, setRecipientSource] =
+    useState<CommunicationRecipientSource>("tournament-applications");
   const [type, setType] = useState<CommunicationType>("tournament-info");
   const [recipientFilter, setRecipientFilter] = useState<CommunicationRecipientFilter>(
     defaultRecipientFilterForType("tournament-info"),
@@ -109,10 +121,16 @@ export function CommunicationComposeForm({
   const [important, setImportant] = useState(false);
   const [requireConfirmation, setRequireConfirmation] = useState(false);
   const [selectedApplicationIds, setSelectedApplicationIds] = useState<string[]>([]);
+  const [selectedDirectoryEntryIds, setSelectedDirectoryEntryIds] = useState<string[]>([]);
   const [pickerFilters, setPickerFilters] =
     useState<RecipientPickerFilters>(DEFAULT_RECIPIENT_PICKER_FILTERS);
+  const [directoryPickerFilters, setDirectoryPickerFilters] =
+    useState<DirectoryRecipientPickerFilters>(DEFAULT_DIRECTORY_RECIPIENT_PICKER_FILTERS);
   const [eligibleApplications, setEligibleApplications] = useState<
     Awaited<ReturnType<typeof loadEligibleCommunicationApplicationsAction>>["applications"]
+  >([]);
+  const [directoryEntries, setDirectoryEntries] = useState<
+    Awaited<ReturnType<typeof loadEligibleCommunicationDirectoryEntriesAction>>["entries"]
   >([]);
   const [previewRecipients, setPreviewRecipients] = useState<
     Awaited<ReturnType<typeof previewCommunicationRecipientsAction>>["recipients"]
@@ -122,11 +140,17 @@ export function CommunicationComposeForm({
   const [idempotencyKey] = useState(createIdempotencyKey);
 
   const selectedTournament = tournaments.find((item) => item.id === tournamentId) ?? null;
+  const isDirectorySource = recipientSource === "team-directory";
+  const allowedTypes = useMemo(
+    () => allowedCommunicationTypesForSource(recipientSource),
+    [recipientSource],
+  );
   const allowedFilters = useMemo(() => allowedRecipientFiltersForType(type), [type]);
   const effectiveRecipientFilter = allowedFilters.includes(recipientFilter)
     ? recipientFilter
     : defaultRecipientFilterForType(type);
-  const customSelectionActive = effectiveRecipientFilter === "custom";
+  const customSelectionActive = !isDirectorySource && effectiveRecipientFilter === "custom";
+  const effectiveType = allowedTypes.includes(type) ? type : allowedTypes[0] ?? "general";
 
   useEffect(() => {
     if (!tournamentId) {
@@ -148,6 +172,25 @@ export function CommunicationComposeForm({
   }, [tournamentId]);
 
   useEffect(() => {
+    if (!canUseTeamDirectorySource || !isDirectorySource) {
+      return;
+    }
+
+    let cancelled = false;
+    void loadEligibleCommunicationDirectoryEntriesAction().then((result) => {
+      if (!cancelled) {
+        setDirectoryEntries(result.entries);
+        setSelectedDirectoryEntryIds([]);
+        setDirectoryPickerFilters(DEFAULT_DIRECTORY_RECIPIENT_PICKER_FILTERS);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canUseTeamDirectorySource, isDirectorySource]);
+
+  useEffect(() => {
     if (!tournamentId) {
       return;
     }
@@ -156,10 +199,14 @@ export function CommunicationComposeForm({
     const timer = window.setTimeout(() => {
       void previewCommunicationRecipientsAction({
         tournamentId,
-        type,
-        recipientFilter: effectiveRecipientFilter,
+        type: effectiveType,
+        recipientFilter: isDirectorySource ? "custom" : effectiveRecipientFilter,
+        recipientSource,
         applicationIds:
-          effectiveRecipientFilter === "custom" ? selectedApplicationIds : undefined,
+          !isDirectorySource && effectiveRecipientFilter === "custom"
+            ? selectedApplicationIds
+            : undefined,
+        teamDirectoryEntryIds: isDirectorySource ? selectedDirectoryEntryIds : undefined,
       }).then((result) => {
         if (cancelled) {
           return;
@@ -173,7 +220,15 @@ export function CommunicationComposeForm({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [tournamentId, type, effectiveRecipientFilter, selectedApplicationIds]);
+  }, [
+    tournamentId,
+    effectiveType,
+    effectiveRecipientFilter,
+    recipientSource,
+    selectedApplicationIds,
+    selectedDirectoryEntryIds,
+    isDirectorySource,
+  ]);
 
   function handleTypeChange(nextType: CommunicationType) {
     setType(nextType);
@@ -181,6 +236,20 @@ export function CommunicationComposeForm({
     setBody(defaultBodyByType[nextType]);
     if (nextType === "important-change") {
       setImportant(true);
+    }
+  }
+
+  function handleRecipientSourceChange(nextSource: CommunicationRecipientSource) {
+    setRecipientSource(nextSource);
+    setSelectedApplicationIds([]);
+    setSelectedDirectoryEntryIds([]);
+    setPickerFilters(DEFAULT_RECIPIENT_PICKER_FILTERS);
+    setDirectoryPickerFilters(DEFAULT_DIRECTORY_RECIPIENT_PICKER_FILTERS);
+
+    if (nextSource === "team-directory" && type === "payment-reminder") {
+      setType("general");
+      setRecipientFilter("custom");
+      setBody(defaultBodyByType.general);
     }
   }
 
@@ -201,21 +270,21 @@ export function CommunicationComposeForm({
   const previewSample = useMemo(() => {
     const sample = previewRecipients[0];
     const variables = buildCommunicationVariables({
-      contactFirstName: "Team",
+      contactFirstName: sample?.recipientContactFirstName ?? "Team",
       teamName: sample?.recipientTeamName ?? "Mannschaft",
       clubName: sample?.recipientClubName ?? "Verein",
       tournamentName: selectedTournament?.name ?? "Turnier",
       tournamentSlug: selectedTournament?.slug ?? "",
       meinTurnierplanUrl: null,
       participationFee: null,
-      paymentStatus: type === "payment-reminder" ? "pending" : null,
+      paymentStatus: effectiveType === "payment-reminder" ? "pending" : null,
     });
 
     return {
       subject: stripUnresolvedPlaceholders(renderEmailTemplate(subject, variables)),
       body: stripUnresolvedPlaceholders(renderEmailTemplate(body, variables)),
     };
-  }, [body, previewRecipients, selectedTournament, subject, type]);
+  }, [body, effectiveType, previewRecipients, selectedTournament, subject]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -229,10 +298,14 @@ export function CommunicationComposeForm({
 
     const result = await sendCommunicationAction({
       tournamentId,
-      type,
-      recipientFilter: effectiveRecipientFilter,
+      recipientSource,
+      type: effectiveType,
+      recipientFilter: isDirectorySource ? "custom" : effectiveRecipientFilter,
       applicationIds:
-        effectiveRecipientFilter === "custom" ? selectedApplicationIds : undefined,
+        !isDirectorySource && effectiveRecipientFilter === "custom"
+          ? selectedApplicationIds
+          : undefined,
+      teamDirectoryEntryIds: isDirectorySource ? selectedDirectoryEntryIds : undefined,
       subject,
       body,
       important,
@@ -273,40 +346,69 @@ export function CommunicationComposeForm({
           </Field>
           <Field id="communication-type" label="Nachrichtentyp">
             <SelectInput
-              value={type}
+              value={effectiveType}
               onChange={(event) =>
                 handleTypeChange(event.target.value as CommunicationType)
               }
             >
-              {COMMUNICATION_TYPES.map((item) => (
+              {allowedTypes.map((item) => (
                 <option key={item} value={item}>
                   {communicationTypeLabel(item)}
                 </option>
               ))}
             </SelectInput>
           </Field>
-          <Field id="communication-filter" label="Empfängerfilter">
-            <SelectInput
-              value={effectiveRecipientFilter}
-              onChange={(event) =>
-                handleRecipientFilterChange(
-                  event.target.value as CommunicationRecipientFilter,
-                )
-              }
-            >
-              {allowedFilters.map((item) => (
-                <option key={item} value={item}>
-                  {communicationRecipientFilterLabel(item)}
-                </option>
-              ))}
-            </SelectInput>
-          </Field>
         </div>
 
-        {tournamentId ? (
+        {canUseTeamDirectorySource ? (
+          <div className="mt-6">
+            <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+              Empfängerquelle
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {(["tournament-applications", "team-directory"] as const).map((source) => (
+                <label
+                  key={source}
+                  className="inline-flex items-center gap-2 border border-line bg-white px-4 py-3 text-[14px] text-ink"
+                >
+                  <input
+                    type="radio"
+                    name="communication-recipient-source"
+                    checked={recipientSource === source}
+                    onChange={() => handleRecipientSourceChange(source)}
+                  />
+                  {communicationRecipientSourceLabel(source)}
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {!isDirectorySource ? (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <Field id="communication-filter" label="Empfängerfilter">
+              <SelectInput
+                value={effectiveRecipientFilter}
+                onChange={(event) =>
+                  handleRecipientFilterChange(
+                    event.target.value as CommunicationRecipientFilter,
+                  )
+                }
+              >
+                {allowedFilters.map((item) => (
+                  <option key={item} value={item}>
+                    {communicationRecipientFilterLabel(item)}
+                  </option>
+                ))}
+              </SelectInput>
+            </Field>
+          </div>
+        ) : null}
+
+        {tournamentId && !isDirectorySource ? (
           <CommunicationRecipientPicker
             applications={eligibleApplications}
-            communicationType={type}
+            communicationType={effectiveType}
             filters={pickerFilters}
             onFiltersChange={setPickerFilters}
             selectedApplicationIds={selectedApplicationIds}
@@ -315,10 +417,24 @@ export function CommunicationComposeForm({
           />
         ) : null}
 
+        {tournamentId && isDirectorySource ? (
+          <CommunicationTeamDirectoryRecipientPicker
+            entries={directoryEntries}
+            filters={directoryPickerFilters}
+            onFiltersChange={setDirectoryPickerFilters}
+            selectedEntryIds={selectedDirectoryEntryIds}
+            onSelectionChange={setSelectedDirectoryEntryIds}
+          />
+        ) : null}
+
         <CommunicationRecipientPreview
           recipients={previewRecipients}
           selectedTeamCount={
-            customSelectionActive ? selectedApplicationIds.length : null
+            isDirectorySource
+              ? selectedDirectoryEntryIds.length
+              : customSelectionActive
+                ? selectedApplicationIds.length
+                : null
           }
         />
       </AdminCard>

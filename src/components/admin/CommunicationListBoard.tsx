@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AdminEmpty } from "@/components/admin/AdminPanel";
 import {
   communicationRecipientFilterLabel,
+  communicationRecipientSourceLabel,
   communicationStatusLabel,
   communicationTypeLabel,
 } from "@/lib/communications/labels";
@@ -53,7 +54,10 @@ export function CommunicationListBoard({
                   {item.subject}
                 </Link>
                 <p className="mt-1 text-[12px] text-muted">
-                  {communicationRecipientFilterLabel(item.recipientFilter)}
+                  {communicationRecipientSourceLabel(item.recipientSource)}
+                  {item.recipientSource === "tournament-applications"
+                    ? ` · ${communicationRecipientFilterLabel(item.recipientFilter)}`
+                    : ""}
                 </p>
               </td>
               <td className="px-4 py-3 text-muted">

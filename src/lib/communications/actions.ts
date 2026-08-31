@@ -4,23 +4,29 @@ import { revalidatePath } from "next/cache";
 import {
   requireCommunicationsManage,
   requireCommunicationsView,
+  requireTeamsView,
 } from "@/lib/rbac/action-access";
+import { getCommunicationTeamDirectoryAccess } from "@/lib/communications/access";
 import {
-  COMMUNICATION_RECIPIENT_FILTERS,
+  COMMUNICATION_RECIPIENT_SOURCES,
   COMMUNICATION_TYPES,
   type CommunicationComposeInput,
   type CommunicationRecipientFilter,
+  type CommunicationRecipientSource,
   type CommunicationType,
 } from "@/types/communication";
 import {
   isRecipientFilterAllowed,
+  isTypeAllowedForRecipientSource,
   requiresCustomApplicationIds,
+  requiresCustomDirectoryEntryIds,
 } from "@/lib/communications/recipient-filters";
 import {
   previewCommunicationRecipients,
   listCommunications,
   getCommunicationDetail,
   listEligibleApplicationsForTournament,
+  listEligibleDirectoryEntriesForCommunication,
 } from "@/lib/communications/queries";
 import { sendTournamentCommunication } from "@/lib/communications/communication-mail";
 
@@ -37,16 +43,30 @@ function parseCommunicationType(value: string): CommunicationType | null {
 }
 
 function parseRecipientFilter(value: string): CommunicationRecipientFilter | null {
-  return COMMUNICATION_RECIPIENT_FILTERS.includes(value as CommunicationRecipientFilter)
+  return ["accepted", "payment-paid", "payment-pending", "waitlist", "custom"].includes(
+    value,
+  )
     ? (value as CommunicationRecipientFilter)
     : null;
+}
+
+function parseRecipientSource(value: string): CommunicationRecipientSource | null {
+  return COMMUNICATION_RECIPIENT_SOURCES.includes(value as CommunicationRecipientSource)
+    ? (value as CommunicationRecipientSource)
+    : null;
+}
+
+function paymentReminderDirectoryError() {
+  return "Zahlungserinnerungen sind für die Team-Datenbank nicht verfügbar.";
 }
 
 export async function previewCommunicationRecipientsAction(input: {
   tournamentId: string;
   type: string;
   recipientFilter: string;
+  recipientSource: string;
   applicationIds?: string[];
+  teamDirectoryEntryIds?: string[];
 }): Promise<{
   recipients: Awaited<ReturnType<typeof previewCommunicationRecipients>>["recipients"];
   error: string | null;
@@ -58,20 +78,36 @@ export async function previewCommunicationRecipientsAction(input: {
 
   const type = parseCommunicationType(input.type);
   const recipientFilter = parseRecipientFilter(input.recipientFilter);
+  const recipientSource = parseRecipientSource(input.recipientSource);
 
-  if (!type || !recipientFilter) {
+  if (!type || !recipientFilter || !recipientSource) {
     return { recipients: [], error: "Ungültige Auswahl." };
   }
 
-  if (!isRecipientFilterAllowed({ type, filter: recipientFilter })) {
+  if (!isTypeAllowedForRecipientSource({ type, recipientSource })) {
+    return { recipients: [], error: paymentReminderDirectoryError() };
+  }
+
+  if (recipientSource === "team-directory") {
+    const directoryAccess = await getCommunicationTeamDirectoryAccess();
+    if (!directoryAccess.canUseTeamDirectorySource) {
+      return { recipients: [], error: "Keine Berechtigung für die Team-Datenbank." };
+    }
+
+    if (!requiresCustomDirectoryEntryIds(recipientSource)) {
+      return { recipients: [], error: "Ungültige Empfängerquelle." };
+    }
+
+    if (!input.teamDirectoryEntryIds?.length) {
+      return { recipients: [], error: "Bitte mindestens ein Team auswählen." };
+    }
+  } else if (!isRecipientFilterAllowed({ type, filter: recipientFilter })) {
     return {
       recipients: [],
       error:
         "Zahlungserinnerungen sind nur für ausstehende Zahlungen oder eine individuelle Auswahl erlaubt.",
     };
-  }
-
-  if (requiresCustomApplicationIds(recipientFilter)) {
+  } else if (requiresCustomApplicationIds(recipientFilter)) {
     if (!input.applicationIds?.length) {
       return { recipients: [], error: "Bitte mindestens ein Team auswählen." };
     }
@@ -81,7 +117,9 @@ export async function previewCommunicationRecipientsAction(input: {
     tournamentId: input.tournamentId,
     type,
     recipientFilter,
+    recipientSource,
     applicationIds: input.applicationIds,
+    teamDirectoryEntryIds: input.teamDirectoryEntryIds,
   });
 
   if (!result.ready) {
@@ -104,8 +142,9 @@ export async function sendCommunicationAction(
 
   const type = parseCommunicationType(input.type);
   const recipientFilter = parseRecipientFilter(input.recipientFilter);
+  const recipientSource = parseRecipientSource(input.recipientSource);
 
-  if (!type || !recipientFilter) {
+  if (!type || !recipientFilter || !recipientSource) {
     return { error: "Ungültige Auswahl." };
   }
 
@@ -121,22 +160,39 @@ export async function sendCommunicationAction(
     return { error: "Sende-Vorgang konnte nicht eindeutig identifiziert werden." };
   }
 
-  if (!isRecipientFilterAllowed({ type, filter: recipientFilter })) {
-    return {
-      error:
-        "Zahlungserinnerungen sind nur für ausstehende Zahlungen oder eine individuelle Auswahl erlaubt.",
-    };
+  if (!isTypeAllowedForRecipientSource({ type, recipientSource })) {
+    return { error: paymentReminderDirectoryError() };
   }
 
-  if (requiresCustomApplicationIds(recipientFilter) && !input.applicationIds?.length) {
-    return { error: "Bitte mindestens ein Team auswählen." };
+  if (recipientSource === "team-directory") {
+    const directoryAccess = await getCommunicationTeamDirectoryAccess();
+    if (!directoryAccess.canUseTeamDirectorySource) {
+      return { error: "Keine Berechtigung für die Team-Datenbank." };
+    }
+
+    if (!input.teamDirectoryEntryIds?.length) {
+      return { error: "Bitte mindestens ein Team auswählen." };
+    }
+  } else {
+    if (!isRecipientFilterAllowed({ type, filter: recipientFilter })) {
+      return {
+        error:
+          "Zahlungserinnerungen sind nur für ausstehende Zahlungen oder eine individuelle Auswahl erlaubt.",
+      };
+    }
+
+    if (requiresCustomApplicationIds(recipientFilter) && !input.applicationIds?.length) {
+      return { error: "Bitte mindestens ein Team auswählen." };
+    }
   }
 
   const preview = await previewCommunicationRecipients({
     tournamentId: input.tournamentId,
     type,
     recipientFilter,
+    recipientSource,
     applicationIds: input.applicationIds,
+    teamDirectoryEntryIds: input.teamDirectoryEntryIds,
   });
 
   if (!preview.ready) {
@@ -152,6 +208,7 @@ export async function sendCommunicationAction(
       ...input,
       type,
       recipientFilter,
+      recipientSource,
     },
     actorId: access.session.user.id,
   });
@@ -211,4 +268,37 @@ export async function loadEligibleCommunicationApplicationsAction(tournamentId: 
 
   const applications = await listEligibleApplicationsForTournament(tournamentId);
   return { applications, error: null };
+}
+
+export async function loadEligibleCommunicationDirectoryEntriesAction() {
+  const viewAccess = await requireCommunicationsView();
+  if (viewAccess.error) {
+    return { entries: [], ready: false, error: viewAccess.error };
+  }
+
+  const teamsAccess = await requireTeamsView();
+  if (teamsAccess.error) {
+    return { entries: [], ready: false, error: teamsAccess.error };
+  }
+
+  const directoryAccess = await getCommunicationTeamDirectoryAccess();
+  if (!directoryAccess.canUseTeamDirectorySource) {
+    return { entries: [], ready: true, error: "Keine Berechtigung für die Team-Datenbank." };
+  }
+
+  const result = await listEligibleDirectoryEntriesForCommunication();
+  return { entries: result.entries, ready: result.ready, error: null };
+}
+
+export async function loadCommunicationTeamDirectoryAccessAction() {
+  const viewAccess = await requireCommunicationsView();
+  if (viewAccess.error) {
+    return { canUseTeamDirectorySource: false, error: viewAccess.error };
+  }
+
+  const directoryAccess = await getCommunicationTeamDirectoryAccess();
+  return {
+    canUseTeamDirectorySource: directoryAccess.canUseTeamDirectorySource,
+    error: null,
+  };
 }

@@ -1,4 +1,4 @@
-import type { CommunicationType, CommunicationRecipientFilter } from "@/types/communication";
+import type { CommunicationType, CommunicationRecipientFilter, CommunicationRecipientSource } from "@/types/communication";
 import { formatDateTimeDe } from "@/lib/format";
 
 export function communicationTypeLabel(type: CommunicationType): string {
@@ -11,6 +11,17 @@ export function communicationTypeLabel(type: CommunicationType): string {
   };
 
   return labels[type];
+}
+
+export function communicationRecipientSourceLabel(
+  source: CommunicationRecipientSource,
+): string {
+  const labels: Record<CommunicationRecipientSource, string> = {
+    "tournament-applications": "Turnier-Bewerbungen",
+    "team-directory": "Team-Datenbank",
+  };
+
+  return labels[source];
 }
 
 export function communicationRecipientFilterLabel(

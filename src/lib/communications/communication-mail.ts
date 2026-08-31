@@ -19,9 +19,11 @@ import type { CommunicationComposeInput } from "@/types/communication";
 type RecipientSendRow = {
   id: string;
   application_id: string | null;
+  team_directory_entry_id: string | null;
   recipient_email: string;
   recipient_team_name: string;
   recipient_club_name: string | null;
+  recipient_contact_first_name: string | null;
 };
 
 type ApplicationContextRow = {
@@ -174,6 +176,11 @@ export async function sendTournamentCommunication(input: {
           : null,
       p_idempotency_key: compose.idempotencyKey,
       p_require_confirmation: compose.requireConfirmation,
+      p_recipient_source: compose.recipientSource,
+      p_team_directory_entry_ids:
+        compose.teamDirectoryEntryIds && compose.teamDirectoryEntryIds.length > 0
+          ? compose.teamDirectoryEntryIds
+          : null,
     },
   );
 
@@ -190,14 +197,17 @@ export async function sendTournamentCommunication(input: {
 
     if (
       message.includes("payment reminder only allows payment-pending or custom filter") ||
-      message.includes("payment reminder cannot target waitlist")
+      message.includes("payment reminder cannot target waitlist") ||
+      message.includes("payment reminder not allowed for team-directory source")
     ) {
       return {
         communicationId: null,
         sentCount: 0,
         failedCount: 0,
         error:
-          "Zahlungserinnerungen sind nur für ausstehende Zahlungen (payment-pending) oder eine individuelle Auswahl erlaubt.",
+          compose.recipientSource === "team-directory"
+            ? "Zahlungserinnerungen sind für die Team-Datenbank nicht verfügbar."
+            : "Zahlungserinnerungen sind nur für ausstehende Zahlungen (payment-pending) oder eine individuelle Auswahl erlaubt.",
       };
     }
 
@@ -238,7 +248,7 @@ export async function sendTournamentCommunication(input: {
   const { data: recipients, error: recipientsError } = await supabase
     .from("communication_recipients")
     .select(
-      "id, application_id, recipient_email, recipient_team_name, recipient_club_name",
+      "id, application_id, team_directory_entry_id, recipient_email, recipient_team_name, recipient_club_name, recipient_contact_first_name",
     )
     .eq("communication_id", communicationId)
     .eq("send_status", "pending");
@@ -269,7 +279,9 @@ export async function sendTournamentCommunication(input: {
       continue;
     }
 
-    const application = await loadApplicationContext(recipient.application_id);
+    const application = recipient.application_id
+      ? await loadApplicationContext(recipient.application_id)
+      : null;
     const participationFee =
       application?.participation_fee != null
         ? Number(application.participation_fee)
@@ -299,7 +311,10 @@ export async function sendTournamentCommunication(input: {
     }
 
     const variables = buildCommunicationVariables({
-      contactFirstName: application?.contact_first_name ?? "",
+      contactFirstName:
+        application?.contact_first_name ??
+        recipient.recipient_contact_first_name ??
+        "",
       teamName: recipient.recipient_team_name,
       clubName: recipient.recipient_club_name ?? application?.club_name ?? "",
       tournamentName: tournament?.name ?? "",

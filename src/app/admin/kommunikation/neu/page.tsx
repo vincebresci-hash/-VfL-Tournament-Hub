@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { CommunicationComposeForm } from "@/components/admin/CommunicationComposeForm";
 import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
 import { listAdminTournaments } from "@/lib/db/admin-queries";
+import { getCommunicationTeamDirectoryAccess } from "@/lib/communications/access";
 import {
   hasPermissionInAuthorization,
   requireAdminSession,
@@ -17,6 +18,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminCommunicationComposePage() {
   const tournaments = await listAdminTournaments();
   const adminAccess = await requireAdminSession();
+  const directoryAccess = await getCommunicationTeamDirectoryAccess();
   const canSend =
     !("error" in adminAccess && adminAccess.error) &&
     adminAccess.session !== null &&
@@ -42,7 +44,11 @@ export default async function AdminCommunicationComposePage() {
       {tournaments.length === 0 ? (
         <AdminNotice>Es sind noch keine Turniere vorhanden.</AdminNotice>
       ) : (
-        <CommunicationComposeForm tournaments={tournaments} canSend={canSend} />
+        <CommunicationComposeForm
+          tournaments={tournaments}
+          canSend={canSend}
+          canUseTeamDirectorySource={directoryAccess.canUseTeamDirectorySource}
+        />
       )}
     </div>
   );

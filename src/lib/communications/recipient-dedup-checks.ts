@@ -86,12 +86,14 @@ export function runCommunicationRecipientDedupChecks() {
   const deduped = deduplicateRecipientsByEmail([
     {
       applicationId: "a-1",
+      teamDirectoryEntryId: null,
       recipientEmail: "Test@example.com",
       recipientTeamName: "Team A",
       recipientClubName: "Club A",
     },
     {
       applicationId: "a-2",
+      teamDirectoryEntryId: null,
       recipientEmail: "test@example.com",
       recipientTeamName: "Team B",
       recipientClubName: "Club B",
@@ -111,12 +113,14 @@ export function runCommunicationRecipientDedupChecks() {
     [
       {
         applicationId: "a-1",
+      teamDirectoryEntryId: null,
         recipientEmail: "one@example.com",
         recipientTeamName: "Team A",
         recipientClubName: null,
       },
       {
         applicationId: "a-2",
+      teamDirectoryEntryId: null,
         recipientEmail: "two@example.com",
         recipientTeamName: "Team B",
         recipientClubName: null,
@@ -131,6 +135,7 @@ export function runCommunicationRecipientDedupChecks() {
     [
       {
         applicationId: "a-1",
+      teamDirectoryEntryId: null,
         recipientEmail: "solo@example.com",
         recipientTeamName: "Team A",
         recipientClubName: null,

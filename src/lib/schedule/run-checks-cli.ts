@@ -47,6 +47,7 @@ import { runCommunicationChecks } from "@/lib/communications/communication-check
 import { runCommunicationReceiptChecks } from "@/lib/communications/communication-receipt-checks";
 import { runCommunicationRecipientPickerChecks } from "@/lib/communications/recipient-picker-checks";
 import { runCommunicationRecipientDedupChecks } from "@/lib/communications/recipient-dedup-checks";
+import { runCommunicationTeamDirectoryChecks } from "@/lib/communications/communication-team-directory-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runPublicTournamentAnonVisibilityChecks } from "@/lib/tournaments/public-tournament-anon-visibility-checks";
@@ -107,6 +108,7 @@ try {
   const communicationChecks = runCommunicationChecks();
   const communicationRecipientPickerChecks = runCommunicationRecipientPickerChecks();
   const communicationRecipientDedupChecks = runCommunicationRecipientDedupChecks();
+  const communicationTeamDirectoryChecks = runCommunicationTeamDirectoryChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
@@ -163,6 +165,7 @@ try {
   console.log(`communication-checks: ${communicationChecks}`);
   console.log(`communication-recipient-picker-checks: ${communicationRecipientPickerChecks}`);
   console.log(`communication-recipient-dedup-checks: ${communicationRecipientDedupChecks}`);
+  console.log(`communication-team-directory-checks: ${communicationTeamDirectoryChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);

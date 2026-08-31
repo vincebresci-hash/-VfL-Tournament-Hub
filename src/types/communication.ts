@@ -8,6 +8,14 @@ export const COMMUNICATION_TYPES = [
 
 export type CommunicationType = (typeof COMMUNICATION_TYPES)[number];
 
+export const COMMUNICATION_RECIPIENT_SOURCES = [
+  "tournament-applications",
+  "team-directory",
+] as const;
+
+export type CommunicationRecipientSource =
+  (typeof COMMUNICATION_RECIPIENT_SOURCES)[number];
+
 export const COMMUNICATION_RECIPIENT_FILTERS = [
   "accepted",
   "payment-paid",
@@ -42,10 +50,12 @@ export type CommunicationRecipientSendStatus =
   (typeof COMMUNICATION_RECIPIENT_SEND_STATUSES)[number];
 
 export type CommunicationRecipientPreview = {
-  applicationId: string;
+  applicationId: string | null;
+  teamDirectoryEntryId: string | null;
   recipientEmail: string;
   recipientTeamName: string;
   recipientClubName: string | null;
+  recipientContactFirstName: string | null;
 };
 
 export type CommunicationListItem = {
@@ -53,6 +63,7 @@ export type CommunicationListItem = {
   tournamentId: string;
   tournamentName: string;
   tournamentSlug: string;
+  recipientSource: CommunicationRecipientSource;
   type: CommunicationType;
   subject: string;
   important: boolean;
@@ -70,6 +81,7 @@ export type CommunicationListItem = {
 export type CommunicationRecipientDetail = {
   id: string;
   applicationId: string | null;
+  teamDirectoryEntryId: string | null;
   recipientEmail: string;
   recipientTeamName: string;
   recipientClubName: string | null;
@@ -86,9 +98,11 @@ export type CommunicationDetail = CommunicationListItem & {
 
 export type CommunicationComposeInput = {
   tournamentId: string;
+  recipientSource: CommunicationRecipientSource;
   type: CommunicationType;
   recipientFilter: CommunicationRecipientFilter;
   applicationIds?: string[];
+  teamDirectoryEntryIds?: string[];
   subject: string;
   body: string;
   important: boolean;

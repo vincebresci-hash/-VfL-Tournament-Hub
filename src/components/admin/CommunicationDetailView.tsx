@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
 import {
   communicationRecipientFilterLabel,
   communicationRecipientConfirmationStatusLabel,
   communicationRecipientSendStatusLabel,
+  communicationRecipientSourceLabel,
   communicationStatusLabel,
   communicationTypeLabel,
 } from "@/lib/communications/labels";
@@ -41,6 +43,10 @@ export function CommunicationDetailView({
           <AdminInfo
             label="Typ"
             value={`${communicationTypeLabel(communication.type)}${communication.important ? " · Wichtig" : ""}`}
+          />
+          <AdminInfo
+            label="Empfängerquelle"
+            value={communicationRecipientSourceLabel(communication.recipientSource)}
           />
           <AdminInfo
             label="Empfängerfilter"
@@ -88,6 +94,7 @@ export function CommunicationDetailView({
                 <th className="px-3 py-2">Team</th>
                 <th className="px-3 py-2">Verein</th>
                 <th className="px-3 py-2">E-Mail</th>
+                <th className="px-3 py-2">Quelle</th>
                 <th className="px-3 py-2">Status</th>
                 {communication.requireConfirmation ? (
                   <th className="px-3 py-2">Empfang</th>
@@ -110,6 +117,20 @@ export function CommunicationDetailView({
                       {recipient.recipientClubName ?? "—"}
                     </td>
                     <td className="px-3 py-2 text-muted">{recipient.recipientEmail}</td>
+                    <td className="px-3 py-2 text-muted">
+                      {recipient.teamDirectoryEntryId ? (
+                        <Link
+                          href={`/admin/team-datenbank/${recipient.teamDirectoryEntryId}`}
+                          className="font-semibold text-ink underline decoration-brand-yellow underline-offset-2"
+                        >
+                          Team-Datenbank
+                        </Link>
+                      ) : recipient.applicationId ? (
+                        "Turnier-Bewerbung"
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td
                       className={`px-3 py-2 ${incomplete ? "font-semibold text-[#9a2b2b]" : "text-muted"}`}
                     >
