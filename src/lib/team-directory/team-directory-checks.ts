@@ -5,6 +5,7 @@ import {
   normalizeDirectoryEmail,
   normalizeDirectoryText,
 } from "@/lib/team-directory/normalize";
+import { canSeeAdminNavItem } from "@/lib/rbac/admin-access";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -102,6 +103,23 @@ export function runTeamDirectoryChecks() {
 
   assert(applicationDetail.includes("TeamDirectorySavePanel"), "application save panel");
   assert(applicationDetail.includes("In Team-Datenbank übernehmen") === false, "button text in panel component");
+
+  const adminNavigation = readRepoFile("src/lib/admin-navigation.ts");
+  assert(adminNavigation.includes('href: "/admin/team-datenbank"'), "team directory sidebar route");
+  assert(adminNavigation.includes('label: "Team-Datenbank"'), "team directory sidebar label");
+  assert(adminNavigation.includes('href: "/admin/teams"'), "operational teams sidebar route preserved");
+  assert(
+    canSeeAdminNavItem("/admin/team-datenbank", new Set(["teams.view"]), false),
+    "teams.view can see team directory nav item",
+  );
+  assert(
+    !canSeeAdminNavItem("/admin/team-datenbank", new Set(["applications.view"]), false),
+    "without teams.view team directory nav item hidden",
+  );
+  assert(
+    canSeeAdminNavItem("/admin/teams", new Set(["teams.view"]), false),
+    "teams.view still sees operational teams nav item",
+  );
 
   assert(dedupMigration.includes("DISTINCT ON (lower(btrim(a.contact_email)))"), "PR34 dedup unchanged");
   assert(!migration.includes("resolve_communication_recipients"), "recipient resolver untouched");

@@ -21,6 +21,7 @@ export const adminNavigation = [
   { href: "/admin/turniere", label: "Turniere", icon: IconTrophy },
   { href: "/admin/vereine", label: "Vereine", icon: IconClubs },
   { href: "/admin/teams", label: "Teams", icon: IconUsers },
+  { href: "/admin/team-datenbank", label: "Team-Datenbank", icon: IconClipboard },
   { href: "/admin/benutzer", label: "Benutzer", icon: IconUsers },
   { href: "/admin/rollen", label: "Rollen", icon: IconShield },
   { href: "/admin/news", label: "News", icon: IconNews },
