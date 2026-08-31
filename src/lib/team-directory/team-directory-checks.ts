@@ -53,6 +53,14 @@ export function runTeamDirectoryChecks() {
   assert(actions.includes("setTeamDirectoryArchivedAction"), "archive action");
   assert(actions.includes("requirePlatformTeamsManage"), "platform manage guard");
   assert(actions.includes("forceCreate"), "force create duplicate override");
+  assert(
+    !actions.includes("excludeId: input.forceCreate ? undefined : undefined"),
+    "save action has no dead excludeId ternary",
+  );
+  assert(
+    actions.includes("excludeId: entryId"),
+    "update action excludes current entry from duplicate detection",
+  );
   assert(!actions.includes(".update(applications"), "applications not mutated on save");
   assert(!actions.includes("updateApplicationStatus"), "no status changes");
 

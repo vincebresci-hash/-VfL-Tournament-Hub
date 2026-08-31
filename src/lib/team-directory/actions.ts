@@ -169,7 +169,6 @@ export async function saveTeamDirectoryEntryAction(input: TeamDirectorySaveInput
     ageGroup: input.ageGroup,
     clubId: input.clubId,
     teamId: input.teamId,
-    excludeId: input.forceCreate ? undefined : undefined,
   });
 
   if (!input.forceCreate && duplicates.length > 0) {
