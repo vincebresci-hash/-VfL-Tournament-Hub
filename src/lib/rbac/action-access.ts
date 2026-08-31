@@ -98,6 +98,10 @@ export function requireTeamsManage() {
   return requirePermissionAccess("teams.manage");
 }
 
+export function requireTeamsView() {
+  return requirePermissionAccess("teams.view");
+}
+
 export function requireCancellationsView() {
   return requirePermissionAccess("cancellations.view");
 }

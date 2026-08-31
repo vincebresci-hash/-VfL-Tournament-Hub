@@ -40,6 +40,12 @@ const DASHBOARD_LINKS: DashboardLink[] = [
     required: ["cancellations.view"],
   },
   {
+    href: "/admin/team-datenbank",
+    label: "Team-Datenbank",
+    description: "Gespeicherte Teams für spätere Einladungen.",
+    required: ["teams.view"],
+  },
+  {
     href: "/admin/turniere",
     label: "Turniere",
     description: "Turniere, Spielpläne und Ergebnisse.",
