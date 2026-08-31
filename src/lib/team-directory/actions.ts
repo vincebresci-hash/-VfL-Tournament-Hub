@@ -7,6 +7,7 @@ import { requireTeamsManage, requireTeamsView } from "@/lib/rbac/action-access";
 import { hasAnyPlatformPermission } from "@/lib/rbac/permissions";
 import { requireAdminSession } from "@/lib/auth/guards";
 import {
+  findActiveTeamDirectoryEntryBySourceApplication,
   findTeamDirectoryDuplicates,
   getTeamDirectoryEntry,
   loadApplicationForTeamDirectory,
@@ -152,6 +153,7 @@ export async function getTeamDirectorySavePreviewAction(applicationId: string) {
     ageGroup: suggested.ageGroup,
     clubId: suggested.clubId,
     teamId: suggested.teamId,
+    sourceApplicationId: application.id,
   });
 
   return { suggested, duplicates };
@@ -169,7 +171,18 @@ export async function saveTeamDirectoryEntryAction(input: TeamDirectorySaveInput
     ageGroup: input.ageGroup,
     clubId: input.clubId,
     teamId: input.teamId,
+    sourceApplicationId: input.sourceApplicationId,
   });
+
+  const applicationDuplicate = duplicates.find(
+    (duplicate) => duplicate.matchReason === "source_application",
+  );
+  if (applicationDuplicate) {
+    return {
+      error: "Diese Bewerbung wurde bereits in die Team-Datenbank übernommen.",
+      duplicates,
+    };
+  }
 
   if (!input.forceCreate && duplicates.length > 0) {
     return {
@@ -194,6 +207,17 @@ export async function saveTeamDirectoryEntryAction(input: TeamDirectorySaveInput
 
   if (error) {
     if (error.code === "23505") {
+      if (input.sourceApplicationId) {
+        const existingFromApplication =
+          await findActiveTeamDirectoryEntryBySourceApplication(input.sourceApplicationId);
+        if (existingFromApplication) {
+          return {
+            error: "Diese Bewerbung wurde bereits in die Team-Datenbank übernommen.",
+            duplicates: [existingFromApplication],
+          };
+        }
+      }
+
       return { error: "Dieses Hub-Team ist bereits in der Team-Datenbank gespeichert." };
     }
 

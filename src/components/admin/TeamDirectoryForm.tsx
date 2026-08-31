@@ -28,6 +28,8 @@ function duplicateReasonLabel(reason: TeamDirectoryDuplicateMatch["matchReason"]
       return "Gleicher Verein + Team + Altersklasse";
     case "normalized_identity":
       return "Gleiche normalisierte Identität";
+    case "source_application":
+      return "Gleiche Bewerbung bereits übernommen";
     default:
       return "Mögliches Duplikat";
   }

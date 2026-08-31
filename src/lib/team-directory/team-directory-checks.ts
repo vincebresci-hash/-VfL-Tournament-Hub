@@ -35,7 +35,12 @@ export function runTeamDirectoryChecks() {
   assert(migration.includes("has_rbac_permission('teams.view')"), "teams.view read policy");
   assert(migration.includes("has_rbac_permission('teams.manage')"), "teams.manage write policy");
   assert(!migration.includes("TO anon"), "no anon grants on team directory");
-  assert(!migration.includes("is_admin()"), "no is_admin bypass");
+  assert(migration.includes("team_directory_entries_active_source_application_uidx"), "active source application unique index");
+  assert(
+    migration.includes("UNIQUE") && migration.includes("source_application_id") && migration.includes("archived_at IS NULL"),
+    "one active entry per source application",
+  );
+  assert(!migration.includes("team_directory_entries_source_application_idx"), "non-unique source application index replaced");
 
   assert(normalizeDirectoryText("  VfL Kirchheim  ") === "vfl kirchheim", "normalize text");
   assert(normalizeDirectoryEmail("  Test@Mail.DE ") === "test@mail.de", "normalize email");
@@ -65,9 +70,16 @@ export function runTeamDirectoryChecks() {
   assert(!actions.includes("updateApplicationStatus"), "no status changes");
 
   assert(queries.includes("findTeamDirectoryDuplicates"), "duplicate detection query");
+  assert(queries.includes("findActiveTeamDirectoryEntryBySourceApplication"), "source application lookup");
   assert(queries.includes('addMatch(row, "team_id")'), "team_id duplicate reason");
   assert(queries.includes('addMatch(row, "club_team_age")'), "club team age duplicate reason");
   assert(queries.includes('addMatch(row, "normalized_identity")'), "normalized duplicate reason");
+  assert(queries.includes('"source_application"'), "source application duplicate reason");
+  assert(actions.includes('duplicate.matchReason === "source_application"'), "application duplicate blocks save");
+  assert(
+    actions.includes("Diese Bewerbung wurde bereits in die Team-Datenbank übernommen."),
+    "application duplicate error message",
+  );
   assert(queries.includes("loadTeamDirectoryHistory"), "history from applications");
   assert(!queries.includes("team_directory_history"), "no redundant history table");
 

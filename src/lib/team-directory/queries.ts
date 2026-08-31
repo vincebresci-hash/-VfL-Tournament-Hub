@@ -134,12 +134,47 @@ export async function getTeamDirectoryEntry(id: string) {
   return data ? toTeamDirectoryEntry(data) : null;
 }
 
+export async function findActiveTeamDirectoryEntryBySourceApplication(
+  sourceApplicationId: string,
+) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_directory_entries")
+    .select("id, club_name, team_name, age_group, contact_email, archived_at")
+    .eq("source_application_id", sourceApplicationId)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingRelationError(error)) {
+      return null;
+    }
+
+    throw error;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    clubName: data.club_name,
+    teamName: data.team_name,
+    ageGroup: data.age_group,
+    contactEmail: data.contact_email,
+    matchReason: "source_application" as const,
+    archivedAt: data.archived_at,
+  };
+}
+
 export async function findTeamDirectoryDuplicates(input: {
   clubName: string;
   teamName: string;
   ageGroup?: string | null;
   clubId?: string | null;
   teamId?: string | null;
+  sourceApplicationId?: string | null;
   excludeId?: string;
 }) {
   const supabase = await createClient();
@@ -171,6 +206,16 @@ export async function findTeamDirectoryDuplicates(input: {
       archivedAt: row.archived_at,
     });
   };
+
+  if (input.sourceApplicationId) {
+    const existingFromApplication = await findActiveTeamDirectoryEntryBySourceApplication(
+      input.sourceApplicationId,
+    );
+
+    if (existingFromApplication && existingFromApplication.id !== input.excludeId) {
+      matches.set(existingFromApplication.id, existingFromApplication);
+    }
+  }
 
   if (input.teamId) {
     const { data } = await supabase

@@ -78,9 +78,9 @@ CREATE INDEX IF NOT EXISTS team_directory_entries_club_norm_idx
 CREATE INDEX IF NOT EXISTS team_directory_entries_archived_idx
   ON public.team_directory_entries (archived_at);
 
-CREATE INDEX IF NOT EXISTS team_directory_entries_source_application_idx
+CREATE UNIQUE INDEX IF NOT EXISTS team_directory_entries_active_source_application_uidx
   ON public.team_directory_entries (source_application_id)
-  WHERE source_application_id IS NOT NULL;
+  WHERE source_application_id IS NOT NULL AND archived_at IS NULL;
 
 DROP TRIGGER IF EXISTS set_team_directory_entries_updated_at ON public.team_directory_entries;
 CREATE TRIGGER set_team_directory_entries_updated_at

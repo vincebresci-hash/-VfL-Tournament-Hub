@@ -54,7 +54,7 @@ export type TeamDirectoryDuplicateMatch = {
   teamName: string;
   ageGroup: string | null;
   contactEmail: string | null;
-  matchReason: "team_id" | "club_team_age" | "normalized_identity";
+  matchReason: "team_id" | "club_team_age" | "normalized_identity" | "source_application";
   archivedAt: string | null;
 };
 
