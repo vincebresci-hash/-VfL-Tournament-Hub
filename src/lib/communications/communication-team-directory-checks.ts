@@ -153,7 +153,15 @@ export function runCommunicationTeamDirectoryChecks() {
   );
 
   assert(verifyScript.includes("SELECT/EXISTS only"), "verify script read-only");
-  assert(verifyScript.includes("directory_resolver_not_granted_to_anon"), "verify anon guard");
+  assert(verifyScript.includes("pg_get_function_identity_arguments"), "verify uses identity args");
+  assert(verifyScript.includes("preview_is_6_arg_signature"), "verify checks 6-arg preview");
+  assert(verifyScript.includes("initiate_is_11_arg_signature"), "verify checks 11-arg initiate");
+  assert(verifyScript.includes("old_preview_4_arg_absent"), "verify checks old preview dropped");
+  assert(verifyScript.includes("legacy_initiate_8_arg_absent"), "verify checks 8-arg initiate absent");
+  assert(verifyScript.includes("authenticated_can_execute_preview"), "verify checks authenticated preview grant");
+  assert(verifyScript.includes("anon_cannot_execute_preview"), "verify checks anon preview blocked");
+  assert(verifyScript.includes("communication_recipients_single_source_check_exists"), "verify single source check");
+  assert(verifyScript.includes("pg_attrdef"), "verify uses pg_attrdef for default");
 
   assert(mail.includes("p_recipient_source"), "mail initiate passes recipient source");
   assert(mail.includes("recipient_contact_first_name"), "mail uses directory contact snapshot");
