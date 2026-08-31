@@ -41,6 +41,20 @@ export function runTeamDirectoryChecks() {
     "one active entry per source application",
   );
   assert(!migration.includes("team_directory_entries_source_application_idx"), "non-unique source application index replaced");
+  assert(
+    (migration.match(/REFERENCES/g) ?? []).length === 5,
+    "five foreign keys on team_directory_entries",
+  );
+
+  const verifyScript = readRepoFile("supabase/scripts/pr36_team_directory_post_migration_verify.sql");
+  assert(
+    verifyScript.includes("team_directory_foreign_key_count_is_5"),
+    "post-migration verify checks five foreign keys",
+  );
+  assert(
+    verifyScript.includes("has_table_privilege('anon', 'public.team_directory_entries'"),
+    "post-migration verify uses has_table_privilege for anon",
+  );
 
   assert(normalizeDirectoryText("  VfL Kirchheim  ") === "vfl kirchheim", "normalize text");
   assert(normalizeDirectoryEmail("  Test@Mail.DE ") === "test@mail.de", "normalize email");
