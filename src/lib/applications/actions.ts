@@ -33,12 +33,37 @@ export type SubmitApplicationResult = {
   applicationId?: string | null;
 };
 
+type RpcErrorShape = {
+  code?: string;
+  message?: string;
+  details?: string;
+  hint?: string;
+};
+
+function logApplicationSubmitFailure(
+  tournamentId: string,
+  error: RpcErrorShape | null,
+  context: { hasData: boolean; submitPath: "guest" | "club"; sessionRole: string | null },
+) {
+  console.error("public application submit failed", {
+    tournamentId,
+    submitPath: context.submitPath,
+    sessionRole: context.sessionRole,
+    hasData: context.hasData,
+    code: error?.code ?? null,
+    message: error?.message ?? null,
+    details: error?.details ?? null,
+    hint: error?.hint ?? null,
+  });
+}
+
 export async function submitTournamentApplicationAction(input: {
   tournamentSlug: string;
   teamId?: string | null;
   values: ApplicationFormValues;
 }): Promise<SubmitApplicationResult> {
   if (isHoneypotFilled(input.values)) {
+    console.error("submitTournamentApplicationAction honeypot blocked");
     return { error: "Die Bewerbung konnte nicht gespeichert werden." };
   }
 
@@ -74,13 +99,12 @@ export async function submitTournamentApplicationAction(input: {
   }
 
   const session = await getAuthSession();
-  const isClubUser = Boolean(
-    session && canAccessClub(session.user.role),
-  );
+  const sessionRole = session?.user.role ?? null;
+  const isClubUser = Boolean(session && canAccessClub(sessionRole));
 
   const result = isClubUser
-    ? await submitClubApplication(input, tournament.id)
-    : await submitGuestApplication(input, tournament.id);
+    ? await submitClubApplication(input, tournament.id, sessionRole)
+    : await submitGuestApplication(input, tournament.id, sessionRole);
 
   if (result.error) {
     return result;
@@ -119,6 +143,7 @@ async function submitClubApplication(
     values: ApplicationFormValues;
   },
   tournamentId: string,
+  sessionRole: string | null,
 ): Promise<SubmitApplicationResult> {
   const ensured = await ensureClubForCurrentUser();
   if (ensured.error === "database-missing") {
@@ -231,6 +256,12 @@ async function submitClubApplication(
       return { error: DUPLICATE_TEAM_APPLICATION_MESSAGE };
     }
 
+    logApplicationSubmitFailure(tournamentId, error, {
+      hasData: Boolean(data),
+      submitPath: "club",
+      sessionRole,
+    });
+
     return {
       error: toUserFacingDbError("Die Bewerbung konnte nicht gespeichert werden.", error),
     };
@@ -253,6 +284,7 @@ async function submitGuestApplication(
     values: ApplicationFormValues;
   },
   tournamentId: string,
+  sessionRole: string | null,
 ): Promise<SubmitApplicationResult> {
   const supabase = await createClient();
   const snapshot = applicationSnapshot(input.values);
@@ -266,6 +298,12 @@ async function submitGuestApplication(
   });
 
   if (error || !data) {
+    logApplicationSubmitFailure(tournamentId, error, {
+      hasData: Boolean(data),
+      submitPath: "guest",
+      sessionRole,
+    });
+
     return {
       error: toUserFacingDbError(
         "Die Bewerbung konnte nicht gespeichert werden.",
