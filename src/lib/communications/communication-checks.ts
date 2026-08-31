@@ -124,6 +124,14 @@ export function runCommunicationChecks() {
   assert(mail.includes("getEmailProvider"), "Resend from server module");
   assert(!mail.includes("resend.com"), "no direct Resend fetch in migration");
   assert(mail.includes("reserve_communication_email_send"), "DB reservation before send");
+  assert(
+    mail.includes("list_pending_communication_recipients"),
+    "pending recipients loaded via send RPC",
+  );
+  assert(
+    !mail.includes('.from("communication_recipients")'),
+    "send path does not query communication_recipients directly",
+  );
   assert(mail.includes("communication_recipient_id"), "email_logs link");
   assert(!mail.includes("confirmation_url"), "no confirmation URL in C1");
 

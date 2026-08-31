@@ -245,15 +245,14 @@ export async function sendTournamentCommunication(input: {
     };
   }
 
-  const { data: recipients, error: recipientsError } = await supabase
-    .from("communication_recipients")
-    .select(
-      "id, application_id, team_directory_entry_id, recipient_email, recipient_team_name, recipient_club_name, recipient_contact_first_name",
-    )
-    .eq("communication_id", communicationId)
-    .eq("send_status", "pending");
+  const { data: recipients, error: recipientsError } = await supabase.rpc(
+    "list_pending_communication_recipients",
+    {
+      p_communication_id: communicationId,
+    },
+  );
 
-  if (recipientsError || !recipients) {
+  if (recipientsError || !recipients || recipients.length === 0) {
     await supabase.rpc("finalize_communication", {
       p_communication_id: communicationId,
     });

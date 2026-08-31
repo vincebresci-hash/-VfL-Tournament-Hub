@@ -238,5 +238,25 @@ export function runCommunicationTeamDirectoryChecks() {
     "club admin blocked from platform directory source",
   );
 
+  const hotfixMigration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831280000_communication_pending_recipients_rpc.sql",
+    ),
+    "utf8",
+  );
+  assert(
+    mail.includes("list_pending_communication_recipients"),
+    "send path loads pending recipients via SECURITY DEFINER RPC",
+  );
+  assert(
+    hotfixMigration.includes("communications.send required"),
+    "pending recipients RPC guarded by communications.send",
+  );
+  assert(
+    !hotfixMigration.includes("resolve_team_directory_communication_recipients"),
+    "pending recipients RPC does not expose directory resolver",
+  );
+
   return "ok";
 }

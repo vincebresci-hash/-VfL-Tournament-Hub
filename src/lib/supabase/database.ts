@@ -1312,6 +1312,20 @@ export type Database = {
         };
         Returns: undefined;
       };
+      list_pending_communication_recipients: {
+        Args: {
+          p_communication_id: string;
+        };
+        Returns: Array<{
+          id: string;
+          application_id: string | null;
+          team_directory_entry_id: string | null;
+          recipient_email: string;
+          recipient_team_name: string;
+          recipient_club_name: string | null;
+          recipient_contact_first_name: string | null;
+        }>;
+      };
       sync_mein_turnierplan_tournament: {
         Args: {
           p_tournament_id: string;
