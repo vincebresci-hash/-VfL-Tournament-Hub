@@ -35,10 +35,12 @@ export const DEFAULT_RECIPIENT_PICKER_FILTERS: RecipientPickerFilters = {
 };
 
 export type CommunicationRecipientPreviewRow = {
-  applicationId: string;
+  applicationId: string | null;
+  teamDirectoryEntryId: string | null;
   recipientEmail: string;
   recipientTeamName: string;
   recipientClubName: string | null;
+  recipientContactFirstName?: string | null;
 };
 
 export function normalizeRecipientEmail(email: string) {

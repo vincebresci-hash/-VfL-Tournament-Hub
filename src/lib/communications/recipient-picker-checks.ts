@@ -82,7 +82,8 @@ export function runCommunicationRecipientPickerChecks() {
   const actions = readActions();
   const composePage = readComposePage();
 
-  assert(composeForm.includes("CommunicationRecipientPicker"), "recipient picker wired");
+  assert(composeForm.includes("recipientSource"), "recipient source state");
+  assert(composeForm.includes("CommunicationTeamDirectoryRecipientPicker"), "directory picker");
   assert(composeForm.includes("CommunicationRecipientPreview"), "recipient preview wired");
   assert(composeForm.includes("canSend"), "send permission gate in compose form");
   assert(composeForm.includes('effectiveRecipientFilter === "custom"'), "custom selection path");
@@ -145,12 +146,14 @@ export function runCommunicationRecipientPickerChecks() {
   const deduped = deduplicateRecipientsByEmail([
     {
       applicationId: "a-1",
+      teamDirectoryEntryId: null,
       recipientEmail: "same@example.com",
       recipientTeamName: "Team A",
       recipientClubName: "Club A",
     },
     {
       applicationId: "a-2",
+      teamDirectoryEntryId: null,
       recipientEmail: "same@example.com",
       recipientTeamName: "Team B",
       recipientClubName: "Club B",
@@ -161,12 +164,14 @@ export function runCommunicationRecipientPickerChecks() {
   const summary = summarizeRecipientPreview([
     {
       applicationId: "a-1",
+      teamDirectoryEntryId: null,
       recipientEmail: "same@example.com",
       recipientTeamName: "Team A",
       recipientClubName: "Club A",
     },
     {
       applicationId: "a-2",
+      teamDirectoryEntryId: null,
       recipientEmail: "other@example.com",
       recipientTeamName: "Team B",
       recipientClubName: "Club B",

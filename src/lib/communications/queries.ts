@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
+import { toTeamDirectoryEntry } from "@/lib/team-directory/mappers";
 import type { CommunicationEligibleApplication } from "@/lib/communications/recipient-picker";
+import type { CommunicationEligibleDirectoryEntry } from "@/lib/communications/team-directory-recipient-picker";
 import type {
   CommunicationDetail,
   CommunicationListItem,
   CommunicationRecipientPreview,
   CommunicationRecipientFilter,
+  CommunicationRecipientSource,
   CommunicationType,
 } from "@/types/communication";
 
@@ -45,11 +48,44 @@ function asRecipientFilter(value: string): CommunicationRecipientFilter {
     : "accepted";
 }
 
+function asRecipientSource(value: string): CommunicationRecipientSource {
+  return value === "team-directory" ? "team-directory" : "tournament-applications";
+}
+
+const DIRECTORY_ENTRY_SELECT = `
+  id,
+  club_name,
+  team_name,
+  age_group,
+  contact_first_name,
+  contact_last_name,
+  contact_role,
+  contact_email,
+  contact_phone,
+  website,
+  league,
+  birth_year,
+  division,
+  self_rated_strength,
+  internal_category,
+  internal_strength,
+  internal_notes,
+  source,
+  source_application_id,
+  club_id,
+  team_id,
+  archived_at,
+  created_at,
+  updated_at
+`;
+
 export async function previewCommunicationRecipients(input: {
   tournamentId: string;
   type: CommunicationType;
   recipientFilter: CommunicationRecipientFilter;
+  recipientSource: CommunicationRecipientSource;
   applicationIds?: string[];
+  teamDirectoryEntryIds?: string[];
 }): Promise<{ recipients: CommunicationRecipientPreview[]; ready: boolean }> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("preview_communication_recipients", {
@@ -59,6 +95,11 @@ export async function previewCommunicationRecipients(input: {
     p_application_ids:
       input.applicationIds && input.applicationIds.length > 0
         ? input.applicationIds
+        : null,
+    p_recipient_source: input.recipientSource,
+    p_team_directory_entry_ids:
+      input.teamDirectoryEntryIds && input.teamDirectoryEntryIds.length > 0
+        ? input.teamDirectoryEntryIds
         : null,
   });
 
@@ -70,9 +111,11 @@ export async function previewCommunicationRecipients(input: {
     ready: true,
     recipients: data.map((row) => ({
       applicationId: row.application_id,
+      teamDirectoryEntryId: row.team_directory_entry_id,
       recipientEmail: row.recipient_email,
       recipientTeamName: row.recipient_team_name,
       recipientClubName: row.recipient_club_name,
+      recipientContactFirstName: row.recipient_contact_first_name,
     })),
   };
 }
@@ -85,7 +128,7 @@ export async function listCommunications(): Promise<{
   const { data, error } = await supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug)",
+      "id, tournament_id, recipient_source, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug)",
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false });
@@ -109,6 +152,7 @@ export async function listCommunications(): Promise<{
         tournamentId: row.tournament_id,
         tournamentName: tournament?.name ?? "Turnier",
         tournamentSlug: tournament?.slug ?? "",
+        recipientSource: asRecipientSource(row.recipient_source ?? "tournament-applications"),
         type: asCommunicationType(row.type),
         subject: row.subject,
         important: row.important,
@@ -133,7 +177,7 @@ export async function getCommunicationDetail(
   const { data, error } = await supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, type, subject, body, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug), communication_recipients (id, application_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, confirmed_at, error_message)",
+      "id, tournament_id, recipient_source, type, subject, body, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug), communication_recipients (id, application_id, team_directory_entry_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, confirmed_at, error_message)",
     )
     .eq("id", communicationId)
     .maybeSingle();
@@ -151,6 +195,7 @@ export async function getCommunicationDetail(
   const recipients = (data.communication_recipients ?? []) as Array<{
     id: string;
     application_id: string | null;
+    team_directory_entry_id: string | null;
     recipient_email: string;
     recipient_team_name: string;
     recipient_club_name: string | null;
@@ -167,6 +212,7 @@ export async function getCommunicationDetail(
     tournamentId: data.tournament_id,
     tournamentName: tournament?.name ?? "Turnier",
     tournamentSlug: tournament?.slug ?? "",
+    recipientSource: asRecipientSource(data.recipient_source ?? "tournament-applications"),
     type: asCommunicationType(data.type),
     subject: data.subject,
     body: data.body,
@@ -184,6 +230,7 @@ export async function getCommunicationDetail(
       .map((recipient) => ({
         id: recipient.id,
         applicationId: recipient.application_id,
+        teamDirectoryEntryId: recipient.team_directory_entry_id,
         recipientEmail: recipient.recipient_email,
         recipientTeamName: recipient.recipient_team_name,
         recipientClubName: recipient.recipient_club_name,
@@ -226,4 +273,30 @@ export async function listEligibleApplicationsForTournament(
       paymentStatus: row.payment_status,
       participationFee: row.participation_fee,
     }));
+}
+
+export async function listEligibleDirectoryEntriesForCommunication(): Promise<{
+  entries: CommunicationEligibleDirectoryEntry[];
+  ready: boolean;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("team_directory_entries")
+    .select(DIRECTORY_ENTRY_SELECT)
+    .is("archived_at", null)
+    .order("club_name", { ascending: true })
+    .order("team_name", { ascending: true });
+
+  if (error) {
+    if (isMissingRelationError(error)) {
+      return { entries: [], ready: false };
+    }
+
+    throw error;
+  }
+
+  return {
+    ready: true,
+    entries: (data ?? []).map((row) => toTeamDirectoryEntry(row)),
+  };
 }

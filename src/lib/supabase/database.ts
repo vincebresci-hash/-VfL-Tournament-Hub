@@ -392,6 +392,7 @@ export type EmailLogRow = {
 export type TournamentCommunicationRow = {
   id: string;
   tournament_id: string;
+  recipient_source: string;
   type: string;
   subject: string;
   body: string;
@@ -414,9 +415,11 @@ export type CommunicationRecipientRow = {
   id: string;
   communication_id: string;
   application_id: string | null;
+  team_directory_entry_id: string | null;
   recipient_email: string;
   recipient_team_name: string;
   recipient_club_name: string | null;
+  recipient_contact_first_name: string | null;
   send_status: string;
   sent_at: string | null;
   confirmed_at: string | null;
@@ -841,6 +844,13 @@ export type Database = {
             referencedRelation: "applications";
             referencedColumns: ["id"];
           },
+          {
+            foreignKeyName: "communication_recipients_team_directory_entry_id_fkey";
+            columns: ["team_directory_entry_id"];
+            isOneToOne: false;
+            referencedRelation: "team_directory_entries";
+            referencedColumns: ["id"];
+          },
         ]
       >;
       communication_confirmation_tokens: Table<
@@ -1223,12 +1233,16 @@ export type Database = {
           p_communication_type: string;
           p_recipient_filter: string;
           p_application_ids?: string[] | null;
+          p_recipient_source?: string;
+          p_team_directory_entry_ids?: string[] | null;
         };
         Returns: Array<{
-          application_id: string;
+          application_id: string | null;
+          team_directory_entry_id: string | null;
           recipient_email: string;
           recipient_team_name: string;
           recipient_club_name: string | null;
+          recipient_contact_first_name: string | null;
         }>;
       };
       initiate_communication_send: {
@@ -1242,6 +1256,8 @@ export type Database = {
           p_application_ids?: string[] | null;
           p_idempotency_key?: string | null;
           p_require_confirmation?: boolean;
+          p_recipient_source?: string;
+          p_team_directory_entry_ids?: string[] | null;
         };
         Returns: string;
       };
