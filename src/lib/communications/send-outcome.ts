@@ -30,12 +30,19 @@ export function evaluateCommunicationSendOutcome(input: {
   if (failedCount > 0) {
     return {
       error: null,
-      notice: `${sentCount} versendet, ${failedCount} fehlgeschlagen.`,
+      notice: `${sentCount} E-Mail${sentCount === 1 ? "" : "s"} gesendet, ${failedCount} fehlgeschlagen.`,
+    };
+  }
+
+  if (sentCount === 1) {
+    return {
+      error: null,
+      notice: "E-Mail erfolgreich gesendet.",
     };
   }
 
   return {
     error: null,
-    notice: `${sentCount} E-Mail${sentCount === 1 ? "" : "s"} versendet.`,
+    notice: `${sentCount} E-Mails erfolgreich gesendet.`,
   };
 }

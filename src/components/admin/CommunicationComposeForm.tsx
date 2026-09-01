@@ -328,14 +328,14 @@ export function CommunicationComposeForm({
     const params = new URLSearchParams();
     if (result.notice) {
       params.set("notice", result.notice);
+      params.set(
+        "noticeLevel",
+        result.notice.includes("fehlgeschlagen") ? "warning" : "success",
+      );
     }
     const query = params.toString();
 
-    router.push(
-      result.communicationId
-        ? `/admin/kommunikation/${result.communicationId}${query ? `?${query}` : ""}`
-        : `/admin/kommunikation${query ? `?${query}` : ""}`,
-    );
+    router.push(`/admin/kommunikation${query ? `?${query}` : ""}`);
     router.refresh();
   }
 
