@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CommunicationListBoard } from "@/components/admin/CommunicationListBoard";
 import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
 import { listCommunications } from "@/lib/communications/queries";
+import { cn } from "@/lib/cn";
 
 export const metadata: Metadata = {
   title: "Kommunikation",
@@ -10,7 +11,14 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminCommunicationsPage() {
+type AdminCommunicationsPageProps = {
+  searchParams: Promise<{ notice?: string; noticeLevel?: string }>;
+};
+
+export default async function AdminCommunicationsPage({
+  searchParams,
+}: AdminCommunicationsPageProps) {
+  const { notice, noticeLevel } = await searchParams;
   const { communications, ready } = await listCommunications();
 
   return (
@@ -27,6 +35,19 @@ export default async function AdminCommunicationsPage() {
           Neue Nachricht
         </Link>
       </div>
+      {notice ? (
+        <p
+          className={cn(
+            "mt-6 border px-4 py-3 text-[14px]",
+            noticeLevel === "warning"
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-green-200 bg-green-50 text-green-950",
+          )}
+          role="status"
+        >
+          {notice}
+        </p>
+      ) : null}
       {!ready ? (
         <AdminNotice>
           Bitte zuerst die PR-C1-Migration im Supabase SQL Editor ausführen.

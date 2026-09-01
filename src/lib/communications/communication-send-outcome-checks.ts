@@ -40,6 +40,13 @@ function readDetailPage() {
   );
 }
 
+function readListPage() {
+  return readFileSync(
+    join(process.cwd(), "src/app/admin/kommunikation/page.tsx"),
+    "utf8",
+  );
+}
+
 function readPr42Migration() {
   return readFileSync(
     join(
@@ -82,6 +89,7 @@ export function runCommunicationSendOutcomeChecks() {
   const actions = readActions();
   const composeForm = readComposeForm();
   const detailPage = readDetailPage();
+  const listPage = readListPage();
   const pr42Migration = readPr42Migration();
   const hardeningMigration = readHardeningMigration();
   const rbacMigration = readFileSync(
@@ -114,7 +122,7 @@ export function runCommunicationSendOutcomeChecks() {
   });
   assert(partial.error == null, "partial success is not hard error");
   assert(
-    Boolean(partial.notice?.includes("3 versendet") && partial.notice?.includes("1 fehlgeschlagen")),
+    Boolean(partial.notice?.includes("3 E-Mails gesendet") && partial.notice?.includes("1 fehlgeschlagen")),
     "partial success reports counts",
   );
 
@@ -124,7 +132,14 @@ export function runCommunicationSendOutcomeChecks() {
     skippedCount: 0,
   });
   assert(success.error == null, "successful send has no error");
-  assert(Boolean(success.notice?.includes("1 E-Mail versendet")), "successful send reports success");
+  assert(success.notice === "E-Mail erfolgreich gesendet.", "single success message");
+
+  const multiSuccess = evaluateCommunicationSendOutcome({
+    sentCount: 4,
+    failedCount: 0,
+    skippedCount: 0,
+  });
+  assert(multiSuccess.notice === "4 E-Mails erfolgreich gesendet.", "multi success message");
 
   const idempotent = evaluateCommunicationSendOutcome({
     sentCount: 0,
@@ -220,9 +235,34 @@ export function runCommunicationSendOutcomeChecks() {
     "actions return communicationId on failure for navigation context",
   );
 
-  // UI notice handling
+  // UI notice handling — post-send redirects to list, not detail
   assert(composeForm.includes("result.notice"), "compose form reads result.notice");
   assert(composeForm.includes('params.set("notice"'), "compose form passes notice on redirect");
+  assert(
+    composeForm.includes('router.push(`/admin/kommunikation${query ? `?${query}` : ""}`)'),
+    "successful send redirects to communication list",
+  );
+  assert(
+    !composeForm.includes("/admin/kommunikation/${result.communicationId}"),
+    "successful send does not navigate to detail route",
+  );
+  assert(
+    composeForm.includes('if (result.error)') &&
+      composeForm.includes("return;") &&
+      composeForm.indexOf("if (result.error)") < composeForm.indexOf("router.push"),
+    "failure stays on compose page without redirect",
+  );
+  assert(composeForm.includes('params.set("noticeLevel"'), "compose form passes notice level");
+  assert(
+    composeForm.includes('result.notice.includes("fehlgeschlagen") ? "warning" : "success"'),
+    "partial success uses warning notice level",
+  );
+  assert(listPage.includes("searchParams"), "list page accepts notice query params");
+  assert(listPage.includes("noticeLevel"), "list page reads notice level");
+  assert(
+    listPage.includes("border-green-200") && listPage.includes("border-amber-200"),
+    "list page shows success and warning notice styles",
+  );
   assert(detailPage.includes("searchParams"), "detail page accepts notice query param");
   assert(detailPage.includes("role=\"status\""), "detail page shows notice banner");
 
