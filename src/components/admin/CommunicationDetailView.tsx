@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
 import {
+  communicationAdminStatusLabel,
+  INTERRUPTED_COMMUNICATION_DETAIL_WARNING,
+  isInterruptedCommunication,
+} from "@/lib/communications/interrupted-communication";
+import {
   communicationRecipientFilterLabel,
   communicationRecipientConfirmationStatusLabel,
   communicationRecipientSendStatusLabel,
   communicationRecipientSourceLabel,
-  communicationStatusLabel,
   communicationTypeLabel,
 } from "@/lib/communications/labels";
 import { formatDateTimeDe } from "@/lib/format";
@@ -34,9 +38,15 @@ export function CommunicationDetailView({
   const confirmedCount = communication.recipients.filter(
     (recipient) => recipient.confirmedAt != null,
   ).length;
+  const interrupted = isInterruptedCommunication(communication);
 
   return (
     <div className="mt-8 grid gap-6">
+      {interrupted ? (
+        <p className="border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-950">
+          {INTERRUPTED_COMMUNICATION_DETAIL_WARNING}
+        </p>
+      ) : null}
       <AdminCard title="Nachricht">
         <dl className="grid gap-4 sm:grid-cols-2">
           <AdminInfo label="Turnier" value={communication.tournamentName} />
@@ -54,7 +64,7 @@ export function CommunicationDetailView({
           />
           <AdminInfo
             label="Status"
-            value={communicationStatusLabel(communication.status)}
+            value={communicationAdminStatusLabel(communication)}
           />
           <AdminInfo label="Betreff" value={communication.subject} />
           <AdminInfo
@@ -68,7 +78,7 @@ export function CommunicationDetailView({
             />
           ) : null}
         </dl>
-        {incompleteRecipients.length > 0 ? (
+        {interrupted ? null : incompleteRecipients.length > 0 ? (
           <p className="mt-4 border border-line bg-surface px-4 py-3 text-[14px] leading-6 text-[#9a2b2b]">
             Versandstatus unvollständig ({pendingCount} ausstehend, {sendingCount}{" "}
             in Bearbeitung). Bitte prüfen, bevor erneut gesendet wird.
