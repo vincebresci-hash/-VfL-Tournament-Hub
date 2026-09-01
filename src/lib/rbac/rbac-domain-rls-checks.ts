@@ -70,8 +70,9 @@ export function runRbacDomainRlsChecks() {
   assert(
     pr42Migration.includes("FOR SELECT") &&
       !pr42Migration.includes("FOR INSERT") &&
-      !pr42Migration.includes("FOR UPDATE"),
-    "PR42 RLS changes are read-only",
+      !pr42Migration.includes("FOR UPDATE") &&
+      !pr42Migration.includes("issue_communication_confirmation_token"),
+    "PR42 RLS changes are read-only and do not weaken RPC expiry",
   );
 
   assert(

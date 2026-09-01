@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { evaluateCommunicationSendOutcome } from "@/lib/communications/send-outcome";
-import { communicationReceiptTokenExpiresAt } from "@/lib/communications/communication-receipt-token";
+import {
+  COMMUNICATION_RECEIPT_TOKEN_VALIDITY_DAYS,
+  communicationReceiptTokenExpiresAt,
+  createCommunicationReceiptTokenPair,
+} from "@/lib/communications/communication-receipt-token";
+import { hashSecureAccessToken } from "@/lib/cancellations/tokens";
+import { createHash } from "node:crypto";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -44,9 +50,19 @@ function readPr42Migration() {
   );
 }
 
-function readRbacMigration() {
+function readHardeningMigration() {
   return readFileSync(
-    join(process.cwd(), "supabase/migrations/20260831210000_rbac_domain_rls_enforcement.sql"),
+    join(
+      process.cwd(),
+      "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+    ),
+    "utf8",
+  );
+}
+
+function readRbacSeedMigration() {
+  return readFileSync(
+    join(process.cwd(), "supabase/migrations/20260831160000_user_profiles_rbac.sql"),
     "utf8",
   );
 }
@@ -57,7 +73,12 @@ export function runCommunicationSendOutcomeChecks() {
   const composeForm = readComposeForm();
   const detailPage = readDetailPage();
   const pr42Migration = readPr42Migration();
-  const rbacMigration = readRbacMigration();
+  const hardeningMigration = readHardeningMigration();
+  const rbacMigration = readFileSync(
+    join(process.cwd(), "supabase/migrations/20260831210000_rbac_domain_rls_enforcement.sql"),
+    "utf8",
+  );
+  const rbacSeedMigration = readRbacSeedMigration();
 
   // Send outcome evaluation
   const allFailed = evaluateCommunicationSendOutcome({
@@ -105,11 +126,53 @@ export function runCommunicationSendOutcomeChecks() {
     "idempotent retry reports already processed",
   );
 
-  // Receipt token expiry for past tournaments
-  const pastExpiry = communicationReceiptTokenExpiresAt("2020-01-01", new Date("2026-09-01T00:00:00Z"));
+  // Receipt token expiry: future, today, past tournaments
+  const now = new Date("2026-09-01T12:00:00Z");
+  const futureExpiry = communicationReceiptTokenExpiresAt("2026-12-01", now);
+  const todayExpiry = communicationReceiptTokenExpiresAt("2026-09-01", now);
+  const pastExpiry = communicationReceiptTokenExpiresAt("2020-01-01", now);
+
+  for (const expiry of [futureExpiry, todayExpiry, pastExpiry]) {
+    assert(new Date(expiry).getTime() > now.getTime(), "app always yields future expiry");
+  }
+
+  const futureReference = new Date("2026-12-01T00:00:00Z");
+  futureReference.setUTCDate(
+    futureReference.getUTCDate() + COMMUNICATION_RECEIPT_TOKEN_VALIDITY_DAYS,
+  );
   assert(
-    new Date(pastExpiry).getTime() > new Date("2026-09-01T00:00:00Z").getTime(),
-    "past tournament date still yields future token expiry",
+    new Date(futureExpiry).getTime() === futureReference.getTime(),
+    "future tournament expiry",
+  );
+
+  const todayReference = new Date("2026-09-01T00:00:00Z");
+  todayReference.setUTCDate(
+    todayReference.getUTCDate() + COMMUNICATION_RECEIPT_TOKEN_VALIDITY_DAYS,
+  );
+  assert(
+    new Date(todayExpiry).getTime() === todayReference.getTime(),
+    "today tournament expiry",
+  );
+  assert(
+    new Date(pastExpiry).getTime() === todayReference.getTime(),
+    "past tournament expiry uses today as reference",
+  );
+
+  assert(
+    hardeningMigration.includes("RAISE EXCEPTION 'invalid expiry'"),
+    "RPC still rejects past/invalid expiry",
+  );
+  assert(
+    !pr42Migration.includes("issue_communication_confirmation_token"),
+    "PR42 migration does not modify RPC expiry validation",
+  );
+
+  const tokenPair = createCommunicationReceiptTokenPair();
+  assert(tokenPair.tokenHash.length === 64, "token remains securely hashed");
+  assert(
+    tokenPair.tokenHash === hashSecureAccessToken(tokenPair.token) &&
+      tokenPair.tokenHash === createHash("sha256").update(tokenPair.token).digest("hex"),
+    "token hash is SHA-256",
   );
 
   // Reserve RPC errors must not silently skip
@@ -125,8 +188,10 @@ export function runCommunicationSendOutcomeChecks() {
   // Send path uses outcome evaluation
   assert(mail.includes("evaluateCommunicationSendOutcome"), "send path evaluates outcome");
   assert(
-    mail.includes("issue_communication_confirmation_token"),
-    "confirmation-required communication reaches token issuance",
+    mail.includes("compose.requireConfirmation") &&
+      mail.includes("issue_communication_confirmation_token") &&
+      mail.includes("provider.send"),
+    "confirmation mail for past tournament reaches provider",
   );
   assert(
     mail.includes("Bestätigungstoken konnte nicht erstellt werden"),
@@ -150,14 +215,10 @@ export function runCommunicationSendOutcomeChecks() {
   assert(detailPage.includes("searchParams"), "detail page accepts notice query param");
   assert(detailPage.includes("role=\"status\""), "detail page shows notice banner");
 
-  // PR42 migration: receipt token clamp + view RLS
+  // PR42 migration: view RLS only (no RPC weakening)
   assert(
-    pr42Migration.includes("v_expires_at := now() + interval '90 days'"),
-    "RPC clamps invalid/past expiry instead of rejecting",
-  );
-  assert(
-    !pr42Migration.includes("RAISE EXCEPTION 'invalid expiry'"),
-    "RPC no longer rejects past expiry",
+    !pr42Migration.includes("issue_communication_confirmation_token"),
+    "PR42 migration is RLS-only",
   );
   assert(
     pr42Migration.includes("tournament_communications_view_select") &&
@@ -172,6 +233,27 @@ export function runCommunicationSendOutcomeChecks() {
   assert(
     !pr42Migration.includes("FOR INSERT") && !pr42Migration.includes("FOR UPDATE"),
     "view migration is SELECT-only",
+  );
+
+  const clubAdminBlock =
+    rbacSeedMigration.match(/WHERE r\.key = 'CLUB_ADMIN'[\s\S]*?ON CONFLICT DO NOTHING;/)?.[0] ??
+    "";
+  assert(
+    !clubAdminBlock.includes("communications.view") &&
+      !clubAdminBlock.includes("communications.send"),
+    "club admin has no communications access",
+  );
+  assert(
+    rbacSeedMigration.includes(
+      "JOIN public.rbac_permissions p ON p.key IN (\n  'teams.view', 'schedule.view', 'results.view', 'communications.view'\n)\nWHERE r.key = 'TEAM_MANAGER'",
+    ),
+    "team manager view permission unchanged",
+  );
+  assert(
+    !rbacSeedMigration.includes(
+      "JOIN public.rbac_permissions p ON p.key IN (\n  'teams.view', 'schedule.view', 'results.view', 'communications.view', 'communications.send'",
+    ),
+    "team manager cannot send communications",
   );
 
   // Manage policies unchanged in prior migration

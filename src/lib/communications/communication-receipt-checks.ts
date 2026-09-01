@@ -12,6 +12,7 @@ import {
   buildCommunicationReceiptEmailAppendix,
   buildCommunicationReceiptUrl,
   COMMUNICATION_RECEIPT_TOKEN_PURPOSE,
+  COMMUNICATION_RECEIPT_TOKEN_VALIDITY_DAYS,
   communicationReceiptTokenExpiresAt,
   createCommunicationReceiptTokenPair,
 } from "@/lib/communications/communication-receipt-token";
@@ -35,6 +36,16 @@ function readHardeningMigration() {
     join(
       process.cwd(),
       "supabase/migrations/20260831220000_rbac_security_definer_hardening.sql",
+    ),
+    "utf8",
+  );
+}
+
+function readPr42Migration() {
+  return readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260901120000_communication_pr42_send_incident_fix.sql",
     ),
     "utf8",
   );
@@ -110,6 +121,7 @@ function readFaq() {
 export function runCommunicationReceiptChecks() {
   const migration = readMigration();
   const hardeningMigration = readHardeningMigration();
+  const pr42Migration = readPr42Migration();
   const c1Migration = readC1Migration();
   const cancellationMigration = readCancellationMigration();
   const paymentMigration = readPaymentMigration();
@@ -125,6 +137,14 @@ export function runCommunicationReceiptChecks() {
     hardeningMigration.includes("issue_communication_confirmation_token") &&
       hardeningMigration.includes("communications.send required"),
     "receipt token issuance RBAC hardened",
+  );
+  assert(
+    hardeningMigration.includes("RAISE EXCEPTION 'invalid expiry'"),
+    "RPC rejects invalid/past expiry",
+  );
+  assert(
+    !pr42Migration.includes("issue_communication_confirmation_token"),
+    "PR42 migration does not weaken RPC expiry validation",
   );
   assert(
     hardeningMigration.includes("p_require_confirmation") &&
@@ -363,17 +383,49 @@ export function runCommunicationReceiptChecks() {
   });
   assert(variables.confirmation_url === url, "confirmation_url variable");
 
-  // Expiry helper
-  const expiresAt = communicationReceiptTokenExpiresAt("2026-09-01");
-  assert(new Date(expiresAt).getTime() > Date.now(), "token expiry in future");
-  const pastTournamentExpiry = communicationReceiptTokenExpiresAt(
-    "2020-01-01",
-    new Date("2026-09-01T00:00:00Z"),
+  // Expiry helper: future, today, and past tournaments
+  const now = new Date("2026-09-01T12:00:00Z");
+  const futureExpiry = communicationReceiptTokenExpiresAt("2026-12-01", now);
+  const todayExpiry = communicationReceiptTokenExpiresAt("2026-09-01", now);
+  const pastExpiry = communicationReceiptTokenExpiresAt("2020-01-01", now);
+  const nullExpiry = communicationReceiptTokenExpiresAt(null, now);
+
+  for (const expiry of [futureExpiry, todayExpiry, pastExpiry, nullExpiry]) {
+    assert(new Date(expiry).getTime() > now.getTime(), "app always yields future expiry");
+  }
+
+  const futureReference = new Date("2026-12-01T00:00:00Z");
+  futureReference.setUTCDate(
+    futureReference.getUTCDate() + COMMUNICATION_RECEIPT_TOKEN_VALIDITY_DAYS,
   );
   assert(
-    new Date(pastTournamentExpiry).getTime() >
-      new Date("2026-09-01T00:00:00Z").getTime(),
-    "past tournament date yields future token expiry",
+    new Date(futureExpiry).getTime() === futureReference.getTime(),
+    "future tournament uses tournament date + validity days",
+  );
+
+  const todayReference = new Date("2026-09-01T00:00:00Z");
+  todayReference.setUTCDate(
+    todayReference.getUTCDate() + COMMUNICATION_RECEIPT_TOKEN_VALIDITY_DAYS,
+  );
+  assert(
+    new Date(todayExpiry).getTime() === todayReference.getTime(),
+    "today tournament uses today + validity days",
+  );
+  assert(
+    new Date(pastExpiry).getTime() === todayReference.getTime(),
+    "past tournament uses today + validity days",
+  );
+  assert(
+    new Date(nullExpiry).getTime() === todayReference.getTime(),
+    "missing tournament date uses today + validity days",
+  );
+
+  // Past tournament confirmation flow reaches provider after valid token expiry
+  assert(
+    mail.includes("compose.requireConfirmation") &&
+      mail.includes("issue_communication_confirmation_token") &&
+      mail.includes("provider.send"),
+    "confirmation mail for past tournament reaches provider after token issuance",
   );
 
   // Hash is SHA-256
