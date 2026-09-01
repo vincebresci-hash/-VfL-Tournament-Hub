@@ -465,6 +465,11 @@ export function runCommunicationReceiptChecks() {
     new Date(nullExpiry).getTime() === todayReference.getTime(),
     "missing tournament date uses today + validity days",
   );
+  const malformedExpiry = communicationReceiptTokenExpiresAt("not-a-date", now);
+  assert(
+    new Date(malformedExpiry).getTime() > now.getTime(),
+    "malformed tournament date falls back to future expiry",
+  );
 
   // Past tournament confirmation flow reaches provider after valid token expiry
   assert(
