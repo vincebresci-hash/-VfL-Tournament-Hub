@@ -240,7 +240,7 @@ export async function loadCommunicationsAction() {
   }
 
   const result = await listCommunications();
-  return { ...result, error: null };
+  return { ...result, error: result.error };
 }
 
 export async function loadCommunicationDetailAction(communicationId: string) {

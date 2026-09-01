@@ -49,6 +49,7 @@ import { runCommunicationRecipientPickerChecks } from "@/lib/communications/reci
 import { runCommunicationRecipientDedupChecks } from "@/lib/communications/recipient-dedup-checks";
 import { runCommunicationTeamDirectoryChecks } from "@/lib/communications/communication-team-directory-checks";
 import { runCommunicationSendOutcomeChecks } from "@/lib/communications/communication-send-outcome-checks";
+import { runCommunicationListChecks } from "@/lib/communications/communication-list-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runPublicTournamentAnonVisibilityChecks } from "@/lib/tournaments/public-tournament-anon-visibility-checks";
@@ -111,6 +112,7 @@ try {
   const communicationRecipientDedupChecks = runCommunicationRecipientDedupChecks();
   const communicationTeamDirectoryChecks = runCommunicationTeamDirectoryChecks();
   const communicationSendOutcomeChecks = runCommunicationSendOutcomeChecks();
+  const communicationListChecks = runCommunicationListChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
@@ -169,6 +171,7 @@ try {
   console.log(`communication-recipient-dedup-checks: ${communicationRecipientDedupChecks}`);
   console.log(`communication-team-directory-checks: ${communicationTeamDirectoryChecks}`);
   console.log(`communication-send-outcome-checks: ${communicationSendOutcomeChecks}`);
+  console.log(`communication-list-checks: ${communicationListChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);

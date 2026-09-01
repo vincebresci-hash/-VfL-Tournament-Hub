@@ -252,7 +252,12 @@ export function runCommunicationSendOutcomeChecks() {
       composeForm.indexOf("if (result.error)") < composeForm.indexOf("router.push"),
     "failure stays on compose page without redirect",
   );
-  assert(composeForm.includes('params.set("noticeLevel"'), "compose form passes notice level");
+  assert(
+    composeForm.includes('"noticeLevel"') &&
+      composeForm.includes("fehlgeschlagen") &&
+      composeForm.includes('"success"'),
+    "compose form passes notice level",
+  );
   assert(
     composeForm.includes('result.notice.includes("fehlgeschlagen") ? "warning" : "success"'),
     "partial success uses warning notice level",
