@@ -55,6 +55,25 @@ export function runRbacDomainRlsChecks() {
   assert(migration.includes("preview_communication_recipients"), "communication preview rpc");
   assert(migration.includes("communications.send required"), "communication send rpc guard");
 
+  const pr42Migration = readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260901120000_communication_pr42_send_incident_fix.sql",
+    ),
+    "utf8",
+  );
+  assert(
+    pr42Migration.includes("tournament_communications_view_select") &&
+      pr42Migration.includes("communication_recipients_view_select"),
+    "communications.view read policies added",
+  );
+  assert(
+    pr42Migration.includes("FOR SELECT") &&
+      !pr42Migration.includes("FOR INSERT") &&
+      !pr42Migration.includes("FOR UPDATE"),
+    "PR42 RLS changes are read-only",
+  );
+
   assert(
     readFileSync(
       join(

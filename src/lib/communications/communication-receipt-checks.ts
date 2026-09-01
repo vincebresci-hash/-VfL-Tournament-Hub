@@ -366,6 +366,15 @@ export function runCommunicationReceiptChecks() {
   // Expiry helper
   const expiresAt = communicationReceiptTokenExpiresAt("2026-09-01");
   assert(new Date(expiresAt).getTime() > Date.now(), "token expiry in future");
+  const pastTournamentExpiry = communicationReceiptTokenExpiresAt(
+    "2020-01-01",
+    new Date("2026-09-01T00:00:00Z"),
+  );
+  assert(
+    new Date(pastTournamentExpiry).getTime() >
+      new Date("2026-09-01T00:00:00Z").getTime(),
+    "past tournament date yields future token expiry",
+  );
 
   // Hash is SHA-256
   const sample = hashSecureAccessToken("test-token");

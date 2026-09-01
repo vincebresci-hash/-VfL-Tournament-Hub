@@ -214,7 +214,11 @@ export async function sendCommunicationAction(
   });
 
   if (result.error) {
-    return { error: result.error };
+    return {
+      error: result.error,
+      communicationId: result.communicationId,
+      notice: result.notice,
+    };
   }
 
   revalidatePath("/admin/kommunikation");
@@ -225,10 +229,7 @@ export async function sendCommunicationAction(
   return {
     error: null,
     communicationId: result.communicationId,
-    notice:
-      result.failedCount > 0
-        ? `${result.sentCount} versendet, ${result.failedCount} fehlgeschlagen.`
-        : `${result.sentCount} E-Mail${result.sentCount === 1 ? "" : "s"} versendet.`,
+    notice: result.notice,
   };
 }
 

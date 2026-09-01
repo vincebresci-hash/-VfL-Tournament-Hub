@@ -19,13 +19,22 @@ export function createCommunicationReceiptTokenPair() {
   };
 }
 
-export function communicationReceiptTokenExpiresAt(tournamentDate: string | null) {
-  if (tournamentDate) {
-    return secureAccessTokenExpiresAt(tournamentDate);
-  }
+export function communicationReceiptTokenExpiresAt(
+  tournamentDate: string | null,
+  now = new Date(),
+) {
+  const minimumExpiry = new Date(now.getTime());
+  minimumExpiry.setUTCDate(minimumExpiry.getUTCDate() + 1);
 
-  const expires = new Date();
-  expires.setUTCDate(expires.getUTCDate() + 90);
+  const candidate = tournamentDate
+    ? new Date(secureAccessTokenExpiresAt(tournamentDate))
+    : (() => {
+        const fallback = new Date(now.getTime());
+        fallback.setUTCDate(fallback.getUTCDate() + 90);
+        return fallback;
+      })();
+
+  const expires = candidate > minimumExpiry ? candidate : minimumExpiry;
   return expires.toISOString();
 }
 
