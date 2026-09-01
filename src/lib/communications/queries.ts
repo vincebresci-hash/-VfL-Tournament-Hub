@@ -1,5 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { isMissingRelationError } from "@/lib/db/errors";
+import {
+  aggregateConfirmedCounts,
+  buildCommunicationListItems,
+  COMMUNICATION_LIST_USER_ERROR,
+  type CommunicationListRow,
+  type TournamentLookup,
+} from "@/lib/communications/list-communications";
 import { toTeamDirectoryEntry } from "@/lib/team-directory/mappers";
 import type { CommunicationEligibleApplication } from "@/lib/communications/recipient-picker";
 import type { CommunicationEligibleDirectoryEntry } from "@/lib/communications/team-directory-recipient-picker";
@@ -120,52 +127,107 @@ export async function previewCommunicationRecipients(input: {
   };
 }
 
+function logCommunicationListQueryError(
+  scope: string,
+  error: { code?: string; message?: string } | null,
+) {
+  console.error(`[communications.list] ${scope}`, {
+    code: error?.code ?? "unknown",
+    message: error?.message ?? "unknown",
+  });
+}
+
+async function loadTournamentsById(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tournamentIds: string[],
+): Promise<Map<string, TournamentLookup>> {
+  const tournamentsById = new Map<string, TournamentLookup>();
+
+  if (tournamentIds.length === 0) {
+    return tournamentsById;
+  }
+
+  const { data, error } = await supabase
+    .from("tournaments")
+    .select("id, name, slug")
+    .in("id", tournamentIds);
+
+  if (error) {
+    logCommunicationListQueryError("tournament lookup failed", error);
+    return tournamentsById;
+  }
+
+  for (const tournament of data ?? []) {
+    tournamentsById.set(tournament.id, tournament);
+  }
+
+  return tournamentsById;
+}
+
+async function loadConfirmedCountsByCommunicationId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  communicationIds: string[],
+): Promise<Map<string, number>> {
+  if (communicationIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("communication_recipients")
+    .select("communication_id, confirmed_at")
+    .in("communication_id", communicationIds);
+
+  if (error) {
+    logCommunicationListQueryError("confirmation lookup failed", error);
+    return new Map();
+  }
+
+  return aggregateConfirmedCounts(data ?? []);
+}
+
 export async function listCommunications(): Promise<{
   communications: CommunicationListItem[];
   ready: boolean;
+  error: string | null;
 }> {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, recipient_source, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug)",
+      "id, tournament_id, recipient_source, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at",
     )
     .neq("status", "draft")
     .order("created_at", { ascending: false });
 
-  if (error || !data) {
-    return { communications: [], ready: !isMissingRelationError(error) };
+  if (error) {
+    if (isMissingRelationError(error)) {
+      return { communications: [], ready: false, error: null };
+    }
+
+    logCommunicationListQueryError("list query failed", error);
+    return {
+      communications: [],
+      ready: true,
+      error: COMMUNICATION_LIST_USER_ERROR,
+    };
   }
+
+  const rows = (data ?? []) as CommunicationListRow[];
+  const tournamentIds = [...new Set(rows.map((row) => row.tournament_id))];
+  const communicationIds = rows.map((row) => row.id);
+
+  const [tournamentsById, confirmedCountsByCommunicationId] = await Promise.all([
+    loadTournamentsById(supabase, tournamentIds),
+    loadConfirmedCountsByCommunicationId(supabase, communicationIds),
+  ]);
 
   return {
     ready: true,
-    communications: data.map((row) => {
-      const tournament = firstRelation(
-        row.tournaments as
-          | { id: string; name: string; slug: string }
-          | { id: string; name: string; slug: string }[]
-          | null,
-      );
-
-      return {
-        id: row.id,
-        tournamentId: row.tournament_id,
-        tournamentName: tournament?.name ?? "Turnier",
-        tournamentSlug: tournament?.slug ?? "",
-        recipientSource: asRecipientSource(row.recipient_source ?? "tournament-applications"),
-        type: asCommunicationType(row.type),
-        subject: row.subject,
-        important: row.important,
-        requireConfirmation: row.require_confirmation ?? false,
-        recipientFilter: asRecipientFilter(row.recipient_filter),
-        status: row.status as CommunicationListItem["status"],
-        recipientCount: row.recipient_count,
-        sentCount: row.sent_count,
-        failedCount: row.failed_count,
-        confirmedCount: 0,
-        createdAt: row.created_at,
-        sentAt: row.sent_at,
-      };
+    error: null,
+    communications: buildCommunicationListItems({
+      rows,
+      tournamentsById,
+      confirmedCountsByCommunicationId,
     }),
   };
 }

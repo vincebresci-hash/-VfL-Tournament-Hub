@@ -25,27 +25,18 @@ export function CommunicationListBoard({
       <table className="min-w-full text-left text-[14px]">
         <thead className="border-b border-line bg-surface text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
           <tr>
-            <th className="px-4 py-3">Turnier</th>
-            <th className="px-4 py-3">Typ</th>
             <th className="px-4 py-3">Betreff</th>
+            <th className="px-4 py-3">Turnier</th>
             <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Empfänger</th>
-            <th className="px-4 py-3">Versendet</th>
+            <th className="px-4 py-3">Gesendet</th>
+            <th className="px-4 py-3">Fehlgeschlagen</th>
+            <th className="px-4 py-3">Empfang bestätigt</th>
             <th className="px-4 py-3">Datum</th>
           </tr>
         </thead>
         <tbody>
           {communications.map((item) => (
             <tr key={item.id} className="border-b border-line last:border-b-0">
-              <td className="px-4 py-3 text-ink">{item.tournamentName}</td>
-              <td className="px-4 py-3 text-muted">
-                {communicationTypeLabel(item.type)}
-                {item.important ? (
-                  <span className="ml-2 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase">
-                    Wichtig
-                  </span>
-                ) : null}
-              </td>
               <td className="px-4 py-3">
                 <Link
                   href={`/admin/kommunikation/${item.id}`}
@@ -54,22 +45,37 @@ export function CommunicationListBoard({
                   {item.subject}
                 </Link>
                 <p className="mt-1 text-[12px] text-muted">
+                  {communicationTypeLabel(item.type)}
+                  {item.important ? (
+                    <span className="ml-2 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase">
+                      Wichtig
+                    </span>
+                  ) : null}
+                </p>
+                <p className="mt-1 text-[12px] text-muted">
                   {communicationRecipientSourceLabel(item.recipientSource)}
                   {item.recipientSource === "tournament-applications"
                     ? ` · ${communicationRecipientFilterLabel(item.recipientFilter)}`
                     : ""}
                 </p>
               </td>
+              <td className="px-4 py-3 text-ink">{item.tournamentName}</td>
               <td className="px-4 py-3 text-muted">
                 {communicationStatusLabel(item.status)}
               </td>
-              <td className="px-4 py-3 text-muted">
-                {item.sentCount}/{item.recipientCount}
-                {item.failedCount > 0 ? (
-                  <span className="ml-1 text-[#9a2b2b]">({item.failedCount} fehlgeschlagen)</span>
-                ) : null}
-              </td>
               <td className="px-4 py-3 text-muted">{item.sentCount}</td>
+              <td className="px-4 py-3 text-muted">
+                {item.failedCount > 0 ? (
+                  <span className="text-[#9a2b2b]">{item.failedCount}</span>
+                ) : (
+                  item.failedCount
+                )}
+              </td>
+              <td className="px-4 py-3 text-muted">
+                {item.requireConfirmation
+                  ? `${item.confirmedCount} / ${item.recipientCount}`
+                  : "—"}
+              </td>
               <td className="px-4 py-3 text-muted">
                 {formatDateTimeDe(item.sentAt ?? item.createdAt)}
               </td>
