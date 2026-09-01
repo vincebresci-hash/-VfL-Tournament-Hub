@@ -163,6 +163,16 @@ export function runRbacSecurityDefinerChecks() {
       migration.includes("communications.view"),
     "confirmation token admin read policy hardened",
   );
+  assert(
+    readFileSync(
+      join(
+        process.cwd(),
+        "supabase/migrations/20260901130000_communication_confirmation_tokens_platform_scope.sql",
+      ),
+      "utf8",
+    ).includes("has_platform_rbac_access()"),
+    "confirmation token admin read policy platform-scoped",
+  );
 
   assert(
     migration.includes("REVOKE ALL ON FUNCTION public.sync_mein_turnierplan_tournament") &&

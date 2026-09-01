@@ -13,6 +13,7 @@ import {
   communicationReceiptTokenExpiresAt,
   createCommunicationReceiptTokenPair,
 } from "@/lib/communications/communication-receipt-token";
+import { evaluateCommunicationSendOutcome } from "@/lib/communications/send-outcome";
 import type { PaymentStatus } from "@/types/payment";
 import type { CommunicationComposeInput } from "@/types/communication";
 
@@ -41,10 +42,12 @@ async function reserveCommunicationEmailSend(recipientId: string) {
   });
 
   if (error) {
-    return "skip" as const;
+    return { status: "error" as const, message: error.message };
   }
 
-  return data === "send" ? ("send" as const) : ("skip" as const);
+  return data === "send"
+    ? { status: "send" as const }
+    : { status: "skip" as const };
 }
 
 async function completeCommunicationRecipient(input: {
@@ -156,7 +159,9 @@ export async function sendTournamentCommunication(input: {
   communicationId: string | null;
   sentCount: number;
   failedCount: number;
+  skippedCount: number;
   error: string | null;
+  notice: string | null;
 }> {
   const supabase = await createClient();
   const { compose, actorId } = input;
@@ -191,7 +196,9 @@ export async function sendTournamentCommunication(input: {
         communicationId: null,
         sentCount: 0,
         failedCount: 0,
+        skippedCount: 0,
         error: "Keine berechtigten Empfänger gefunden.",
+        notice: null,
       };
     }
 
@@ -204,10 +211,12 @@ export async function sendTournamentCommunication(input: {
         communicationId: null,
         sentCount: 0,
         failedCount: 0,
+        skippedCount: 0,
         error:
           compose.recipientSource === "team-directory"
             ? "Zahlungserinnerungen sind für die Team-Datenbank nicht verfügbar."
             : "Zahlungserinnerungen sind nur für ausstehende Zahlungen (payment-pending) oder eine individuelle Auswahl erlaubt.",
+        notice: null,
       };
     }
 
@@ -216,7 +225,9 @@ export async function sendTournamentCommunication(input: {
         communicationId: null,
         sentCount: 0,
         failedCount: 0,
+        skippedCount: 0,
         error: "Kommunikationsmodul ist noch nicht migriert.",
+        notice: null,
       };
     }
 
@@ -224,7 +235,9 @@ export async function sendTournamentCommunication(input: {
       communicationId: null,
       sentCount: 0,
       failedCount: 0,
+      skippedCount: 0,
       error: "Die Kommunikation konnte nicht gestartet werden.",
+      notice: null,
     };
   }
 
@@ -232,16 +245,30 @@ export async function sendTournamentCommunication(input: {
 
   const { data: communicationRow } = await supabase
     .from("tournament_communications")
-    .select("status, sent_count, failed_count")
+    .select("status, sent_count, failed_count, recipient_count")
     .eq("id", communicationId)
     .maybeSingle();
 
   if (communicationRow && communicationRow.status !== "sending") {
+    const sentCount = communicationRow.sent_count ?? 0;
+    const failedCount = communicationRow.failed_count ?? 0;
+    const skippedCount = Math.max(
+      0,
+      (communicationRow.recipient_count ?? 0) - sentCount - failedCount,
+    );
+    const outcome = evaluateCommunicationSendOutcome({
+      sentCount,
+      failedCount,
+      skippedCount,
+    });
+
     return {
       communicationId,
-      sentCount: communicationRow.sent_count,
-      failedCount: communicationRow.failed_count,
-      error: null,
+      sentCount,
+      failedCount,
+      skippedCount,
+      error: outcome.error,
+      notice: outcome.notice,
     };
   }
 
@@ -261,20 +288,35 @@ export async function sendTournamentCommunication(input: {
       communicationId,
       sentCount: 0,
       failedCount: 0,
+      skippedCount: 0,
       error: "Empfänger konnten nicht geladen werden.",
+      notice: null,
     };
   }
 
   const provider = getEmailProvider();
   let sentCount = 0;
   let failedCount = 0;
+  let skippedCount = 0;
   const tokenExpiresAt = communicationReceiptTokenExpiresAt(
     tournament?.date ?? null,
   );
 
   for (const recipient of recipients as RecipientSendRow[]) {
     const reservation = await reserveCommunicationEmailSend(recipient.id);
-    if (reservation === "skip") {
+    if (reservation.status === "skip") {
+      skippedCount += 1;
+      continue;
+    }
+
+    if (reservation.status === "error") {
+      await completeCommunicationRecipient({
+        recipientId: recipient.id,
+        sendStatus: "failed",
+        emailLogId: null,
+        errorMessage: "Versandreservierung fehlgeschlagen.",
+      });
+      failedCount += 1;
       continue;
     }
 
@@ -384,10 +426,18 @@ export async function sendTournamentCommunication(input: {
     p_communication_id: communicationId,
   });
 
+  const outcome = evaluateCommunicationSendOutcome({
+    sentCount,
+    failedCount,
+    skippedCount,
+  });
+
   return {
     communicationId,
     sentCount,
     failedCount,
-    error: null,
+    skippedCount,
+    error: outcome.error,
+    notice: outcome.notice,
   };
 }

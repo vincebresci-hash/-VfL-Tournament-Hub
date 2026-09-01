@@ -136,6 +136,7 @@ export function CommunicationComposeForm({
     Awaited<ReturnType<typeof previewCommunicationRecipientsAction>>["recipients"]
   >([]);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [idempotencyKey] = useState(createIdempotencyKey);
 
@@ -295,6 +296,7 @@ export function CommunicationComposeForm({
 
     setSubmitting(true);
     setError(null);
+    setNotice(null);
 
     const result = await sendCommunicationAction({
       tournamentId,
@@ -317,13 +319,22 @@ export function CommunicationComposeForm({
 
     if (result.error) {
       setError(result.error);
+      if (result.notice) {
+        setNotice(result.notice);
+      }
       return;
     }
 
+    const params = new URLSearchParams();
+    if (result.notice) {
+      params.set("notice", result.notice);
+    }
+    const query = params.toString();
+
     router.push(
       result.communicationId
-        ? `/admin/kommunikation/${result.communicationId}`
-        : "/admin/kommunikation",
+        ? `/admin/kommunikation/${result.communicationId}${query ? `?${query}` : ""}`
+        : `/admin/kommunikation${query ? `?${query}` : ""}`,
     );
     router.refresh();
   }
@@ -483,6 +494,12 @@ export function CommunicationComposeForm({
           {previewSample.body || "—"}
         </pre>
       </AdminCard>
+
+      {notice ? (
+        <p className="text-[14px] text-ink" role="status">
+          {notice}
+        </p>
+      ) : null}
 
       {error ? (
         <p className="text-[14px] text-[#9a2b2b]" role="alert">

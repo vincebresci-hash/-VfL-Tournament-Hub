@@ -7,6 +7,7 @@ import { getCommunicationDetail } from "@/lib/communications/queries";
 
 type CommunicationDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ notice?: string }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,10 @@ export async function generateMetadata({
 
 export default async function AdminCommunicationDetailPage({
   params,
+  searchParams,
 }: CommunicationDetailPageProps) {
   const { id } = await params;
+  const { notice } = await searchParams;
   const communication = await getCommunicationDetail(id);
 
   if (!communication) {
@@ -46,6 +49,11 @@ export default async function AdminCommunicationDetailPage({
           Zurück zur Übersicht
         </Link>
       </div>
+      {notice ? (
+        <p className="mt-6 text-[14px] text-ink" role="status">
+          {notice}
+        </p>
+      ) : null}
       <CommunicationDetailView communication={communication} />
     </div>
   );

@@ -125,6 +125,11 @@ export function runCommunicationChecks() {
   assert(!mail.includes("resend.com"), "no direct Resend fetch in migration");
   assert(mail.includes("reserve_communication_email_send"), "DB reservation before send");
   assert(
+    mail.includes('status: "error"') || mail.includes("Versandreservierung fehlgeschlagen"),
+    "reserve RPC error reported",
+  );
+  assert(mail.includes("evaluateCommunicationSendOutcome"), "send outcome evaluation");
+  assert(
     mail.includes("list_pending_communication_recipients"),
     "pending recipients loaded via send RPC",
   );
