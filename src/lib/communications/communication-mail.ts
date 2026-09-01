@@ -152,6 +152,22 @@ async function issueCommunicationConfirmationToken(input: {
     : ("error" as const);
 }
 
+async function finalizeCommunicationSafe(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  communicationId: string,
+) {
+  const { error } = await supabase.rpc("finalize_communication", {
+    p_communication_id: communicationId,
+  });
+
+  if (error) {
+    console.error("[communications.send] finalize_communication failed", {
+      code: error.code ?? "unknown",
+      message: error.message ?? "unknown",
+    });
+  }
+}
+
 export async function sendTournamentCommunication(input: {
   compose: CommunicationComposeInput;
   actorId: string | null;
@@ -272,172 +288,183 @@ export async function sendTournamentCommunication(input: {
     };
   }
 
-  const { data: recipients, error: recipientsError } = await supabase.rpc(
-    "list_pending_communication_recipients",
-    {
-      p_communication_id: communicationId,
-    },
-  );
-
-  if (recipientsError || !recipients || recipients.length === 0) {
-    await supabase.rpc("finalize_communication", {
-      p_communication_id: communicationId,
-    });
-
-    return {
-      communicationId,
-      sentCount: 0,
-      failedCount: 0,
-      skippedCount: 0,
-      error: "Empfänger konnten nicht geladen werden.",
-      notice: null,
-    };
-  }
-
-  const provider = getEmailProvider();
   let sentCount = 0;
   let failedCount = 0;
   let skippedCount = 0;
-  const tokenExpiresAt = communicationReceiptTokenExpiresAt(
-    tournament?.date ?? null,
-  );
 
-  for (const recipient of recipients as RecipientSendRow[]) {
-    const reservation = await reserveCommunicationEmailSend(recipient.id);
-    if (reservation.status === "skip") {
-      skippedCount += 1;
-      continue;
+  try {
+    const { data: recipients, error: recipientsError } = await supabase.rpc(
+      "list_pending_communication_recipients",
+      {
+        p_communication_id: communicationId,
+      },
+    );
+
+    if (recipientsError || !recipients || recipients.length === 0) {
+      return {
+        communicationId,
+        sentCount: 0,
+        failedCount: 0,
+        skippedCount: 0,
+        error: "Empfänger konnten nicht geladen werden.",
+        notice: null,
+      };
     }
 
-    if (reservation.status === "error") {
-      await completeCommunicationRecipient({
-        recipientId: recipient.id,
-        sendStatus: "failed",
-        emailLogId: null,
-        errorMessage: "Versandreservierung fehlgeschlagen.",
-      });
-      failedCount += 1;
-      continue;
-    }
+    const provider = getEmailProvider();
+    const tokenExpiresAt = communicationReceiptTokenExpiresAt(
+      tournament?.date ?? null,
+    );
 
-    const application = recipient.application_id
-      ? await loadApplicationContext(recipient.application_id)
-      : null;
-    const participationFee =
-      application?.participation_fee != null
-        ? Number(application.participation_fee)
-        : null;
+    for (const recipient of recipients as RecipientSendRow[]) {
+      const reservation = await reserveCommunicationEmailSend(recipient.id);
+      if (reservation.status === "skip") {
+        skippedCount += 1;
+        continue;
+      }
 
-    let confirmationUrl = "";
-    if (compose.requireConfirmation) {
-      const tokenPair = createCommunicationReceiptTokenPair();
-      const issueResult = await issueCommunicationConfirmationToken({
-        recipientId: recipient.id,
-        tokenHash: tokenPair.tokenHash,
-        expiresAt: tokenExpiresAt,
-      });
-
-      if (issueResult === "created" || issueResult === "replaced") {
-        confirmationUrl = buildCommunicationReceiptUrl(tokenPair.token);
-      } else {
+      if (reservation.status === "error") {
         await completeCommunicationRecipient({
           recipientId: recipient.id,
           sendStatus: "failed",
           emailLogId: null,
-          errorMessage: "Bestätigungstoken konnte nicht erstellt werden.",
+          errorMessage: "Versandreservierung fehlgeschlagen.",
         });
         failedCount += 1;
         continue;
       }
+
+      const application = recipient.application_id
+        ? await loadApplicationContext(recipient.application_id)
+        : null;
+      const participationFee =
+        application?.participation_fee != null
+          ? Number(application.participation_fee)
+          : null;
+
+      let confirmationUrl = "";
+      if (compose.requireConfirmation) {
+        const tokenPair = createCommunicationReceiptTokenPair();
+        const issueResult = await issueCommunicationConfirmationToken({
+          recipientId: recipient.id,
+          tokenHash: tokenPair.tokenHash,
+          expiresAt: tokenExpiresAt,
+        });
+
+        if (issueResult === "created" || issueResult === "replaced") {
+          confirmationUrl = buildCommunicationReceiptUrl(tokenPair.token);
+        } else {
+          await completeCommunicationRecipient({
+            recipientId: recipient.id,
+            sendStatus: "failed",
+            emailLogId: null,
+            errorMessage: "Bestätigungstoken konnte nicht erstellt werden.",
+          });
+          failedCount += 1;
+          continue;
+        }
+      }
+
+      const variables = buildCommunicationVariables({
+        contactFirstName:
+          application?.contact_first_name ??
+          recipient.recipient_contact_first_name ??
+          "",
+        teamName: recipient.recipient_team_name,
+        clubName: recipient.recipient_club_name ?? application?.club_name ?? "",
+        tournamentName: tournament?.name ?? "",
+        tournamentSlug: tournament?.slug ?? "",
+        meinTurnierplanUrl: tournament?.mein_turnierplan_url ?? null,
+        participationFee: Number.isFinite(participationFee) ? participationFee : null,
+        paymentStatus: application?.payment_status ?? null,
+        confirmationUrl,
+      });
+
+      const renderedSubject = stripUnresolvedPlaceholders(
+        renderEmailTemplate(compose.subject, variables),
+      );
+      let renderedBody = stripUnresolvedPlaceholders(
+        renderEmailTemplate(compose.body, variables),
+      );
+
+      if (compose.requireConfirmation && confirmationUrl) {
+        renderedBody += buildCommunicationReceiptEmailAppendix(confirmationUrl);
+      }
+
+      const emailContent = buildTournamentHubEmailFromTemplate({
+        subject: renderedSubject,
+        bodyText: renderedBody,
+        variables,
+        tournament: {
+          name: tournament?.name ?? variables.tournament_name,
+          date: tournament?.date ? formatDateDe(tournament.date) : variables.tournament_date,
+        },
+      });
+
+      const sendResult = await provider.send({
+        to: recipient.recipient_email,
+        subject: renderedSubject,
+        text: emailContent.text,
+        html: emailContent.html,
+      });
+
+      const logStatus = sendResult.ok ? "sent" : "failed";
+      const emailLogId = await writeCommunicationEmailLog({
+        applicationId: recipient.application_id,
+        communicationRecipientId: recipient.id,
+        toEmail: recipient.recipient_email,
+        subject: renderedSubject,
+        body: renderedBody,
+        status: logStatus,
+        error: sendResult.ok ? null : (sendResult.error ?? null),
+        provider: sendResult.provider,
+        providerMessageId: sendResult.providerMessageId ?? null,
+        createdBy: actorId,
+      });
+
+      await completeCommunicationRecipient({
+        recipientId: recipient.id,
+        sendStatus: logStatus,
+        emailLogId,
+        errorMessage: sendResult.ok ? null : (sendResult.error ?? null),
+      });
+
+      if (sendResult.ok) {
+        sentCount += 1;
+      } else {
+        failedCount += 1;
+      }
     }
 
-    const variables = buildCommunicationVariables({
-      contactFirstName:
-        application?.contact_first_name ??
-        recipient.recipient_contact_first_name ??
-        "",
-      teamName: recipient.recipient_team_name,
-      clubName: recipient.recipient_club_name ?? application?.club_name ?? "",
-      tournamentName: tournament?.name ?? "",
-      tournamentSlug: tournament?.slug ?? "",
-      meinTurnierplanUrl: tournament?.mein_turnierplan_url ?? null,
-      participationFee: Number.isFinite(participationFee) ? participationFee : null,
-      paymentStatus: application?.payment_status ?? null,
-      confirmationUrl,
+    const outcome = evaluateCommunicationSendOutcome({
+      sentCount,
+      failedCount,
+      skippedCount,
     });
 
-    const renderedSubject = stripUnresolvedPlaceholders(
-      renderEmailTemplate(compose.subject, variables),
-    );
-    let renderedBody = stripUnresolvedPlaceholders(
-      renderEmailTemplate(compose.body, variables),
-    );
-
-    if (compose.requireConfirmation && confirmationUrl) {
-      renderedBody += buildCommunicationReceiptEmailAppendix(confirmationUrl);
-    }
-
-    const emailContent = buildTournamentHubEmailFromTemplate({
-      subject: renderedSubject,
-      bodyText: renderedBody,
-      variables,
-      tournament: {
-        name: tournament?.name ?? variables.tournament_name,
-        date: tournament?.date ? formatDateDe(tournament.date) : variables.tournament_date,
-      },
+    return {
+      communicationId,
+      sentCount,
+      failedCount,
+      skippedCount,
+      error: outcome.error,
+      notice: outcome.notice,
+    };
+  } catch (error) {
+    console.error("[communications.send] unexpected error", {
+      message: error instanceof Error ? error.message : "unknown",
     });
 
-    const sendResult = await provider.send({
-      to: recipient.recipient_email,
-      subject: renderedSubject,
-      text: emailContent.text,
-      html: emailContent.html,
-    });
-
-    const logStatus = sendResult.ok ? "sent" : "failed";
-    const emailLogId = await writeCommunicationEmailLog({
-      applicationId: recipient.application_id,
-      communicationRecipientId: recipient.id,
-      toEmail: recipient.recipient_email,
-      subject: renderedSubject,
-      body: renderedBody,
-      status: logStatus,
-      error: sendResult.ok ? null : (sendResult.error ?? null),
-      provider: sendResult.provider,
-      providerMessageId: sendResult.providerMessageId ?? null,
-      createdBy: actorId,
-    });
-
-    await completeCommunicationRecipient({
-      recipientId: recipient.id,
-      sendStatus: logStatus,
-      emailLogId,
-      errorMessage: sendResult.ok ? null : (sendResult.error ?? null),
-    });
-
-    if (sendResult.ok) {
-      sentCount += 1;
-    } else {
-      failedCount += 1;
-    }
+    return {
+      communicationId,
+      sentCount,
+      failedCount,
+      skippedCount,
+      error: "Der Versand wurde unerwartet unterbrochen.",
+      notice: null,
+    };
+  } finally {
+    // Controlled paths always finalize. Abrupt serverless termination may skip this.
+    await finalizeCommunicationSafe(supabase, communicationId);
   }
-
-  await supabase.rpc("finalize_communication", {
-    p_communication_id: communicationId,
-  });
-
-  const outcome = evaluateCommunicationSendOutcome({
-    sentCount,
-    failedCount,
-    skippedCount,
-  });
-
-  return {
-    communicationId,
-    sentCount,
-    failedCount,
-    skippedCount,
-    error: outcome.error,
-    notice: outcome.notice,
-  };
 }

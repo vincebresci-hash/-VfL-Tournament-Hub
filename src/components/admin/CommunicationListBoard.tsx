@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { AdminEmpty } from "@/components/admin/AdminPanel";
 import {
+  communicationAdminStatusHint,
+  communicationAdminStatusLabel,
+} from "@/lib/communications/interrupted-communication";
+import {
   communicationRecipientFilterLabel,
   communicationRecipientSourceLabel,
-  communicationStatusLabel,
   communicationTypeLabel,
 } from "@/lib/communications/labels";
 import { formatDateTimeDe } from "@/lib/format";
@@ -35,7 +38,10 @@ export function CommunicationListBoard({
           </tr>
         </thead>
         <tbody>
-          {communications.map((item) => (
+          {communications.map((item) => {
+            const statusHint = communicationAdminStatusHint(item);
+
+            return (
             <tr key={item.id} className="border-b border-line last:border-b-0">
               <td className="px-4 py-3">
                 <Link
@@ -61,7 +67,10 @@ export function CommunicationListBoard({
               </td>
               <td className="px-4 py-3 text-ink">{item.tournamentName}</td>
               <td className="px-4 py-3 text-muted">
-                {communicationStatusLabel(item.status)}
+                <span>{communicationAdminStatusLabel(item)}</span>
+                {statusHint ? (
+                  <p className="mt-1 text-[12px] text-muted">{statusHint}</p>
+                ) : null}
               </td>
               <td className="px-4 py-3 text-muted">{item.sentCount}</td>
               <td className="px-4 py-3 text-muted">
@@ -80,7 +89,8 @@ export function CommunicationListBoard({
                 {formatDateTimeDe(item.sentAt ?? item.createdAt)}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
