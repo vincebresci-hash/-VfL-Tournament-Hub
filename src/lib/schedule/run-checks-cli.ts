@@ -50,6 +50,7 @@ import { runCommunicationRecipientDedupChecks } from "@/lib/communications/recip
 import { runCommunicationTeamDirectoryChecks } from "@/lib/communications/communication-team-directory-checks";
 import { runCommunicationSendOutcomeChecks } from "@/lib/communications/communication-send-outcome-checks";
 import { runCommunicationListChecks } from "@/lib/communications/communication-list-checks";
+import { runCommunicationTableGrantChecks } from "@/lib/communications/communication-table-grant-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runPublicTournamentAnonVisibilityChecks } from "@/lib/tournaments/public-tournament-anon-visibility-checks";
@@ -113,6 +114,7 @@ try {
   const communicationTeamDirectoryChecks = runCommunicationTeamDirectoryChecks();
   const communicationSendOutcomeChecks = runCommunicationSendOutcomeChecks();
   const communicationListChecks = runCommunicationListChecks();
+  const communicationTableGrantChecks = runCommunicationTableGrantChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
@@ -172,6 +174,7 @@ try {
   console.log(`communication-team-directory-checks: ${communicationTeamDirectoryChecks}`);
   console.log(`communication-send-outcome-checks: ${communicationSendOutcomeChecks}`);
   console.log(`communication-list-checks: ${communicationListChecks}`);
+  console.log(`communication-table-grant-checks: ${communicationTableGrantChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);
