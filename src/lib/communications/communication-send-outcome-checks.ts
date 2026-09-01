@@ -222,17 +222,34 @@ export function runCommunicationSendOutcomeChecks() {
   );
   assert(
     pr42Migration.includes("tournament_communications_view_select") &&
+      pr42Migration.includes("has_platform_rbac_access()") &&
       pr42Migration.includes("has_rbac_permission('communications.view')"),
-    "communications.view can read tournament_communications",
+    "communications.view can read tournament_communications (platform-scoped)",
   );
   assert(
     pr42Migration.includes("communication_recipients_view_select") &&
       pr42Migration.includes("FOR SELECT"),
-    "communications.view can read communication_recipients",
+    "communications.view can read communication_recipients (platform-scoped)",
   );
   assert(
     !pr42Migration.includes("FOR INSERT") && !pr42Migration.includes("FOR UPDATE"),
     "view migration is SELECT-only",
+  );
+  assert(
+    Boolean(
+      pr42Migration.match(
+        /tournament_communications_view_select[\s\S]*has_platform_rbac_access\(\)[\s\S]*has_rbac_permission\('communications\.view'\)/,
+      ),
+    ),
+    "tournament_communications_view_select requires platform access",
+  );
+  assert(
+    Boolean(
+      pr42Migration.match(
+        /communication_recipients_view_select[\s\S]*has_platform_rbac_access\(\)[\s\S]*has_rbac_permission\('communications\.view'\)/,
+      ),
+    ),
+    "communication_recipients_view_select requires platform access",
   );
 
   const clubAdminBlock =
@@ -244,10 +261,25 @@ export function runCommunicationSendOutcomeChecks() {
     "club admin has no communications access",
   );
   assert(
+    rbacSeedMigration.includes("WHERE r.key = 'COMMUNICATION_MANAGER'") &&
+      rbacSeedMigration.includes("'communications.view', 'communications.send'"),
+    "communication manager can view and send",
+  );
+  assert(
+    rbacSeedMigration.includes("is_platform_role") &&
+      rbacSeedMigration.includes("('COMMUNICATION_MANAGER'"),
+    "communication manager is platform role",
+  );
+  assert(
     rbacSeedMigration.includes(
       "JOIN public.rbac_permissions p ON p.key IN (\n  'teams.view', 'schedule.view', 'results.view', 'communications.view'\n)\nWHERE r.key = 'TEAM_MANAGER'",
     ),
-    "team manager view permission unchanged",
+    "team manager role permission row unchanged",
+  );
+  assert(
+    rbacSeedMigration.includes("('TEAM_MANAGER', 'Team-Manager'") &&
+      rbacSeedMigration.includes("false)"),
+    "team manager is not a platform role",
   );
   assert(
     !rbacSeedMigration.includes(

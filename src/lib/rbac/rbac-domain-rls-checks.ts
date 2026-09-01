@@ -68,11 +68,12 @@ export function runRbacDomainRlsChecks() {
     "communications.view read policies added",
   );
   assert(
-    pr42Migration.includes("FOR SELECT") &&
+    pr42Migration.includes("has_platform_rbac_access()") &&
+      pr42Migration.includes("FOR SELECT") &&
       !pr42Migration.includes("FOR INSERT") &&
       !pr42Migration.includes("FOR UPDATE") &&
       !pr42Migration.includes("issue_communication_confirmation_token"),
-    "PR42 RLS changes are read-only and do not weaken RPC expiry",
+    "PR42 RLS changes are platform-scoped SELECT-only and do not weaken RPC expiry",
   );
 
   assert(
