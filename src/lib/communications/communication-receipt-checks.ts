@@ -51,6 +51,16 @@ function readPr42Migration() {
   );
 }
 
+function readTokenRlsMigration() {
+  return readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260901130000_communication_confirmation_tokens_platform_scope.sql",
+    ),
+    "utf8",
+  );
+}
+
 function readC1Migration() {
   return readFileSync(
     join(process.cwd(), "supabase/migrations/20260830120000_communication_center.sql"),
@@ -122,6 +132,7 @@ export function runCommunicationReceiptChecks() {
   const migration = readMigration();
   const hardeningMigration = readHardeningMigration();
   const pr42Migration = readPr42Migration();
+  const tokenRlsMigration = readTokenRlsMigration();
   const c1Migration = readC1Migration();
   const cancellationMigration = readCancellationMigration();
   const paymentMigration = readPaymentMigration();
@@ -157,6 +168,33 @@ export function runCommunicationReceiptChecks() {
     "confirmation token admin select RBAC hardened",
   );
   assert(
+    tokenRlsMigration.includes("communication_confirmation_tokens_admin_select") &&
+      tokenRlsMigration.includes("has_platform_rbac_access()") &&
+      tokenRlsMigration.includes("has_rbac_permission('communications.view')"),
+    "confirmation token admin select is platform-scoped",
+  );
+  assert(
+    !tokenRlsMigration.includes("FOR INSERT") &&
+      !tokenRlsMigration.includes("FOR UPDATE") &&
+      !tokenRlsMigration.includes("FOR DELETE"),
+    "confirmation token policy remains SELECT-only",
+  );
+  assert(
+    (migration.match(/CREATE POLICY[\s\S]*communication_confirmation_tokens/g) ?? []).length ===
+      1,
+    "only one confirmation token RLS policy in receipts migration",
+  );
+  assert(
+    !pr42Migration.includes("communication_confirmation_tokens"),
+    "PR42 migration does not touch confirmation token policies",
+  );
+  assert(
+    !tokenRlsMigration.includes("get_communication_receipt_context") &&
+      !tokenRlsMigration.includes("confirm_communication_receipt") &&
+      !tokenRlsMigration.includes("issue_communication_confirmation_token"),
+    "public token RPCs unchanged",
+  );
+  assert(
     !hardeningMigration.includes("get_communication_receipt_context") &&
       !hardeningMigration.includes("confirm_communication_receipt"),
     "public receipt RPCs left token-scoped",
@@ -172,6 +210,14 @@ export function runCommunicationReceiptChecks() {
     "require_confirmation column",
   );
   assert(migration.includes("confirmed_at timestamptz"), "confirmed_at column");
+  assert(migration.includes("token_hash text NOT NULL"), "token_hash column");
+  assert(migration.includes("expires_at timestamptz NOT NULL"), "expires_at column");
+  assert(migration.includes("revoked_at timestamptz"), "revoked_at column");
+  assert(migration.includes("created_at timestamptz NOT NULL"), "created_at column");
+  assert(
+    migration.includes("communication_recipient_id uuid NOT NULL"),
+    "communication_recipient_id column",
+  );
   assert(migration.includes("length(token_hash) = 64"), "token hash length check");
   assert(
     migration.includes("communication_confirmation_tokens_recipient_unique"),

@@ -67,6 +67,16 @@ function readRbacSeedMigration() {
   );
 }
 
+function readTokenRlsMigration() {
+  return readFileSync(
+    join(
+      process.cwd(),
+      "supabase/migrations/20260901130000_communication_confirmation_tokens_platform_scope.sql",
+    ),
+    "utf8",
+  );
+}
+
 export function runCommunicationSendOutcomeChecks() {
   const mail = readMail();
   const actions = readActions();
@@ -79,6 +89,7 @@ export function runCommunicationSendOutcomeChecks() {
     "utf8",
   );
   const rbacSeedMigration = readRbacSeedMigration();
+  const tokenRlsMigration = readTokenRlsMigration();
 
   // Send outcome evaluation
   const allFailed = evaluateCommunicationSendOutcome({
@@ -261,14 +272,22 @@ export function runCommunicationSendOutcomeChecks() {
     "club admin has no communications access",
   );
   assert(
+    tokenRlsMigration.includes("communication_confirmation_tokens_admin_select"),
+    "confirmation token policy hardened in forward migration",
+  );
+  assert(
     rbacSeedMigration.includes("WHERE r.key = 'COMMUNICATION_MANAGER'") &&
       rbacSeedMigration.includes("'communications.view', 'communications.send'"),
     "communication manager can view and send",
   );
   assert(
-    rbacSeedMigration.includes("is_platform_role") &&
-      rbacSeedMigration.includes("('COMMUNICATION_MANAGER'"),
+    rbacSeedMigration.includes("('COMMUNICATION_MANAGER', 'Kommunikation'") &&
+      rbacSeedMigration.includes("true)"),
     "communication manager is platform role",
+  );
+  assert(
+    tokenRlsMigration.includes("has_platform_rbac_access()"),
+    "confirmation token read requires platform access",
   );
   assert(
     rbacSeedMigration.includes(
