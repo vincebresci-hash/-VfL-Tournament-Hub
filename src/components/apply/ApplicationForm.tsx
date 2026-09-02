@@ -167,19 +167,6 @@ export function ApplicationForm({
             onChange={(event) => update("website", event.target.value)}
           />
         </Field>
-        <div>
-          <p className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
-            Vereinslogo
-            <span className="ml-3 font-medium tracking-[0.08em] text-muted normal-case">
-              Optional
-            </span>
-          </p>
-          <div className="mt-2 flex h-28 items-center justify-center border border-dashed border-line bg-surface px-4 text-center">
-            <p className="text-[12px] leading-5 tracking-[0.06em] text-muted uppercase">
-              Logo-Upload folgt später
-            </p>
-          </div>
-        </div>
       </FormSection>
 
       <FormSection title="Mannschaft" icon={<IconUsers className="h-4 w-4 text-brand-yellow" />}>
