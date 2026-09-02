@@ -28,7 +28,7 @@ import {
 import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import { publicTeamLabel } from "@/lib/schedule/names";
 import { tournamentImageObjectPosition } from "@/data/tournaments";
-import { withCanonical } from "@/lib/site";
+import { getSiteUrl, withCanonical } from "@/lib/site";
 
 type TournamentDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -43,9 +43,20 @@ export async function generateMetadata({
   const { slug } = await params;
   const tournament = await getPublicTournamentBySlug(slug);
 
+  const title = tournament?.name ?? "Turnier";
+  const description =
+    nonempty(tournament?.shortDescription) ?? nonempty(tournament?.description) ?? undefined;
+  const pageUrl = `${getSiteUrl()}/turniere/${slug}`;
+
   return withCanonical(`/turniere/${slug}`, {
-    title: tournament?.name ?? "Turnier",
-    description: nonempty(tournament?.shortDescription) ?? nonempty(tournament?.description) ?? undefined,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+      url: pageUrl,
+    },
   });
 }
 
