@@ -5,23 +5,15 @@ import {
   HELP_CHAT_RATE_LIMIT_MESSAGE,
   isHelpChatRateLimited,
   recordHelpChatAttempt,
+  resolveHelpChatRateLimitIdentifier,
 } from "@/lib/help/help-chat-rate-limit";
 import { publicContactEmail } from "@/lib/contact";
 import { getAppSettings } from "@/lib/settings";
 
-function getClientIdentifier(request: Request) {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() || "unknown";
-  }
-
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
-}
-
 export async function POST(request: Request) {
-  const identifier = getClientIdentifier(request);
+  const identifier = resolveHelpChatRateLimitIdentifier(request);
 
-  if (isHelpChatRateLimited(identifier)) {
+  if (identifier && isHelpChatRateLimited(identifier)) {
     return NextResponse.json(
       { error: HELP_CHAT_RATE_LIMIT_MESSAGE },
       { status: 429 },
@@ -47,7 +39,9 @@ export async function POST(request: Request) {
     );
   }
 
-  recordHelpChatAttempt(identifier);
+  if (identifier) {
+    recordHelpChatAttempt(identifier);
+  }
 
   const settings = await getAppSettings();
   const contactEmail = publicContactEmail(settings);

@@ -1,12 +1,76 @@
 import type { TurnierhubKnowledgeEntry } from "@/lib/help/turnierhub-knowledge";
 
-export const HELP_CHAT_MATCH_THRESHOLD = 4;
+export const HELP_CHAT_MATCH_THRESHOLD = 6;
+export const HELP_CHAT_DOMAIN_SCORE_THRESHOLD = 4;
+
+const GENERIC_QUERY_TOKENS = new Set([
+  "wann",
+  "wie",
+  "wo",
+  "was",
+  "wer",
+  "wem",
+  "wen",
+  "warum",
+  "wieso",
+  "ist",
+  "sind",
+  "bin",
+  "bist",
+  "war",
+  "waren",
+  "das",
+  "die",
+  "der",
+  "den",
+  "dem",
+  "des",
+  "ein",
+  "eine",
+  "einer",
+  "einem",
+  "einen",
+  "mein",
+  "meine",
+  "meiner",
+  "meinem",
+  "meinen",
+  "unser",
+  "unsere",
+  "unserer",
+  "noch",
+  "schon",
+  "gibt",
+  "es",
+  "bei",
+  "von",
+  "fur",
+  "fuer",
+  "und",
+  "oder",
+  "kann",
+  "ich",
+  "wir",
+  "ihr",
+  "du",
+  "sie",
+  "man",
+  "bitte",
+  "denn",
+  "also",
+  "auch",
+  "nur",
+  "mal",
+  "schon",
+  "team",
+  "mannschaft",
+]);
 
 const GERMAN_SYNONYMS: Record<string, string[]> = {
   bewerben: ["anmelden", "bewerbung", "anmeldung"],
   warteliste: ["warten", "wartelistenplatz"],
-  absage: ["absagen", "stornieren", "zurückziehen"],
-  zahlung: ["bezahlen", "gebühr", "startgebühr"],
+  absage: ["absagen", "stornieren", "zuruckziehen"],
+  zahlung: ["bezahlen", "gebuehr", "startgebuehr"],
   spielplan: ["ergebnisse", "tabelle", "gruppen"],
   konto: ["account", "vereinskonto", "login"],
 };
@@ -19,6 +83,10 @@ export function normalizeHelpChatText(value: string) {
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function isDomainToken(token: string) {
+  return token.length > 1 && !GENERIC_QUERY_TOKENS.has(token);
 }
 
 function expandTokens(tokens: string[]) {
@@ -44,10 +112,12 @@ function tokenize(value: string) {
 
 function scoreEntry(query: string, queryTokens: Set<string>, entry: TurnierhubKnowledgeEntry) {
   let score = 0;
+  let domainScore = 0;
   const normalizedTitle = normalizeHelpChatText(entry.title);
 
   if (query.includes(normalizedTitle)) {
     score += 12;
+    domainScore += 12;
   }
 
   for (const keyword of entry.keywords) {
@@ -58,31 +128,39 @@ function scoreEntry(query: string, queryTokens: Set<string>, entry: TurnierhubKn
 
     if (query === normalizedKeyword) {
       score += 10;
+      domainScore += 10;
       continue;
     }
 
     if (query.includes(normalizedKeyword)) {
-      score += normalizedKeyword.includes(" ") ? 8 : 5;
+      const phrasePoints = normalizedKeyword.includes(" ") ? 8 : 5;
+      score += phrasePoints;
+      domainScore += phrasePoints;
     }
 
-    const keywordTokens = tokenize(normalizedKeyword);
+    const keywordTokens = tokenize(normalizedKeyword).filter(isDomainToken);
     const overlap = keywordTokens.filter((token) => queryTokens.has(token)).length;
-    score += overlap * 2;
+    if (overlap > 0) {
+      score += overlap * 2;
+      domainScore += overlap * 2;
+    }
   }
 
-  const titleTokens = tokenize(entry.title);
+  const titleTokens = tokenize(entry.title).filter(isDomainToken);
   for (const token of titleTokens) {
     if (queryTokens.has(token)) {
       score += 1;
+      domainScore += 1;
     }
   }
 
-  return score;
+  return { score, domainScore };
 }
 
 export type IntentMatchResult = {
   entry: TurnierhubKnowledgeEntry;
   score: number;
+  domainScore: number;
 };
 
 export function matchKnowledgeEntry(
@@ -94,17 +172,21 @@ export function matchKnowledgeEntry(
     return null;
   }
 
-  const queryTokens = expandTokens(tokenize(query));
+  const queryTokens = expandTokens(tokenize(query).filter(isDomainToken));
   let best: IntentMatchResult | null = null;
 
   for (const entry of entries) {
-    const score = scoreEntry(query, queryTokens, entry);
+    const { score, domainScore } = scoreEntry(query, queryTokens, entry);
     if (!best || score > best.score) {
-      best = { entry, score };
+      best = { entry, score, domainScore };
     }
   }
 
-  if (!best || best.score < HELP_CHAT_MATCH_THRESHOLD) {
+  if (
+    !best ||
+    best.score < HELP_CHAT_MATCH_THRESHOLD ||
+    best.domainScore < HELP_CHAT_DOMAIN_SCORE_THRESHOLD
+  ) {
     return null;
   }
 

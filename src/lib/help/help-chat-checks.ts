@@ -1,11 +1,19 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { processHelpChatMessage } from "@/lib/help/help-chat";
+import { filterAllowedHelpChatLinks, isAllowedHelpChatHref } from "@/lib/help/help-chat-links";
 import {
   HELP_CHAT_MAX_INPUT_LENGTH,
   sanitizeHelpChatInput,
 } from "@/lib/help/help-chat-input";
 import { isHelpWidgetPathAllowed } from "@/lib/help/help-chat-paths";
+import {
+  HELP_CHAT_RATE_LIMIT_CONFIG,
+  isHelpChatRateLimited,
+  recordHelpChatAttempt,
+  resetHelpChatRateLimitStoreForTests,
+  resolveHelpChatRateLimitIdentifier,
+} from "@/lib/help/help-chat-rate-limit";
 import { matchKnowledgeEntry } from "@/lib/help/intent-matcher";
 import {
   getTurnierhubKnowledgeEntries,
@@ -40,11 +48,36 @@ function readApiRoute() {
   );
 }
 
+function readRateLimitModule() {
+  return readFileSync(
+    join(process.cwd(), "src/lib/help/help-chat-rate-limit.ts"),
+    "utf8",
+  );
+}
+
+function assertScheduleRedirect(question: string) {
+  const result = processHelpChatMessage(question);
+  assert(
+    result.type === "schedule_redirect",
+    `${question} should schedule_redirect, got ${result.type}`,
+  );
+  assert(
+    result.links.some((link) => link.href === "/turniere"),
+    `${question} should link to /turniere`,
+  );
+  assert(
+    result.links.some((link) => link.href === "/live"),
+    `${question} should link to /live`,
+  );
+  assert(!result.entryId, `${question} must not return knowledge entry`);
+}
+
 export function runHelpChatChecks() {
   const faq = readFaq();
   const layout = readLayout();
   const widgetGate = readWidgetGate();
   const apiRoute = readApiRoute();
+  const rateLimitModule = readRateLimitModule();
   const entries = getTurnierhubKnowledgeEntries("test@example.com");
 
   assert(
@@ -84,9 +117,26 @@ export function runHelpChatChecks() {
   assert(payment.type === "knowledge", "payment maps to knowledge");
   assert(payment.entryId === "zahlung", "payment knowledge entry");
 
-  const schedule = processHelpChatMessage("Wo ist der Spielplan?");
-  assert(schedule.type === "knowledge", "schedule maps to knowledge");
-  assert(schedule.entryId === "spielplan", "schedule knowledge entry");
+  const scheduleFaq = processHelpChatMessage("Wo ist der Spielplan?");
+  assert(scheduleFaq.type === "knowledge", "generic schedule FAQ maps to knowledge");
+  assert(scheduleFaq.entryId === "spielplan", "spielplan knowledge entry");
+
+  assertScheduleRedirect("Wann spielt VfL U10?");
+  assert(
+    processHelpChatMessage("Wann spielt VfL U10?").entryId !== "zahlung",
+    "Wann spielt VfL U10? must not map to zahlung",
+  );
+
+  assertScheduleRedirect("Wann spielt mein Team?");
+  assert(
+    processHelpChatMessage("Wann spielt mein Team?").entryId !== "bewerben",
+    "Wann spielt mein Team? must not map to bewerben",
+  );
+
+  assertScheduleRedirect("Wann ist das nächste Spiel?");
+  assertScheduleRedirect("Wie ist der Spielplan von U12?");
+  assertScheduleRedirect("Gegen wen spielt VfL U10?");
+  assertScheduleRedirect("Was ist das Ergebnis?");
 
   const tournamentSpecific = processHelpChatMessage(
     "Ist das VfL Cup 2026 noch offen und wann ist das Turnier?",
@@ -160,6 +210,68 @@ export function runHelpChatChecks() {
   assert(
     !apiRoute.includes("communication") && !apiRoute.includes("resend"),
     "help chat api isolated from communication/resend",
+  );
+
+  assert(
+    apiRoute.includes("resolveHelpChatRateLimitIdentifier"),
+    "api uses resolveHelpChatRateLimitIdentifier",
+  );
+  assert(
+    !apiRoute.includes('"unknown"') && !apiRoute.includes("'unknown'"),
+    "api does not use shared unknown bucket",
+  );
+
+  assert(
+    rateLimitModule.includes("per-runtime/serverless-instance") ||
+      rateLimitModule.includes("per-runtime-instance"),
+    "serverless limitation documented",
+  );
+  assert(
+    rateLimitModule.includes("Fail open"),
+    "fail-open without client identifier documented",
+  );
+
+  resetHelpChatRateLimitStoreForTests();
+  const identifier = "test-client-a";
+  const expiredAt = 1_000_000;
+  for (let i = 0; i < HELP_CHAT_RATE_LIMIT_CONFIG.maxAttempts; i++) {
+    recordHelpChatAttempt(identifier, expiredAt + i);
+  }
+  assert(
+    isHelpChatRateLimited(
+      identifier,
+      expiredAt + HELP_CHAT_RATE_LIMIT_CONFIG.windowMs + 1,
+    ) === false,
+    "expired attempts do not rate limit",
+  );
+  recordHelpChatAttempt(identifier, expiredAt + HELP_CHAT_RATE_LIMIT_CONFIG.windowMs + 2);
+  assert(
+    isHelpChatRateLimited(
+      identifier,
+      expiredAt + HELP_CHAT_RATE_LIMIT_CONFIG.windowMs + 2,
+    ) === false,
+    "fresh attempt after expiry starts clean window",
+  );
+
+  const missingIdentifierRequest = new Request("http://localhost/api/help/chat", {
+    method: "POST",
+  });
+  assert(
+    resolveHelpChatRateLimitIdentifier(missingIdentifierRequest) === null,
+    "missing client identifier returns null",
+  );
+
+  assert(
+    !isAllowedHelpChatHref("javascript:alert(1)"),
+    "javascript href blocked",
+  );
+  assert(!isAllowedHelpChatHref("https://evil.example"), "external href blocked");
+  assert(
+    filterAllowedHelpChatLinks([
+      { label: "Evil", href: "javascript:alert(1)" },
+      { label: "FAQ", href: "/faq" },
+    ]).length === 1,
+    "only allowed internal links returned",
   );
 
   const fristEntry = entries.find((entry) => entry.id === "frist");

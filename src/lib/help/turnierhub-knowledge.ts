@@ -50,6 +50,15 @@ export const HELP_CHAT_TOURNAMENT_REDIRECT_LINKS: TurnierhubKnowledgeLink[] = [
   { label: "FAQ", href: "/faq" },
 ];
 
+export const HELP_CHAT_SCHEDULE_REDIRECT_MESSAGE =
+  "Konkrete Spielzeiten, Gegner, Plätze, Spielpläne und Ergebnisse sind turnierabhängig und können hier nicht sicher genannt werden. Bitte schaut auf der Turnierseite oder im Live-Bereich nach dem aktuellen Stand.";
+
+export const HELP_CHAT_SCHEDULE_REDIRECT_LINKS: TurnierhubKnowledgeLink[] = [
+  { label: "Turniere ansehen", href: "/turniere" },
+  { label: "Live & Ergebnisse", href: "/live" },
+  { label: "FAQ", href: "/faq" },
+];
+
 export const HELP_CHAT_APPLICATION_STATUS_MESSAGE =
   "Den Status einer konkreten Bewerbung kann ich hier nicht einsehen. Mit Vereinskonto findet ihr eure Bewerbungen unter „Bewerbungen“. Sonst hilft der Veranstalter weiter.";
 

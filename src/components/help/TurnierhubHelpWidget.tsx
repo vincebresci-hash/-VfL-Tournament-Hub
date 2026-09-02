@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { IconClose, IconMessage } from "@/components/ui/icons";
+import { filterAllowedHelpChatLinks } from "@/lib/help/help-chat-links";
 import {
   HELP_CHAT_GREETING,
   getStarterQuestions,
@@ -26,13 +27,14 @@ function createMessageId() {
 }
 
 function renderLinks(links: TurnierhubKnowledgeLink[] | undefined) {
-  if (!links || links.length === 0) {
+  const safeLinks = filterAllowedHelpChatLinks(links);
+  if (safeLinks.length === 0) {
     return null;
   }
 
   return (
     <div className="mt-2 flex flex-wrap gap-2">
-      {links.map((link) => (
+      {safeLinks.map((link) => (
         <Link
           key={link.href}
           href={link.href}
