@@ -37,7 +37,10 @@ function readStatusMail() {
 }
 
 function readFaq() {
-  return readFileSync(join(process.cwd(), "src/data/faq.tsx"), "utf8");
+  return readFileSync(
+    join(process.cwd(), "src/lib/help/turnierhub-knowledge.ts"),
+    "utf8",
+  );
 }
 
 export function runCancellationRequestsChecks() {

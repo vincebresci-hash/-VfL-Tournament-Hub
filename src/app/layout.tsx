@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Barlow_Condensed, Geist } from "next/font/google";
+import { TurnierhubHelpWidgetGate } from "@/components/help/TurnierhubHelpWidgetGate";
 import { APP_DESCRIPTION, APP_NAME } from "@/lib/constants";
 import { getSiteUrl } from "@/lib/site";
 import "./globals.css";
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Zum Inhalt springen
         </a>
         {children}
+        <TurnierhubHelpWidgetGate />
       </body>
     </html>
   );
