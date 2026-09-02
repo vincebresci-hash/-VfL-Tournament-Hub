@@ -123,6 +123,18 @@ export function runSiteUrlAndCspChecks() {
       !/alternates:\s*\{\s*canonical:\s*"\/"/.test(layoutSource),
       "layout must not force global canonical /",
     );
+
+    const tournamentDetailPage = readFileSync(
+      join(process.cwd(), "src/app/turniere/[slug]/page.tsx"),
+      "utf8",
+    );
+    assert(tournamentDetailPage.includes("openGraph"), "tournament detail openGraph metadata");
+    assert(
+      tournamentDetailPage.includes("url: pageUrl"),
+      "tournament route-specific openGraph.url",
+    );
+    assert(tournamentDetailPage.includes("getSiteUrl()"), "tournament builds absolute url");
+
     // F/G CSP header value
     const csp = getContentSecurityPolicyHeaderValue();
     assert(csp.includes("frame-src"), "F: CSP has frame-src");
