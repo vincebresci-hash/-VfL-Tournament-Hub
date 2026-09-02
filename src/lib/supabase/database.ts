@@ -32,6 +32,7 @@ export type EmailTemplateTypeRow =
   | "cancellation-request-submitted"
   | "cancellation-confirmed"
   | "cancellation-rejected"
+  | "participation-access-recovery"
   | "follow-up"
   | "general";
 
@@ -1203,6 +1204,21 @@ export type Database = {
           p_reason: string;
         };
         Returns: string;
+      };
+      issue_participation_access_recovery_token: {
+        Args: {
+          p_tournament_id: string;
+          p_contact_email: string;
+          p_email_identifier_hash: string;
+          p_ip_identifier_hash: string;
+          p_token_hash: string;
+        };
+        Returns: Array<{
+          application_id: string;
+          contact_email: string;
+          contact_first_name: string;
+          tournament_name: string;
+        }>;
       };
       decide_cancellation_request: {
         Args: {
