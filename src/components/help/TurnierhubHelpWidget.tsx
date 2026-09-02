@@ -292,16 +292,18 @@ export function TurnierhubHelpWidget() {
         </div>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="pointer-events-auto inline-flex h-12 min-h-11 items-center gap-2 rounded-full border border-navy bg-navy px-4 text-[13px] font-semibold text-white shadow-[0_12px_32px_rgba(7,11,18,0.28)] transition-transform duration-200 hover:scale-[1.03] hover:bg-[#0f2f63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow active:scale-[0.98] sm:h-13 sm:px-5"
-        aria-expanded={open}
-        aria-controls={open ? dialogTitleId : undefined}
-      >
-        <IconMessage className="h-5 w-5 text-brand-yellow" />
-        <span>Hilfe</span>
-      </button>
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="pointer-events-auto inline-flex h-12 min-h-11 items-center gap-2 rounded-full border border-navy bg-navy px-4 text-[13px] font-semibold text-white shadow-[0_12px_32px_rgba(7,11,18,0.28)] transition-transform duration-200 hover:scale-[1.03] hover:bg-[#0f2f63] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow active:scale-[0.98] sm:h-13 sm:px-5"
+          aria-expanded={false}
+          aria-controls={dialogTitleId}
+        >
+          <IconMessage className="h-5 w-5 text-brand-yellow" />
+          <span>Hilfe</span>
+        </button>
+      ) : null}
     </div>
   );
 }
