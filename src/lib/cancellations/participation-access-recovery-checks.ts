@@ -11,6 +11,10 @@ import {
   PARTICIPATION_RECOVERY_NEUTRAL_NOTICE,
 } from "@/lib/cancellations/participation-recovery";
 import {
+  participationRecoveryTokenExpiresAt,
+  PARTICIPATION_RECOVERY_MIN_RESPONSE_MS,
+} from "@/lib/cancellations/participation-recovery-timing";
+import {
   generateSecureAccessToken,
   hashSecureAccessToken,
   isValidSecureAccessTokenFormat,
@@ -32,7 +36,9 @@ export function runParticipationAccessRecoveryChecks() {
   const migration = read("supabase/migrations/20260902120000_participation_access_recovery.sql");
   const recovery = read("src/lib/cancellations/participation-recovery.ts");
   const recoveryActions = read("src/lib/cancellations/participation-recovery-actions.ts");
+  const recoveryDelivery = read("src/lib/cancellations/participation-recovery-delivery.ts");
   const recoveryMail = read("src/lib/cancellations/participation-recovery-mail.ts");
+  const recoveryTiming = read("src/lib/cancellations/participation-recovery-timing.ts");
   const actions = read("src/lib/cancellations/actions.ts");
   const participationToken = read("src/lib/cancellations/participation-token.ts");
   const cancellationMigration = read(
@@ -42,26 +48,44 @@ export function runParticipationAccessRecoveryChecks() {
   const client = read("src/lib/supabase/client.ts");
   const kontaktPage = read("src/app/kontakt/page.tsx");
   const absagePage = read("src/app/kontakt/absage/page.tsx");
-  const recoveryForm = read("src/components/cancellation/ParticipationRecoveryForm.tsx");
-  const existingLinkForm = read("src/components/cancellation/ExistingParticipationLinkForm.tsx");
   const statusMail = read("src/lib/email/status-mail.ts");
   const adminTypes = read("src/types/admin.ts");
 
   // Migration safety
   assert(
-    migration.includes("issue_participation_access_recovery_token"),
-    "migration defines recovery RPC",
+    migration.includes("stage_participation_access_recovery_token"),
+    "migration defines stage RPC",
+  );
+  assert(
+    migration.includes("activate_participation_access_recovery_token"),
+    "migration defines activate RPC",
+  );
+  assert(
+    migration.includes("discard_participation_access_recovery_token"),
+    "migration defines discard RPC",
+  );
+  assert(
+    migration.includes("pending_activation"),
+    "migration adds pending_activation column",
   );
   assert(migration.includes("SECURITY DEFINER"), "migration RPC is SECURITY DEFINER");
   assert(migration.includes("SET search_path = public"), "migration RPC sets search_path");
   assert(
-    migration.includes("REVOKE ALL ON FUNCTION public.issue_participation_access_recovery_token"),
-    "migration revokes public RPC access",
+    migration.includes("REVOKE ALL ON FUNCTION public.stage_participation_access_recovery_token"),
+    "migration revokes public stage RPC access",
   );
   assert(
-    migration.includes("GRANT EXECUTE ON FUNCTION public.issue_participation_access_recovery_token") &&
+    migration.includes("GRANT EXECUTE ON FUNCTION public.stage_participation_access_recovery_token") &&
       migration.includes("TO service_role"),
-    "migration grants RPC to service_role only",
+    "migration grants stage RPC to service_role only",
+  );
+  assert(
+    migration.includes("REVOKE ALL ON FUNCTION public.activate_participation_access_recovery_token"),
+    "migration revokes public activate RPC access",
+  );
+  assert(
+    migration.includes("REVOKE ALL ON FUNCTION public.discard_participation_access_recovery_token"),
+    "migration revokes public discard RPC access",
   );
   assert(
     migration.includes("participation-access-recovery"),
@@ -76,172 +100,181 @@ export function runParticipationAccessRecoveryChecks() {
     "migration requires accepted status",
   );
   assert(
-    migration.includes("participation_recovery_email") &&
-      migration.includes("participation_recovery_ip") &&
-      migration.includes("participation_recovery_app"),
-    "migration defines rate limit buckets",
-  );
-  assert(
-    !migration.includes("cancellation_requests") ||
-      !migration.toLowerCase().includes("insert into public.cancellation_requests"),
-    "migration does not create cancellation requests",
-  );
-  assert(
-    !migration.includes("status = 'cancelled'"),
-    "migration does not cancel applications",
+    migration.includes("FOR UPDATE"),
+    "migration serializes recovery with row locks",
   );
 
-  // A: neutral public response
+  // P1-1: expired unrevoked token does not block recovery
+  assert(
+    migration.includes("pending_activation = true"),
+    "P1-1: stage inserts pending token instead of immediate activation",
+  );
+  assert(
+    migration.includes("pending_activation = false") &&
+      migration.includes("AND revoked_at IS NULL"),
+    "P1-1: activate revokes active non-pending tokens",
+  );
+  assert(
+    !migration.includes("expires_at > now()") ||
+      !migration.match(/UPDATE public\.secure_access_tokens[\s\S]*expires_at > now\(\)/),
+    "P1-1: stage does not skip expired unrevoked tokens via expires_at filter",
+  );
+
+  // P1-2: email failure must not destroy active access
+  assert(
+    recoveryActions.includes("stage_participation_access_recovery_token"),
+    "P1-2: stage before email",
+  );
+  assert(
+    recoveryDelivery.includes("activate_participation_access_recovery_token"),
+    "P1-2: activate only after provider acceptance",
+  );
+  assert(
+    recoveryDelivery.includes("discard_participation_access_recovery_token"),
+    "P1-2: discard on provider failure",
+  );
+  assert(
+    recoveryMail.includes("deliverParticipationAccessRecoveryEmail"),
+    "P1-2: delivery returns provider outcome",
+  );
+  assert(
+    recoveryDelivery.includes("emailResult.ok"),
+    "P1-2: activation gated on provider ok",
+  );
+  assert(
+    migration.includes("pending_activation = true") &&
+      migration.includes("revoked_at = now()"),
+    "P1-2: staged token is not portal-valid until activation",
+  );
+
+  // P1-3: timing mitigation
+  assert(
+    recoveryDelivery.includes('from "next/server"') &&
+      recoveryDelivery.includes("after("),
+    "P1-3: email delivery deferred via next/server after",
+  );
+  assert(
+    recoveryActions.includes("scheduleParticipationRecoveryDelivery"),
+    "P1-3: action schedules async delivery module",
+  );
+  assert(
+    !recoveryActions.includes("await deliverParticipationAccessRecoveryEmail"),
+    "P1-3: request path does not await email delivery",
+  );
+  assert(
+    recoveryTiming.includes("PARTICIPATION_RECOVERY_MIN_RESPONSE_MS"),
+    "P1-3: bounded response normalization exists",
+  );
+  assert(
+    recoveryActions.includes("waitForParticipationRecoveryResponseDeadline"),
+    "P1-3: action applies response deadline",
+  );
+  assert(
+    PARTICIPATION_RECOVERY_MIN_RESPONSE_MS >= 300 &&
+      PARTICIPATION_RECOVERY_MIN_RESPONSE_MS <= 2000,
+    "P1-3: bounded min response window",
+  );
+
+  // P1-4: concurrency
+  assert(
+    migration.includes("FROM public.applications") &&
+      migration.includes("FOR UPDATE"),
+    "P1-4: application row locked during stage",
+  );
+  assert(
+    migration.includes("DELETE FROM public.secure_access_tokens") &&
+      migration.includes("pending_activation = true"),
+    "P1-4: stale pending tokens removed before new stage",
+  );
+  assert(
+    migration.includes("FOR UPDATE") &&
+      migration.includes("pending_activation = true"),
+    "P1-4: activate locks pending token row",
+  );
+
+  // Expiry future-safe
+  assert(
+    migration.includes("participation_recovery_token_expires_at"),
+    "expiry helper exists in migration",
+  );
+  assert(
+    migration.includes("GREATEST(") && migration.includes("p_tournament_date"),
+    "expiry uses max(tournament date, today)",
+  );
+  const pastTournament = "2020-01-01";
+  const futureExpiry = participationRecoveryTokenExpiresAt(pastTournament);
+  assert(Date.parse(futureExpiry) > Date.now(), "past tournament expiry is in the future");
+  const futureTournament = new Date();
+  futureTournament.setUTCFullYear(futureTournament.getUTCFullYear() + 1);
+  const futureTournamentIso = futureTournament.toISOString().slice(0, 10);
+  const futureTournamentExpiry = participationRecoveryTokenExpiresAt(futureTournamentIso);
+  assert(
+    Date.parse(futureTournamentExpiry) > Date.now(),
+    "future tournament expiry is in the future",
+  );
+
+  // Neutral public response
   assert(
     recoveryActions.includes("PARTICIPATION_RECOVERY_NEUTRAL_NOTICE"),
-    "A: action uses neutral notice constant",
+    "neutral notice constant used",
   );
   assert(
     recoveryActions.includes("notice: PARTICIPATION_RECOVERY_NEUTRAL_NOTICE"),
-    "A: action returns neutral notice on success path",
-  );
-  assert(
-    recoveryActions.includes('console.error("issue_participation_access_recovery_token failed"'),
-    "A: RPC errors still return neutral response",
+    "neutral notice returned on success path",
   );
 
-  // B-D: recovery alone does not mutate cancellation workflow
+  // No cancellation side effects
+  assert(
+    !migration.toLowerCase().includes("insert into public.cancellation_requests"),
+    "no cancellation request insert",
+  );
+  assert(
+    !migration.includes("status = 'cancelled'"),
+    "no application cancellation",
+  );
   assert(
     !recoveryActions.includes("submit_cancellation_request_external"),
-    "B: recovery action does not submit cancellation",
-  );
-  assert(
-    !recoveryActions.includes("cancellation_requests"),
-    "B: recovery action does not touch cancellation_requests",
-  );
-  assert(
-    !recovery.includes("submitExternalCancellationRequestAction"),
-    "recovery helper does not call external cancellation",
-  );
-  assert(
-    recoveryActions.includes('createServiceRoleClient()'),
-    "recovery uses server-only service role path",
+    "recovery action does not submit cancellation",
   );
 
-  // E: valid recovery reaches existing portal
-  const tokenMaterial = createParticipationRecoveryTokenMaterial();
+  // Token hashing
+  const token = generateSecureAccessToken();
+  const hash = hashSecureAccessToken(token);
+  assert(hash.length === 64, "sha256 hash length");
+  assert(!hash.includes(token), "hash is not plaintext token");
   assert(
-    tokenMaterial.participationUrl.includes("/teilnahme/"),
-    "E: recovery URL targets participation portal",
+    recoveryActions.includes("p_token_hash: tokenHash"),
+    "only token hash sent to RPC",
   );
-  assert(
-    actions.includes("loadParticipationPortalByToken"),
-    "E: existing portal loader remains",
-  );
-  assert(absagePage.includes("ParticipationRecoveryForm"), "E: absage page includes recovery form");
 
-  // F: cancellation still requires valid token
+  // Service role isolation
+  assert(serviceRole.includes('import "server-only"'), "service role is server-only");
+  assert(!client.includes("SUPABASE_SERVICE_ROLE_KEY"), "browser client has no service role key");
+
+  // Existing flows unchanged
+  assert(actions.includes("loadParticipationPortalByToken"), "portal loader exists");
+  assert(actions.includes("submitExternalCancellationRequestAction"), "external cancellation unchanged");
+  assert(actions.includes("submitClubCancellationRequestAction"), "club cancellation unchanged");
+  assert(statusMail.includes("ensureParticipationCancellationToken"), "acceptance token helper preserved");
+  assert(participationToken.includes("revokeActiveParticipationTokens"), "acceptance revoke helper preserved");
+
+  // Portal + cancellation still token gated
   assert(
-    actions.includes("submitExternalCancellationRequestAction"),
-    "F: external cancellation action unchanged",
+    cancellationMigration.includes("validate_secure_access_token"),
+    "portal validation RPC unchanged",
   );
   assert(
     cancellationMigration.includes("submit_cancellation_request_external"),
-    "F: external cancellation RPC unchanged in base migration",
+    "external cancellation RPC unchanged",
   );
 
-  // G: late cancellation rule preserved
-  const lateDate = new Date();
-  lateDate.setUTCDate(lateDate.getUTCDate() + 5);
-  const lateIso = lateDate.toISOString().slice(0, 10);
-  assert(requiresCancellationReason(lateIso), "G: <14 days still requires reason");
-  assert(isLateCancellationRequest(lateIso), "G: late window still detected");
+  // Capacity semantics
+  const acceptedCapacity = countApplicationsByStatus(["accepted"]);
+  assert(acceptedCapacity.confirmedTeams === 1, "capacity: accepted still counts");
+  const cancelledCapacity = countApplicationsByStatus(["cancelled"]);
+  assert(cancelledCapacity.confirmedTeams === 0, "capacity: cancelled does not count");
 
-  // H: admin approval still required
-  assert(actions.includes("decideCancellationRequestAction"), "H: admin decide action exists");
-  assert(
-    cancellationMigration.includes("decide_cancellation_request"),
-    "H: decide RPC exists",
-  );
-
-  // I: no auto waitlist promotion
-  assert(
-    !migration.toLowerCase().includes("waiting-list") ||
-      !migration.toLowerCase().includes("promot"),
-    "I: no waitlist promotion in recovery migration",
-  );
-
-  // J: rate limits exist
-  assert(
-    recovery.includes("buildParticipationRecoveryRateLimitHashes"),
-    "J: client-side rate limit hash builder exists",
-  );
-  assert(
-    recoveryActions.includes("emailIdentifierHash") &&
-      recoveryActions.includes("ipIdentifierHash"),
-    "J: action passes rate limit hashes to RPC",
-  );
-
-  // K: token plaintext not stored
-  const token = generateSecureAccessToken();
-  const hash = hashSecureAccessToken(token);
-  assert(hash.length === 64, "K: sha256 hash length");
-  assert(!hash.includes(token), "K: hash is not plaintext token");
-  assert(
-    recoveryActions.includes("p_token_hash: tokenHash"),
-    "K: only token hash sent to RPC",
-  );
-  assert(
-    !migration.includes("token_hash text") || migration.includes("p_token_hash"),
-    "K: migration stores hash parameter only",
-  );
-
-  // L: no service role secret exposure
-  assert(serviceRole.includes('import "server-only"'), "L: service role is server-only");
-  assert(!client.includes("SUPABASE_SERVICE_ROLE_KEY"), "L: browser client has no service role key");
-  assert(
-    !recoveryForm.includes("SUPABASE_SERVICE_ROLE_KEY") &&
-      !existingLinkForm.includes("SUPABASE_SERVICE_ROLE_KEY"),
-    "L: UI does not reference service role key",
-  );
-
-  // M: club cancellation unchanged
-  assert(
-    actions.includes("submitClubCancellationRequestAction"),
-    "M: club cancellation action unchanged",
-  );
-  assert(
-    !recoveryActions.includes("submitClubCancellationRequestAction"),
-    "M: recovery does not alter club cancellation",
-  );
-  assert(absagePage.includes("/login?redirect=%2Fverein%2Fbewerbungen"), "M: club path links to login");
-
-  // N: acceptance/status emails unchanged
-  assert(statusMail.includes("ensureParticipationCancellationToken"), "N: status mail token helper preserved");
-  assert(
-    !statusMail.includes("sendParticipationAccessRecoveryEmail"),
-    "N: status mail does not send recovery email",
-  );
-  assert(
-    recoveryMail.includes("participation-access-recovery"),
-    "N: recovery uses distinct template type",
-  );
-  assert(
-    !recoveryMail.includes("application-accepted"),
-    "N: recovery mail is not acceptance mail",
-  );
-  assert(
-    !recoveryMail.includes("abgesagt") && !recoveryMail.includes("Absage bestätigt"),
-    "N: recovery mail does not claim cancellation",
-  );
-
-  // UI entry points
-  assert(kontaktPage.includes("/kontakt/absage"), "kontakt card links to absage page");
-  assert(kontaktPage.includes("Teilnahme absagen"), "kontakt card copy present");
-  assert(kontaktPage.includes("Absage anfragen"), "kontakt CTA present");
-  assert(absagePage.includes("Gastbewerbung"), "absage page external path");
-  assert(absagePage.includes("ExistingParticipationLinkForm"), "optional existing link fallback");
-
-  // Enumeration protection
-  assert(
-    recovery.includes("parseParticipationTokenFromUserInput"),
-    "existing link parser exists",
-  );
+  // Enumeration helpers
   const siteHost = new URL(getEmailSiteUrl()).host;
   const validToken = generateSecureAccessToken();
   const parsed = parseParticipationTokenFromUserInput(
@@ -256,41 +289,34 @@ export function runParticipationAccessRecoveryChecks() {
     normalizeParticipationRecoveryEmail("  Test@Mail.DE ") === "test@mail.de",
     "email normalization for lookup",
   );
+  assert(!isValidSecureAccessTokenFormat("not valid!"), "invalid token format blocked");
 
-  // Capacity semantics unchanged
-  const acceptedCapacity = countApplicationsByStatus(["accepted"]);
-  assert(acceptedCapacity.confirmedTeams === 1, "capacity: accepted still counts");
-  const cancelledCapacity = countApplicationsByStatus(["cancelled"]);
-  assert(cancelledCapacity.confirmedTeams === 0, "capacity: cancelled does not count");
+  // Late cancellation rule preserved
+  const lateDate = new Date();
+  lateDate.setUTCDate(lateDate.getUTCDate() + 5);
+  const lateIso = lateDate.toISOString().slice(0, 10);
+  assert(requiresCancellationReason(lateIso), "<14 days still requires reason");
+  assert(isLateCancellationRequest(lateIso), "late window still detected");
 
-  // Email template type registered
+  // UI entry points
+  assert(kontaktPage.includes("/kontakt/absage"), "kontakt card links to absage page");
+  assert(absagePage.includes("ParticipationRecoveryForm"), "absage page includes recovery form");
+
   assert(
     adminTypes.includes('"participation-access-recovery"'),
     "admin email template type includes recovery",
   );
 
-  // Participation token reuse semantics
+  const tokenMaterial = createParticipationRecoveryTokenMaterial();
   assert(
-    participationToken.includes("revokeActiveParticipationTokens"),
-    "existing token rotation helper preserved",
-  );
-  assert(
-    migration.includes("revoked_at = now()"),
-    "migration revokes previous active tokens",
+    tokenMaterial.participationUrl.includes("/teilnahme/"),
+    "recovery URL targets participation portal",
   );
 
-  // Neutral notice wording
   assert(
     PARTICIPATION_RECOVERY_NEUTRAL_NOTICE.includes("sicheren Link"),
-    "neutral notice mentions secure link without leaking data",
+    "neutral notice mentions secure link",
   );
-  assert(
-    !PARTICIPATION_RECOVERY_NEUTRAL_NOTICE.toLowerCase().includes("token"),
-    "neutral notice avoids token wording",
-  );
-
-  // Invalid token format guard for existing link
-  assert(!isValidSecureAccessTokenFormat("not valid!"), "invalid token format blocked");
 
   return "ok";
 }

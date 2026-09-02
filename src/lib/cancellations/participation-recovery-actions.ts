@@ -10,7 +10,7 @@ import {
   parseParticipationTokenFromUserInput,
   PARTICIPATION_RECOVERY_NEUTRAL_NOTICE,
 } from "@/lib/cancellations/participation-recovery";
-import { sendParticipationAccessRecoveryEmail } from "@/lib/cancellations/participation-recovery-mail";
+import { waitForParticipationRecoveryResponseDeadline } from "@/lib/cancellations/participation-recovery-timing";
 
 export type ParticipationRecoveryActionResult = {
   error: string | null;
@@ -35,6 +35,7 @@ export async function requestParticipationAccessRecoveryAction(input: {
   tournamentId: string;
   contactEmail: string;
 }): Promise<ParticipationRecoveryActionResult> {
+  const startedAt = Date.now();
   const tournamentId = input.tournamentId.trim();
   const contactEmail = input.contactEmail.trim();
 
@@ -56,7 +57,7 @@ export async function requestParticipationAccessRecoveryAction(input: {
 
   try {
     const service = createServiceRoleClient();
-    const { data, error } = await service.rpc("issue_participation_access_recovery_token", {
+    const { data, error } = await service.rpc("stage_participation_access_recovery_token", {
       p_tournament_id: tournamentId,
       p_contact_email: normalizedEmail,
       p_email_identifier_hash: emailIdentifierHash,
@@ -65,27 +66,29 @@ export async function requestParticipationAccessRecoveryAction(input: {
     });
 
     if (error) {
-      console.error("issue_participation_access_recovery_token failed", error.message);
-      return {
-        error: null,
-        notice: PARTICIPATION_RECOVERY_NEUTRAL_NOTICE,
-      };
-    }
-
-    const match = data?.[0];
-    if (match?.application_id && match.contact_email) {
-      await sendParticipationAccessRecoveryEmail({
-        applicationId: match.application_id,
-        toEmail: match.contact_email,
-        contactFirstName: match.contact_first_name ?? "",
-        tournamentName: match.tournament_name ?? "Turnier",
-        participationUrl,
-      });
+      console.error("stage_participation_access_recovery_token failed", error.message);
+    } else {
+      const match = data?.[0];
+      if (match?.application_id && match.contact_email) {
+        const { scheduleParticipationRecoveryDelivery } = await import(
+          "@/lib/cancellations/participation-recovery-delivery"
+        );
+        scheduleParticipationRecoveryDelivery({
+          tokenHash,
+          applicationId: match.application_id,
+          toEmail: match.contact_email,
+          contactFirstName: match.contact_first_name ?? "",
+          tournamentName: match.tournament_name ?? "Turnier",
+          participationUrl,
+        });
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "recovery_unavailable";
     console.error("participation access recovery failed", message);
   }
+
+  await waitForParticipationRecoveryResponseDeadline(startedAt);
 
   return {
     error: null,

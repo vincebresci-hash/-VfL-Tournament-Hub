@@ -14,6 +14,13 @@ type RecoveryMailInput = {
   participationUrl: string;
 };
 
+export type ParticipationRecoveryEmailResult = {
+  ok: boolean;
+  skipped: boolean;
+  providerMessageId: string | null;
+  error: string | null;
+};
+
 async function writeRecoveryEmailLog(entry: {
   applicationId: string;
   templateId: string | null;
@@ -45,9 +52,9 @@ async function writeRecoveryEmailLog(entry: {
   }
 }
 
-export async function sendParticipationAccessRecoveryEmail(
+export async function deliverParticipationAccessRecoveryEmail(
   input: RecoveryMailInput,
-): Promise<void> {
+): Promise<ParticipationRecoveryEmailResult> {
   const supabase = createServiceRoleClient();
   const { data: templates, error: templateError } = await supabase
     .from("email_templates")
@@ -60,12 +67,23 @@ export async function sendParticipationAccessRecoveryEmail(
     if (!isMissingRelationError(templateError)) {
       console.error("participation recovery template lookup failed", templateError.message);
     }
-    return;
+
+    return {
+      ok: false,
+      skipped: true,
+      providerMessageId: null,
+      error: templateError.message,
+    };
   }
 
   const template = templates?.[0] ?? null;
   if (!template || !template.active) {
-    return;
+    return {
+      ok: false,
+      skipped: true,
+      providerMessageId: null,
+      error: "recovery_template_unavailable",
+    };
   }
 
   const variables = {
@@ -105,4 +123,18 @@ export async function sendParticipationAccessRecoveryEmail(
     provider: result.provider,
     providerMessageId: result.providerMessageId ?? null,
   });
+
+  return {
+    ok: result.ok,
+    skipped: Boolean(result.skipped),
+    providerMessageId: result.providerMessageId ?? null,
+    error: result.ok ? null : result.error ?? "E-Mail-Versand fehlgeschlagen.",
+  };
+}
+
+/** @deprecated Use deliverParticipationAccessRecoveryEmail for recovery activation flow. */
+export async function sendParticipationAccessRecoveryEmail(
+  input: RecoveryMailInput,
+): Promise<void> {
+  await deliverParticipationAccessRecoveryEmail(input);
 }

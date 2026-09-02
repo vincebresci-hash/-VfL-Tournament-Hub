@@ -447,6 +447,7 @@ export type SecureAccessTokenRow = {
   used_at: string | null;
   last_used_at: string | null;
   revoked_at: string | null;
+  pending_activation: boolean;
   created_at: string;
 };
 
@@ -1219,6 +1220,39 @@ export type Database = {
           contact_first_name: string;
           tournament_name: string;
         }>;
+      };
+      stage_participation_access_recovery_token: {
+        Args: {
+          p_tournament_id: string;
+          p_contact_email: string;
+          p_email_identifier_hash: string;
+          p_ip_identifier_hash: string;
+          p_token_hash: string;
+        };
+        Returns: Array<{
+          application_id: string;
+          contact_email: string;
+          contact_first_name: string;
+          tournament_name: string;
+        }>;
+      };
+      activate_participation_access_recovery_token: {
+        Args: {
+          p_token_hash: string;
+        };
+        Returns: boolean;
+      };
+      discard_participation_access_recovery_token: {
+        Args: {
+          p_token_hash: string;
+        };
+        Returns: boolean;
+      };
+      participation_recovery_token_expires_at: {
+        Args: {
+          p_tournament_date: string;
+        };
+        Returns: string;
       };
       decide_cancellation_request: {
         Args: {
