@@ -3,10 +3,12 @@
 -- =============================================================================
 -- Production: NOT auto-applied. Run manually in Supabase SQL Editor when ready.
 -- Pending-activation tokens: active links stay valid until email provider accepts.
+--
+-- Requires prior committed migration:
+--   20260902115900_participation_access_recovery_enum.sql
+-- which adds email_template_type value 'participation-access-recovery'.
+-- Do NOT re-add the enum value here (PostgreSQL ERROR 55P04).
 -- =============================================================================
-
-ALTER TYPE public.email_template_type
-  ADD VALUE IF NOT EXISTS 'participation-access-recovery';
 
 ALTER TABLE public.secure_access_tokens
   ADD COLUMN IF NOT EXISTS pending_activation boolean NOT NULL DEFAULT false;

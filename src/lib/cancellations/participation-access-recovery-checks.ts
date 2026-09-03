@@ -57,8 +57,10 @@ function migrateLocksApplicationThenMutates(migration: string) {
 }
 
 export function runParticipationAccessRecoveryChecks() {
+  const enumMigration = read(
+    "supabase/migrations/20260902115900_participation_access_recovery_enum.sql",
+  );
   const migration = read("supabase/migrations/20260902120000_participation_access_recovery.sql");
-  const recovery = read("src/lib/cancellations/participation-recovery.ts");
   const recoveryActions = read("src/lib/cancellations/participation-recovery-actions.ts");
   const recoveryDelivery = read("src/lib/cancellations/participation-recovery-delivery.ts");
   const recoveryMail = read("src/lib/cancellations/participation-recovery-mail.ts");
@@ -74,6 +76,39 @@ export function runParticipationAccessRecoveryChecks() {
   const absagePage = read("src/app/kontakt/absage/page.tsx");
   const statusMail = read("src/lib/email/status-mail.ts");
   const adminTypes = read("src/types/admin.ts");
+
+  // Enum split (PostgreSQL 55P04): ADD VALUE must commit before seed usage
+  assert(
+    enumMigration.includes(
+      "ALTER TYPE public.email_template_type\n  ADD VALUE IF NOT EXISTS 'participation-access-recovery';",
+    ),
+    "enum migration adds participation-access-recovery",
+  );
+  assert(
+    !enumMigration.includes("CREATE OR REPLACE FUNCTION"),
+    "enum migration contains no RPC definitions",
+  );
+  assert(
+    !enumMigration.includes("email_templates"),
+    "enum migration does not seed email templates",
+  );
+  assert(
+    !migration.includes("ALTER TYPE public.email_template_type"),
+    "body migration does not re-add enum value",
+  );
+  const bodyWithoutComments = migration
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n")
+    .trimStart();
+  assert(
+    bodyWithoutComments.startsWith("ALTER TABLE public.secure_access_tokens"),
+    "body migration first statement is pending_activation ALTER TABLE",
+  );
+  assert(
+    migration.includes("ADD COLUMN IF NOT EXISTS pending_activation boolean NOT NULL DEFAULT false"),
+    "pending_activation is NOT NULL DEFAULT false",
+  );
 
   // Migration safety
   assert(
