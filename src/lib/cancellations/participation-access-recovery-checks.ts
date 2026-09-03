@@ -163,6 +163,29 @@ export function runParticipationAccessRecoveryChecks() {
     "migration serializes recovery with row locks",
   );
 
+  // pgcrypto under SET search_path = public must be schema-qualified
+  const stageFn = migration.slice(
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.stage_participation_access_recovery_token"),
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.activate_participation_access_recovery_token"),
+  );
+  assert(
+    stageFn.includes("extensions.digest(v_app.id::text, 'sha256')"),
+    "stage RPC uses extensions.digest for app rate-limit hash",
+  );
+  assert(
+    (stageFn.match(/extensions\.digest\(v_app\.id::text, 'sha256'\)/g) ?? []).length >= 2,
+    "stage RPC qualifies digest for rate-limit check and record",
+  );
+  assert(
+    !/\bdigest\s*\(/.test(stageFn.replace(/extensions\.digest\s*\(/g, "")),
+    "stage RPC has no unqualified digest() calls",
+  );
+  assert(
+    !migration.includes("SET search_path = public, extensions") &&
+      !migration.includes("SET search_path = public,extensions"),
+    "search_path remains public-only (not broadened)",
+  );
+
   // P1-1: expired unrevoked token does not block recovery
   assert(
     migration.includes("pending_activation = true"),

@@ -176,7 +176,7 @@ BEGIN
 
   IF public.is_public_action_rate_limited(
     'participation_recovery_app',
-    encode(digest(v_app.id::text, 'sha256'), 'hex'),
+    encode(extensions.digest(v_app.id::text, 'sha256'), 'hex'),
     1,
     interval '15 minutes'
   ) THEN
@@ -185,7 +185,7 @@ BEGIN
 
   PERFORM public.record_public_action_attempt(
     'participation_recovery_app',
-    encode(digest(v_app.id::text, 'sha256'), 'hex')
+    encode(extensions.digest(v_app.id::text, 'sha256'), 'hex')
   );
 
   SELECT *
