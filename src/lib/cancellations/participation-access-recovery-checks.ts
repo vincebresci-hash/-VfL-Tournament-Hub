@@ -186,6 +186,36 @@ export function runParticipationAccessRecoveryChecks() {
     "search_path remains public-only (not broadened)",
   );
 
+  // RETURNS TABLE output vars collide with unqualified SQL column names (42702)
+  assert(
+    stageFn.includes("DELETE FROM public.secure_access_tokens AS sat"),
+    "stage RPC DELETE uses secure_access_tokens alias",
+  );
+  assert(
+    stageFn.includes("sat.application_id = v_app.id"),
+    "stage RPC DELETE qualifies application_id via sat alias",
+  );
+  assert(
+    !/WHERE\s+application_id\s*=/.test(stageFn),
+    "stage RPC has no unqualified WHERE application_id =",
+  );
+  assert(
+    !/\bWHERE[\s\S]*?(?<![\w.])contact_email\s*=/.test(
+      stageFn.replace(/a\.contact_email/g, "QUALIFIED").replace(/v_app\.contact_email/g, "QUALIFIED"),
+    ) || stageFn.includes("a.contact_email"),
+    "stage RPC contact_email comparisons use qualified table/record refs",
+  );
+  assert(
+    stageFn.includes("AND lower(btrim(a.contact_email)) = v_email"),
+    "stage lookup qualifies applications.contact_email as a.contact_email",
+  );
+  assert(
+    !stageFn.includes("WHERE contact_email") &&
+      !stageFn.includes("WHERE contact_first_name") &&
+      !stageFn.includes("WHERE tournament_name"),
+    "stage RPC has no unqualified WHERE on RETURNS TABLE output names",
+  );
+
   // P1-1: expired unrevoked token does not block recovery
   assert(
     migration.includes("pending_activation = true"),

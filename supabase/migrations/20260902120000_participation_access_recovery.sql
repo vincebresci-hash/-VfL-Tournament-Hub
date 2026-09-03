@@ -199,10 +199,10 @@ BEGIN
 
   v_expires_at := public.participation_recovery_token_expires_at(v_tournament.date);
 
-  DELETE FROM public.secure_access_tokens
-  WHERE application_id = v_app.id
-    AND purpose = 'cancellation'::public.secure_access_token_purpose
-    AND pending_activation = true;
+  DELETE FROM public.secure_access_tokens AS sat
+  WHERE sat.application_id = v_app.id
+    AND sat.purpose = 'cancellation'::public.secure_access_token_purpose
+    AND sat.pending_activation = true;
 
   INSERT INTO public.secure_access_tokens (
     application_id,
