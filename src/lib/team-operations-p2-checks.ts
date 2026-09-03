@@ -139,8 +139,8 @@ export function runTeamOperationsP2Checks() {
 
   // CAN-03
   assert(
-    participationToken.includes("revokeActiveParticipationTokens"),
-    "CAN-03: active tokens revoked before reissue",
+    participationToken.includes("rotate_participation_cancellation_token"),
+    "CAN-03: atomic rotate RPC used for acceptance token issuance",
   );
   assert(
     participationToken.includes("issueParticipationCancellationToken"),

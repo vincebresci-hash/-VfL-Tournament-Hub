@@ -281,6 +281,7 @@ export const emailTemplateTypeLabel: Record<EmailTemplateType, string> = {
   "cancellation-request-submitted": "Absageanfrage eingegangen",
   "cancellation-confirmed": "Absage bestätigt",
   "cancellation-rejected": "Absageanfrage abgelehnt",
+  "participation-access-recovery": "Teilnahme-Link erneut anfordern",
   "follow-up": "Rückfrage",
   general: "Allgemeine Nachricht",
 };

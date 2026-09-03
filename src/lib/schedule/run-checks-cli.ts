@@ -29,6 +29,7 @@ import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-applic
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
+import { runParticipationAccessRecoveryChecks } from "@/lib/cancellations/participation-access-recovery-checks";
 import { runTeamOperationsP2Checks } from "@/lib/team-operations-p2-checks";
 import { runRbacChecks } from "@/lib/rbac/rbac-checks";
 import { runRbacDomainRlsChecks } from "@/lib/rbac/rbac-domain-rls-checks";
@@ -98,6 +99,7 @@ try {
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
+  const participationAccessRecoveryChecks = runParticipationAccessRecoveryChecks();
   const teamOperationsP2Checks = runTeamOperationsP2Checks();
   const rbacChecks = runRbacChecks();
   const rbacDomainRlsChecks = runRbacDomainRlsChecks();
@@ -160,6 +162,7 @@ try {
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
+  console.log(`participation-access-recovery-checks: ${participationAccessRecoveryChecks}`);
   console.log(`team-operations-p2-checks: ${teamOperationsP2Checks}`);
   console.log(`rbac-checks: ${rbacChecks}`);
   console.log(`rbac-domain-rls-checks: ${rbacDomainRlsChecks}`);

@@ -32,6 +32,7 @@ export type EmailTemplateTypeRow =
   | "cancellation-request-submitted"
   | "cancellation-confirmed"
   | "cancellation-rejected"
+  | "participation-access-recovery"
   | "follow-up"
   | "general";
 
@@ -446,6 +447,7 @@ export type SecureAccessTokenRow = {
   used_at: string | null;
   last_used_at: string | null;
   revoked_at: string | null;
+  pending_activation: boolean;
   created_at: string;
 };
 
@@ -1173,6 +1175,14 @@ export type Database = {
         };
         Returns: string;
       };
+      rotate_participation_cancellation_token: {
+        Args: {
+          p_application_id: string;
+          p_token_hash: string;
+          p_expires_at: string;
+        };
+        Returns: string;
+      };
       validate_secure_access_token: {
         Args: {
           p_token_hash: string;
@@ -1201,6 +1211,54 @@ export type Database = {
         Args: {
           p_token_hash: string;
           p_reason: string;
+        };
+        Returns: string;
+      };
+      issue_participation_access_recovery_token: {
+        Args: {
+          p_tournament_id: string;
+          p_contact_email: string;
+          p_email_identifier_hash: string;
+          p_ip_identifier_hash: string;
+          p_token_hash: string;
+        };
+        Returns: Array<{
+          application_id: string;
+          contact_email: string;
+          contact_first_name: string;
+          tournament_name: string;
+        }>;
+      };
+      stage_participation_access_recovery_token: {
+        Args: {
+          p_tournament_id: string;
+          p_contact_email: string;
+          p_email_identifier_hash: string;
+          p_ip_identifier_hash: string;
+          p_token_hash: string;
+        };
+        Returns: Array<{
+          application_id: string;
+          contact_email: string;
+          contact_first_name: string;
+          tournament_name: string;
+        }>;
+      };
+      activate_participation_access_recovery_token: {
+        Args: {
+          p_token_hash: string;
+        };
+        Returns: boolean;
+      };
+      discard_participation_access_recovery_token: {
+        Args: {
+          p_token_hash: string;
+        };
+        Returns: boolean;
+      };
+      participation_recovery_token_expires_at: {
+        Args: {
+          p_tournament_date: string;
         };
         Returns: string;
       };
