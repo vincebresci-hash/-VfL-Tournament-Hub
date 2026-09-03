@@ -1175,6 +1175,14 @@ export type Database = {
         };
         Returns: string;
       };
+      rotate_participation_cancellation_token: {
+        Args: {
+          p_application_id: string;
+          p_token_hash: string;
+          p_expires_at: string;
+        };
+        Returns: string;
+      };
       validate_secure_access_token: {
         Args: {
           p_token_hash: string;

@@ -15,6 +15,11 @@ import {
   PARTICIPATION_RECOVERY_MIN_RESPONSE_MS,
 } from "@/lib/cancellations/participation-recovery-timing";
 import {
+  countActiveNonPending,
+  simulateOrderA,
+  simulateOrderB,
+} from "@/lib/cancellations/participation-token-concurrency";
+import {
   generateSecureAccessToken,
   hashSecureAccessToken,
   isValidSecureAccessTokenFormat,
@@ -30,6 +35,25 @@ function assert(condition: boolean, message: string) {
 
 function read(path: string) {
   return readFileSync(join(process.cwd(), path), "utf8");
+}
+
+function migrateLocksApplicationThenMutates(migration: string) {
+  for (const name of [
+    "stage_participation_access_recovery_token",
+    "activate_participation_access_recovery_token",
+    "rotate_participation_cancellation_token",
+  ]) {
+    const start = migration.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
+    if (start < 0) {
+      return false;
+    }
+    const body = migration.slice(start, start + 3500);
+    if (!body.includes("FROM public.applications") || !body.includes("FOR UPDATE")) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 export function runParticipationAccessRecoveryChecks() {
@@ -175,7 +199,7 @@ export function runParticipationAccessRecoveryChecks() {
     "P1-3: bounded min response window",
   );
 
-  // P1-4: concurrency
+  // P1-4: concurrency + acceptance race serialization
   assert(
     migration.includes("FROM public.applications") &&
       migration.includes("FOR UPDATE"),
@@ -187,30 +211,98 @@ export function runParticipationAccessRecoveryChecks() {
     "P1-4: stale pending tokens removed before new stage",
   );
   assert(
-    migration.includes("FOR UPDATE") &&
-      migration.includes("pending_activation = true"),
-    "P1-4: activate locks pending token row",
+    migration.includes("rotate_participation_cancellation_token"),
+    "P1-4: atomic acceptance rotate RPC exists",
+  );
+  assert(
+    participationToken.includes("rotate_participation_cancellation_token"),
+    "P1-4: acceptance path uses rotate RPC",
+  );
+  assert(
+    !participationToken.includes("store_secure_access_token"),
+    "P1-4: acceptance no longer uses non-atomic store_secure_access_token",
+  );
+  assert(
+    migration.includes("GRANT EXECUTE ON FUNCTION public.rotate_participation_cancellation_token") &&
+      migration.includes("TO authenticated"),
+    "P1-4: rotate granted to authenticated only",
+  );
+  assert(
+    migration.includes("REVOKE ALL ON FUNCTION public.rotate_participation_cancellation_token") &&
+      migration.includes("FROM PUBLIC, anon"),
+    "P1-4: rotate revoked from PUBLIC/anon",
+  );
+  // Activate lock order: applications before pending token
+  const activateFn = migration.slice(
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.activate_participation_access_recovery_token"),
+    migration.indexOf("CREATE OR REPLACE FUNCTION public.rotate_participation_cancellation_token"),
+  );
+  assert(
+    activateFn.indexOf("FROM public.applications") <
+      activateFn.indexOf("pending_activation = true\n  FOR UPDATE"),
+    "P1-4: activate locks applications before pending token FOR UPDATE",
+  );
+  assert(
+    migrateLocksApplicationThenMutates(migration),
+    "P1-4: stage/activate/rotate all lock applications FOR UPDATE",
   );
 
-  // Expiry future-safe
+  const orderA = simulateOrderA();
+  assert(countActiveNonPending(orderA) === 1, "order A: exactly one active non-pending");
+  assert(orderA.active?.hash === "acceptance-hash", "order A: acceptance token wins");
+  assert(orderA.pending === null, "order A: no pending after rotate");
+
+  const orderB = simulateOrderB();
+  assert(countActiveNonPending(orderB) === 1, "order B: exactly one active non-pending");
+  assert(orderB.active?.hash === "acceptance-hash", "order B: acceptance token final");
+  assert(orderB.pending === null, "order B: no pending after rotate");
+
+  // Expiry volatility + future-safe semantics
   assert(
     migration.includes("participation_recovery_token_expires_at"),
     "expiry helper exists in migration",
   );
   assert(
+    /LANGUAGE plpgsql\nSTABLE\nSET search_path = public/.test(
+      migration.slice(
+        migration.indexOf("CREATE OR REPLACE FUNCTION public.participation_recovery_token_expires_at"),
+        migration.indexOf("REVOKE ALL ON FUNCTION public.participation_recovery_token_expires_at"),
+      ),
+    ),
+    "expiry helper is STABLE (uses now())",
+  );
+  assert(
+    !/LANGUAGE plpgsql\nIMMUTABLE/.test(
+      migration.slice(
+        migration.indexOf("CREATE OR REPLACE FUNCTION public.participation_recovery_token_expires_at"),
+        migration.indexOf("REVOKE ALL ON FUNCTION public.participation_recovery_token_expires_at"),
+      ),
+    ),
+    "expiry helper is not IMMUTABLE",
+  );
+  assert(
     migration.includes("GREATEST(") && migration.includes("p_tournament_date"),
     "expiry uses max(tournament date, today)",
   );
-  const pastTournament = "2020-01-01";
-  const futureExpiry = participationRecoveryTokenExpiresAt(pastTournament);
-  assert(Date.parse(futureExpiry) > Date.now(), "past tournament expiry is in the future");
-  const futureTournament = new Date();
-  futureTournament.setUTCFullYear(futureTournament.getUTCFullYear() + 1);
-  const futureTournamentIso = futureTournament.toISOString().slice(0, 10);
-  const futureTournamentExpiry = participationRecoveryTokenExpiresAt(futureTournamentIso);
+
+  const fixedNow = new Date("2026-09-03T12:00:00.000Z");
+  const pastExpiry = participationRecoveryTokenExpiresAt("2020-01-01", fixedNow);
+  const todayIso = "2026-09-03";
+  const todayExpiry = participationRecoveryTokenExpiresAt(todayIso, fixedNow);
+  const futureIso = "2027-06-15";
+  const futureExpiry = participationRecoveryTokenExpiresAt(futureIso, fixedNow);
+  const minExpiryMs = Date.parse("2026-09-04T12:00:00.000Z");
+
+  assert(Date.parse(pastExpiry) >= minExpiryMs, "past tournament: at least +1 day");
+  assert(Date.parse(todayExpiry) > Date.parse(fixedNow.toISOString()), "today tournament: future expiry");
   assert(
-    Date.parse(futureTournamentExpiry) > Date.now(),
-    "future tournament expiry is in the future",
+    Date.parse(futureExpiry) === Date.parse("2027-07-15T00:00:00.000Z"),
+    "future tournament: tournament date + 30 days UTC midnight",
+  );
+  assert(
+    recoveryTiming.includes("GREATEST") === false &&
+      recoveryTiming.includes("parsed.getTime() > reference.getTime()"),
+    "TS expiry mirrors max(tournament, today) semantics",
   );
 
   // Neutral public response
@@ -256,7 +348,10 @@ export function runParticipationAccessRecoveryChecks() {
   assert(actions.includes("submitExternalCancellationRequestAction"), "external cancellation unchanged");
   assert(actions.includes("submitClubCancellationRequestAction"), "club cancellation unchanged");
   assert(statusMail.includes("ensureParticipationCancellationToken"), "acceptance token helper preserved");
-  assert(participationToken.includes("revokeActiveParticipationTokens"), "acceptance revoke helper preserved");
+  assert(
+    participationToken.includes("rotate_participation_cancellation_token"),
+    "acceptance rotate helper used",
+  );
 
   // Portal + cancellation still token gated
   assert(

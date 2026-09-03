@@ -18,12 +18,13 @@ COMMENT ON COLUMN public.secure_access_tokens.pending_activation IS
 -- Helpers
 -- -----------------------------------------------------------------------------
 
+-- STABLE (not IMMUTABLE): depends on timezone('UTC', now()) / current UTC date.
 CREATE OR REPLACE FUNCTION public.participation_recovery_token_expires_at(
   p_tournament_date date
 )
 RETURNS timestamptz
 LANGUAGE plpgsql
-IMMUTABLE
+STABLE
 SET search_path = public
 AS $$
 DECLARE
@@ -229,6 +230,7 @@ $$;
 
 -- -----------------------------------------------------------------------------
 -- Activate staged token after provider acceptance
+-- Lock order: applications first, then pending token (matches stage/rotate).
 -- -----------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.activate_participation_access_recovery_token(
@@ -240,10 +242,38 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+  v_application_id uuid;
   v_token public.secure_access_tokens%ROWTYPE;
   v_app public.applications%ROWTYPE;
 BEGIN
   IF char_length(p_token_hash) <> 64 OR p_token_hash !~ '^[0-9a-f]{64}$' THEN
+    RETURN false;
+  END IF;
+
+  SELECT application_id
+  INTO v_application_id
+  FROM public.secure_access_tokens
+  WHERE token_hash = p_token_hash
+    AND purpose = 'cancellation'::public.secure_access_token_purpose
+    AND pending_activation = true;
+
+  IF v_application_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  SELECT *
+  INTO v_app
+  FROM public.applications
+  WHERE id = v_application_id
+  FOR UPDATE;
+
+  IF NOT FOUND
+     OR v_app.status IS DISTINCT FROM 'accepted'::public.application_status
+     OR v_app.club_id IS NOT NULL THEN
+    DELETE FROM public.secure_access_tokens
+    WHERE token_hash = p_token_hash
+      AND purpose = 'cancellation'::public.secure_access_token_purpose
+      AND pending_activation = true;
     RETURN false;
   END IF;
 
@@ -259,21 +289,6 @@ BEGIN
     RETURN false;
   END IF;
 
-  SELECT *
-  INTO v_app
-  FROM public.applications
-  WHERE id = v_token.application_id
-  FOR UPDATE;
-
-  IF NOT FOUND
-     OR v_app.status IS DISTINCT FROM 'accepted'::public.application_status
-     OR v_app.club_id IS NOT NULL THEN
-    DELETE FROM public.secure_access_tokens
-    WHERE id = v_token.id
-      AND pending_activation = true;
-    RETURN false;
-  END IF;
-
   IF v_token.expires_at <= now() THEN
     DELETE FROM public.secure_access_tokens
     WHERE id = v_token.id
@@ -281,6 +296,7 @@ BEGIN
     RETURN false;
   END IF;
 
+  -- Revoke every active non-pending cancellation token (including expired).
   UPDATE public.secure_access_tokens
   SET revoked_at = now()
   WHERE application_id = v_app.id
@@ -302,6 +318,96 @@ BEGIN
     AND id IS DISTINCT FROM v_token.id;
 
   RETURN true;
+END;
+$$;
+
+-- -----------------------------------------------------------------------------
+-- Atomic acceptance / admin participation-token rotation
+-- Same application FOR UPDATE serialization as recovery stage/activate.
+-- -----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION public.rotate_participation_cancellation_token(
+  p_application_id uuid,
+  p_token_hash text,
+  p_expires_at timestamptz
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_app public.applications%ROWTYPE;
+  v_id uuid;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'admin required';
+  END IF;
+
+  IF NOT (
+    public.has_rbac_permission('cancellations.manage')
+    OR public.has_rbac_permission('applications.decide')
+  ) THEN
+    RAISE EXCEPTION 'admin required';
+  END IF;
+
+  IF p_application_id IS NULL THEN
+    RAISE EXCEPTION 'application required';
+  END IF;
+
+  IF char_length(p_token_hash) <> 64 OR p_token_hash !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'invalid token hash';
+  END IF;
+
+  IF p_expires_at IS NULL OR p_expires_at <= now() THEN
+    RAISE EXCEPTION 'invalid expiry';
+  END IF;
+
+  SELECT *
+  INTO v_app
+  FROM public.applications
+  WHERE id = p_application_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'application not found';
+  END IF;
+
+  IF v_app.status IS DISTINCT FROM 'accepted'::public.application_status THEN
+    RAISE EXCEPTION 'application not accepted';
+  END IF;
+
+  -- Drop in-flight recovery pendings so a later activate cannot overwrite this link.
+  DELETE FROM public.secure_access_tokens
+  WHERE application_id = v_app.id
+    AND purpose = 'cancellation'::public.secure_access_token_purpose
+    AND pending_activation = true;
+
+  -- Revoke every active non-pending cancellation token (including expired).
+  UPDATE public.secure_access_tokens
+  SET revoked_at = now()
+  WHERE application_id = v_app.id
+    AND purpose = 'cancellation'::public.secure_access_token_purpose
+    AND pending_activation = false
+    AND revoked_at IS NULL;
+
+  INSERT INTO public.secure_access_tokens (
+    application_id,
+    purpose,
+    token_hash,
+    expires_at,
+    pending_activation
+  )
+  VALUES (
+    v_app.id,
+    'cancellation'::public.secure_access_token_purpose,
+    p_token_hash,
+    p_expires_at,
+    false
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
 END;
 $$;
 
@@ -345,6 +451,11 @@ COMMENT ON FUNCTION public.activate_participation_access_recovery_token(text) IS
 COMMENT ON FUNCTION public.discard_participation_access_recovery_token(text) IS
   'Service-role only: discard a staged recovery token when email delivery fails.';
 
+COMMENT ON FUNCTION public.rotate_participation_cancellation_token(
+  uuid, text, timestamptz
+) IS
+  'Admin-only atomic participation cancellation token rotation; locks applications FOR UPDATE.';
+
 REVOKE ALL ON FUNCTION public.stage_participation_access_recovery_token(
   uuid, text, text, text, text
 ) FROM PUBLIC, anon, authenticated;
@@ -361,6 +472,13 @@ REVOKE ALL ON FUNCTION public.discard_participation_access_recovery_token(text)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.discard_participation_access_recovery_token(text)
   TO service_role;
+
+REVOKE ALL ON FUNCTION public.rotate_participation_cancellation_token(
+  uuid, text, timestamptz
+) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.rotate_participation_cancellation_token(
+  uuid, text, timestamptz
+) TO authenticated;
 
 -- -----------------------------------------------------------------------------
 -- Email template (idempotent)
