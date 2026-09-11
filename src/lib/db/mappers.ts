@@ -159,5 +159,6 @@ export function toAdminApplication(row: ApplicationWithRelations): AdminApplicat
       ? asStrength(review.internal_strength)
       : null,
     internalNotes: review?.internal_note ?? null,
+    archivedAt: row.archived_at ?? null,
   };
 }

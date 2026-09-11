@@ -11,7 +11,7 @@ const clubApplicationSelect = `
   id, club_id, tournament_id, team_id, submitted_by, status, club_name, club_city, website,
   team_name, age_group, birth_year, league, division, self_rated_strength, team_description,
   club_type, contact_first_name, contact_last_name, contact_role, contact_email, contact_phone,
-  alternative_phone, staff_count, notes, payment_status, participation_fee, paid_at, created_at, updated_at,
+  alternative_phone, staff_count, notes, payment_status, participation_fee, paid_at, archived_at, created_at, updated_at,
   clubs (id, name, city, website, contact_phone),
   teams (id, name, age_group, birth_year, league, division, self_rated_strength, trainer_name),
   tournaments (id, slug, name, age_group, date, location, status, max_teams)

@@ -12,7 +12,10 @@ import {
   type ReactNode,
 } from "react";
 import {
+  archiveApplicationAction,
+  deleteApplicationAction,
   loadAdminApplicationsAction,
+  restoreApplicationAction,
   updateApplicationStatusAction,
   upsertApplicationReviewAction,
 } from "@/lib/db/admin-actions";
@@ -44,6 +47,15 @@ type AdminDataContextValue = {
     status: ApplicationStatus,
   ) => Promise<{ error: string | null; notice: string | null }>;
   updateInternalRating: (id: string, update: InternalRatingUpdate) => void;
+  archiveApplication: (
+    id: string,
+  ) => Promise<{ error: string | null; notice: string | null }>;
+  restoreApplication: (
+    id: string,
+  ) => Promise<{ error: string | null; notice: string | null }>;
+  deleteApplication: (
+    id: string,
+  ) => Promise<{ error: string | null; notice: string | null }>;
   databaseReady: boolean;
 };
 
@@ -145,6 +157,62 @@ export function AdminDataProvider({ children }: { children: ReactNode }) {
         }
 
         persistRating(id, update);
+      },
+      archiveApplication: async (id) => {
+        if (!databaseReady) {
+          return {
+            error: "Die Datenbank ist derzeit nicht erreichbar.",
+            notice: null,
+          };
+        }
+
+        const result = await archiveApplicationAction(id);
+        if (!result.error) {
+          setApplications((current) =>
+            current.map((application) =>
+              application.id === id
+                ? { ...application, archivedAt: new Date().toISOString() }
+                : application,
+            ),
+          );
+        }
+        return result;
+      },
+      restoreApplication: async (id) => {
+        if (!databaseReady) {
+          return {
+            error: "Die Datenbank ist derzeit nicht erreichbar.",
+            notice: null,
+          };
+        }
+
+        const result = await restoreApplicationAction(id);
+        if (!result.error) {
+          setApplications((current) =>
+            current.map((application) =>
+              application.id === id
+                ? { ...application, archivedAt: null }
+                : application,
+            ),
+          );
+        }
+        return result;
+      },
+      deleteApplication: async (id) => {
+        if (!databaseReady) {
+          return {
+            error: "Die Datenbank ist derzeit nicht erreichbar.",
+            notice: null,
+          };
+        }
+
+        const result = await deleteApplicationAction(id);
+        if (!result.error) {
+          setApplications((current) =>
+            current.filter((application) => application.id !== id),
+          );
+        }
+        return result;
       },
     }),
     [applications, externalTeams, persistRating, databaseReady],

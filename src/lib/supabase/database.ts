@@ -314,6 +314,7 @@ export type ApplicationRow = {
   payment_status: PaymentStatusRow;
   participation_fee: number | null;
   paid_at: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
 };
