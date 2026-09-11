@@ -1054,6 +1054,10 @@ export type Database = {
         Args: { p_permission: string; p_club_id?: string | null; p_team_id?: string | null };
         Returns: boolean;
       };
+      get_application_hard_delete_dependency_counts: {
+        Args: { p_application_id: string };
+        Returns: Json;
+      };
       count_active_super_admins: {
         Args: { p_exclude_user_id?: string | null };
         Returns: number;

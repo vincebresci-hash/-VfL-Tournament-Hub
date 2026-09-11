@@ -21,6 +21,71 @@ export type ApplicationHardDeleteGuardResult =
   | { allowed: true }
   | { allowed: false; message: string };
 
+export const APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC =
+  "get_application_hard_delete_dependency_counts" as const;
+
+const DEPENDENCY_COUNT_KEYS = [
+  "match_count",
+  "group_member_count",
+  "cancellation_count",
+  "secure_token_count",
+  "review_count",
+  "status_email_send_key_count",
+  "payment_admin_note_count",
+] as const;
+
+type DependencyCountKey = (typeof DEPENDENCY_COUNT_KEYS)[number];
+
+export type ApplicationHardDeleteDependencyCounts = {
+  matchCount: number;
+  groupMemberCount: number;
+  cancellationCount: number;
+  secureTokenCount: number;
+  reviewCount: number;
+  statusEmailSendKeyCount: number;
+  paymentAdminNoteCount: number;
+};
+
+function readNonNegativeInt(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
+    return null;
+  }
+  return Math.trunc(value);
+}
+
+/**
+ * Parse RPC aggregate payload. Missing/invalid fields fail closed (null).
+ * Never treats absent keys as zero.
+ */
+export function parseApplicationHardDeleteDependencyCounts(
+  payload: unknown,
+): ApplicationHardDeleteDependencyCounts | null {
+  if (payload == null || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const row = payload as Record<string, unknown>;
+  const values = {} as Record<DependencyCountKey, number>;
+
+  for (const key of DEPENDENCY_COUNT_KEYS) {
+    const parsed = readNonNegativeInt(row[key]);
+    if (parsed == null) {
+      return null;
+    }
+    values[key] = parsed;
+  }
+
+  return {
+    matchCount: values.match_count,
+    groupMemberCount: values.group_member_count,
+    cancellationCount: values.cancellation_count,
+    secureTokenCount: values.secure_token_count,
+    reviewCount: values.review_count,
+    statusEmailSendKeyCount: values.status_email_send_key_count,
+    paymentAdminNoteCount: values.payment_admin_note_count,
+  };
+}
+
 /**
  * Hard delete is only allowed for clearly non-participating, non-historical rows.
  * Never delete dependencies to force a delete — block instead and recommend archive.

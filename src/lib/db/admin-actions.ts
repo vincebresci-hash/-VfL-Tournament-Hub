@@ -33,7 +33,9 @@ import { validateMeinTurnierplanInput } from "@/lib/mein-turnierplan";
 import { canAcceptApplicationIntoCapacity } from "@/lib/mein-turnierplan-participants";
 import {
   APPLICATION_HARD_DELETE_BLOCKED_MESSAGE,
+  APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC,
   evaluateApplicationHardDeleteGuard,
+  parseApplicationHardDeleteDependencyCounts,
 } from "@/lib/applications/application-delete-guard";
 import type { PaymentStatus } from "@/types/payment";
 
@@ -415,60 +417,17 @@ export async function deleteApplicationAction(
     };
   }
 
-  const [
-    homeMatches,
-    awayMatches,
-    groupMembers,
-    cancellations,
-    secureTokens,
-    reviews,
-    statusEmailSendKeys,
-    paymentAdminNotes,
-  ] = await Promise.all([
-    supabase
-      .from("tournament_matches")
-      .select("id", { count: "exact", head: true })
-      .eq("home_application_id", applicationId),
-    supabase
-      .from("tournament_matches")
-      .select("id", { count: "exact", head: true })
-      .eq("away_application_id", applicationId),
-    supabase
-      .from("tournament_group_members")
-      .select("id", { count: "exact", head: true })
-      .eq("application_id", applicationId),
-    supabase
-      .from("cancellation_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("application_id", applicationId),
-    supabase
-      .from("secure_access_tokens")
-      .select("id", { count: "exact", head: true })
-      .eq("application_id", applicationId),
-    supabase
-      .from("application_reviews")
-      .select("id", { count: "exact", head: true })
-      .eq("application_id", applicationId),
-    supabase
-      .from("status_email_send_keys")
-      .select("application_id", { count: "exact", head: true })
-      .eq("application_id", applicationId),
-    supabase
-      .from("application_payment_admin_notes")
-      .select("application_id", { count: "exact", head: true })
-      .eq("application_id", applicationId),
-  ]);
+  // Dependency counts via SECURITY DEFINER RPC (bypasses RLS safely under
+  // applications.manage). Never treat missing/errored counts as zero.
+  const { data: dependencyPayload, error: dependencyError } = await supabase.rpc(
+    APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC,
+    { p_application_id: applicationId },
+  );
 
-  if (
-    homeMatches.error ||
-    awayMatches.error ||
-    groupMembers.error ||
-    cancellations.error ||
-    secureTokens.error ||
-    reviews.error ||
-    statusEmailSendKeys.error ||
-    paymentAdminNotes.error
-  ) {
+  const dependencyCounts =
+    parseApplicationHardDeleteDependencyCounts(dependencyPayload);
+
+  if (dependencyError || !dependencyCounts) {
     return {
       error: "Die Abhängigkeiten der Bewerbung konnten nicht geprüft werden.",
       notice: null,
@@ -479,13 +438,7 @@ export async function deleteApplicationAction(
     status: current.status as ApplicationStatus,
     paymentStatus: current.payment_status as PaymentStatus,
     paidAt: current.paid_at,
-    matchCount: (homeMatches.count ?? 0) + (awayMatches.count ?? 0),
-    groupMemberCount: groupMembers.count ?? 0,
-    cancellationCount: cancellations.count ?? 0,
-    secureTokenCount: secureTokens.count ?? 0,
-    reviewCount: reviews.count ?? 0,
-    statusEmailSendKeyCount: statusEmailSendKeys.count ?? 0,
-    paymentAdminNoteCount: paymentAdminNotes.count ?? 0,
+    ...dependencyCounts,
   });
 
   if (!guard.allowed) {
