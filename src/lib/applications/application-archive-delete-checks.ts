@@ -15,6 +15,16 @@ function read(pathFromRoot: string) {
   return readFileSync(join(process.cwd(), pathFromRoot), "utf8");
 }
 
+const emptyHistory = {
+  matchCount: 0,
+  groupMemberCount: 0,
+  cancellationCount: 0,
+  secureTokenCount: 0,
+  reviewCount: 0,
+  statusEmailSendKeyCount: 0,
+  paymentAdminNoteCount: 0,
+} as const;
+
 export function runApplicationArchiveDeleteChecks() {
   const migration = read(
     "supabase/migrations/20260911120000_applications_archived_at.sql",
@@ -92,7 +102,7 @@ export function runApplicationArchiveDeleteChecks() {
   const deleteStart = adminActions.indexOf(
     "export async function deleteApplicationAction",
   );
-  const deleteFn = adminActions.slice(deleteStart, deleteStart + 3500);
+  const deleteFn = adminActions.slice(deleteStart, deleteStart + 4500);
   assert(
     deleteFn.includes("tournament_matches"),
     "delete guard must inspect tournament_matches",
@@ -110,6 +120,18 @@ export function runApplicationArchiveDeleteChecks() {
     "delete guard must inspect secure_access_tokens",
   );
   assert(
+    deleteFn.includes("application_reviews"),
+    "delete guard must inspect application_reviews",
+  );
+  assert(
+    deleteFn.includes("status_email_send_keys"),
+    "delete guard must inspect status_email_send_keys",
+  );
+  assert(
+    deleteFn.includes("application_payment_admin_notes"),
+    "delete guard must inspect application_payment_admin_notes",
+  );
+  assert(
     !deleteFn.includes('.from("tournament_matches").delete'),
     "delete must never remove matches to force application deletion",
   );
@@ -120,6 +142,22 @@ export function runApplicationArchiveDeleteChecks() {
   assert(
     !deleteFn.includes('.from("cancellation_requests").delete'),
     "delete must never remove cancellations to force application deletion",
+  );
+  assert(
+    !deleteFn.includes('.from("application_reviews").delete'),
+    "delete must never remove reviews to force application deletion",
+  );
+  assert(
+    !deleteFn.includes('.from("status_email_send_keys").delete'),
+    "delete must never remove status email keys to force application deletion",
+  );
+  assert(
+    !deleteFn.includes('.from("application_payment_admin_notes").delete'),
+    "delete must never remove payment admin notes to force application deletion",
+  );
+  assert(
+    !deleteFn.includes('.from("secure_access_tokens").delete'),
+    "delete must never remove tokens to force application deletion",
   );
 
   assert(
@@ -132,10 +170,7 @@ export function runApplicationArchiveDeleteChecks() {
       status: "accepted",
       paymentStatus: "pending",
       paidAt: null,
-      matchCount: 0,
-      groupMemberCount: 0,
-      cancellationCount: 0,
-      secureTokenCount: 0,
+      ...emptyHistory,
     }).allowed,
     "accepted applications must not be hard-deletable",
   );
@@ -145,12 +180,19 @@ export function runApplicationArchiveDeleteChecks() {
       status: "waiting-list",
       paymentStatus: "pending",
       paidAt: null,
-      matchCount: 0,
-      groupMemberCount: 0,
-      cancellationCount: 0,
-      secureTokenCount: 0,
+      ...emptyHistory,
     }).allowed,
     "waiting-list applications must not be hard-deletable",
+  );
+
+  assert(
+    !evaluateApplicationHardDeleteGuard({
+      status: "cancelled",
+      paymentStatus: "pending",
+      paidAt: null,
+      ...emptyHistory,
+    }).allowed,
+    "cancelled applications must not be hard-deletable",
   );
 
   assert(
@@ -158,10 +200,8 @@ export function runApplicationArchiveDeleteChecks() {
       status: "new",
       paymentStatus: "pending",
       paidAt: null,
+      ...emptyHistory,
       matchCount: 1,
-      groupMemberCount: 0,
-      cancellationCount: 0,
-      secureTokenCount: 0,
     }).allowed,
     "applications with matches must not be hard-deletable",
   );
@@ -171,10 +211,8 @@ export function runApplicationArchiveDeleteChecks() {
       status: "rejected",
       paymentStatus: "pending",
       paidAt: null,
-      matchCount: 0,
+      ...emptyHistory,
       groupMemberCount: 1,
-      cancellationCount: 0,
-      secureTokenCount: 0,
     }).allowed,
     "applications in groups must not be hard-deletable",
   );
@@ -184,10 +222,8 @@ export function runApplicationArchiveDeleteChecks() {
       status: "rejected",
       paymentStatus: "pending",
       paidAt: null,
-      matchCount: 0,
-      groupMemberCount: 0,
+      ...emptyHistory,
       cancellationCount: 1,
-      secureTokenCount: 0,
     }).allowed,
     "applications with cancellation history must not be hard-deletable",
   );
@@ -195,14 +231,65 @@ export function runApplicationArchiveDeleteChecks() {
   assert(
     !evaluateApplicationHardDeleteGuard({
       status: "rejected",
+      paymentStatus: "pending",
+      paidAt: null,
+      ...emptyHistory,
+      secureTokenCount: 1,
+    }).allowed,
+    "applications with secure tokens must not be hard-deletable",
+  );
+
+  assert(
+    !evaluateApplicationHardDeleteGuard({
+      status: "rejected",
       paymentStatus: "paid",
       paidAt: "2026-01-01T00:00:00.000Z",
-      matchCount: 0,
-      groupMemberCount: 0,
-      cancellationCount: 0,
-      secureTokenCount: 0,
+      ...emptyHistory,
     }).allowed,
     "paid applications must not be hard-deletable",
+  );
+
+  assert(
+    !evaluateApplicationHardDeleteGuard({
+      status: "rejected",
+      paymentStatus: "waived",
+      paidAt: null,
+      ...emptyHistory,
+    }).allowed,
+    "waived applications must not be hard-deletable",
+  );
+
+  assert(
+    !evaluateApplicationHardDeleteGuard({
+      status: "rejected",
+      paymentStatus: "pending",
+      paidAt: null,
+      ...emptyHistory,
+      reviewCount: 1,
+    }).allowed,
+    "applications with reviews must not be hard-deletable",
+  );
+
+  assert(
+    !evaluateApplicationHardDeleteGuard({
+      status: "rejected",
+      paymentStatus: "pending",
+      paidAt: null,
+      ...emptyHistory,
+      statusEmailSendKeyCount: 1,
+    }).allowed,
+    "applications with status email send keys must not be hard-deletable",
+  );
+
+  assert(
+    !evaluateApplicationHardDeleteGuard({
+      status: "new",
+      paymentStatus: "pending",
+      paidAt: null,
+      ...emptyHistory,
+      paymentAdminNoteCount: 1,
+    }).allowed,
+    "applications with payment admin notes must not be hard-deletable",
   );
 
   assert(
@@ -210,10 +297,7 @@ export function runApplicationArchiveDeleteChecks() {
       status: "new",
       paymentStatus: "pending",
       paidAt: null,
-      matchCount: 0,
-      groupMemberCount: 0,
-      cancellationCount: 0,
-      secureTokenCount: 0,
+      ...emptyHistory,
     }).allowed,
     "safe new applications without dependencies may be hard-deleted",
   );
@@ -223,10 +307,7 @@ export function runApplicationArchiveDeleteChecks() {
       status: "rejected",
       paymentStatus: "not_required",
       paidAt: null,
-      matchCount: 0,
-      groupMemberCount: 0,
-      cancellationCount: 0,
-      secureTokenCount: 0,
+      ...emptyHistory,
     }).allowed,
     "rejected applications without history may be hard-deleted",
   );

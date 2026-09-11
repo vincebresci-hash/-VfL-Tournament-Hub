@@ -421,6 +421,9 @@ export async function deleteApplicationAction(
     groupMembers,
     cancellations,
     secureTokens,
+    reviews,
+    statusEmailSendKeys,
+    paymentAdminNotes,
   ] = await Promise.all([
     supabase
       .from("tournament_matches")
@@ -442,6 +445,18 @@ export async function deleteApplicationAction(
       .from("secure_access_tokens")
       .select("id", { count: "exact", head: true })
       .eq("application_id", applicationId),
+    supabase
+      .from("application_reviews")
+      .select("id", { count: "exact", head: true })
+      .eq("application_id", applicationId),
+    supabase
+      .from("status_email_send_keys")
+      .select("application_id", { count: "exact", head: true })
+      .eq("application_id", applicationId),
+    supabase
+      .from("application_payment_admin_notes")
+      .select("application_id", { count: "exact", head: true })
+      .eq("application_id", applicationId),
   ]);
 
   if (
@@ -449,7 +464,10 @@ export async function deleteApplicationAction(
     awayMatches.error ||
     groupMembers.error ||
     cancellations.error ||
-    secureTokens.error
+    secureTokens.error ||
+    reviews.error ||
+    statusEmailSendKeys.error ||
+    paymentAdminNotes.error
   ) {
     return {
       error: "Die Abhängigkeiten der Bewerbung konnten nicht geprüft werden.",
@@ -465,6 +483,9 @@ export async function deleteApplicationAction(
     groupMemberCount: groupMembers.count ?? 0,
     cancellationCount: cancellations.count ?? 0,
     secureTokenCount: secureTokens.count ?? 0,
+    reviewCount: reviews.count ?? 0,
+    statusEmailSendKeyCount: statusEmailSendKeys.count ?? 0,
+    paymentAdminNoteCount: paymentAdminNotes.count ?? 0,
   });
 
   if (!guard.allowed) {

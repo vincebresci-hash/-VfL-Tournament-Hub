@@ -12,6 +12,9 @@ export type ApplicationHardDeleteGuardInput = {
   groupMemberCount: number;
   cancellationCount: number;
   secureTokenCount: number;
+  reviewCount: number;
+  statusEmailSendKeyCount: number;
+  paymentAdminNoteCount: number;
 };
 
 export type ApplicationHardDeleteGuardResult =
@@ -48,6 +51,18 @@ export function evaluateApplicationHardDeleteGuard(
   }
 
   if (input.secureTokenCount > 0) {
+    return { allowed: false, message: APPLICATION_HARD_DELETE_BLOCKED_MESSAGE };
+  }
+
+  if (input.reviewCount > 0) {
+    return { allowed: false, message: APPLICATION_HARD_DELETE_BLOCKED_MESSAGE };
+  }
+
+  if (input.statusEmailSendKeyCount > 0) {
+    return { allowed: false, message: APPLICATION_HARD_DELETE_BLOCKED_MESSAGE };
+  }
+
+  if (input.paymentAdminNoteCount > 0) {
     return { allowed: false, message: APPLICATION_HARD_DELETE_BLOCKED_MESSAGE };
   }
 
