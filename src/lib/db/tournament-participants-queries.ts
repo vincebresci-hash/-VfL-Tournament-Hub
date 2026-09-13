@@ -43,7 +43,7 @@ export async function getTournamentParticipants(
   const [applicationsResult, externalResult, groupsResult] = await Promise.all([
     supabase
       .from("applications")
-      .select("id, club_name, team_name, age_group, birth_year, status, club_id")
+      .select("id, club_name, team_name, age_group, birth_year, status, club_id, logo_url, logo_manual_override")
       .eq("tournament_id", tournamentId)
       .eq("status", "accepted"),
     supabase
@@ -107,6 +107,8 @@ export async function getTournamentParticipants(
         groupName: group?.groupName ?? null,
         clubLogoUrl: clubId ? (clubLogos.get(clubId) ?? null) : null,
         clubId,
+        logoUrl: row.logo_url ? String(row.logo_url) : null,
+        logoManualOverride: Boolean(row.logo_manual_override),
       };
     }),
     externalTeams: (externalResult.data ?? []).map((row) => {

@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
+import { ApplicationParticipantLogoEditor } from "@/components/admin/ApplicationParticipantLogoEditor";
 import { ExternalTeamLogoEditor } from "@/components/admin/ExternalTeamLogoEditor";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
@@ -327,13 +328,27 @@ export function TournamentParticipantsPanel({
                     Bewerbung öffnen →
                   </Link>
                 ) : null}
+                {participant.source === "application" && participant.applicationId ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() =>
+                      setLogoEditingId((current) =>
+                        current === participant.id ? null : participant.id,
+                      )
+                    }
+                    className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                  >
+                    Logo bearbeiten
+                  </button>
+                ) : null}
                 {participant.externalTeamId ? (
                   <button
                     type="button"
                     disabled={pending}
                     onClick={() =>
                       setLogoEditingId((current) =>
-                        current === participant.externalTeamId ? null : participant.externalTeamId,
+                        current === participant.id ? null : participant.id,
                       )
                     }
                     className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
@@ -370,7 +385,19 @@ export function TournamentParticipantsPanel({
                 ) : null}
               </div>
 
-              {participant.externalTeamId && logoEditingId === participant.externalTeamId ? (
+              {participant.source === "application" &&
+              participant.applicationId &&
+              logoEditingId === participant.id ? (
+                <ApplicationParticipantLogoEditor
+                  tournamentId={tournamentId}
+                  participant={participant}
+                  clubs={clubs}
+                  onDone={handleLogoDone}
+                  onCancel={() => setLogoEditingId(null)}
+                />
+              ) : null}
+
+              {participant.externalTeamId && logoEditingId === participant.id ? (
                 <ExternalTeamLogoEditor
                   tournamentId={tournamentId}
                   participant={participant}

@@ -315,6 +315,8 @@ export type ApplicationRow = {
   participation_fee: number | null;
   paid_at: string | null;
   archived_at: string | null;
+  logo_url: string | null;
+  logo_manual_override: boolean;
   created_at: string;
   updated_at: string;
 };

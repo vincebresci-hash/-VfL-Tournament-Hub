@@ -33,6 +33,10 @@ export type ApplicationParticipantInput = {
   clubId?: string | null;
   /** Hub club logo for the application's club_id */
   clubLogoUrl?: string | null;
+  /** Tournament-specific application logo (manual override) */
+  logoUrl?: string | null;
+  /** When true, application logoUrl is preferred over clubLogoUrl */
+  logoManualOverride?: boolean;
 };
 
 export type ExternalParticipantInput = {
@@ -59,7 +63,7 @@ function participantDisplayName(clubName: string, teamName: string) {
   return publicTeamLabel(clubName, teamName);
 }
 
-/** Prefer Hub club logo over stored/imported logo. */
+/** Prefer Hub club logo over stored/imported logo (manual / MeinTurnierplan). */
 export function resolveParticipantLogoUrl(input: {
   hubClubLogoUrl?: string | null;
   storedLogoUrl?: string | null;
@@ -73,31 +77,56 @@ export function resolveParticipantLogoUrl(input: {
   return stored;
 }
 
+/**
+ * Application participants: manual override wins over Hub club logo.
+ * Removing the override restores the club logo / placeholder.
+ */
+export function resolveApplicationParticipantLogoUrl(input: {
+  logoManualOverride?: boolean;
+  applicationLogoUrl?: string | null;
+  clubLogoUrl?: string | null;
+}): string | null {
+  if (input.logoManualOverride) {
+    const override = input.applicationLogoUrl?.trim() || null;
+    if (override) {
+      return override;
+    }
+  }
+
+  return input.clubLogoUrl?.trim() || null;
+}
+
 export function mergeTournamentParticipants(input: {
   applications: ApplicationParticipantInput[];
   externalTeams: ExternalParticipantInput[];
 }): TournamentParticipant[] {
   const acceptedApplicationIds = new Set(input.applications.map((application) => application.id));
-  const participants: TournamentParticipant[] = input.applications.map((application) => ({
-    id: `application:${application.id}`,
-    displayName: participantDisplayName(application.clubName, application.teamName),
-    clubName: application.clubName,
-    teamName: application.teamName,
-    source: "application",
-    applicationId: application.id,
-    externalTeamId: null,
-    clubId: application.clubId ?? null,
-    groupId: application.groupId ?? null,
-    groupName: application.groupName ?? null,
-    ageGroup: application.ageGroup,
-    birthYear: application.birthYear,
-    logoUrl: resolveParticipantLogoUrl({
-      hubClubLogoUrl: application.clubLogoUrl,
-      storedLogoUrl: null,
-    }),
-    customLogoUrl: null,
-    confirmed: true,
-  }));
+  const participants: TournamentParticipant[] = input.applications.map((application) => {
+    const overrideLogo = application.logoUrl?.trim() || null;
+    const logoManualOverride = Boolean(application.logoManualOverride) && Boolean(overrideLogo);
+
+    return {
+      id: `application:${application.id}`,
+      displayName: participantDisplayName(application.clubName, application.teamName),
+      clubName: application.clubName,
+      teamName: application.teamName,
+      source: "application" as const,
+      applicationId: application.id,
+      externalTeamId: null,
+      clubId: application.clubId ?? null,
+      groupId: application.groupId ?? null,
+      groupName: application.groupName ?? null,
+      ageGroup: application.ageGroup,
+      birthYear: application.birthYear,
+      logoUrl: resolveApplicationParticipantLogoUrl({
+        logoManualOverride,
+        applicationLogoUrl: overrideLogo,
+        clubLogoUrl: application.clubLogoUrl,
+      }),
+      customLogoUrl: logoManualOverride ? overrideLogo : null,
+      confirmed: true as const,
+    };
+  });
 
   for (const team of input.externalTeams) {
     if (team.participationStatus !== "confirmed" || !team.externalActive) {
