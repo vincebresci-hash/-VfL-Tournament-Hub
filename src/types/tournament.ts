@@ -1,4 +1,4 @@
-export const AGE_GROUPS = ["U8", "U9", "U10", "U11", "U12", "U13", "U14"] as const;
+export const AGE_GROUPS = ["U8", "U9", "U10", "U11", "U12", "U13", "U14", "U15"] as const;
 
 export type AgeGroup = (typeof AGE_GROUPS)[number];
 
