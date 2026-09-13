@@ -54,8 +54,11 @@ export const applicationSortOptions = [
 
 export type ApplicationSort = (typeof applicationSortOptions)[number]["id"];
 
+export type ApplicationArchiveFilter = "active" | "archived";
+
 export type ApplicationFilters = {
   status: "all" | ApplicationStatus;
+  archive: ApplicationArchiveFilter;
   tournamentId: "all" | string;
   ageGroup: "all" | AgeGroup;
   strength: "all" | TeamStrength;
@@ -65,6 +68,7 @@ export type ApplicationFilters = {
 
 export const emptyApplicationFilters: ApplicationFilters = {
   status: "all",
+  archive: "active",
   tournamentId: "all",
   ageGroup: "all",
   strength: "all",
@@ -199,6 +203,9 @@ export function filterApplications(
   const query = filters.query.trim().toLowerCase();
 
   return applications.filter((item) => {
+    const isArchived = Boolean(item.archivedAt);
+    const archiveMatch =
+      filters.archive === "archived" ? isArchived : !isArchived;
     const statusMatch =
       filters.status === "all" || item.applicationStatus === filters.status;
     const tournamentMatch =
@@ -215,6 +222,7 @@ export function filterApplications(
       item.teamName.toLowerCase().includes(query);
 
     return (
+      archiveMatch &&
       statusMatch &&
       tournamentMatch &&
       ageMatch &&

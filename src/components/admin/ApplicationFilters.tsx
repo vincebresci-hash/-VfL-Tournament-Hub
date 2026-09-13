@@ -41,6 +41,29 @@ export function ApplicationFiltersPanel({
   return (
     <div className="border border-line bg-white p-4 sm:p-5">
       <div className="flex flex-wrap gap-2">
+        {(
+          [
+            { id: "active", label: "Aktiv" },
+            { id: "archived", label: "Archiviert" },
+          ] as const
+        ).map((filter) => (
+          <button
+            key={filter.id}
+            type="button"
+            onClick={() => update("archive", filter.id)}
+            className={cn(
+              "h-9 px-3 text-[11px] font-semibold tracking-[0.08em] uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow",
+              filters.archive === filter.id
+                ? "bg-navy text-white"
+                : "border border-line bg-white text-muted hover:text-ink",
+            )}
+          >
+            {filter.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
         {applicationStatusFilters.map((filter) => (
           <button
             key={filter.id}

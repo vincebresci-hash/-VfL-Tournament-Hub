@@ -78,4 +78,6 @@ export type AdminApplication = TournamentApplication & {
   internalCategory: InternalCategory | null;
   internalStrength: TeamStrength | null;
   internalNotes: string | null;
+  /** Admin soft-archive only; does not affect status/capacity/participation. */
+  archivedAt: string | null;
 } & ApplicationPayment;

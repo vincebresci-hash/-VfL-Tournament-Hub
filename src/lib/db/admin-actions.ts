@@ -31,6 +31,13 @@ import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
 import { slugifyTournamentName } from "@/lib/tournaments";
 import { validateMeinTurnierplanInput } from "@/lib/mein-turnierplan";
 import { canAcceptApplicationIntoCapacity } from "@/lib/mein-turnierplan-participants";
+import {
+  APPLICATION_HARD_DELETE_BLOCKED_MESSAGE,
+  APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC,
+  evaluateApplicationHardDeleteGuard,
+  parseApplicationHardDeleteDependencyCounts,
+} from "@/lib/applications/application-delete-guard";
+import type { PaymentStatus } from "@/types/payment";
 
 export async function loadAdminApplicationsAction(): Promise<{
   applications: AdminApplication[];
@@ -274,6 +281,195 @@ export async function upsertApplicationReviewAction(
   revalidatePath(`/admin/bewerbungen/${applicationId}`);
   revalidatePath("/admin/turniere");
   return { error: null };
+}
+
+function revalidateApplicationAdminPaths(applicationId: string, tournamentSlug?: string | null) {
+  revalidatePath("/admin/bewerbungen");
+  revalidatePath(`/admin/bewerbungen/${applicationId}`);
+  revalidatePath("/admin");
+  revalidatePath("/admin/turniere");
+  if (tournamentSlug) {
+    revalidatePath(`/admin/turniere/${tournamentSlug}`);
+    revalidatePath(`/turniere/${tournamentSlug}`);
+  }
+}
+
+export async function archiveApplicationAction(
+  applicationId: string,
+): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireApplicationsManage();
+  if (access.error || !access.session) {
+    return { error: access.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("applications")
+    .select("id, status, archived_at, tournament_id, tournaments (slug)")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return {
+      error: toUserFacingDbError("Die Bewerbung wurde nicht gefunden.", loadError),
+      notice: null,
+    };
+  }
+
+  if (current.archived_at) {
+    return { error: null, notice: "Die Bewerbung ist bereits archiviert." };
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", applicationId);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Die Bewerbung konnte nicht archiviert werden.", error),
+      notice: null,
+    };
+  }
+
+  const tournamentSlug =
+    current.tournaments && typeof current.tournaments === "object"
+      ? ((current.tournaments as { slug?: string | null }).slug ?? null)
+      : null;
+
+  revalidateApplicationAdminPaths(applicationId, tournamentSlug);
+  return {
+    error: null,
+    notice:
+      "Bewerbung archiviert. Status, Turnierteilnahme und Kapazität bleiben unverändert.",
+  };
+}
+
+export async function restoreApplicationAction(
+  applicationId: string,
+): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireApplicationsManage();
+  if (access.error || !access.session) {
+    return { error: access.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("applications")
+    .select("id, archived_at, tournament_id, tournaments (slug)")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return {
+      error: toUserFacingDbError("Die Bewerbung wurde nicht gefunden.", loadError),
+      notice: null,
+    };
+  }
+
+  if (!current.archived_at) {
+    return { error: null, notice: "Die Bewerbung ist nicht archiviert." };
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update({ archived_at: null })
+    .eq("id", applicationId);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError(
+        "Die Bewerbung konnte nicht wiederhergestellt werden.",
+        error,
+      ),
+      notice: null,
+    };
+  }
+
+  const tournamentSlug =
+    current.tournaments && typeof current.tournaments === "object"
+      ? ((current.tournaments as { slug?: string | null }).slug ?? null)
+      : null;
+
+  revalidateApplicationAdminPaths(applicationId, tournamentSlug);
+  return { error: null, notice: "Bewerbung wiederhergestellt." };
+}
+
+export async function deleteApplicationAction(
+  applicationId: string,
+): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireApplicationsManage();
+  if (access.error || !access.session) {
+    return { error: access.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("applications")
+    .select("id, status, payment_status, paid_at, tournament_id, tournaments (slug)")
+    .eq("id", applicationId)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return {
+      error: toUserFacingDbError("Die Bewerbung wurde nicht gefunden.", loadError),
+      notice: null,
+    };
+  }
+
+  // Dependency counts via SECURITY DEFINER RPC (bypasses RLS safely under
+  // applications.manage). Never treat missing/errored counts as zero.
+  const { data: dependencyPayload, error: dependencyError } = await supabase.rpc(
+    APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC,
+    { p_application_id: applicationId },
+  );
+
+  const dependencyCounts =
+    parseApplicationHardDeleteDependencyCounts(dependencyPayload);
+
+  if (dependencyError || !dependencyCounts) {
+    return {
+      error: "Die Abhängigkeiten der Bewerbung konnten nicht geprüft werden.",
+      notice: null,
+    };
+  }
+
+  const guard = evaluateApplicationHardDeleteGuard({
+    status: current.status as ApplicationStatus,
+    paymentStatus: current.payment_status as PaymentStatus,
+    paidAt: current.paid_at,
+    ...dependencyCounts,
+  });
+
+  if (!guard.allowed) {
+    return {
+      error: guard.message || APPLICATION_HARD_DELETE_BLOCKED_MESSAGE,
+      notice: null,
+    };
+  }
+
+  // Hard delete only the application row. Never delete matches/groups/payments/
+  // cancellations/communications first to force success.
+  const { error } = await supabase
+    .from("applications")
+    .delete()
+    .eq("id", applicationId);
+
+  if (error) {
+    // FK RESTRICT (or similar) — surface archive recommendation, do not cascade-clean.
+    return {
+      error: APPLICATION_HARD_DELETE_BLOCKED_MESSAGE,
+      notice: null,
+    };
+  }
+
+  const tournamentSlug =
+    current.tournaments && typeof current.tournaments === "object"
+      ? ((current.tournaments as { slug?: string | null }).slug ?? null)
+      : null;
+
+  revalidateApplicationAdminPaths(applicationId, tournamentSlug);
+  return { error: null, notice: "Bewerbung endgültig gelöscht." };
 }
 
 function revalidateAdminAdminAreas() {

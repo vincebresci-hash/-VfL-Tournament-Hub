@@ -32,7 +32,16 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
   }));
   const [sort, setSort] = useState<ApplicationSort>("newest");
 
-  const counts = countByStatus(applications);
+  const archiveScopedApplications = useMemo(
+    () =>
+      applications.filter((application) =>
+        filters.archive === "archived"
+          ? Boolean(application.archivedAt)
+          : !application.archivedAt,
+      ),
+    [applications, filters.archive],
+  );
+  const counts = countByStatus(archiveScopedApplications);
   const visible = useMemo(
     () => sortApplications(filterApplications(applications, filters), sort),
     [applications, filters, sort],
@@ -52,6 +61,47 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
       )}
 
       <div className="mt-6 flex flex-wrap gap-2">
+        {(
+          [
+            { id: "active", label: "Aktiv" },
+            { id: "archived", label: "Archiviert" },
+          ] as const
+        ).map((filter) => (
+          <button
+            key={filter.id}
+            type="button"
+            onClick={() =>
+              setFilters((current) => ({ ...current, archive: filter.id }))
+            }
+            className={
+              filters.archive === filter.id
+                ? "border border-navy bg-navy px-3 py-2 text-left text-white"
+                : "border border-line bg-white px-3 py-2 text-left"
+            }
+          >
+            <span className="block font-display text-xl font-bold">
+              {
+                applications.filter((application) =>
+                  filter.id === "archived"
+                    ? Boolean(application.archivedAt)
+                    : !application.archivedAt,
+                ).length
+              }
+            </span>
+            <span
+              className={
+                filters.archive === filter.id
+                  ? "mt-1 block text-[10px] font-semibold tracking-[0.1em] uppercase text-white/80"
+                  : "mt-1 block text-[10px] font-semibold tracking-[0.1em] text-muted uppercase"
+              }
+            >
+              {filter.label}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
         {applicationStatusFilters.map((filter) => (
           <button
             key={filter.id}

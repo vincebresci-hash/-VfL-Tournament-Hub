@@ -25,6 +25,7 @@ import { runAuthLoginValidationChecks } from "@/lib/auth/auth-login-validation-c
 import { runAuthCallbackChecks } from "@/lib/auth/auth-callback-checks";
 import { runClubProfileSecurityChecks } from "@/lib/auth/club-profile-security-checks";
 import { runDuplicateApplicationChecks } from "@/lib/applications/duplicate-application-checks";
+import { runApplicationArchiveDeleteChecks } from "@/lib/applications/application-archive-delete-checks";
 import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-application-fields-checks";
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
@@ -94,6 +95,7 @@ try {
   const authCallbackChecks = runAuthCallbackChecks();
   const clubProfileSecurityChecks = runClubProfileSecurityChecks();
   const duplicateApplicationChecks = runDuplicateApplicationChecks();
+  const applicationArchiveDeleteChecks = runApplicationArchiveDeleteChecks();
   const guestApplicationFieldsChecks = runGuestApplicationFieldsChecks();
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
@@ -156,6 +158,7 @@ try {
   console.log(`auth-callback-checks: ${authCallbackChecks}`);
   console.log(`club-profile-security-checks: ${clubProfileSecurityChecks}`);
   console.log(`duplicate-application-checks: ${duplicateApplicationChecks}`);
+  console.log(`application-archive-delete-checks: ${applicationArchiveDeleteChecks}`);
   console.log(`guest-application-fields-checks: ${guestApplicationFieldsChecks}`);
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);

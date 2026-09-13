@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { PaymentStatusPanel } from "@/components/admin/PaymentStatusPanel";
 import { TeamDirectorySavePanel } from "@/components/admin/TeamDirectorySavePanel";
@@ -36,12 +37,24 @@ export function ApplicationDetail({
   tournament,
   canManageTeamDirectory = false,
 }: ApplicationDetailProps) {
-  const { getApplication, updateStatus, updateInternalRating, applications, externalTeams } =
-    useAdminData();
+  const router = useRouter();
+  const {
+    getApplication,
+    updateStatus,
+    updateInternalRating,
+    archiveApplication,
+    restoreApplication,
+    deleteApplication,
+    applications,
+    externalTeams,
+  } = useAdminData();
   const application = getApplication(applicationId);
   const [pendingStatus, setPendingStatus] = useState<ApplicationStatus | null>(
     null,
   );
+  const [confirmAction, setConfirmAction] = useState<
+    "archive" | "restore" | "delete" | null
+  >(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -220,6 +233,50 @@ export function ApplicationDetail({
 
           <section className="border border-line bg-white p-5">
             <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+              Verwaltung
+            </h2>
+            <p className="mt-3 text-[13px] leading-5 text-muted">
+              Archivieren blendet die Bewerbung nur in der Admin-Liste aus. Status,
+              Turnierteilnahme und Kapazität bleiben unverändert.
+            </p>
+            {application.archivedAt ? (
+              <p className="mt-3 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+                Archiviert
+              </p>
+            ) : null}
+            <div className="mt-4 grid gap-2">
+              {application.archivedAt ? (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setConfirmAction("restore")}
+                  className="inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                >
+                  Wiederherstellen
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setConfirmAction("archive")}
+                  className="inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                >
+                  Archivieren
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => setConfirmAction("delete")}
+                className="inline-flex h-10 items-center justify-center border border-[#c45c5c]/40 px-3 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:border-[#9a2b2b]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+              >
+                Bewerbung löschen
+              </button>
+            </div>
+          </section>
+
+          <section className="border border-line bg-white p-5">
+            <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
               Turnierfeld
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
@@ -278,6 +335,98 @@ export function ApplicationDetail({
             });
         }}
       />
+
+      <ConfirmModal
+        open={confirmAction !== null}
+        title={
+          confirmAction === "archive"
+            ? "Bewerbung archivieren?"
+            : confirmAction === "restore"
+              ? "Bewerbung wiederherstellen?"
+              : "Bewerbung endgültig löschen?"
+        }
+        confirmLabel={
+          confirmAction === "delete"
+            ? "Endgültig löschen"
+            : confirmAction === "restore"
+              ? "Wiederherstellen"
+              : "Archivieren"
+        }
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={() => {
+          if (!confirmAction) {
+            return;
+          }
+
+          const action = confirmAction;
+          setConfirmAction(null);
+          setSaving(true);
+          setNotice(null);
+          setStatusError(null);
+
+          const run =
+            action === "archive"
+              ? archiveApplication(application.id)
+              : action === "restore"
+                ? restoreApplication(application.id)
+                : deleteApplication(application.id);
+
+          void run
+            .then((result) => {
+              if (result.error) {
+                setStatusError(result.error);
+                setSaving(false);
+                return;
+              }
+
+              if (action === "delete") {
+                router.push("/admin/bewerbungen");
+                router.refresh();
+                return;
+              }
+
+              setNotice(result.notice);
+              setSaving(false);
+              router.refresh();
+            })
+            .catch(() => {
+              setStatusError(
+                "Die Aktion konnte nicht abgeschlossen werden. Bitte Seite neu laden.",
+              );
+              setSaving(false);
+            });
+        }}
+      >
+        {confirmAction === "archive" ? (
+          <p className="text-[14px] leading-6 text-muted">
+            <span className="font-medium text-ink">
+              {application.clubName} · {application.teamName}
+            </span>
+            <br />
+            Die Bewerbung wird nur in der normalen Liste ausgeblendet. Status,
+            Teilnahme und Kapazität bleiben unverändert.
+          </p>
+        ) : null}
+        {confirmAction === "restore" ? (
+          <p className="text-[14px] leading-6 text-muted">
+            <span className="font-medium text-ink">
+              {application.clubName} · {application.teamName}
+            </span>
+            <br />
+            Die Bewerbung erscheint wieder in der aktiven Liste.
+          </p>
+        ) : null}
+        {confirmAction === "delete" ? (
+          <p className="text-[14px] leading-6 text-muted">
+            <span className="font-medium text-ink">
+              {application.clubName} · {application.teamName}
+            </span>
+            <br />
+            Diese Aktion ist endgültig. Bewerbungen mit Turnier- oder Historiendaten
+            werden serverseitig blockiert — bitte dann archivieren.
+          </p>
+        ) : null}
+      </ConfirmModal>
     </div>
   );
 }
