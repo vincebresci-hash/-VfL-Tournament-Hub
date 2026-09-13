@@ -4,6 +4,7 @@ import {
   mergeTournamentParticipants,
   participantSourceBadge,
   participantSourceLabel,
+  resolveApplicationParticipantLogoUrl,
   resolveParticipantLogoUrl,
 } from "@/lib/tournament-participants";
 import { countConfirmedParticipants } from "@/lib/mein-turnierplan-participants";
@@ -191,6 +192,70 @@ export function runTournamentParticipantsListChecks() {
   });
   assert(logoApplication[0]?.logoUrl === "https://cdn.example/hub-app.png", "logo: application hub");
 
+  // Logo: application manual override beats hub club logo
+  const logoApplicationOverride = mergeTournamentParticipants({
+    applications: [
+      {
+        id: "app-override",
+        clubName: "FC Override",
+        teamName: "U10",
+        ageGroup: null,
+        birthYear: null,
+        clubLogoUrl: "https://cdn.example/hub-app.png",
+        logoUrl: "https://cdn.example/app-override.png",
+        logoManualOverride: true,
+      },
+    ],
+    externalTeams: [],
+  });
+  assert(
+    logoApplicationOverride[0]?.logoUrl === "https://cdn.example/app-override.png",
+    "logo: application override preferred",
+  );
+  assert(
+    logoApplicationOverride[0]?.customLogoUrl === "https://cdn.example/app-override.png",
+    "logo: application customLogoUrl for editor",
+  );
+
+  // Logo: clearing application override restores hub club logo
+  const logoApplicationCleared = mergeTournamentParticipants({
+    applications: [
+      {
+        id: "app-cleared",
+        clubName: "FC Cleared",
+        teamName: "U10",
+        ageGroup: null,
+        birthYear: null,
+        clubLogoUrl: "https://cdn.example/hub-app.png",
+        logoUrl: null,
+        logoManualOverride: false,
+      },
+    ],
+    externalTeams: [],
+  });
+  assert(
+    logoApplicationCleared[0]?.logoUrl === "https://cdn.example/hub-app.png",
+    "logo: application without override uses hub",
+  );
+  assert(logoApplicationCleared[0]?.customLogoUrl === null, "logo: cleared override has no custom");
+
+  assert(
+    resolveApplicationParticipantLogoUrl({
+      logoManualOverride: true,
+      applicationLogoUrl: "https://cdn.example/override.png",
+      clubLogoUrl: "https://cdn.example/hub.png",
+    }) === "https://cdn.example/override.png",
+    "logo: resolveApplication override wins",
+  );
+  assert(
+    resolveApplicationParticipantLogoUrl({
+      logoManualOverride: false,
+      applicationLogoUrl: "https://cdn.example/override.png",
+      clubLogoUrl: "https://cdn.example/hub.png",
+    }) === "https://cdn.example/hub.png",
+    "logo: resolveApplication without override uses hub",
+  );
+
   // Logo: mein-turnierplan uses imported logo when no hub club
   const logoMtp = mergeTournamentParticipants({
     applications: [],
@@ -295,6 +360,27 @@ export function runTournamentParticipantsListChecks() {
   assert(
     logoMigration.includes("clubs.logo_url"),
     "migration: public roster joins club logos",
+  );
+
+  const applicationLogoMigration = readFileSync(
+    join(process.cwd(), "supabase/migrations/20260913200000_application_participant_logos.sql"),
+    "utf8",
+  );
+  assert(
+    applicationLogoMigration.includes("ADD COLUMN IF NOT EXISTS logo_url text"),
+    "application logo migration: logo_url",
+  );
+  assert(
+    applicationLogoMigration.includes("logo_manual_override boolean NOT NULL DEFAULT false"),
+    "application logo migration: logo_manual_override",
+  );
+  assert(
+    applicationLogoMigration.includes("applications.logo_manual_override"),
+    "application logo migration: roster prefers override",
+  );
+  assert(
+    !applicationLogoMigration.includes("tournament_external_teams"),
+    "application logo migration: no external shadow rows",
   );
 
   return "ok";

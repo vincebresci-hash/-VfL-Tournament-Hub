@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
+  requireApplicationsManage,
   requireTeamsManage,
   requireTournamentsView,
 } from "@/lib/rbac/action-access";
@@ -20,6 +21,7 @@ import {
   selectTeamsForLogoApply,
 } from "@/lib/tournament-participant-logos";
 import {
+  buildApplicationLogoObjectPath,
   buildExternalTeamLogoObjectPath,
   deleteManagedClubLogoIfOwned,
   getFormDataUploadFile,
@@ -680,3 +682,189 @@ export async function applyExternalTeamLogoToSelectedTeamsAction(input: {
     notice: `Logo auf ${selection.targetIds.length} Team(s) übernommen.`,
   };
 }
+
+async function requireParticipantLogoAccess() {
+  const teamsAccess = await requireTeamsManage();
+  if (teamsAccess.error) {
+    return teamsAccess;
+  }
+
+  // Applications RLS requires applications.manage for row updates.
+  const applicationsAccess = await requireApplicationsManage();
+  if (applicationsAccess.error) {
+    return applicationsAccess;
+  }
+
+  return teamsAccess;
+}
+
+export async function updateApplicationParticipantLogoAction(input: {
+  tournamentId: string;
+  applicationId: string;
+  mode: "upload" | "url" | "remove";
+  logoUrl?: string | null;
+  logoFile?: File | null;
+}): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireParticipantLogoAccess();
+  if (access.error) {
+    return { error: access.error, notice: null };
+  }
+
+  const loaded = await loadTournamentMeta(input.tournamentId);
+  if (!loaded.tournament) {
+    return { error: loaded.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  const { data: application, error: loadError } = await supabase
+    .from("applications")
+    .select("id, tournament_id, status, logo_url, logo_manual_override")
+    .eq("id", input.applicationId)
+    .eq("tournament_id", input.tournamentId)
+    .maybeSingle();
+
+  if (loadError || !application) {
+    return { error: "Die Bewerbung wurde nicht gefunden.", notice: null };
+  }
+
+  if (String(application.status) !== "accepted") {
+    return {
+      error: "Logos können nur für angenommene Bewerbungen gesetzt werden.",
+      notice: null,
+    };
+  }
+
+  const previousLogoUrl = application.logo_url ? String(application.logo_url) : null;
+  let nextLogoUrl: string | null = previousLogoUrl;
+  let notice = "Logo wurde gespeichert.";
+
+  if (input.mode === "remove") {
+    nextLogoUrl = null;
+    notice =
+      "Eigenes Bewerbungs-Logo entfernt. Falls der verknüpfte Verein ein Logo hat, wird dieses wieder angezeigt.";
+  } else if (input.mode === "upload") {
+    const logoFile = input.logoFile;
+    if (
+      !logoFile ||
+      typeof logoFile !== "object" ||
+      typeof logoFile.arrayBuffer !== "function" ||
+      logoFile.size <= 0
+    ) {
+      return { error: "Bitte eine Bilddatei auswählen.", notice: null };
+    }
+
+    const mimeType = resolveClubLogoMimeType(logoFile);
+    if (!mimeType) {
+      return { error: "Erlaubt sind PNG, JPEG oder WebP.", notice: null };
+    }
+
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) {
+      return {
+        error: "Keine gültige Admin-Session für den Upload. Bitte erneut anmelden.",
+        notice: null,
+      };
+    }
+
+    const objectPath = buildApplicationLogoObjectPath({
+      tournamentId: input.tournamentId,
+      applicationId: input.applicationId,
+      mimeType,
+    });
+
+    const uploaded = await uploadClubLogoFile({
+      supabase,
+      file: logoFile,
+      objectPath,
+      mimeType,
+    });
+
+    if (uploaded.error || !uploaded.publicUrl) {
+      return { error: uploaded.error ?? "Upload fehlgeschlagen.", notice: null };
+    }
+
+    nextLogoUrl = uploaded.publicUrl;
+    notice = "Logo gespeichert";
+  } else {
+    const logoUrl = input.logoUrl?.trim() || null;
+    if (!logoUrl) {
+      return { error: "Bitte eine Logo-URL angeben.", notice: null };
+    }
+    if (
+      !(
+        logoUrl.startsWith("https://") ||
+        logoUrl.startsWith("http://") ||
+        logoUrl.startsWith("/")
+      )
+    ) {
+      return { error: "Die Logo-URL ist ungültig.", notice: null };
+    }
+
+    nextLogoUrl = logoUrl;
+    notice = "Logo-URL wurde gespeichert.";
+  }
+
+  const { error } = await supabase
+    .from("applications")
+    .update({
+      logo_url: nextLogoUrl,
+      logo_manual_override: nextLogoUrl != null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.applicationId)
+    .eq("tournament_id", input.tournamentId);
+
+  if (error) {
+    if (input.mode === "upload" && nextLogoUrl) {
+      await deleteManagedClubLogoIfOwned({ supabase, logoUrl: nextLogoUrl });
+    }
+    console.error("[club-logos] application logo update failed", {
+      applicationId: input.applicationId,
+      tournamentId: input.tournamentId,
+      message: error.message,
+      code: error.code,
+    });
+    return {
+      error: `Logo konnte nicht gespeichert werden: ${error.message.slice(0, 180)}`,
+      notice: null,
+    };
+  }
+
+  if (previousLogoUrl && previousLogoUrl !== nextLogoUrl) {
+    await deleteManagedClubLogoIfOwned({ supabase, logoUrl: previousLogoUrl });
+  }
+
+  revalidateTournamentPaths(loaded.tournament.slug, loaded.tournament.id);
+  return { error: null, notice };
+}
+
+export async function uploadApplicationParticipantLogoFormAction(
+  formData: FormData,
+): Promise<{ error: string | null; notice: string | null }> {
+  const tournamentId = String(formData.get("tournamentId") ?? "").trim();
+  const applicationId = String(formData.get("applicationId") ?? "").trim();
+  const { file: logoFile, meta } = getFormDataUploadFile(formData, "logoFile");
+
+  if (!tournamentId || !applicationId) {
+    return { error: "Turnier oder Bewerbung fehlt.", notice: null };
+  }
+
+  if (!logoFile) {
+    return {
+      error: meta.received
+        ? "Die hochgeladene Datei ist leer oder ungültig."
+        : "Bitte eine Bilddatei auswählen.",
+      notice: null,
+    };
+  }
+
+  return updateApplicationParticipantLogoAction({
+    tournamentId,
+    applicationId,
+    mode: "upload",
+    logoFile,
+  });
+}
+

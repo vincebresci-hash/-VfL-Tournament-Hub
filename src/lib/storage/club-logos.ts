@@ -120,6 +120,16 @@ export function buildExternalTeamLogoObjectPath(input: {
   return `tournaments/${input.tournamentId}/teams/${input.externalTeamId}/${randomUUID()}.${extension}`;
 }
 
+export function buildApplicationLogoObjectPath(input: {
+  tournamentId: string;
+  applicationId: string;
+  mimeType: LogoMimeType;
+}) {
+  const extension = clubLogoExtensionForMime(input.mimeType);
+  // Server-generated key only — never use original filenames or club names.
+  return `tournaments/${input.tournamentId}/applications/${input.applicationId}/${randomUUID()}.${extension}`;
+}
+
 export function isManagedClubLogoUrl(logoUrl: string | null | undefined) {
   if (!logoUrl) {
     return false;
