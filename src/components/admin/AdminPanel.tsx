@@ -70,22 +70,22 @@ export function AdminCard({
   children: ReactNode;
 }) {
   return (
-    <section className="border border-line bg-white p-5 sm:p-6">
-      <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+    <section className="border border-line bg-white p-4 sm:p-5">
+      <h2 className="font-display text-base font-bold tracking-wide text-ink uppercase sm:text-lg">
         {title}
       </h2>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   );
 }
 
 export function AdminInfo({ label, value }: { label: string; value: string }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
         {label}
       </dt>
-      <dd className="mt-1 text-[14px] leading-6 text-ink">{value}</dd>
+      <dd className="mt-0.5 break-words text-[14px] leading-5 text-ink">{value}</dd>
     </div>
   );
 }

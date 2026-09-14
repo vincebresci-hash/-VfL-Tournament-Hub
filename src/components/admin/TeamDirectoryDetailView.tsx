@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
-import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  adminDestructiveButtonClass,
+  adminSecondaryButtonClass,
+  adminTextLinkClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import { TeamDirectoryForm } from "@/components/admin/TeamDirectoryForm";
 import { TeamDirectoryLogoEditor } from "@/components/admin/TeamDirectoryLogoEditor";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
@@ -87,14 +94,30 @@ export function TeamDirectoryDetailView({
         ← Team-Datenbank
       </Link>
 
-      <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
+      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} size="lg" />
           <div>
-            <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
+            <h1 className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
               {entry.teamName}
             </h1>
-            <p className="mt-2 text-[15px] text-muted">{entry.clubName}</p>
+            <p className="mt-1 truncate text-[14px] text-muted">{entry.clubName}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {entry.ageGroup ? (
+                <span className="inline-flex bg-surface px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-ink uppercase">
+                  {entry.ageGroup}
+                </span>
+              ) : null}
+              <span
+                className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
+                  entry.archivedAt
+                    ? "bg-[#f2e8e8] text-[#8a3b3b]"
+                    : "bg-[#e8f5ee] text-[#1f6b3f]"
+                }`}
+              >
+                {entry.archivedAt ? "Archiviert" : "Aktiv"}
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -103,7 +126,7 @@ export function TeamDirectoryDetailView({
               <button
                 type="button"
                 onClick={() => setEditing((value) => !value)}
-                className="border border-line bg-white px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                className={`${adminSecondaryButtonClass} h-9 px-3 text-[11px]`}
               >
                 {editing ? "Abbrechen" : "Bearbeiten"}
               </button>
@@ -111,7 +134,7 @@ export function TeamDirectoryDetailView({
                 type="button"
                 onClick={handleArchiveToggle}
                 disabled={archiving || deleting}
-                className="border border-line bg-white px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-60"
+                className={`${adminSecondaryButtonClass} h-9 px-3 text-[11px]`}
               >
                 {entry.archivedAt ? "Reaktivieren" : "Archivieren"}
               </button>
@@ -123,7 +146,7 @@ export function TeamDirectoryDetailView({
                   setNotice(null);
                 }}
                 disabled={archiving || deleting}
-                className="border border-[#d9b0b0] bg-[#fff5f5] px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:opacity-60"
+                className={`${adminDestructiveButtonClass} h-9 px-3 text-[11px]`}
               >
                 Endgültig löschen
               </button>
@@ -132,9 +155,9 @@ export function TeamDirectoryDetailView({
         </div>
       </div>
 
-      {notice ? <p className="mt-6 text-[14px] text-muted">{notice}</p> : null}
+      {notice ? <p className="mt-4 text-[14px] text-muted">{notice}</p> : null}
       {error ? (
-        <p className="mt-6 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className="mt-4 text-[14px] text-[#9a2b2b]" role="alert">
           {error}
         </p>
       ) : null}
@@ -168,7 +191,7 @@ export function TeamDirectoryDetailView({
       ) : null}
 
       {editing && canManage ? (
-        <div className="mt-8">
+        <div className="mt-6">
           <TeamDirectoryForm
             initialValues={{
               id: entry.id,
@@ -203,7 +226,7 @@ export function TeamDirectoryDetailView({
           />
         </div>
       ) : (
-        <div className="mt-8 grid gap-5">
+        <div className="mt-6 grid gap-4">
           {canManage ? (
             <TeamDirectoryLogoEditor
               entryId={entry.id}
@@ -227,7 +250,7 @@ export function TeamDirectoryDetailView({
           ) : null}
 
           <AdminCard title="Stammdaten">
-            <dl className="grid gap-4 sm:grid-cols-2">
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <AdminInfo label="Verein" value={entry.clubName} />
               <AdminInfo label="Team" value={entry.teamName} />
               <AdminInfo label="Altersklasse" value={displayValue(entry.ageGroup)} />
@@ -243,14 +266,14 @@ export function TeamDirectoryDetailView({
               />
             </dl>
             {entry.internalNotes ? (
-              <p className="mt-4 whitespace-pre-wrap text-[14px] leading-6 text-ink">
+              <p className="mt-3 whitespace-pre-wrap text-[14px] leading-6 text-ink">
                 {entry.internalNotes}
               </p>
             ) : null}
           </AdminCard>
 
           <AdminCard title="Systemdaten">
-            <dl className="grid gap-4 sm:grid-cols-2">
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <AdminInfo
                 label="Hub-Team"
                 value={entry.isHubLinked ? "Ja" : "Nein (Archiv/CRM)"}
@@ -272,7 +295,7 @@ export function TeamDirectoryDetailView({
             {entry.teamId ? (
               <Link
                 href={`/admin/teams/${entry.teamId}`}
-                className="mt-5 inline-flex text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue"
+                className={`${adminTextLinkClass} mt-4`}
               >
                 Hub-Team ansehen →
               </Link>
@@ -280,7 +303,7 @@ export function TeamDirectoryDetailView({
             {entry.sourceApplicationId ? (
               <Link
                 href={`/admin/bewerbungen/${entry.sourceApplicationId}`}
-                className="mt-5 ml-0 block text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue sm:ml-4 sm:inline-flex"
+                className={`${adminTextLinkClass} mt-4 sm:ml-3`}
               >
                 Ursprungsbewerbung →
               </Link>
@@ -291,11 +314,11 @@ export function TeamDirectoryDetailView({
             {history.length === 0 ? (
               <p className="text-[14px] text-muted">Noch keine passenden Bewerbungen gefunden.</p>
             ) : (
-              <div className="grid gap-3">
+              <div className="grid gap-2">
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-3 border border-line px-4 py-3"
+                    className="flex flex-wrap items-center justify-between gap-2 border border-line px-3 py-2.5"
                   >
                     <div>
                       <p className="text-[14px] font-medium text-ink">{item.tournamentName}</p>
@@ -317,7 +340,7 @@ export function TeamDirectoryDetailView({
                       <ApplicationStatusBadge status={item.status as never} />
                       <Link
                         href={`/admin/bewerbungen/${item.id}`}
-                        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue"
+                        className={adminTextLinkClass}
                       >
                         Bewerbung
                       </Link>

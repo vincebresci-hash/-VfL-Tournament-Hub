@@ -79,11 +79,11 @@ export function TeamDirectoryLogoEditor({
   }
 
   return (
-    <div className="border border-line bg-surface p-4">
+    <div className="border border-line bg-surface p-3 sm:p-4">
       <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
         Team-Logo
       </p>
-      <p className="mt-2 text-[13px] leading-6 text-muted">
+      <p className="mt-1.5 text-[12px] leading-5 text-muted">
         Nur für diesen Team-Datenbank-Eintrag. Ändert keine Vereins-, Bewerbungs- oder
         Turnierlogos.
       </p>
@@ -97,7 +97,7 @@ export function TeamDirectoryLogoEditor({
         <p className="mt-3 border border-line bg-white px-3 py-2 text-[13px] text-ink">{localNotice}</p>
       ) : null}
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-3 flex items-center gap-3">
         <ParticipantClubLogo logoUrl={displayPreview} clubName={clubName} />
         <div className="text-[13px] text-muted">
           <p className="font-medium text-ink">Aktuelle Vorschau</p>
@@ -105,75 +105,79 @@ export function TeamDirectoryLogoEditor({
         </div>
       </div>
 
-      <form
-        className="mt-5 grid gap-3"
-        action={(formData) => {
-          run(async () => {
-            const result = await uploadTeamDirectoryLogoFormAction(formData);
-            if (!result.error) {
-              setOptimisticLogoUrl(filePreviewUrl);
-              setFileName(null);
-            }
-            return {
-              error: result.error,
-              notice: result.error ? null : (result.notice ?? "Logo gespeichert."),
-            };
-          });
-        }}
-      >
-        <input type="hidden" name="entryId" value={entryId} />
-        <label className="grid gap-1 text-[13px] text-ink">
-          <span className="font-semibold uppercase tracking-[0.08em]">Datei auswählen</span>
-          <input
-            type="file"
-            name="logoFile"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={pending}
-            required
-            onChange={(event) => onFileSelected(event.target.files?.[0] ?? null)}
-            className="block w-full text-[13px]"
-          />
-          {fileName ? <span className="text-[12px] text-muted">{fileName}</span> : null}
-        </label>
-        <button
-          type="submit"
-          disabled={pending || !fileName}
-          className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
-        >
-          {pending ? "Lade hoch…" : currentLogoUrl ? "Logo ersetzen" : "Logo hochladen"}
-        </button>
-      </form>
-
-      <label className="mt-4 grid gap-1 text-[13px] text-ink">
-        <span className="font-semibold uppercase tracking-[0.08em]">Oder Logo-URL</span>
-        <input
-          value={urlInput}
-          onChange={(event) => setUrlInput(event.target.value)}
-          className="h-10 border border-line bg-white px-3"
-          placeholder="https://…"
-          disabled={pending}
-        />
-      </label>
-      <button
-        type="button"
-        disabled={pending || !urlInput.trim()}
-        onClick={() =>
-          run(async () => {
-            const result = await updateTeamDirectoryLogoAction({
-              entryId,
-              mode: "url",
-              logoUrl: urlInput,
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <form
+          className="grid gap-3"
+          action={(formData) => {
+            run(async () => {
+              const result = await uploadTeamDirectoryLogoFormAction(formData);
+              if (!result.error) {
+                setOptimisticLogoUrl(filePreviewUrl);
+                setFileName(null);
+              }
+              return {
+                error: result.error,
+                notice: result.error ? null : (result.notice ?? "Logo gespeichert."),
+              };
             });
-            if (!result.error) {
-              setOptimisticLogoUrl(urlInput.trim());
+          }}
+        >
+          <input type="hidden" name="entryId" value={entryId} />
+          <label className="grid gap-1 text-[13px] text-ink">
+            <span className="font-semibold uppercase tracking-[0.08em]">Datei auswählen</span>
+            <input
+              type="file"
+              name="logoFile"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={pending}
+              required
+              onChange={(event) => onFileSelected(event.target.files?.[0] ?? null)}
+              className="block w-full min-w-0 text-[13px]"
+            />
+            {fileName ? <span className="text-[12px] text-muted">{fileName}</span> : null}
+          </label>
+          <button
+            type="submit"
+            disabled={pending || !fileName}
+            className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+          >
+            {pending ? "Lade hoch…" : currentLogoUrl ? "Logo ersetzen" : "Logo hochladen"}
+          </button>
+        </form>
+
+        <div className="grid gap-3 content-start">
+          <label className="grid gap-1 text-[13px] text-ink">
+            <span className="font-semibold uppercase tracking-[0.08em]">Oder Logo-URL</span>
+            <input
+              value={urlInput}
+              onChange={(event) => setUrlInput(event.target.value)}
+              className="h-10 min-w-0 border border-line bg-white px-3"
+              placeholder="https://…"
+              disabled={pending}
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pending || !urlInput.trim()}
+            onClick={() =>
+              run(async () => {
+                const result = await updateTeamDirectoryLogoAction({
+                  entryId,
+                  mode: "url",
+                  logoUrl: urlInput,
+                });
+                if (!result.error) {
+                  setOptimisticLogoUrl(urlInput.trim());
+                }
+                return result;
+              })
             }
-            return result;
-          })
-        }
-        className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
-      >
-        URL speichern
-      </button>
+            className="inline-flex h-9 w-fit items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          >
+            URL speichern
+          </button>
+        </div>
+      </div>
 
       {currentLogoUrl ? (
         <button
@@ -192,7 +196,7 @@ export function TeamDirectoryLogoEditor({
               return result;
             })
           }
-          className="mt-4 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
         >
           Logo entfernen
         </button>
