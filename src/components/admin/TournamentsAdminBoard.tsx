@@ -63,6 +63,7 @@ export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProp
                 applicationsCount={summary.applicationsCount}
                 waitlistCount={summary.waitlistCount}
                 newCount={summary.newCount}
+                underReviewCount={summary.underReviewCount}
               />
             );
           })
