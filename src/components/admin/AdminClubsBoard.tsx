@@ -2,10 +2,16 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { ClubRecordStatusBadge } from "@/components/admin/ClubRecordStatusBadge";
-import { AdminEmpty, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminEmpty,
+  adminFilterControlClass,
+  adminFilterShellClass,
+  adminTextLinkClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
 import type { AdminClubListItem } from "@/types/admin";
+import { ClubRecordStatusBadge } from "@/components/admin/ClubRecordStatusBadge";
 
 type AdminClubsBoardProps = {
   clubs: AdminClubListItem[];
@@ -36,13 +42,20 @@ export function AdminClubsBoard({ clubs }: AdminClubsBoardProps) {
 
   return (
     <div>
-      <input
-        type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        placeholder="Verein, Ansprechpartner oder E-Mail suchen"
-        className="mt-6 h-11 w-full max-w-md border border-line bg-white px-3 text-[15px] text-ink placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
-      />
+      <div className={`mt-6 ${adminFilterShellClass}`}>
+        <label className="block min-w-0">
+          <span className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+            Suche
+          </span>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Verein, Ansprechpartner oder E-Mail suchen"
+            className={`${adminFilterControlClass} mt-2`}
+          />
+        </label>
+      </div>
 
       {visible.length === 0 ? (
         <div className="mt-6">
@@ -58,24 +71,24 @@ export function AdminClubsBoard({ clubs }: AdminClubsBoardProps) {
             {visible.map((club) => (
               <article key={club.id} className="border border-line bg-white p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                  <div className="min-w-0">
+                    <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
                       {club.name}
                     </p>
-                    <p className="mt-1 text-[13px] text-muted">
+                    <p className="mt-1 truncate text-[13px] text-muted">
                       {displayValue(club.contactName)}
                     </p>
                   </div>
                   <ClubRecordStatusBadge status={club.status} />
                 </div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Teams
                     </dt>
                     <dd className="mt-1">{club.teamCount}</dd>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Bewerbungen
                     </dt>
@@ -84,7 +97,7 @@ export function AdminClubsBoard({ clubs }: AdminClubsBoardProps) {
                 </dl>
                 <Link
                   href={`/admin/vereine/${club.id}`}
-                  className="mt-4 inline-flex text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+                  className={`${adminTextLinkClass} mt-4`}
                 >
                   Ansehen
                 </Link>

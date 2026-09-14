@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AdminEmpty, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminEmpty,
+  adminFilterControlClass,
+  adminFilterShellClass,
+  adminTextLinkClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
 import { AGE_GROUPS } from "@/types/tournament";
 import type { AdminTeamListItem, AdminTournamentOption } from "@/types/admin";
@@ -11,9 +17,6 @@ type AdminTeamsBoardProps = {
   teams: AdminTeamListItem[];
   tournaments: AdminTournamentOption[];
 };
-
-const selectClassName =
-  "h-11 w-full border border-line bg-white px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
 
 export function AdminTeamsBoard({ teams, tournaments }: AdminTeamsBoardProps) {
   const [query, setQuery] = useState("");
@@ -51,70 +54,72 @@ export function AdminTeamsBoard({ teams, tournaments }: AdminTeamsBoardProps) {
 
   return (
     <div>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <label className="block">
-          <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
-            Suche
-          </span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Team, Verein oder Trainer"
-            className={`${selectClassName} mt-2`}
-          />
-        </label>
-        <label className="block">
-          <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
-            Verein
-          </span>
-          <select
-            value={clubId}
-            onChange={(event) => setClubId(event.target.value)}
-            className={`${selectClassName} mt-2`}
-          >
-            <option value="all">Alle Vereine</option>
-            {clubs.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
-            Altersklasse
-          </span>
-          <select
-            value={ageGroup}
-            onChange={(event) => setAgeGroup(event.target.value)}
-            className={`${selectClassName} mt-2`}
-          >
-            <option value="all">Alle Altersklassen</option>
-            {AGE_GROUPS.map((group) => (
-              <option key={group} value={group}>
-                {group}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
-            Turnier
-          </span>
-          <select
-            value={tournamentId}
-            onChange={(event) => setTournamentId(event.target.value)}
-            className={`${selectClassName} mt-2`}
-          >
-            <option value="all">Alle Turniere</option>
-            {tournaments.map((tournament) => (
-              <option key={tournament.id} value={tournament.id}>
-                {tournament.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className={`mt-6 ${adminFilterShellClass}`}>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <label className="block min-w-0">
+            <span className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+              Suche
+            </span>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Team, Verein oder Trainer"
+              className={`${adminFilterControlClass} mt-2`}
+            />
+          </label>
+          <label className="block min-w-0">
+            <span className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+              Verein
+            </span>
+            <select
+              value={clubId}
+              onChange={(event) => setClubId(event.target.value)}
+              className={`${adminFilterControlClass} mt-2`}
+            >
+              <option value="all">Alle Vereine</option>
+              {clubs.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block min-w-0">
+            <span className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+              Altersklasse
+            </span>
+            <select
+              value={ageGroup}
+              onChange={(event) => setAgeGroup(event.target.value)}
+              className={`${adminFilterControlClass} mt-2`}
+            >
+              <option value="all">Alle Altersklassen</option>
+              {AGE_GROUPS.map((group) => (
+                <option key={group} value={group}>
+                  {group}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block min-w-0">
+            <span className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+              Turnier
+            </span>
+            <select
+              value={tournamentId}
+              onChange={(event) => setTournamentId(event.target.value)}
+              className={`${adminFilterControlClass} mt-2`}
+            >
+              <option value="all">Alle Turniere</option>
+              {tournaments.map((tournament) => (
+                <option key={tournament.id} value={tournament.id}>
+                  {tournament.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {visible.length === 0 ? (
@@ -130,18 +135,20 @@ export function AdminTeamsBoard({ teams, tournaments }: AdminTeamsBoardProps) {
           <div className="grid gap-3 lg:hidden">
             {visible.map((team) => (
               <article key={team.id} className="border border-line bg-white p-4">
-                <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                  {team.name}
-                </p>
-                <p className="mt-1 text-[13px] text-muted">{team.clubName}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
+                    {team.name}
+                  </p>
+                  <p className="mt-1 truncate text-[13px] text-muted">{team.clubName}</p>
+                </div>
                 <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Altersklasse
                     </dt>
                     <dd className="mt-1">{displayValue(team.ageGroup)}</dd>
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Bewerbungen
                     </dt>
@@ -150,7 +157,7 @@ export function AdminTeamsBoard({ teams, tournaments }: AdminTeamsBoardProps) {
                 </dl>
                 <Link
                   href={`/admin/teams/${team.id}`}
-                  className="mt-4 inline-flex text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+                  className={`${adminTextLinkClass} mt-4`}
                 >
                   Ansehen
                 </Link>

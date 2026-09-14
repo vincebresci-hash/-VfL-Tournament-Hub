@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  AdminNotice,
+  AdminEmpty,
   adminFilterControlClass,
   adminFilterShellClass,
+  adminStatusBadgeClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
@@ -194,7 +195,9 @@ export function AdminUsersBoard({ users }: AdminUsersBoardProps) {
       </div>
 
       {filtered.length === 0 ? (
-        <AdminNotice>Keine Benutzer für die aktuelle Filterauswahl gefunden.</AdminNotice>
+        <div className="mt-4">
+          <AdminEmpty>Keine Benutzer für die aktuelle Filterauswahl gefunden.</AdminEmpty>
+        </div>
       ) : (
         <div>
           <p className="mb-4 text-[13px] text-muted">
@@ -214,10 +217,10 @@ export function AdminUsersBoard({ users }: AdminUsersBoardProps) {
                       <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
                         {displayName}
                       </p>
-                      <p className="mt-1 truncate text-[13px] text-muted">{user.email}</p>
+                      <p className="mt-1 break-all text-[13px] text-muted">{user.email}</p>
                     </div>
                     <span
-                      className={`shrink-0 px-2 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${accountStatusClassName(user.accountStatus)}`}
+                      className={`shrink-0 ${adminStatusBadgeClass} ${accountStatusClassName(user.accountStatus)}`}
                     >
                       {accountStatusLabel(user.accountStatus)}
                     </span>
@@ -320,7 +323,7 @@ export function AdminUsersBoard({ users }: AdminUsersBoardProps) {
                       </td>
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex px-2 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${accountStatusClassName(user.accountStatus)}`}
+                          className={`${adminStatusBadgeClass} ${accountStatusClassName(user.accountStatus)}`}
                         >
                           {accountStatusLabel(user.accountStatus)}
                         </span>

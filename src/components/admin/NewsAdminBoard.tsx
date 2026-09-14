@@ -3,7 +3,11 @@
 import { useRouter } from "next/navigation";
 import { getNewsPostStatus, newsPostStatusLabel } from "@/lib/news";
 import { formatDateTimeDe } from "@/lib/format";
-import { adminSecondaryButtonClass } from "@/components/admin/AdminPanel";
+import {
+  AdminEmpty,
+  adminSecondaryButtonClass,
+  adminStatusBadgeClass,
+} from "@/components/admin/AdminPanel";
 import type { NewsPostWithTournament } from "@/types/news";
 
 type NewsAdminBoardProps = {
@@ -29,9 +33,7 @@ export function NewsAdminBoard({ posts }: NewsAdminBoardProps) {
   return (
     <div className="grid gap-3">
       {posts.length === 0 ? (
-        <p className="border border-line bg-white px-5 py-8 text-[15px] text-muted">
-          Noch keine News vorhanden.
-        </p>
+        <AdminEmpty>Noch keine News vorhanden.</AdminEmpty>
       ) : (
         posts.map((post) => {
           const status = getNewsPostStatus(post);
@@ -41,8 +43,8 @@ export function NewsAdminBoard({ posts }: NewsAdminBoardProps) {
               key={post.id}
               className="border border-line bg-white p-5 sm:flex sm:items-start sm:justify-between sm:gap-4"
             >
-              <div>
-                <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+              <div className="min-w-0">
+                <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
                   {post.title}
                 </p>
                 <p className="mt-1 text-[13px] text-muted">
@@ -51,12 +53,12 @@ export function NewsAdminBoard({ posts }: NewsAdminBoardProps) {
                     : "Noch nicht veröffentlicht"}
                 </p>
                 {post.tournamentName ? (
-                  <p className="mt-1 text-[13px] text-muted">
+                  <p className="mt-1 truncate text-[13px] text-muted">
                     Turnier: {post.tournamentName}
                   </p>
                 ) : null}
                 <p
-                  className={`mt-2 inline-flex px-2 py-0.5 text-[11px] font-semibold tracking-[0.08em] uppercase ${statusClassName(status)}`}
+                  className={`mt-2 ${adminStatusBadgeClass} ${statusClassName(status)}`}
                 >
                   {newsPostStatusLabel[status]}
                 </p>

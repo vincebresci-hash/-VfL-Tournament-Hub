@@ -224,9 +224,9 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
             Was jetzt Aufmerksamkeit braucht — basierend auf bestehenden Kennzahlen.
           </p>
           {openTasks.length === 0 ? (
-            <p className="mt-4 border border-line bg-white px-5 py-5 text-[15px] text-muted">
-              Aktuell keine offenen Bewerbungsaufgaben.
-            </p>
+            <div className="mt-4">
+              <AdminEmpty>Aktuell keine offenen Bewerbungsaufgaben.</AdminEmpty>
+            </div>
           ) : (
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {openTasks.map((task) => (

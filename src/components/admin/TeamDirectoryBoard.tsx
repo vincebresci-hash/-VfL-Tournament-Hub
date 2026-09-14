@@ -194,7 +194,7 @@ export function TeamDirectoryBoard({ entries, ready }: TeamDirectoryBoardProps) 
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       E-Mail
                     </dt>
-                    <dd className="mt-1 truncate">{displayValue(entry.contactEmail)}</dd>
+                    <dd className="mt-1 break-all">{displayValue(entry.contactEmail)}</dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">

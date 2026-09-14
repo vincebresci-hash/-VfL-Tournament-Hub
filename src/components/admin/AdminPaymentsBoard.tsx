@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { adminTextLinkClass } from "@/components/admin/AdminPanel";
+import {
+  AdminEmpty,
+  adminStatusBadgeClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
 import { paymentStatusClassName, paymentStatusLabel } from "@/lib/payments/labels";
 import { formatDateDe } from "@/lib/format";
 import { formatCurrencyEur } from "@/lib/payments/format";
@@ -12,9 +16,11 @@ type AdminPaymentsBoardProps = {
 export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
   if (records.length === 0) {
     return (
-      <p className="mt-8 border border-line bg-white px-5 py-8 text-[15px] text-muted">
-        Keine angenommenen Bewerbungen mit Zahlungsdaten vorhanden.
-      </p>
+      <div className="mt-8">
+        <AdminEmpty>
+          Keine angenommenen Bewerbungen mit Zahlungsdaten vorhanden.
+        </AdminEmpty>
+      </div>
     );
   }
 
@@ -42,7 +48,7 @@ export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
                 <p className="mt-1 truncate text-[13px] text-muted">{record.teamName}</p>
               </div>
               <span
-                className={`shrink-0 px-2 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${paymentStatusClassName[record.paymentStatus]}`}
+                className={`shrink-0 ${adminStatusBadgeClass} ${paymentStatusClassName[record.paymentStatus]}`}
               >
                 {paymentStatusLabel[record.paymentStatus]}
               </span>
@@ -121,7 +127,7 @@ export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
                 </td>
                 <td className="px-4 py-3">
                   <span
-                    className={`inline-flex px-2 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${paymentStatusClassName[record.paymentStatus]}`}
+                    className={`${adminStatusBadgeClass} ${paymentStatusClassName[record.paymentStatus]}`}
                   >
                     {paymentStatusLabel[record.paymentStatus]}
                   </span>

@@ -31,6 +31,10 @@ export const adminFilterShellClass = "border border-line bg-white p-4 sm:p-5";
 export const adminFilterControlClass =
   "h-10 w-full min-w-0 border border-line bg-white px-3 text-[13px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
 
+/** Shared status badge chrome — color classes supplied by callers. */
+export const adminStatusBadgeClass =
+  "inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase";
+
 export function AdminPageHeader({
   title,
   description,
@@ -88,7 +92,7 @@ export function AdminInfo({ label, value }: { label: string; value: string }) {
 
 export function AdminEmpty({ children }: { children: ReactNode }) {
   return (
-    <p className="border border-line bg-white px-5 py-8 text-[15px] text-muted">
+    <p className="border border-line bg-white px-5 py-8 text-[15px] leading-6 text-muted break-words">
       {children}
     </p>
   );
