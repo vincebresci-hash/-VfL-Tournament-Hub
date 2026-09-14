@@ -16,6 +16,21 @@ export const adminDestructiveButtonClass =
 export const adminTextLinkClass =
   "inline-flex h-10 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
 
+/** Compact primary CTA for dense list/table rows. */
+export const adminCompactPrimaryButtonClass =
+  "inline-flex h-9 items-center justify-center bg-brand-yellow px-3 text-[11px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60";
+
+/** Compact secondary action for dense list/table rows. */
+export const adminCompactSecondaryButtonClass =
+  "inline-flex h-9 items-center justify-center border border-line bg-white px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60";
+
+/** Shared filter/search shell for admin list pages. */
+export const adminFilterShellClass = "border border-line bg-white p-4 sm:p-5";
+
+/** Shared filter control (input/select) styling. */
+export const adminFilterControlClass =
+  "h-10 w-full min-w-0 border border-line bg-white px-3 text-[13px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
+
 export function AdminPageHeader({
   title,
   description,

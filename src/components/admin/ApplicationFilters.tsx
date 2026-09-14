@@ -3,6 +3,10 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import {
+  adminFilterControlClass,
+  adminFilterShellClass,
+} from "@/components/admin/AdminPanel";
+import {
   applicationSortOptions,
   applicationStatusFilters,
   clubTypeLabel,
@@ -21,9 +25,6 @@ type ApplicationFiltersProps = {
   onSortChange: (sort: ApplicationSort) => void;
 };
 
-const selectClassName =
-  "h-10 w-full border border-line bg-white px-3 text-[13px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
-
 export function ApplicationFiltersPanel({
   filters,
   sort,
@@ -39,8 +40,25 @@ export function ApplicationFiltersPanel({
   }
 
   return (
-    <div className="border border-line bg-white p-4 sm:p-5">
-      <div className="flex flex-wrap gap-2">
+    <div className={adminFilterShellClass}>
+      <div>
+        <label
+          htmlFor="application-search"
+          className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase"
+        >
+          Suche
+        </label>
+        <input
+          id="application-search"
+          type="search"
+          value={filters.query}
+          onChange={(event) => update("query", event.target.value)}
+          placeholder="Verein oder Mannschaft suchen"
+          className={cn(adminFilterControlClass, "mt-2")}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
         {(
           [
             { id: "active", label: "Aktiv" },
@@ -86,7 +104,7 @@ export function ApplicationFiltersPanel({
           <select
             value={filters.tournamentId}
             onChange={(event) => update("tournamentId", event.target.value)}
-            className={selectClassName}
+            className={adminFilterControlClass}
           >
             <option value="all">Alle Turniere</option>
             {tournaments.map((tournament) => (
@@ -103,7 +121,7 @@ export function ApplicationFiltersPanel({
             onChange={(event) =>
               update("ageGroup", event.target.value as ApplicationFilters["ageGroup"])
             }
-            className={selectClassName}
+            className={adminFilterControlClass}
           >
             <option value="all">Alle</option>
             {AGE_GROUPS.map((ageGroup) => (
@@ -125,7 +143,7 @@ export function ApplicationFiltersPanel({
                   : (Number(event.target.value) as ApplicationFilters["strength"]),
               )
             }
-            className={selectClassName}
+            className={adminFilterControlClass}
           >
             <option value="all">Alle</option>
             {TEAM_STRENGTHS.map((strength) => (
@@ -142,7 +160,7 @@ export function ApplicationFiltersPanel({
             onChange={(event) =>
               update("clubType", event.target.value as ApplicationFilters["clubType"])
             }
-            className={selectClassName}
+            className={adminFilterControlClass}
           >
             <option value="all">Alle</option>
             {CLUB_TYPES.map((type) => (
@@ -157,7 +175,7 @@ export function ApplicationFiltersPanel({
           <select
             value={sort}
             onChange={(event) => onSortChange(event.target.value as ApplicationSort)}
-            className={selectClassName}
+            className={adminFilterControlClass}
           >
             {applicationSortOptions.map((option) => (
               <option key={option.id} value={option.id}>
@@ -166,23 +184,6 @@ export function ApplicationFiltersPanel({
             ))}
           </select>
         </FilterField>
-      </div>
-
-      <div className="mt-3">
-        <label
-          htmlFor="application-search"
-          className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase"
-        >
-          Suche
-        </label>
-        <input
-          id="application-search"
-          type="search"
-          value={filters.query}
-          onChange={(event) => update("query", event.target.value)}
-          placeholder="Verein oder Mannschaft suchen"
-          className={cn(selectClassName, "mt-2")}
-        />
       </div>
 
       <button
@@ -198,7 +199,7 @@ export function ApplicationFiltersPanel({
 
 function FilterField({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="block">
+    <label className="block min-w-0">
       <span className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
         {label}
       </span>
