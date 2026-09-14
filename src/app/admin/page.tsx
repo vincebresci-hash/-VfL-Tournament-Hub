@@ -6,7 +6,7 @@ import { getAdminDashboardData } from "@/lib/db/admin-queries";
 import { loadUserAuthorization } from "@/lib/rbac/queries";
 
 export const metadata: Metadata = {
-  title: "Dashboard",
+  title: "Admin",
 };
 
 export default async function AdminHomePage() {
