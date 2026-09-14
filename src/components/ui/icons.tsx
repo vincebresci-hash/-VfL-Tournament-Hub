@@ -239,6 +239,27 @@ export function IconMail(props: IconProps) {
   );
 }
 
+/** Distinct from clipboard — used for Absagen / cancel flows. */
+export function IconCancel(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="9" {...stroke} />
+      <path d="M8.2 8.2 15.8 15.8M15.8 8.2 8.2 15.8" {...stroke} />
+    </IconBase>
+  );
+}
+
+/** Distinct from users — used for Team-Datenbank / CRM archive. */
+export function IconDatabase(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <ellipse cx="12" cy="6.5" rx="7" ry="2.5" {...stroke} />
+      <path d="M5 6.5v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5" {...stroke} />
+      <path d="M5 11.5v5c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-5" {...stroke} />
+    </IconBase>
+  );
+}
+
 export function IconPhone(props: IconProps) {
   return (
     <IconBase {...props}>

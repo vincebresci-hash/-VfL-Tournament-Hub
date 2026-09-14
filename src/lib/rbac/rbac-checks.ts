@@ -122,6 +122,22 @@ export function runRbacChecks() {
   assert(clubProfileForm.includes("updatePersonalProfileAction"), "club personal profile wired");
   assert(adminShell.includes("getAdminRoutePermissions"), "admin route permission gate");
   assert(adminSidebar.includes("canSeeAdminNavItem"), "permission-based admin navigation");
+  assert(adminSidebar.includes("visibleGroups"), "empty nav groups hidden");
+  assert(adminSidebar.includes("adminNavigationGroups"), "sidebar uses grouped navigation");
+
+  const adminNavigation = readFileSync(
+    join(process.cwd(), "src/lib/admin-navigation.ts"),
+    "utf8",
+  );
+  assert(adminNavigation.includes('href: "/admin/bewerbungen"'), "applications nav href unchanged");
+  assert(adminNavigation.includes('href: "/admin/kommunikation"'), "communications nav href unchanged");
+  assert(adminNavigation.includes('href: "/admin/emails"'), "emails nav href unchanged");
+  assert(adminNavigation.includes('label: "Hub-Teams"'), "hub teams UI label");
+  assert(adminNavigation.includes('label: "Nachrichten"'), "messages UI label");
+  assert(adminNavigation.includes('label: "E-Mail-Vorlagen"'), "email templates UI label");
+  assert(adminAccess.includes("NAV_PERMISSIONS"), "nav permission map preserved");
+  assert(adminAccess.includes('"/admin/teams"'), "teams route permission unchanged");
+  assert(adminAccess.includes('"/admin/team-datenbank"'), "team directory route permission unchanged");
 
   // SUPER_ADMIN
   assert(
