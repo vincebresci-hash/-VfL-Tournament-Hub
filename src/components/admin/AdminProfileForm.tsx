@@ -6,6 +6,7 @@ import { Field, TextInput } from "@/components/apply/FormControls";
 import {
   AdminCard,
   AdminInfo,
+  adminCardShellClass,
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
   displayValue,
@@ -92,7 +93,7 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4">
       <AdminCard title="Konto">
         <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <AdminInfo label="Name" value={displayValue(displayNameValue)} />
@@ -109,10 +110,11 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
         </dl>
       </AdminCard>
 
-      <form onSubmit={handleProfile} className="border border-line bg-white p-4 sm:p-5">
-        <h2 className="font-display text-base font-bold tracking-wide text-ink uppercase sm:text-lg">
-          Profil bearbeiten
+      <form onSubmit={handleProfile} className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className="font-display text-[15px] font-bold tracking-[0.04em] text-ink uppercase sm:text-base">
+          Profildaten
         </h2>
+        <div className="mt-3 border-t border-line/70 pt-3">
         {profileError ? (
           <p className="mt-3 text-[14px] text-[#9a2b2b]" role="alert">
             {profileError}
@@ -167,13 +169,15 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
             {savingProfile ? "Wird gespeichert…" : "Profil speichern"}
           </button>
         </div>
+        </div>
       </form>
 
-      <form onSubmit={handlePassword} className="border border-line bg-white p-4 sm:p-5">
-        <h2 className="font-display text-base font-bold tracking-wide text-ink uppercase sm:text-lg">
-          Passwort ändern
+      <form onSubmit={handlePassword} className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className="font-display text-[15px] font-bold tracking-[0.04em] text-ink uppercase sm:text-base">
+          Passwort & Sicherheit
         </h2>
-        <p className="mt-2 max-w-xl text-[13px] leading-5 text-muted">
+        <div className="mt-3 border-t border-line/70 pt-3">
+        <p className="max-w-xl text-[13px] leading-5 text-muted">
           Das Passwort wird ausschließlich über Supabase Auth gespeichert.
         </p>
         {passwordError ? (
@@ -223,6 +227,7 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
           >
             {savingPassword ? "Wird gespeichert…" : "Passwort ändern"}
           </button>
+        </div>
         </div>
       </form>
     </div>

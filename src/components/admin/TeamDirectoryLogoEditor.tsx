@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { adminCardShellClass } from "@/components/admin/AdminPanel";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
   updateTeamDirectoryLogoAction,
@@ -79,8 +80,8 @@ export function TeamDirectoryLogoEditor({
   }
 
   return (
-    <div className="border border-line bg-surface p-3 sm:p-4">
-      <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
+    <div className={`${adminCardShellClass} bg-surface/50 p-3.5 sm:p-4`}>
+      <p className="font-display text-[15px] font-bold tracking-[0.04em] text-ink uppercase">
         Team-Logo
       </p>
       <p className="mt-1.5 text-[12px] leading-5 text-muted">
@@ -139,7 +140,7 @@ export function TeamDirectoryLogoEditor({
           <button
             type="submit"
             disabled={pending || !fileName}
-            className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+            className="inline-flex h-9 w-fit items-center rounded-md bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.06em] text-navy uppercase transition-colors hover:bg-[#ffe066] disabled:opacity-50"
           >
             {pending ? "Lade hoch…" : currentLogoUrl ? "Logo ersetzen" : "Logo hochladen"}
           </button>
@@ -151,7 +152,7 @@ export function TeamDirectoryLogoEditor({
             <input
               value={urlInput}
               onChange={(event) => setUrlInput(event.target.value)}
-              className="h-10 min-w-0 border border-line bg-white px-3"
+              className="h-10 min-w-0 rounded-lg border border-line bg-white px-3"
               placeholder="https://…"
               disabled={pending}
             />
@@ -172,7 +173,7 @@ export function TeamDirectoryLogoEditor({
                 return result;
               })
             }
-            className="inline-flex h-9 w-fit items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+            className="inline-flex h-9 w-fit items-center rounded-md border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.06em] text-ink uppercase transition-colors hover:bg-white disabled:opacity-50"
           >
             URL speichern
           </button>
@@ -196,7 +197,7 @@ export function TeamDirectoryLogoEditor({
               return result;
             })
           }
-          className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className="mt-3 inline-flex h-9 items-center rounded-md border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.06em] text-ink uppercase transition-colors hover:bg-white disabled:opacity-50"
         >
           Logo entfernen
         </button>

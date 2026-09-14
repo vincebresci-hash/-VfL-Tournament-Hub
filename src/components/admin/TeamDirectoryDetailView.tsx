@@ -7,8 +7,10 @@ import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadg
 import {
   AdminCard,
   AdminInfo,
+  adminCardShellClass,
   adminDestructiveButtonClass,
   adminSecondaryButtonClass,
+  adminStatusBadgeClass,
   adminTextLinkClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
@@ -94,22 +96,23 @@ export function TeamDirectoryDetailView({
         ← Team-Datenbank
       </Link>
 
-      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-3">
+      <div className={`mt-5 ${adminCardShellClass} p-4 sm:p-5`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3.5">
           <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} size="lg" />
-          <div>
+          <div className="min-w-0">
             <h1 className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
               {entry.teamName}
             </h1>
             <p className="mt-1 truncate text-[14px] text-muted">{entry.clubName}</p>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               {entry.ageGroup ? (
-                <span className="inline-flex bg-surface px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-ink uppercase">
+                <span className={`${adminStatusBadgeClass} bg-surface text-ink`}>
                   {entry.ageGroup}
                 </span>
               ) : null}
               <span
-                className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${
+                className={`${adminStatusBadgeClass} ${
                   entry.archivedAt
                     ? "bg-[#f2e8e8] text-[#8a3b3b]"
                     : "bg-[#e8f5ee] text-[#1f6b3f]"
@@ -117,6 +120,11 @@ export function TeamDirectoryDetailView({
               >
                 {entry.archivedAt ? "Archiviert" : "Aktiv"}
               </span>
+              {entry.internalCategory ? (
+                <span className={`${adminStatusBadgeClass} bg-navy/5 text-navy`}>
+                  {entry.internalCategory}
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -153,6 +161,7 @@ export function TeamDirectoryDetailView({
             </>
           ) : null}
         </div>
+        </div>
       </div>
 
       {notice ? <p className="mt-4 text-[14px] text-muted">{notice}</p> : null}
@@ -163,7 +172,7 @@ export function TeamDirectoryDetailView({
       ) : null}
 
       {confirmDelete && canManage ? (
-        <div className="mt-6 border border-[#d9b0b0] bg-[#fff5f5] p-4">
+        <div className="mt-5 rounded-xl border border-[#d9b0b0] bg-[#fff5f5] p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
           <p className="text-[14px] font-medium text-[#9a2b2b]">Eintrag endgültig löschen?</p>
           <p className="mt-2 text-[13px] leading-6 text-ink">
             Dieser Vorgang löscht nur den Eintrag aus der Team-Datenbank. Bewerbungen,
@@ -226,7 +235,7 @@ export function TeamDirectoryDetailView({
           />
         </div>
       ) : (
-        <div className="mt-6 grid gap-4">
+        <div className="mt-5 grid gap-4">
           {canManage ? (
             <TeamDirectoryLogoEditor
               entryId={entry.id}
@@ -318,7 +327,7 @@ export function TeamDirectoryDetailView({
                 {history.map((item) => (
                   <div
                     key={item.id}
-                    className="flex flex-wrap items-center justify-between gap-2 border border-line px-3 py-2.5"
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-line bg-surface/40 px-3 py-2.5"
                   >
                     <div>
                       <p className="text-[14px] font-medium text-ink">{item.tournamentName}</p>

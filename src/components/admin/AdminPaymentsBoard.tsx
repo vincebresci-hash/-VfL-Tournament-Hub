@@ -1,8 +1,9 @@
 import Link from "next/link";
 import {
   AdminEmpty,
+  adminCardShellClass,
+  adminCompactSecondaryButtonClass,
   adminStatusBadgeClass,
-  adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { paymentStatusClassName, paymentStatusLabel } from "@/lib/payments/labels";
 import { formatDateDe } from "@/lib/format";
@@ -35,7 +36,7 @@ export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
         {records.map((record) => (
           <article
             key={`mobile-${record.applicationId}`}
-            className="border border-line bg-white p-3.5"
+            className={`${adminCardShellClass} p-3.5`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -84,7 +85,7 @@ export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
             </dl>
             <Link
               href={`/admin/zahlungen/${record.applicationId}`}
-              className={`${adminTextLinkClass} mt-4`}
+              className={`${adminCompactSecondaryButtonClass} mt-3`}
             >
               Ansehen
             </Link>
@@ -92,25 +93,25 @@ export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto border border-line bg-white lg:block">
+      <div className={`hidden overflow-x-auto ${adminCardShellClass} lg:block`}>
         <table className="w-full table-fixed text-left text-[13px]">
-          <thead className="border-b border-line bg-surface text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+          <thead className="border-b border-line bg-surface/90 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
             <tr>
-              <th className="w-[32%] px-3 py-2.5">Verein / Team</th>
-              <th className="w-[28%] px-3 py-2.5">Turnier</th>
-              <th className="w-[12%] px-3 py-2.5">Status</th>
-              <th className="w-[10%] px-3 py-2.5">Startgebühr</th>
-              <th className="w-[10%] px-3 py-2.5">Bezahlt am</th>
-              <th className="w-[8%] px-3 py-2.5">Aktionen</th>
+              <th className="w-[32%] px-3.5 py-3">Verein / Team</th>
+              <th className="w-[28%] px-3.5 py-3">Turnier</th>
+              <th className="w-[12%] px-3.5 py-3">Status</th>
+              <th className="w-[10%] px-3.5 py-3">Startgebühr</th>
+              <th className="w-[10%] px-3.5 py-3">Bezahlt am</th>
+              <th className="w-[8%] px-3.5 py-3">Aktionen</th>
             </tr>
           </thead>
           <tbody>
             {records.map((record) => (
               <tr
                 key={`desktop-${record.applicationId}`}
-                className="border-b border-line last:border-b-0 hover:bg-surface/70"
+                className="border-b border-line/80 last:border-b-0 transition-colors hover:bg-surface/80"
               >
-                <td className="px-3 py-2.5">
+                <td className="px-3.5 py-3">
                   <Link
                     href={`/admin/zahlungen/${record.applicationId}`}
                     className="block truncate font-medium text-navy hover:underline"
@@ -119,31 +120,31 @@ export function AdminPaymentsBoard({ records }: AdminPaymentsBoardProps) {
                   </Link>
                   <p className="truncate text-[13px] text-muted">{record.teamName}</p>
                 </td>
-                <td className="px-3 py-2.5 text-muted">
+                <td className="px-3.5 py-3 text-muted">
                   <p className="truncate">{record.tournamentName}</p>
                   {record.tournamentDate ? (
                     <p className="text-[12px]">{formatDateDe(record.tournamentDate)}</p>
                   ) : null}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5">
+                <td className="whitespace-nowrap px-3.5 py-3">
                   <span
                     className={`${adminStatusBadgeClass} ${paymentStatusClassName[record.paymentStatus]}`}
                   >
                     {paymentStatusLabel[record.paymentStatus]}
                   </span>
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-muted">
+                <td className="whitespace-nowrap px-3.5 py-3 text-muted">
                   {record.participationFee != null
                     ? formatCurrencyEur(record.participationFee)
                     : "—"}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2.5 text-muted">
+                <td className="whitespace-nowrap px-3.5 py-3 text-muted">
                   {record.paidAt ? formatDateDe(record.paidAt.slice(0, 10)) : "—"}
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3.5 py-3">
                   <Link
                     href={`/admin/zahlungen/${record.applicationId}`}
-                    className={adminTextLinkClass}
+                    className={adminCompactSecondaryButtonClass}
                   >
                     Ansehen
                   </Link>
