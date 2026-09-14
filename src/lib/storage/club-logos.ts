@@ -130,6 +130,32 @@ export function buildApplicationLogoObjectPath(input: {
   return `tournaments/${input.tournamentId}/applications/${input.applicationId}/${randomUUID()}.${extension}`;
 }
 
+export function buildTeamDirectoryLogoObjectPath(input: {
+  entryId: string;
+  mimeType: LogoMimeType;
+}) {
+  const extension = clubLogoExtensionForMime(input.mimeType);
+  // Server-generated key only — never use original filenames or team names.
+  return `team-directory/${input.entryId}/${randomUUID()}.${extension}`;
+}
+
+export function teamDirectoryLogoPathPrefix(entryId: string) {
+  return `team-directory/${entryId}/`;
+}
+
+/** True when the public URL points at this entry's managed team-directory prefix. */
+export function isTeamDirectoryManagedLogoUrl(
+  logoUrl: string | null | undefined,
+  entryId: string,
+) {
+  const path = logoUrl ? clubLogoObjectPathFromPublicUrl(logoUrl) : null;
+  if (!path || !entryId) {
+    return false;
+  }
+
+  return path.startsWith(teamDirectoryLogoPathPrefix(entryId));
+}
+
 export function isManagedClubLogoUrl(logoUrl: string | null | undefined) {
   if (!logoUrl) {
     return false;
@@ -215,9 +241,20 @@ export async function uploadClubLogoFile(input: {
 export async function deleteManagedClubLogoIfOwned(input: {
   supabase: SupabaseClient<Database>;
   logoUrl: string | null | undefined;
+  /** When set, only delete if the object path starts with this prefix. */
+  requiredPathPrefix?: string;
 }) {
   const path = input.logoUrl ? clubLogoObjectPathFromPublicUrl(input.logoUrl) : null;
   if (!path) {
+    return;
+  }
+
+  if (input.requiredPathPrefix && !path.startsWith(input.requiredPathPrefix)) {
+    console.error("[club-logos] delete skipped: path prefix mismatch", {
+      bucket: CLUB_LOGOS_BUCKET,
+      path,
+      requiredPathPrefix: input.requiredPathPrefix,
+    });
     return;
   }
 

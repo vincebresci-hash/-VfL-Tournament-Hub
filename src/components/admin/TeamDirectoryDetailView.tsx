@@ -6,9 +6,14 @@ import { useState } from "react";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
 import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
 import { TeamDirectoryForm } from "@/components/admin/TeamDirectoryForm";
+import { TeamDirectoryLogoEditor } from "@/components/admin/TeamDirectoryLogoEditor";
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { formatDateDe } from "@/lib/format";
 import { paymentStatusLabel } from "@/lib/payments/labels";
-import { setTeamDirectoryArchivedAction } from "@/lib/team-directory/actions";
+import {
+  deleteTeamDirectoryEntryAction,
+  setTeamDirectoryArchivedAction,
+} from "@/lib/team-directory/actions";
 import type {
   TeamDirectoryApplicationHistory,
   TeamDirectoryEntry,
@@ -31,6 +36,8 @@ export function TeamDirectoryDetailView({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [archiving, setArchiving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function handleArchiveToggle() {
     setArchiving(true);
@@ -49,6 +56,24 @@ export function TeamDirectoryDetailView({
     router.refresh();
   }
 
+  async function handleHardDelete() {
+    setDeleting(true);
+    setError(null);
+    setNotice(null);
+
+    const result = await deleteTeamDirectoryEntryAction(entry.id);
+    setDeleting(false);
+
+    if (result.error) {
+      setError(result.error);
+      setConfirmDelete(false);
+      return;
+    }
+
+    router.push("/admin/team-datenbank");
+    router.refresh();
+  }
+
   const contactName = [entry.contactFirstName, entry.contactLastName]
     .filter(Boolean)
     .join(" ");
@@ -63,11 +88,14 @@ export function TeamDirectoryDetailView({
       </Link>
 
       <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-            {entry.teamName}
-          </h1>
-          <p className="mt-2 text-[15px] text-muted">{entry.clubName}</p>
+        <div className="flex items-start gap-4">
+          <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} size="lg" />
+          <div>
+            <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
+              {entry.teamName}
+            </h1>
+            <p className="mt-2 text-[15px] text-muted">{entry.clubName}</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           {canManage ? (
@@ -82,10 +110,22 @@ export function TeamDirectoryDetailView({
               <button
                 type="button"
                 onClick={handleArchiveToggle}
-                disabled={archiving}
+                disabled={archiving || deleting}
                 className="border border-line bg-white px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-60"
               >
                 {entry.archivedAt ? "Reaktivieren" : "Archivieren"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDelete(true);
+                  setError(null);
+                  setNotice(null);
+                }}
+                disabled={archiving || deleting}
+                className="border border-[#d9b0b0] bg-[#fff5f5] px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:opacity-60"
+              >
+                Endgültig löschen
               </button>
             </>
           ) : null}
@@ -97,6 +137,34 @@ export function TeamDirectoryDetailView({
         <p className="mt-6 text-[14px] text-[#9a2b2b]" role="alert">
           {error}
         </p>
+      ) : null}
+
+      {confirmDelete && canManage ? (
+        <div className="mt-6 border border-[#d9b0b0] bg-[#fff5f5] p-4">
+          <p className="text-[14px] font-medium text-[#9a2b2b]">Eintrag endgültig löschen?</p>
+          <p className="mt-2 text-[13px] leading-6 text-ink">
+            Dieser Vorgang löscht nur den Eintrag aus der Team-Datenbank. Bewerbungen,
+            Turnierteilnahmen, Spiele und andere Turnierdaten bleiben erhalten.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={handleHardDelete}
+              className="border border-[#9a2b2b] bg-[#9a2b2b] px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-white uppercase disabled:opacity-60"
+            >
+              {deleting ? "Lösche…" : "Ja, endgültig löschen"}
+            </button>
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={() => setConfirmDelete(false)}
+              className="border border-line bg-white px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-60"
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
       ) : null}
 
       {editing && canManage ? (
@@ -136,6 +204,28 @@ export function TeamDirectoryDetailView({
         </div>
       ) : (
         <div className="mt-8 grid gap-5">
+          {canManage ? (
+            <TeamDirectoryLogoEditor
+              entryId={entry.id}
+              clubName={entry.clubName}
+              logoUrl={entry.logoUrl}
+              onDone={(result) => {
+                if (result.error) {
+                  setError(result.error);
+                  setNotice(null);
+                  return;
+                }
+                setError(null);
+                setNotice(result.notice);
+                router.refresh();
+              }}
+            />
+          ) : entry.logoUrl ? (
+            <AdminCard title="Team-Logo">
+              <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} size="lg" />
+            </AdminCard>
+          ) : null}
+
           <AdminCard title="Stammdaten">
             <dl className="grid gap-4 sm:grid-cols-2">
               <AdminInfo label="Verein" value={entry.clubName} />

@@ -17,6 +17,14 @@ import {
   cleanOptionalText,
 } from "@/lib/team-directory/normalize";
 import { toTeamDirectoryEntry } from "@/lib/team-directory/mappers";
+import {
+  buildTeamDirectoryLogoObjectPath,
+  deleteManagedClubLogoIfOwned,
+  getFormDataUploadFile,
+  resolveClubLogoMimeType,
+  teamDirectoryLogoPathPrefix,
+  uploadClubLogoFile,
+} from "@/lib/storage/club-logos";
 import type { TeamDirectorySaveInput } from "@/types/team-directory";
 
 async function requirePlatformTeamsManage() {
@@ -324,4 +332,229 @@ export async function setTeamDirectoryArchivedAction(entryId: string, archived: 
   revalidatePath(`/admin/team-datenbank/${entryId}`);
 
   return { ok: true };
+}
+
+export async function updateTeamDirectoryLogoAction(input: {
+  entryId: string;
+  mode: "upload" | "url" | "remove";
+  logoUrl?: string | null;
+  logoFile?: File | null;
+}): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requirePlatformTeamsManage();
+  if (access.error || !access.session) {
+    return { error: access.error ?? "Keine Berechtigung.", notice: null };
+  }
+
+  const entryId = input.entryId.trim();
+  if (!entryId) {
+    return { error: "Team-Eintrag fehlt.", notice: null };
+  }
+
+  const supabase = await createClient();
+  const { data: existing, error: loadError } = await supabase
+    .from("team_directory_entries")
+    .select("id, logo_url")
+    .eq("id", entryId)
+    .maybeSingle();
+
+  if (loadError || !existing) {
+    return { error: "Team-Datenbank-Eintrag wurde nicht gefunden.", notice: null };
+  }
+
+  const previousLogoUrl = existing.logo_url ? String(existing.logo_url) : null;
+  let nextLogoUrl: string | null = previousLogoUrl;
+  let notice = "Logo wurde gespeichert.";
+  const pathPrefix = teamDirectoryLogoPathPrefix(entryId);
+
+  if (input.mode === "remove") {
+    nextLogoUrl = null;
+    notice = "Logo entfernt.";
+  } else if (input.mode === "upload") {
+    const logoFile = input.logoFile;
+    if (
+      !logoFile ||
+      typeof logoFile !== "object" ||
+      typeof logoFile.arrayBuffer !== "function" ||
+      logoFile.size <= 0
+    ) {
+      return { error: "Bitte eine Bilddatei auswählen.", notice: null };
+    }
+
+    const mimeType = resolveClubLogoMimeType(logoFile);
+    if (!mimeType) {
+      return { error: "Erlaubt sind PNG, JPEG oder WebP.", notice: null };
+    }
+
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) {
+      return {
+        error: "Keine gültige Admin-Session für den Upload. Bitte erneut anmelden.",
+        notice: null,
+      };
+    }
+
+    const objectPath = buildTeamDirectoryLogoObjectPath({
+      entryId,
+      mimeType,
+    });
+
+    const uploaded = await uploadClubLogoFile({
+      supabase,
+      file: logoFile,
+      objectPath,
+      mimeType,
+    });
+
+    if (uploaded.error || !uploaded.publicUrl) {
+      return { error: uploaded.error ?? "Upload fehlgeschlagen.", notice: null };
+    }
+
+    nextLogoUrl = uploaded.publicUrl;
+    notice = "Logo gespeichert.";
+  } else {
+    const logoUrl = input.logoUrl?.trim() || null;
+    if (!logoUrl) {
+      return { error: "Bitte eine Logo-URL angeben.", notice: null };
+    }
+    if (
+      !(
+        logoUrl.startsWith("https://") ||
+        logoUrl.startsWith("http://") ||
+        logoUrl.startsWith("/")
+      )
+    ) {
+      return { error: "Die Logo-URL ist ungültig.", notice: null };
+    }
+
+    nextLogoUrl = logoUrl;
+    notice = "Logo-URL wurde gespeichert.";
+  }
+
+  const { error } = await supabase
+    .from("team_directory_entries")
+    .update({
+      logo_url: nextLogoUrl,
+      updated_by: access.session.user.id,
+    })
+    .eq("id", entryId);
+
+  if (error) {
+    if (input.mode === "upload" && nextLogoUrl) {
+      await deleteManagedClubLogoIfOwned({
+        supabase,
+        logoUrl: nextLogoUrl,
+        requiredPathPrefix: pathPrefix,
+      });
+    }
+    console.error("[team-directory] logo update failed", {
+      entryId,
+      message: error.message,
+      code: error.code,
+    });
+    return {
+      error: `Logo konnte nicht gespeichert werden: ${error.message.slice(0, 180)}`,
+      notice: null,
+    };
+  }
+
+  if (previousLogoUrl && previousLogoUrl !== nextLogoUrl) {
+    await deleteManagedClubLogoIfOwned({
+      supabase,
+      logoUrl: previousLogoUrl,
+      requiredPathPrefix: pathPrefix,
+    });
+  }
+
+  revalidatePath("/admin/team-datenbank");
+  revalidatePath(`/admin/team-datenbank/${entryId}`);
+  return { error: null, notice };
+}
+
+export async function uploadTeamDirectoryLogoFormAction(
+  formData: FormData,
+): Promise<{ error: string | null; notice: string | null }> {
+  const entryId = String(formData.get("entryId") ?? "").trim();
+  const { file: logoFile, meta } = getFormDataUploadFile(formData, "logoFile");
+
+  if (!entryId) {
+    return { error: "Team-Eintrag fehlt.", notice: null };
+  }
+
+  if (!logoFile) {
+    return {
+      error: meta.received
+        ? "Die hochgeladene Datei ist leer oder ungültig."
+        : "Bitte eine Bilddatei auswählen.",
+      notice: null,
+    };
+  }
+
+  return updateTeamDirectoryLogoAction({
+    entryId,
+    mode: "upload",
+    logoFile,
+  });
+}
+
+/**
+ * Hard-delete a Team-Datenbank CRM row only.
+ * Does not delete applications, clubs, teams, tournaments, or match data.
+ * communication_recipients.team_directory_entry_id becomes NULL via FK ON DELETE SET NULL.
+ */
+export async function deleteTeamDirectoryEntryAction(
+  entryId: string,
+): Promise<{ error: string | null; ok?: true }> {
+  const access = await requirePlatformTeamsManage();
+  if (access.error || !access.session) {
+    return { error: access.error ?? "Keine Berechtigung." };
+  }
+
+  const id = entryId.trim();
+  if (!id) {
+    return { error: "Team-Eintrag fehlt." };
+  }
+
+  const supabase = await createClient();
+  const { data: existing, error: loadError } = await supabase
+    .from("team_directory_entries")
+    .select("id, logo_url")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !existing) {
+    return { error: "Team-Datenbank-Eintrag wurde nicht gefunden." };
+  }
+
+  const previousLogoUrl = existing.logo_url ? String(existing.logo_url) : null;
+  const pathPrefix = teamDirectoryLogoPathPrefix(id);
+
+  const { error: deleteError } = await supabase
+    .from("team_directory_entries")
+    .delete()
+    .eq("id", id);
+
+  if (deleteError) {
+    console.error("[team-directory] hard delete failed", {
+      entryId: id,
+      message: deleteError.message,
+      code: deleteError.code,
+    });
+    return {
+      error: `Eintrag konnte nicht gelöscht werden: ${deleteError.message.slice(0, 180)}`,
+    };
+  }
+
+  if (previousLogoUrl) {
+    await deleteManagedClubLogoIfOwned({
+      supabase,
+      logoUrl: previousLogoUrl,
+      requiredPathPrefix: pathPrefix,
+    });
+  }
+
+  revalidatePath("/admin/team-datenbank");
+  revalidatePath(`/admin/team-datenbank/${id}`);
+  return { ok: true, error: null };
 }

@@ -23,6 +23,7 @@ type TeamDirectoryRow = {
   source_application_id: string | null;
   club_id: string | null;
   team_id: string | null;
+  logo_url?: string | null;
   archived_at: string | null;
   created_at: string;
   updated_at: string;
@@ -52,6 +53,7 @@ export function toTeamDirectoryEntry(row: TeamDirectoryRow): TeamDirectoryEntry 
     clubId: row.club_id,
     teamId: row.team_id,
     isHubLinked: row.team_id !== null && row.club_id !== null,
+    logoUrl: row.logo_url ? String(row.logo_url) : null,
     archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
