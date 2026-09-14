@@ -12,7 +12,7 @@ export default async function AdminClubsPage() {
     <div>
       <AdminPageHeader
         title="Vereine"
-        description="Registrierte Vereine, Ansprechpartner und Bewerbungszahlen aus der Datenbank."
+        description="Registrierte Vereine, Ansprechpartner und zugehörige Teams einsehen."
       />
       {!ready ? (
         <AdminNotice>

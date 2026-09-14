@@ -17,7 +17,7 @@ export default async function AdminSettingsPage() {
     <div>
       <AdminPageHeader
         title="Einstellungen"
-        description="Allgemeine Plattform-, Bewerbungs- und Admin-Einstellungen. Nur für Admin und Super-Admin."
+        description="Allgemeine Plattform-, Bewerbungs- und Admin-Einstellungen."
       />
       {!ready ? (
         <AdminNotice>

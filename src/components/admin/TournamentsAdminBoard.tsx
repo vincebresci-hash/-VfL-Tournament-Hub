@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { TournamentAdminCard } from "@/components/admin/TournamentAdminCard";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
+import { AdminPageHeader, adminPrimaryButtonClass } from "@/components/admin/AdminPanel";
 import { getTournamentAdminSummary } from "@/lib/admin";
 import { sortTournaments, toBoardTournament } from "@/lib/tournaments";
 import type { AdminTournamentRecord } from "@/types/admin";
@@ -23,22 +24,15 @@ export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProp
 
   return (
     <div>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-            Turniere
-          </h1>
-          <p className="mt-2 text-[15px] text-muted">
-            Alle Turniere aus der Datenbank mit Kapazitäten und Bewerbungsstand.
-          </p>
-        </div>
-        <Link
-          href="/admin/turniere/neu"
-          className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
-        >
-          + Neues Turnier
-        </Link>
-      </div>
+      <AdminPageHeader
+        title="Turniere"
+        description="Turniere anlegen, Teilnehmer verwalten und den Spielbetrieb organisieren."
+        actions={
+          <Link href="/admin/turniere/neu" className={adminPrimaryButtonClass}>
+            + Neues Turnier
+          </Link>
+        }
+      />
 
       {databaseReady ? null : (
         <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-muted">

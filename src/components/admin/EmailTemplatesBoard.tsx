@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
-import { AdminEmpty } from "@/components/admin/AdminPanel";
+import {
+  AdminEmpty,
+  adminDestructiveButtonClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
 import { emailTemplateTypeLabel } from "@/lib/admin";
 import { deleteEmailTemplateAction } from "@/lib/db/admin-actions";
 import type { EmailTemplate } from "@/types/admin";
@@ -36,31 +40,21 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
 
   return (
     <div>
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-2xl text-[14px] leading-6 text-muted">
-          Status-Mails nutzen die aktiven Vorlagen. Inaktive Vorlagen werden nicht
-          versendet, der Status wird trotzdem gespeichert.
-        </p>
-        <Link
-          href="/admin/emails/neu"
-          className="inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
-        >
-          Neue Vorlage
-        </Link>
-      </div>
+      <p className="mb-6 max-w-2xl text-[14px] leading-6 text-muted">
+        Status-Mails nutzen die aktiven Vorlagen. Inaktive Vorlagen werden nicht
+        versendet, der Status wird trotzdem gespeichert.
+      </p>
 
       {error ? (
-        <p className="mt-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className="mb-4 text-[14px] text-[#9a2b2b]" role="alert">
           {error}
         </p>
       ) : null}
 
       {templates.length === 0 ? (
-        <div className="mt-6">
-          <AdminEmpty>Noch keine E-Mail-Vorlagen vorhanden.</AdminEmpty>
-        </div>
+        <AdminEmpty>Noch keine E-Mail-Vorlagen vorhanden.</AdminEmpty>
       ) : (
-        <div className="mt-6 grid gap-3">
+        <div className="grid gap-3">
           {templates.map((template) => (
             <article
               key={template.id}
@@ -77,17 +71,14 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
                   {template.active ? "Aktiv" : "Inaktiv"}
                 </p>
               </div>
-              <div className="mt-4 flex gap-3 sm:mt-0">
-                <Link
-                  href={`/admin/emails/${template.id}`}
-                  className="inline-flex h-10 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
-                >
+              <div className="mt-4 flex flex-wrap gap-3 sm:mt-0">
+                <Link href={`/admin/emails/${template.id}`} className={adminTextLinkClass}>
                   Bearbeiten
                 </Link>
                 <button
                   type="button"
                   onClick={() => setPendingId(template.id)}
-                  className="inline-flex h-10 items-center text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                  className={adminDestructiveButtonClass}
                 >
                   Löschen
                 </button>

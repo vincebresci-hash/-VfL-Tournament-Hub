@@ -14,8 +14,8 @@ export default async function AdminTeamsPage() {
   return (
     <div>
       <AdminPageHeader
-        title="Teams"
-        description="Alle Mannschaften mit Verein, Altersklasse und Bewerbungen."
+        title="Hub-Teams"
+        description="Operative Mannschaften mit Verein, Altersklasse und Bewerbungen."
       />
       {!ready ? (
         <AdminNotice>

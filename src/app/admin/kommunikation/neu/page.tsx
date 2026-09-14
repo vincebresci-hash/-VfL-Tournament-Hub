@@ -38,7 +38,7 @@ export default async function AdminCommunicationComposePage() {
   return (
     <div>
       <AdminPageHeader
-        title="Neue Kommunikation"
+        title="Neue Nachricht"
         description="Nachricht verfassen, Empfänger prüfen und per E-Mail versenden."
       />
       {tournaments.length === 0 ? (

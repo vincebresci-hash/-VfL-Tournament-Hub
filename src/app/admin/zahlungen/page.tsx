@@ -12,7 +12,7 @@ export default async function AdminPaymentsPage() {
     <div>
       <AdminPageHeader
         title="Zahlungen"
-        description="Zahlungsstatus für angenommene Bewerbungen. Zugriff unabhängig von der Bewerbungsverwaltung."
+        description="Zahlungsstatus der angenommenen Mannschaften verwalten."
       />
       {error ? (
         <AdminNotice>

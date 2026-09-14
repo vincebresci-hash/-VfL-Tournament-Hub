@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { EmailLogsList } from "@/components/admin/EmailLogsList";
 import { EmailTemplatesBoard } from "@/components/admin/EmailTemplatesBoard";
-import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
+import {
+  AdminNotice,
+  AdminPageHeader,
+  adminPrimaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { listEmailLogs, listEmailTemplates } from "@/lib/db/admin-queries";
 
-export const metadata: Metadata = { title: "E-Mails" };
+export const metadata: Metadata = { title: "E-Mail-Vorlagen" };
 
 export default async function AdminEmailsPage() {
   const [{ templates, ready }, { logs, ready: logsReady }] = await Promise.all([
@@ -15,8 +20,15 @@ export default async function AdminEmailsPage() {
   return (
     <div>
       <AdminPageHeader
-        title="E-Mails"
-        description="Vorlagen für Statusrückmeldungen. Beim Speichern eines Bewerbungsstatus wird die passende Mail an contact_email gesendet."
+        title="E-Mail-Vorlagen"
+        description="Vorlagen für automatische und manuelle Turnier-E-Mails verwalten."
+        actions={
+          ready ? (
+            <Link href="/admin/emails/neu" className={adminPrimaryButtonClass}>
+              Neue Vorlage
+            </Link>
+          ) : undefined
+        }
       />
       {!ready ? (
         <AdminNotice>
@@ -24,7 +36,9 @@ export default async function AdminEmailsPage() {
           E-Mail-Vorlagen gespeichert werden können.
         </AdminNotice>
       ) : (
-        <EmailTemplatesBoard templates={templates} />
+        <div className="mt-8">
+          <EmailTemplatesBoard templates={templates} />
+        </div>
       )}
       {logsReady ? <EmailLogsList logs={logs} /> : null}
     </div>
