@@ -63,16 +63,74 @@ export function AdminTournamentDetailView({
   });
   const maxLabel = tournament.maxTeams == null ? "—" : String(tournament.maxTeams);
 
+  const base = `/admin/turniere/${tournament.id}`;
+  const orientationLinks = [
+    {
+      href: `/admin/bewerbungen?turnier=${tournament.slug}`,
+      label: "Bewerbungen",
+      hint: "Eingänge prüfen und entscheiden",
+    },
+    {
+      href: `${base}?bereich=teilnehmer`,
+      label: "Teilnehmer",
+      hint: "Bestätigtes Teilnehmerfeld",
+    },
+    {
+      href: `${base}/gruppen`,
+      label: "Gruppen",
+      hint: "Gruppen und Zuordnung",
+    },
+    {
+      href: `${base}/spielplan`,
+      label: "Spielplan",
+      hint: "Spiele und Zeiten",
+    },
+    {
+      href: `${base}/ergebnisse`,
+      label: "Ergebnisse",
+      hint: "Ergebnisse erfassen",
+    },
+    {
+      href: `${base}/ko-runde`,
+      label: "KO-Runde",
+      hint: "K.o.-Phase verwalten",
+    },
+  ] as const;
+
   return (
     <TournamentAdminChrome
       tournament={tournament}
       stageStatus={stageStatus}
       current={current}
     >
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="border border-line border-l-4 border-l-brand-yellow bg-white p-4 sm:p-5">
+        <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
+          Turnierübersicht
+        </p>
+        <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase">
+              {tournament.name}
+            </p>
+            <p className="mt-1 text-[14px] text-muted">
+              {formatDateDe(tournament.date)} · {tournament.ageGroup}
+              {tournament.location ? ` · ${tournament.location}` : ""}
+            </p>
+          </div>
+          <Link
+            href={`${base}/bearbeiten`}
+            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+          >
+            Bearbeiten
+          </Link>
+        </div>
+      </section>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <CapacityStat
           label="Teilnehmer"
           value={`${capacity.confirmedTeams} / ${maxLabel}`}
+          emphasize
         />
         <CapacityStat label="Freie Plätze" value={String(capacity.availableSlots)} />
         <CapacityStat label="Warteliste" value={String(capacity.waitingListCount)} />
@@ -93,6 +151,29 @@ export function AdminTournamentDetailView({
           auf der Warteliste).
         </p>
       ) : null}
+
+      <section className="mt-6">
+        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+          Bereiche
+        </h2>
+        <p className="mt-1 text-[13px] text-muted">
+          Schnellzugriff auf die bestehenden Turnierbereiche.
+        </p>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {orientationLinks.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="border border-line bg-white px-4 py-3 transition-colors hover:border-navy/20"
+            >
+              <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
+                {item.label}
+              </p>
+              <p className="mt-1 text-[13px] text-muted">{item.hint}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <div className="mt-8 grid gap-5">
         <AdminCard title="Kapazität">
@@ -186,9 +267,23 @@ export function AdminTournamentDetailView({
   );
 }
 
-function CapacityStat({ label, value }: { label: string; value: string }) {
+function CapacityStat({
+  label,
+  value,
+  emphasize = false,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
   return (
-    <article className="border border-line bg-white px-5 py-5">
+    <article
+      className={
+        emphasize
+          ? "border border-brand-yellow/70 bg-[#fff8e0] px-5 py-5"
+          : "border border-line bg-white px-5 py-5"
+      }
+    >
       <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
         {label}
       </p>
