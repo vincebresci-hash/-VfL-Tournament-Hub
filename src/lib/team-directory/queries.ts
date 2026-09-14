@@ -31,6 +31,7 @@ const ENTRY_SELECT = `
   source_application_id,
   club_id,
   team_id,
+  logo_url,
   archived_at,
   created_at,
   updated_at

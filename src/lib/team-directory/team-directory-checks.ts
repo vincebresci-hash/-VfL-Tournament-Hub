@@ -6,6 +6,11 @@ import {
   normalizeDirectoryText,
 } from "@/lib/team-directory/normalize";
 import { canSeeAdminNavItem } from "@/lib/rbac/admin-access";
+import {
+  buildTeamDirectoryLogoObjectPath,
+  isTeamDirectoryManagedLogoUrl,
+  teamDirectoryLogoPathPrefix,
+} from "@/lib/storage/club-logos";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -68,10 +73,60 @@ export function runTeamDirectoryChecks() {
     "build normalization",
   );
 
+  const entryId = "11111111-1111-1111-1111-111111111111";
+  const managedPath = buildTeamDirectoryLogoObjectPath({
+    entryId,
+    mimeType: "image/png",
+  });
+  assert(
+    managedPath.startsWith(teamDirectoryLogoPathPrefix(entryId)),
+    "team directory logo path uses entry prefix",
+  );
+  assert(
+    managedPath.startsWith("team-directory/") && managedPath.endsWith(".png"),
+    "team directory logo path shape",
+  );
+  assert(
+    isTeamDirectoryManagedLogoUrl(
+      `https://example.supabase.co/storage/v1/object/public/club-logos/${managedPath}`,
+      entryId,
+    ),
+    "managed team-directory logo url accepted",
+  );
+  assert(
+    !isTeamDirectoryManagedLogoUrl(
+      `https://example.supabase.co/storage/v1/object/public/club-logos/tournaments/t1/applications/a1/x.png`,
+      entryId,
+    ),
+    "foreign application logo path rejected",
+  );
+  assert(
+    !isTeamDirectoryManagedLogoUrl(
+      `https://example.supabase.co/storage/v1/object/public/club-logos/team-directory/other-id/x.png`,
+      entryId,
+    ),
+    "other entry logo path rejected",
+  );
+
   assert(actions.includes("saveTeamDirectoryEntryAction"), "save action");
   assert(actions.includes("updateTeamDirectoryEntryAction"), "update action");
   assert(actions.includes("setTeamDirectoryArchivedAction"), "archive action");
+  assert(actions.includes("updateTeamDirectoryLogoAction"), "logo action");
+  assert(actions.includes("uploadTeamDirectoryLogoFormAction"), "logo form action");
+  assert(actions.includes("deleteTeamDirectoryEntryAction"), "hard delete action");
   assert(actions.includes("requirePlatformTeamsManage"), "platform manage guard");
+  assert(actions.includes("buildTeamDirectoryLogoObjectPath"), "server-built logo path");
+  assert(actions.includes("requiredPathPrefix"), "storage delete prefix guard");
+  assert(actions.includes("teamDirectoryLogoPathPrefix"), "team-directory path prefix");
+  assert(
+    actions.includes('.from("team_directory_entries")') && actions.includes(".delete()"),
+    "hard delete targets team_directory_entries only",
+  );
+  assert(!actions.includes('.from("applications").delete'), "applications not hard-deleted");
+  assert(!actions.includes('.from("clubs").delete'), "clubs not hard-deleted");
+  assert(!actions.includes('.from("teams").delete'), "teams not hard-deleted");
+  assert(!actions.includes("applications.logo_url"), "does not write applications.logo_url");
+  assert(!actions.includes("tournament_external_teams"), "does not touch external team logos");
   assert(actions.includes("forceCreate"), "force create duplicate override");
   assert(
     !actions.includes("excludeId: input.forceCreate ? undefined : undefined"),
@@ -84,8 +139,87 @@ export function runTeamDirectoryChecks() {
   assert(!actions.includes(".update(applications"), "applications not mutated on save");
   assert(!actions.includes("updateApplicationStatus"), "no status changes");
 
+  const logoDeleteMigration = readRepoFile(
+    "supabase/migrations/20260914180000_team_directory_logo_hard_delete.sql",
+  );
+  assert(
+    logoDeleteMigration.includes("ADD COLUMN IF NOT EXISTS logo_url text NULL"),
+    "additive logo_url column",
+  );
+  assert(
+    logoDeleteMigration.includes("team_directory_entries_delete"),
+    "delete RLS policy",
+  );
+  assert(
+    logoDeleteMigration.includes("has_platform_rbac_access()") &&
+      logoDeleteMigration.includes("has_rbac_permission('teams.manage')"),
+    "delete policy requires platform + teams.manage",
+  );
+  assert(
+    logoDeleteMigration.includes("GRANT DELETE ON TABLE public.team_directory_entries TO authenticated"),
+    "delete grant for authenticated",
+  );
+  assert(!logoDeleteMigration.includes("TO anon"), "no anon delete grant");
+  assert(!logoDeleteMigration.includes("GRANT DELETE") || !logoDeleteMigration.includes("TO PUBLIC"), "no public delete");
+  assert(!logoDeleteMigration.includes("service_role"), "no service_role workaround");
+  assert(!logoDeleteMigration.includes("ON DELETE CASCADE"), "no cascade changes");
+  assert(!logoDeleteMigration.includes("DROP TRIGGER"), "no trigger changes");
+  assert(!logoDeleteMigration.includes("applications"), "migration does not touch applications");
+  assert(
+    !logoDeleteMigration.includes("tournament_external_teams"),
+    "migration does not touch external teams",
+  );
+  assert(
+    !logoDeleteMigration.includes("get_application_hard_delete_dependency_counts"),
+    "PR52/53 delete guard untouched",
+  );
+
+  const storage = readRepoFile("src/lib/storage/club-logos.ts");
+  assert(storage.includes("buildTeamDirectoryLogoObjectPath"), "team directory path builder");
+  assert(
+    storage.includes("`team-directory/${input.entryId}/"),
+    "team-directory storage path prefix",
+  );
+  assert(storage.includes("requiredPathPrefix"), "prefix-guarded storage delete");
+  assert(storage.includes("buildApplicationLogoObjectPath"), "PR55 application path preserved");
+  assert(storage.includes("buildExternalTeamLogoObjectPath"), "external team path preserved");
+
+  const detailView = readRepoFile("src/components/admin/TeamDirectoryDetailView.tsx");
+  assert(detailView.includes("TeamDirectoryLogoEditor"), "logo editor on detail");
+  assert(detailView.includes("setTeamDirectoryArchivedAction"), "archive action retained");
+  assert(detailView.includes("deleteTeamDirectoryEntryAction"), "hard delete wired");
+  assert(
+    detailView.includes("Dieser Vorgang löscht nur den Eintrag aus der Team-Datenbank.") &&
+      detailView.includes("Bewerbungen,") &&
+      detailView.includes("Turnierteilnahmen, Spiele und andere Turnierdaten bleiben erhalten."),
+    "hard delete confirmation copy",
+  );
+  assert(detailView.includes("Endgültig löschen"), "hard delete button label");
+  assert(detailView.includes("Reaktivieren"), "restore retained");
+  assert(detailView.includes("Archivieren"), "archive retained");
+
+  const board = readRepoFile("src/components/admin/TeamDirectoryBoard.tsx");
+  assert(board.includes('"active" | "archived" | "all"'), "archive filters retained");
+
+  const applicationLogoMigration = readRepoFile(
+    "supabase/migrations/20260913200000_application_participant_logos.sql",
+  );
+  assert(
+    applicationLogoMigration.includes("applications.logo_manual_override"),
+    "PR55 application logo migration preserved",
+  );
+
+  const applicationDeleteGuard = readRepoFile(
+    "supabase/migrations/20260911153000_application_hard_delete_dependency_counts_rpc.sql",
+  );
+  assert(
+    applicationDeleteGuard.includes("get_application_hard_delete_dependency_counts"),
+    "PR53 hard delete RPC preserved",
+  );
+
   assert(queries.includes("findTeamDirectoryDuplicates"), "duplicate detection query");
   assert(queries.includes("findActiveTeamDirectoryEntryBySourceApplication"), "source application lookup");
+  assert(queries.includes("logo_url"), "queries select logo_url");
   assert(queries.includes('addMatch(row, "team_id")'), "team_id duplicate reason");
   assert(queries.includes('addMatch(row, "club_team_age")'), "club team age duplicate reason");
   assert(queries.includes('addMatch(row, "normalized_identity")'), "normalized duplicate reason");

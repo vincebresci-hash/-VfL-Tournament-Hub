@@ -25,6 +25,8 @@ export type TeamDirectoryEntry = {
   clubId: string | null;
   teamId: string | null;
   isHubLinked: boolean;
+  /** Team-Datenbank entry logo only — independent of club/application/tournament logos. */
+  logoUrl: string | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;

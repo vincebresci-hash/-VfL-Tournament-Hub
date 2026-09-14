@@ -102,6 +102,7 @@ export type TeamDirectoryEntryRow = {
   source_application_id: string | null;
   club_id: string | null;
   team_id: string | null;
+  logo_url: string | null;
   norm_club_name: string;
   norm_team_name: string;
   norm_age_group: string;
