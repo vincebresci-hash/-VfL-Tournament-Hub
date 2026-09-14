@@ -16,12 +16,12 @@ export default async function AdminProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-3xl">
       <AdminPageHeader
         title="Profil"
         description="Persönliche Angaben zum Admin-Konto. Das Passwort liegt ausschließlich bei Supabase Auth."
       />
-      <div className="mt-6">
+      <div className="mt-5">
         <AdminProfileForm profile={session.user} />
       </div>
     </div>
