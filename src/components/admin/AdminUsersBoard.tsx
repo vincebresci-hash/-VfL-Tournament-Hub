@@ -2,7 +2,12 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AdminNotice } from "@/components/admin/AdminPanel";
+import {
+  AdminNotice,
+  adminFilterControlClass,
+  adminFilterShellClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
 import type { AdminUserSummary } from "@/types/rbac";
 import type { RbacRoleKey } from "@/types/rbac";
@@ -22,6 +27,25 @@ function accountStatusLabel(status: AdminUserSummary["accountStatus"]) {
     case "invitation_pending":
       return "Einladung ausstehend";
   }
+}
+
+function accountStatusClassName(status: AdminUserSummary["accountStatus"]) {
+  switch (status) {
+    case "inactive":
+      return "bg-[#fff5f5] text-[#9a2b2b]";
+    case "invitation_pending":
+      return "bg-surface text-muted";
+    default:
+      return "bg-[#e6f4ea] text-[#1f6b3a]";
+  }
+}
+
+function userDisplayName(user: AdminUserSummary) {
+  return (
+    user.displayName?.trim() ||
+    `${user.firstName} ${user.lastName}`.trim() ||
+    user.email
+  );
 }
 
 export function AdminUsersBoard({ users }: AdminUsersBoardProps) {
@@ -97,142 +121,227 @@ export function AdminUsersBoard({ users }: AdminUsersBoardProps) {
 
   return (
     <div className="mt-8 space-y-4">
-      <div className="grid gap-3 border border-line bg-white p-4 sm:grid-cols-2 xl:grid-cols-5">
-        <label className="grid gap-1 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Suche
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Name, E-Mail, Verein, Team…"
-            className="h-10 border border-line px-3 text-[14px] font-normal normal-case tracking-normal text-ink"
-          />
-        </label>
-        <label className="grid gap-1 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Rolle
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value as RbacRoleKey | "")}
-            className="h-10 border border-line px-3 text-[14px] font-normal normal-case tracking-normal text-ink"
-          >
-            <option value="">Alle</option>
-            {roles.map(([key, name]) => (
-              <option key={key} value={key}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Verein
-          <select
-            value={clubFilter}
-            onChange={(event) => setClubFilter(event.target.value)}
-            className="h-10 border border-line px-3 text-[14px] font-normal normal-case tracking-normal text-ink"
-          >
-            <option value="">Alle</option>
-            {clubs.map((club) => (
-              <option key={club} value={club}>
-                {club}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Team
-          <select
-            value={teamFilter}
-            onChange={(event) => setTeamFilter(event.target.value)}
-            className="h-10 border border-line px-3 text-[14px] font-normal normal-case tracking-normal text-ink"
-          >
-            <option value="">Alle</option>
-            {teams.map((team) => (
-              <option key={team} value={team}>
-                {team}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="grid gap-1 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Status
-          <select
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as AccountStatusFilter)}
-            className="h-10 border border-line px-3 text-[14px] font-normal normal-case tracking-normal text-ink"
-          >
-            <option value="all">Alle</option>
-            <option value="active">Aktiv</option>
-            <option value="inactive">Deaktiviert</option>
-            <option value="invitation_pending">Einladung ausstehend</option>
-          </select>
-        </label>
+      <div className={adminFilterShellClass}>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <label className="grid min-w-0 gap-1 text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+            Suche
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Name, E-Mail, Verein, Team…"
+              className={`${adminFilterControlClass} font-normal normal-case tracking-normal`}
+            />
+          </label>
+          <label className="grid min-w-0 gap-1 text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+            Rolle
+            <select
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value as RbacRoleKey | "")}
+              className={`${adminFilterControlClass} font-normal normal-case tracking-normal`}
+            >
+              <option value="">Alle</option>
+              {roles.map(([key, name]) => (
+                <option key={key} value={key}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-1 text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+            Verein
+            <select
+              value={clubFilter}
+              onChange={(event) => setClubFilter(event.target.value)}
+              className={`${adminFilterControlClass} font-normal normal-case tracking-normal`}
+            >
+              <option value="">Alle</option>
+              {clubs.map((club) => (
+                <option key={club} value={club}>
+                  {club}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-1 text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+            Team
+            <select
+              value={teamFilter}
+              onChange={(event) => setTeamFilter(event.target.value)}
+              className={`${adminFilterControlClass} font-normal normal-case tracking-normal`}
+            >
+              <option value="">Alle</option>
+              {teams.map((team) => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid min-w-0 gap-1 text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+            Status
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as AccountStatusFilter)}
+              className={`${adminFilterControlClass} font-normal normal-case tracking-normal`}
+            >
+              <option value="all">Alle</option>
+              <option value="active">Aktiv</option>
+              <option value="inactive">Deaktiviert</option>
+              <option value="invitation_pending">Einladung ausstehend</option>
+            </select>
+          </label>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         <AdminNotice>Keine Benutzer für die aktuelle Filterauswahl gefunden.</AdminNotice>
       ) : (
-        <div className="overflow-x-auto border border-line bg-white">
-          <table className="min-w-full text-left text-[14px]">
-            <thead className="border-b border-line bg-background text-[11px] font-semibold tracking-[0.1em] text-ink/60 uppercase">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">E-Mail</th>
-                <th className="px-4 py-3">Verein</th>
-                <th className="px-4 py-3">Rollen</th>
-                <th className="px-4 py-3">Teams</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Seit</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((user) => {
-                const displayName =
-                  user.displayName?.trim() ||
-                  `${user.firstName} ${user.lastName}`.trim() ||
-                  user.email;
+        <div>
+          <p className="mb-4 text-[13px] text-muted">
+            {filtered.length} {filtered.length === 1 ? "Benutzer" : "Benutzer"}
+          </p>
 
-                return (
-                  <tr key={user.id} className="border-b border-line/70">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/benutzer/${user.id}`}
-                        className="font-medium text-navy hover:underline"
-                      >
+          <div className="grid gap-3 lg:hidden">
+            {filtered.map((user) => {
+              const displayName = userDisplayName(user);
+              return (
+                <article
+                  key={`mobile-${user.id}`}
+                  className="border border-line bg-white p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
                         {displayName}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-muted">{user.email}</td>
-                    <td className="px-4 py-3 text-muted">{user.clubName ?? "—"}</td>
-                    <td className="px-4 py-3 text-muted">
-                      {user.roles.length > 0
-                        ? user.roles.map((role) => role.name).join(", ")
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-muted">
-                      {user.teamAssignments.length > 0
-                        ? user.teamAssignments.map((t) => t.teamName).join(", ")
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={
-                          user.accountStatus === "inactive"
-                            ? "font-medium text-[#9a2b2b]"
-                            : user.accountStatus === "invitation_pending"
-                              ? "text-muted"
-                              : "text-ink"
-                        }
-                      >
-                        {accountStatusLabel(user.accountStatus)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-muted">
-                      {formatDateDe(user.createdAt.slice(0, 10))}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </p>
+                      <p className="mt-1 truncate text-[13px] text-muted">{user.email}</p>
+                    </div>
+                    <span
+                      className={`shrink-0 px-2 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${accountStatusClassName(user.accountStatus)}`}
+                    >
+                      {accountStatusLabel(user.accountStatus)}
+                    </span>
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
+                    <div className="min-w-0">
+                      <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+                        Verein
+                      </dt>
+                      <dd className="mt-1 truncate">{user.clubName ?? "—"}</dd>
+                    </div>
+                    <div className="min-w-0">
+                      <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+                        Seit
+                      </dt>
+                      <dd className="mt-1">{formatDateDe(user.createdAt.slice(0, 10))}</dd>
+                    </div>
+                    <div className="min-w-0 col-span-2">
+                      <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+                        Rollen
+                      </dt>
+                      <dd className="mt-1">
+                        {user.roles.length > 0
+                          ? user.roles.map((role) => role.name).join(", ")
+                          : "—"}
+                      </dd>
+                    </div>
+                    <div className="min-w-0 col-span-2">
+                      <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+                        Teams
+                      </dt>
+                      <dd className="mt-1">
+                        {user.teamAssignments.length > 0
+                          ? user.teamAssignments.map((t) => t.teamName).join(", ")
+                          : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                  <Link
+                    href={`/admin/benutzer/${user.id}`}
+                    className={`${adminTextLinkClass} mt-4`}
+                  >
+                    Ansehen
+                  </Link>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="hidden overflow-x-auto border border-line bg-white lg:block">
+            <table className="min-w-full text-left text-[14px]">
+              <thead className="border-b border-line bg-surface text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+                <tr>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">E-Mail</th>
+                  <th className="px-4 py-3">Verein</th>
+                  <th className="px-4 py-3">Rollen</th>
+                  <th className="px-4 py-3">Teams</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Seit</th>
+                  <th className="px-4 py-3">Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((user) => {
+                  const displayName = userDisplayName(user);
+
+                  return (
+                    <tr
+                      key={`desktop-${user.id}`}
+                      className="border-b border-line last:border-b-0 hover:bg-surface/70"
+                    >
+                      <td className="max-w-[160px] px-4 py-3">
+                        <Link
+                          href={`/admin/benutzer/${user.id}`}
+                          className="block truncate font-medium text-navy hover:underline"
+                        >
+                          {displayName}
+                        </Link>
+                      </td>
+                      <td className="max-w-[200px] px-4 py-3 text-muted">
+                        <span className="block truncate">{user.email}</span>
+                      </td>
+                      <td className="max-w-[140px] px-4 py-3 text-muted">
+                        <span className="block truncate">{user.clubName ?? "—"}</span>
+                      </td>
+                      <td className="max-w-[180px] px-4 py-3 text-muted">
+                        <span className="block truncate">
+                          {user.roles.length > 0
+                            ? user.roles.map((role) => role.name).join(", ")
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="max-w-[160px] px-4 py-3 text-muted">
+                        <span className="block truncate">
+                          {user.teamAssignments.length > 0
+                            ? user.teamAssignments.map((t) => t.teamName).join(", ")
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex px-2 py-1 text-[11px] font-semibold tracking-[0.06em] uppercase ${accountStatusClassName(user.accountStatus)}`}
+                        >
+                          {accountStatusLabel(user.accountStatus)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-muted">
+                        {formatDateDe(user.createdAt.slice(0, 10))}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/admin/benutzer/${user.id}`}
+                          className={adminTextLinkClass}
+                        >
+                          Ansehen
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

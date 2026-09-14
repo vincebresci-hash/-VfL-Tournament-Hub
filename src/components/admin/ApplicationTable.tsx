@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
+import { adminTextLinkClass } from "@/components/admin/AdminPanel";
 import { getClubTypeLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
 import type { AdminApplication } from "@/types/application";
@@ -30,35 +31,47 @@ export function ApplicationTable({
       <div className="grid gap-3 lg:hidden">
         {applications.map((application) => (
           <article
-            key={application.id}
+            key={`mobile-${application.id}`}
             className="border border-line bg-white p-4"
           >
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+              <div className="min-w-0">
+                <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
                   {application.clubName}
                 </p>
-                <p className="mt-1 text-[13px] text-muted">{application.teamName}</p>
+                <p className="mt-1 truncate text-[13px] text-muted">{application.teamName}</p>
               </div>
               <ApplicationStatusBadge status={application.applicationStatus} />
             </div>
             <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
-              <div>
+              <div className="min-w-0">
                 <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                   Turnier
                 </dt>
-                <dd className="mt-1">{tournamentName(application.tournamentId)}</dd>
+                <dd className="mt-1 truncate">{tournamentName(application.tournamentId)}</dd>
               </div>
-              <div>
+              <div className="min-w-0">
+                <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+                  Altersklasse
+                </dt>
+                <dd className="mt-1">{application.ageGroup}</dd>
+              </div>
+              <div className="min-w-0">
                 <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                   Spielstärke
                 </dt>
                 <dd className="mt-1">{application.selfRatedStrength}/5</dd>
               </div>
+              <div className="min-w-0">
+                <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+                  Eingang
+                </dt>
+                <dd className="mt-1">{formatDateDe(application.createdAt.slice(0, 10))}</dd>
+              </div>
             </dl>
             <Link
               href={`/admin/bewerbungen/${application.id}`}
-              className="mt-4 inline-flex text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+              className={`${adminTextLinkClass} mt-4`}
             >
               Ansehen
             </Link>
@@ -93,17 +106,19 @@ export function ApplicationTable({
           <tbody>
             {applications.map((application) => (
               <tr
-                key={application.id}
+                key={`desktop-${application.id}`}
                 className="border-b border-line last:border-b-0 hover:bg-surface/70"
               >
-                <td className="px-4 py-3 text-[14px] font-medium text-ink">
-                  {application.clubName}
+                <td className="max-w-[180px] px-4 py-3 text-[14px] font-medium text-ink">
+                  <span className="block truncate">{application.clubName}</span>
                 </td>
-                <td className="px-4 py-3 text-[14px] text-muted">
-                  {application.teamName}
+                <td className="max-w-[160px] px-4 py-3 text-[14px] text-muted">
+                  <span className="block truncate">{application.teamName}</span>
                 </td>
-                <td className="px-4 py-3 text-[14px] text-muted">
-                  {tournamentName(application.tournamentId)}
+                <td className="max-w-[200px] px-4 py-3 text-[14px] text-muted">
+                  <span className="block truncate">
+                    {tournamentName(application.tournamentId)}
+                  </span>
                 </td>
                 <td className="px-4 py-3 text-[14px] text-ink">{application.ageGroup}</td>
                 <td className="px-4 py-3 text-[14px] text-ink">
@@ -121,7 +136,7 @@ export function ApplicationTable({
                 <td className="px-4 py-3">
                   <Link
                     href={`/admin/bewerbungen/${application.id}`}
-                    className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+                    className={adminTextLinkClass}
                   >
                     Ansehen
                   </Link>

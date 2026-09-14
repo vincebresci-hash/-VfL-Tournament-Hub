@@ -48,6 +48,11 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
     [applications, filters, sort],
   );
 
+  const activeCount = applications.filter((application) => !application.archivedAt).length;
+  const archivedCount = applications.filter((application) =>
+    Boolean(application.archivedAt),
+  ).length;
+
   return (
     <div>
       <AdminPageHeader
@@ -62,65 +67,6 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap gap-2">
-        {(
-          [
-            { id: "active", label: "Aktiv" },
-            { id: "archived", label: "Archiviert" },
-          ] as const
-        ).map((filter) => (
-          <button
-            key={filter.id}
-            type="button"
-            onClick={() =>
-              setFilters((current) => ({ ...current, archive: filter.id }))
-            }
-            className={
-              filters.archive === filter.id
-                ? "border border-navy bg-navy px-3 py-2 text-left text-white"
-                : "border border-line bg-white px-3 py-2 text-left"
-            }
-          >
-            <span className="block font-display text-xl font-bold">
-              {
-                applications.filter((application) =>
-                  filter.id === "archived"
-                    ? Boolean(application.archivedAt)
-                    : !application.archivedAt,
-                ).length
-              }
-            </span>
-            <span
-              className={
-                filters.archive === filter.id
-                  ? "mt-1 block text-[10px] font-semibold tracking-[0.1em] uppercase text-white/80"
-                  : "mt-1 block text-[10px] font-semibold tracking-[0.1em] text-muted uppercase"
-              }
-            >
-              {filter.label}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {applicationStatusFilters.map((filter) => (
-          <button
-            key={filter.id}
-            type="button"
-            onClick={() => setFilters((current) => ({ ...current, status: filter.id }))}
-            className="border border-line bg-white px-3 py-2 text-left"
-          >
-            <span className="block font-display text-xl font-bold text-ink">
-              {counts[filter.id]}
-            </span>
-            <span className="mt-1 block text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
-              {filter.label}
-            </span>
-          </button>
-        ))}
-      </div>
-
       <div className="mt-6">
         <ApplicationFiltersPanel
           filters={filters}
@@ -129,6 +75,34 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
           onChange={setFilters}
           onSortChange={setSort}
         />
+      </div>
+
+      <div className="mt-4 border border-line bg-white px-4 py-3">
+        <p className="text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+          Übersicht ({filters.archive === "archived" ? "Archiviert" : "Aktiv"})
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          <div className="min-w-0 border border-line px-3 py-2">
+            <p className="font-display text-xl font-bold text-ink">
+              {filters.archive === "archived" ? archivedCount : activeCount}
+            </p>
+            <p className="mt-1 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+              {filters.archive === "archived" ? "Archiviert" : "Aktiv"}
+            </p>
+          </div>
+          {applicationStatusFilters.map((filter) => (
+            <div key={filter.id} className="min-w-0 border border-line px-3 py-2">
+              <p className="font-display text-xl font-bold text-ink">{counts[filter.id]}</p>
+              <p className="mt-1 truncate text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+                {filter.label}
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-[13px] text-muted">
+          {visible.length}{" "}
+          {visible.length === 1 ? "Bewerbung" : "Bewerbungen"} für die aktuelle Auswahl
+        </p>
       </div>
 
       <div className="mt-6">
