@@ -53,7 +53,7 @@ const DASHBOARD_LINKS: DashboardLink[] = [
   },
   {
     href: "/admin/kommunikation",
-    label: "Kommunikation",
+    label: "Nachrichten",
     description: "Mitteilungen und E-Mail-Versand.",
     required: ["communications.view"],
   },

@@ -242,6 +242,18 @@ export function runTeamDirectoryChecks() {
   assert(adminNavigation.includes('href: "/admin/team-datenbank"'), "team directory sidebar route");
   assert(adminNavigation.includes('label: "Team-Datenbank"'), "team directory sidebar label");
   assert(adminNavigation.includes('href: "/admin/teams"'), "operational teams sidebar route preserved");
+  assert(adminNavigation.includes('label: "Hub-Teams"'), "hub teams sidebar label");
+  assert(adminNavigation.includes("adminNavigationGroups"), "grouped admin navigation");
+  assert(adminNavigation.includes('label: "Turnierbetrieb"'), "operations nav group");
+  assert(adminNavigation.includes('label: "Stammdaten"'), "master data nav group");
+  assert(adminNavigation.includes('label: "Nachrichten"'), "messages nav label");
+  assert(adminNavigation.includes('label: "E-Mail-Vorlagen"'), "email templates nav label");
+  assert(adminNavigation.includes('href: "/admin/kommunikation", label: "Nachrichten"'), "kommunikation route labeled Nachrichten");
+  assert(adminNavigation.includes('href: "/admin/emails", label: "E-Mail-Vorlagen"'), "emails route labeled E-Mail-Vorlagen");
+  assert(adminNavigation.includes('href: "/admin/teams", label: "Hub-Teams"'), "teams route labeled Hub-Teams");
+  assert(!adminNavigation.includes('href: "/admin/teams", label: "Teams"'), "old Teams item label removed");
+  assert(!adminNavigation.includes('href: "/admin/kommunikation", label: "Kommunikation"'), "old Kommunikation item label removed");
+  assert(!adminNavigation.includes('href: "/admin/emails", label: "E-Mails"'), "old E-Mails item label removed");
   assert(
     canSeeAdminNavItem("/admin/team-datenbank", new Set(["teams.view"]), false),
     "teams.view can see team directory nav item",
