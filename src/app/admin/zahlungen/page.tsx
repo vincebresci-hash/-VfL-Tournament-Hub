@@ -9,7 +9,7 @@ export default async function AdminPaymentsPage() {
   const { records, ready, error } = await loadAdminPaymentRecordsAction();
 
   return (
-    <div>
+    <div className="mx-auto max-w-6xl">
       <AdminPageHeader
         title="Zahlungen"
         description="Zahlungsstatus der angenommenen Mannschaften verwalten."
