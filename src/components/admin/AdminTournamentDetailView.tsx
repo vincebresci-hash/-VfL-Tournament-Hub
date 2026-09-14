@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
-import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
+import { AdminCard, AdminInfo, adminCompactSecondaryButtonClass, displayValue } from "@/components/admin/AdminPanel";
 import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
 import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
@@ -119,7 +119,7 @@ export function AdminTournamentDetailView({
           </div>
           <Link
             href={`${base}/bearbeiten`}
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+            className={adminCompactSecondaryButtonClass}
           >
             Bearbeiten
           </Link>

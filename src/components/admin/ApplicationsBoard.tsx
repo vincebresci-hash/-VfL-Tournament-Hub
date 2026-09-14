@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApplicationFiltersPanel } from "@/components/admin/ApplicationFilters";
 import { ApplicationTable } from "@/components/admin/ApplicationTable";
-import { AdminPageHeader } from "@/components/admin/AdminPanel";
+import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
 import {
   applicationStatusFilters,
@@ -61,10 +61,10 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
       />
 
       {databaseReady ? null : (
-        <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-muted">
+        <AdminNotice>
           Die Datenbank ist derzeit nicht erreichbar. Es werden keine
           Beispielbewerbungen angezeigt.
-        </p>
+        </AdminNotice>
       )}
 
       <div className="mt-6">

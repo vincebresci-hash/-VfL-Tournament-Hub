@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
-import { adminTextLinkClass } from "@/components/admin/AdminPanel";
+import { AdminEmpty, adminTextLinkClass } from "@/components/admin/AdminPanel";
 import { getClubTypeLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
 import type { AdminApplication } from "@/types/application";
@@ -19,11 +19,7 @@ export function ApplicationTable({
     tournaments.find((tournament) => tournament.id === id)?.name ?? id;
 
   if (applications.length === 0) {
-    return (
-      <p className="border border-line bg-white px-5 py-8 text-[15px] text-muted">
-        Keine Bewerbungen für die aktuelle Auswahl.
-      </p>
-    );
+    return <AdminEmpty>Keine Bewerbungen für die aktuelle Auswahl.</AdminEmpty>;
   }
 
   return (

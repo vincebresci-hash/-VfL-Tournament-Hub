@@ -7,6 +7,7 @@ import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import {
   AdminEmpty,
   adminDestructiveButtonClass,
+  adminStatusBadgeClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { emailTemplateTypeLabel } from "@/lib/admin";
@@ -67,7 +68,13 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
                 <p className="mt-1 text-[13px] text-muted">
                   {emailTemplateTypeLabel[template.type]} · {template.subject}
                 </p>
-                <p className="mt-2 text-[12px] font-semibold tracking-[0.08em] uppercase text-muted">
+                <p
+                  className={`mt-2 ${adminStatusBadgeClass} ${
+                    template.active
+                      ? "bg-[#e8f5ee] text-[#1f6b3f]"
+                      : "bg-line/60 text-muted"
+                  }`}
+                >
                   {template.active ? "Aktiv" : "Inaktiv"}
                 </p>
               </div>

@@ -1,3 +1,4 @@
+import { adminStatusBadgeClass } from "@/components/admin/AdminPanel";
 import {
   paymentStatusClassName,
   paymentStatusClubMessage,
@@ -18,7 +19,7 @@ export function PaymentStatusDisplay({ payment }: PaymentStatusDisplayProps) {
       </p>
       <div className="mt-3">
         <span
-          className={`inline-flex px-2 py-1 text-[11px] font-semibold tracking-[0.08em] uppercase ${paymentStatusClassName[payment.paymentStatus]}`}
+          className={`${adminStatusBadgeClass} ${paymentStatusClassName[payment.paymentStatus]}`}
         >
           {paymentStatusLabel[payment.paymentStatus]}
         </span>
@@ -38,7 +39,7 @@ export function PaymentStatusDisplay({ payment }: PaymentStatusDisplayProps) {
 export function PaymentStatusBadge({ payment }: PaymentStatusDisplayProps) {
   return (
     <span
-      className={`inline-flex px-2 py-1 text-[11px] font-semibold tracking-[0.08em] uppercase ${paymentStatusClassName[payment.paymentStatus]}`}
+      className={`${adminStatusBadgeClass} ${paymentStatusClassName[payment.paymentStatus]}`}
     >
       {paymentStatusLabel[payment.paymentStatus]}
     </span>

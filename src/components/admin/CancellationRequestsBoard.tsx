@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import {
   AdminCard,
+  AdminEmpty,
   adminCompactPrimaryButtonClass,
   adminCompactSecondaryButtonClass,
   adminTextLinkClass,
@@ -90,7 +91,7 @@ export function CancellationRequestsBoard({ requests }: CancellationRequestsBoar
     <div className="grid gap-6">
       <AdminCard title={`Offene Absageanfragen (${pending.length})`}>
         {pending.length === 0 ? (
-          <p className="text-[14px] text-muted">Keine offenen Absageanfragen.</p>
+          <AdminEmpty>Keine offenen Absageanfragen.</AdminEmpty>
         ) : (
           <>
             <div className="grid gap-3 lg:hidden">
@@ -126,7 +127,7 @@ export function CancellationRequestsBoard({ requests }: CancellationRequestsBoar
                       </dt>
                       <dd className="mt-1">
                         {request.contactFirstName} {request.contactLastName}
-                        <p className="mt-1 truncate">{request.contactEmail}</p>
+                        <p className="mt-1 break-all">{request.contactEmail}</p>
                       </dd>
                     </div>
                     <div className="min-w-0">

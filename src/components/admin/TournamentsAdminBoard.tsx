@@ -3,7 +3,12 @@
 import Link from "next/link";
 import { TournamentAdminCard } from "@/components/admin/TournamentAdminCard";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
-import { AdminPageHeader, adminPrimaryButtonClass } from "@/components/admin/AdminPanel";
+import {
+  AdminEmpty,
+  AdminNotice,
+  AdminPageHeader,
+  adminPrimaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { getTournamentAdminSummary } from "@/lib/admin";
 import { sortTournaments, toBoardTournament } from "@/lib/tournaments";
 import type { AdminTournamentRecord } from "@/types/admin";
@@ -35,17 +40,15 @@ export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProp
       />
 
       {databaseReady ? null : (
-        <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-muted">
+        <AdminNotice>
           Bewerbungszahlen können nicht geladen werden. Es werden keine
           Beispieldaten angezeigt.
-        </p>
+        </AdminNotice>
       )}
 
       <div className="mt-8 grid gap-4">
         {list.length === 0 ? (
-          <p className="border border-line bg-white px-5 py-8 text-[15px] text-muted">
-            Noch keine Turniere in der Datenbank.
-          </p>
+          <AdminEmpty>Noch keine Turniere in der Datenbank.</AdminEmpty>
         ) : (
           list.map((tournament) => {
             const summary = getTournamentAdminSummary(

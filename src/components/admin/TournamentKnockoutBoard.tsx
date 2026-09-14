@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
-import { AdminCard } from "@/components/admin/AdminPanel";
+import { AdminCard, AdminEmpty } from "@/components/admin/AdminPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import {
   completeTournamentAction,
@@ -301,9 +301,7 @@ export function TournamentKnockoutBoard({
           ) : null}
         </div>
       ) : (
-        <p className="border border-line bg-white px-5 py-8 text-[15px] text-muted">
-          Noch keine KO-Spiele vorhanden.
-        </p>
+        <AdminEmpty>Noch keine KO-Spiele vorhanden.</AdminEmpty>
       )}
 
       {placements.length > 0 ? (
