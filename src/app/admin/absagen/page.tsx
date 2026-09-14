@@ -15,8 +15,8 @@ export default async function AdminCancellationRequestsPage() {
   return (
     <div>
       <AdminPageHeader
-        title="Absageanfragen"
-        description="Offene und bearbeitete Absageanfragen für angenommene Turnierteilnahmen."
+        title="Absagen"
+        description="Absageanfragen prüfen und über die Teilnahme entscheiden."
       />
       {!ready ? (
         <p className="mt-6 border border-line bg-white px-5 py-8 text-[15px] text-muted">

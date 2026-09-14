@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApplicationFiltersPanel } from "@/components/admin/ApplicationFilters";
 import { ApplicationTable } from "@/components/admin/ApplicationTable";
+import { AdminPageHeader } from "@/components/admin/AdminPanel";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
 import {
   applicationStatusFilters,
@@ -49,9 +50,10 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-        Bewerbungen
-      </h1>
+      <AdminPageHeader
+        title="Bewerbungen"
+        description="Bewerbungen prüfen, annehmen und den passenden Turnieren zuordnen."
+      />
 
       {databaseReady ? null : (
         <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-muted">

@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { NewsAdminBoard } from "@/components/admin/NewsAdminBoard";
-import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
+import {
+  AdminNotice,
+  AdminPageHeader,
+  adminPrimaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { listAdminNewsPosts } from "@/lib/db/news-queries";
 
 export const metadata: Metadata = { title: "News" };
@@ -12,7 +17,14 @@ export default async function AdminNewsPage() {
     <div>
       <AdminPageHeader
         title="News"
-        description="Veröffentliche aktuelle Informationen zu Turnieren, Spielplänen und Veranstaltungen."
+        description="Aktuelle Informationen zu Turnieren, Spielplänen und Veranstaltungen veröffentlichen."
+        actions={
+          ready ? (
+            <Link href="/admin/news/neu" className={adminPrimaryButtonClass}>
+              + Neue News
+            </Link>
+          ) : undefined
+        }
       />
       {!ready ? (
         <AdminNotice>
@@ -20,7 +32,9 @@ export default async function AdminNewsPage() {
           News gespeichert werden können.
         </AdminNotice>
       ) : (
-        <NewsAdminBoard posts={posts} />
+        <div className="mt-8">
+          <NewsAdminBoard posts={posts} />
+        </div>
       )}
     </div>
   );

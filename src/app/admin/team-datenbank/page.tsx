@@ -18,7 +18,7 @@ export default async function AdminTeamDirectoryPage() {
     <div>
       <AdminPageHeader
         title="Team-Datenbank"
-        description="Archivierte Teams für spätere Turniereinladungen. Teams werden nur bewusst übernommen, nicht automatisch."
+        description="Mannschaften und Kontakte für zukünftige Turniere zentral verwalten."
       />
       <TeamDirectoryBoard entries={entries} ready={ready} />
     </div>

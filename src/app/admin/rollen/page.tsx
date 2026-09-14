@@ -27,7 +27,7 @@ export default async function AdminRolesPage() {
     <div>
       <AdminPageHeader
         title="Rollen"
-        description="Systemrollen und ihre effektiven Berechtigungen."
+        description="Systemrollen und ihre Berechtigungen einsehen."
       />
       {matrix.length === 0 ? (
         <AdminNotice>

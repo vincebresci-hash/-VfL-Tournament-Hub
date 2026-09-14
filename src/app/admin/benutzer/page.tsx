@@ -43,15 +43,15 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <AdminPageHeader
-          title="Benutzer"
-          description="Registrierte Benutzer, Einladungen, Rollen und effektive Berechtigungen."
-        />
-        {canInvite && ready ? (
-          <AdminInviteUserDialog roles={roles} clubs={clubs} teams={teams} />
-        ) : null}
-      </div>
+      <AdminPageHeader
+        title="Benutzer"
+        description="Benutzer einladen, Rollen zuweisen und Zugänge verwalten."
+        actions={
+          canInvite && ready ? (
+            <AdminInviteUserDialog roles={roles} clubs={clubs} teams={teams} />
+          ) : undefined
+        }
+      />
       {params.deleted === "1" ? (
         <AdminNotice>Der Benutzer wurde erfolgreich gelöscht.</AdminNotice>
       ) : null}

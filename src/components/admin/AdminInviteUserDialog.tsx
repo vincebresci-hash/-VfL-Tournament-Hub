@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AdminInviteUserForm } from "@/components/admin/AdminInviteUserForm";
+import { adminPrimaryButtonClass } from "@/components/admin/AdminPanel";
 import type { RbacRole } from "@/types/rbac";
 
 type ClubOption = { id: string; name: string };
@@ -27,7 +28,7 @@ export function AdminInviteUserDialog({ roles, clubs, teams }: AdminInviteUserDi
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-11 items-center bg-navy px-5 text-[12px] font-semibold tracking-[0.08em] text-white uppercase hover:bg-navy-soft"
+        className={adminPrimaryButtonClass}
       >
         Benutzer einladen
       </button>

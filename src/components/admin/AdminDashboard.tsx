@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
-import { AdminEmpty, AdminNotice } from "@/components/admin/AdminPanel";
+import { AdminEmpty, AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
 import type { AdminDashboardData } from "@/types/admin";
@@ -100,12 +100,10 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-        Dashboard
-      </h1>
-      <p className="mt-2 text-[15px] text-muted">
-        Übersicht über die für dich freigeschalteten Bereiche
-      </p>
+      <AdminPageHeader
+        title="Dashboard"
+        description="Übersicht über die für dich freigeschalteten Bereiche und aktuelle Kennzahlen."
+      />
 
       {!ready ? (
         <AdminNotice>
