@@ -115,6 +115,29 @@ export default async function KontaktPage() {
           </div>
 
           <div className="border border-line bg-white p-6">
+            <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
+              Teilnahme absagen
+            </p>
+            <p className="mt-3 font-display text-lg font-bold tracking-wide text-ink uppercase">
+              Teilnahme absagen
+            </p>
+            <p className="mt-3 text-[14px] leading-6 text-muted">
+              Ihr könnt nicht am Turnier teilnehmen? Stellt hier eine
+              Absageanfrage.
+            </p>
+            <p className="mt-2 text-[13px] leading-5 text-muted">
+              Bei kurzfristigen Absagen unter 14 Tagen ist ein Grund
+              erforderlich.
+            </p>
+            <Link
+              href="/kontakt/absage"
+              className="mt-6 inline-flex h-11 items-center border border-navy bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase hover:bg-[#0f1f3d]"
+            >
+              Absage anfragen
+            </Link>
+          </div>
+
+          <div className="border border-line bg-white p-6">
             <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
               Schnelle Hilfe
             </p>
