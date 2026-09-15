@@ -2,6 +2,7 @@ import type { AgeGroup } from "@/types/tournament";
 
 /** Canonical age-group images in /public (optimized WebP from original photos). */
 export const ageGroupImageSrc = {
+  U7: "/u7.webp",
   U8: "/u8.webp",
   U9: "/u9.webp",
   U10: "/u10.webp",
@@ -10,6 +11,7 @@ export const ageGroupImageSrc = {
   U13: "/u13.webp",
   U14: "/u14.webp",
   U15: "/u15.webp",
+  Firmenturnier: "/firmenturnier.webp",
 } as const satisfies Record<AgeGroup, string>;
 
 /** Card/hero crop focus — only U13 needs a top-weighted position (portrait source). */
