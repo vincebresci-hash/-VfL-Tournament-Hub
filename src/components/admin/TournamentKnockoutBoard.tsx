@@ -123,15 +123,15 @@ export function TournamentKnockoutBoard({
   return (
     <div className="grid gap-5">
       {error ? (
-        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted">{notice}</p>
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted`}>{notice}</p>
       ) : null}
       {!progress.complete ? (
-        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted`}>
           Die Gruppenphase ist noch nicht vollständig abgeschlossen.
         </p>
       ) : null}

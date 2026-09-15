@@ -144,7 +144,7 @@ export function TournamentParticipantsPanel({
 
       {showForm ? (
         <form
-          className={`mt-5 grid gap-3 ${adminCardShellClass} p-4`
+          className={`mt-5 grid gap-3 ${adminCardShellClass} p-4`}
           onSubmit={(event) => {
             event.preventDefault();
             const payload = {

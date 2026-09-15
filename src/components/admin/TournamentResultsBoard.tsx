@@ -41,7 +41,7 @@ export function TournamentResultsBoard({
   return (
     <div className="grid gap-5">
       {error ? (
-        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
           {error}
         </p>
       ) : null}
