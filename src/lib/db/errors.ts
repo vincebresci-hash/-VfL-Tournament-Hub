@@ -23,14 +23,17 @@ const USER_FACING_DB_MESSAGES = [
   "Gastbewerbungen sind nur ohne Anmeldung möglich.",
 ];
 
-export function toUserFacingDbError(fallback: string, error?: { message?: string } | null) {
+export function toUserFacingDbError(
+  fallback: string,
+  error?: { message?: string; details?: string; hint?: string } | null,
+) {
   if (isMissingRelationError(error ?? null)) {
     return "Die Datenbank ist noch nicht eingerichtet. Bitte die SQL-Migration im Supabase SQL Editor ausführen.";
   }
 
-  const message = error?.message ?? "";
+  const haystack = `${error?.message ?? ""} ${error?.details ?? ""} ${error?.hint ?? ""}`;
   for (const known of USER_FACING_DB_MESSAGES) {
-    if (message.includes(known)) {
+    if (haystack.includes(known)) {
       return known;
     }
   }
