@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
@@ -8,18 +9,23 @@ import {
   adminCardShellClass,
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
+  adminStatusBadgeClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
+import { AvatarUpload } from "@/components/profile/AvatarUpload";
 import { userRoleLabel } from "@/lib/admin";
+import type { OwnTeamAssignment } from "@/lib/auth/own-affiliations";
 import { formatDateDe, formatDateTimeDe } from "@/lib/format";
 import {
   updateAdminProfileAction,
   updatePasswordAction,
 } from "@/lib/auth/actions";
-import type { UserProfile } from "@/types/auth";
+import type { ClubProfile, UserProfile } from "@/types/auth";
 
 type AdminProfileFormProps = {
   profile: UserProfile;
+  club: ClubProfile | null;
+  teamAssignments: OwnTeamAssignment[];
 };
 
 function profileInitials(profile: UserProfile, fallbackName: string) {
@@ -36,13 +42,18 @@ function profileInitials(profile: UserProfile, fallbackName: string) {
   return fromName || "?";
 }
 
-export function AdminProfileForm({ profile }: AdminProfileFormProps) {
+export function AdminProfileForm({
+  profile,
+  club,
+  teamAssignments,
+}: AdminProfileFormProps) {
   const router = useRouter();
   const [firstName, setFirstName] = useState(profile.firstName);
   const [lastName, setLastName] = useState(profile.lastName);
   const [displayName, setDisplayName] = useState(profile.displayName ?? "");
   const [phone, setPhone] = useState(profile.phone ?? "");
   const [jobTitle, setJobTitle] = useState(profile.jobTitle ?? "");
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileNotice, setProfileNotice] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -56,6 +67,7 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
 
   const displayNameValue =
     displayName.trim() || `${firstName} ${lastName}`.trim();
+  const legalName = `${firstName} ${lastName}`.trim();
   const initials = profileInitials(profile, displayNameValue);
 
   async function handleProfile(event: FormEvent<HTMLFormElement>) {
@@ -108,16 +120,28 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
 
   return (
     <div className="grid gap-4">
-      {/* Account overview / hero */}
       <section
         className={`${adminCardShellClass} border-l-4 border-l-brand-yellow p-4 sm:p-5`}
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div
-            aria-hidden
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-navy font-display text-lg font-bold tracking-wide text-brand-yellow"
-          >
-            {initials}
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-navy sm:h-20 sm:w-20">
+            {avatarUrl ? (
+              <Image
+                src={avatarUrl}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="80px"
+                unoptimized
+              />
+            ) : (
+              <div
+                aria-hidden
+                className="flex h-full w-full items-center justify-center font-display text-lg font-bold tracking-wide text-brand-yellow sm:text-xl"
+              >
+                {initials}
+              </div>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="truncate font-display text-xl font-bold tracking-wide text-ink uppercase sm:text-2xl">
@@ -128,15 +152,23 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
               {userRoleLabel[profile.role]}
               {jobTitle ? ` · ${jobTitle}` : ""}
             </p>
+            {club?.name ? (
+              <p className="mt-2 truncate text-[13px] text-muted">
+                Verein: <span className="font-medium text-ink">{club.name}</span>
+                {club.city ? ` · ${club.city}` : ""}
+              </p>
+            ) : null}
           </div>
         </div>
 
         <dl className="mt-4 grid gap-x-5 gap-y-3.5 border-t border-line/70 pt-4 sm:grid-cols-2 lg:grid-cols-3">
-          <AdminInfo label="Name" value={displayValue(displayNameValue)} />
+          <AdminInfo label="Name" value={displayValue(legalName)} />
+          <AdminInfo label="Anzeigename" value={displayValue(displayNameValue)} />
           <AdminInfo label="E-Mail" value={profile.email} />
           <AdminInfo label="Rolle" value={userRoleLabel[profile.role]} />
           <AdminInfo label="Funktion" value={displayValue(jobTitle)} />
           <AdminInfo label="Telefon" value={displayValue(phone)} />
+          <AdminInfo label="Verein" value={displayValue(club?.name)} />
           <AdminInfo
             label="Konto seit"
             value={formatDateDe(profile.createdAt.slice(0, 10))}
@@ -146,6 +178,52 @@ export function AdminProfileForm({ profile }: AdminProfileFormProps) {
             value={profile.lastSignInAt ? formatDateTimeDe(profile.lastSignInAt) : "—"}
           />
         </dl>
+
+        <div className="mt-4 border-t border-line/70 pt-4">
+          <p className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase">
+            Teams
+          </p>
+          {teamAssignments.length === 0 ? (
+            <p className="mt-1.5 text-[14px] text-muted">Keine Team-Zuordnungen.</p>
+          ) : (
+            <ul className="mt-2 flex flex-wrap gap-1.5">
+              {teamAssignments.map((assignment) => (
+                <li
+                  key={assignment.teamId}
+                  className={`${adminStatusBadgeClass} bg-navy/5 text-navy`}
+                  title={
+                    assignment.clubName
+                      ? `${assignment.clubName}${assignment.ageGroup ? ` · ${assignment.ageGroup}` : ""}`
+                      : (assignment.ageGroup ?? undefined)
+                  }
+                >
+                  {assignment.teamName}
+                  {assignment.ageGroup ? ` · ${assignment.ageGroup}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className="font-display text-[15px] font-bold tracking-[0.04em] text-ink uppercase sm:text-base">
+          Profilbild
+        </h2>
+        <div className="mt-3 border-t border-line/70 pt-3">
+          <AvatarUpload
+            currentUrl={avatarUrl}
+            displayName={displayNameValue}
+            onUploaded={(url) => {
+              setAvatarUrl(url);
+              router.refresh();
+            }}
+            onRemoved={() => {
+              setAvatarUrl(null);
+              router.refresh();
+            }}
+          />
+        </div>
       </section>
 
       <form onSubmit={handleProfile} className={`${adminCardShellClass} p-4 sm:p-5`}>
