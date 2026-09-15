@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import {
+  adminCardShellClass,
+  adminCompactPrimaryButtonClass,
+  adminCompactSecondaryButtonClass,
+  adminFilterControlClass,
+  adminPrimaryButtonClass,
+  adminSectionTitleClass,
+  adminSecondaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
   applyExternalTeamLogoToSelectedTeamsAction,
@@ -139,22 +148,24 @@ export function ExternalTeamLogoEditor({
   }
 
   return (
-    <div className="mt-4 border border-line bg-surface p-4">
-      <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-        Logo bearbeiten
-      </p>
+    <div className={`mt-4 ${adminCardShellClass} bg-surface/50 p-4 sm:p-5`}>
+      <p className={adminSectionTitleClass}>Logo bearbeiten</p>
       <p className="mt-2 text-[13px] leading-6 text-muted">
         Ein Hub-Verein ist nicht erforderlich. Du kannst jedem importierten oder manuellen Team
         direkt ein eigenes Logo zuweisen.
       </p>
 
       {localError ? (
-        <p className="mt-3 border border-[#d9b0b0] bg-[#fff5f5] px-3 py-2 text-[13px] text-[#9a2b2b]">
+        <p
+          className={`mt-3 ${adminCardShellClass} border-[#d9b0b0] bg-[#fff5f5] px-3 py-2 text-[13px] text-[#9a2b2b]`}
+        >
           {localError}
         </p>
       ) : null}
       {localNotice ? (
-        <p className="mt-3 border border-line bg-white px-3 py-2 text-[13px] text-ink">{localNotice}</p>
+        <p className={`mt-3 ${adminCardShellClass} px-3 py-2 text-[13px] text-ink`}>
+          {localNotice}
+        </p>
       ) : null}
 
       <div className="mt-4 flex items-center gap-3">
@@ -170,16 +181,14 @@ export function ExternalTeamLogoEditor({
         </div>
       </div>
 
-      <section className="mt-5 border border-line bg-white p-4">
-        <h3 className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Optionaler Hub-Verein
-        </h3>
+      <section className={`mt-5 ${adminCardShellClass} p-4`}>
+        <h3 className={adminSectionTitleClass}>Optionaler Hub-Verein</h3>
         <label className="mt-3 grid gap-1 text-[13px] text-ink">
           <span className="sr-only">Hub-Verein</span>
           <select
             value={clubId}
             onChange={(event) => setClubId(event.target.value)}
-            className="h-10 border border-line bg-white px-3"
+            className={adminFilterControlClass}
             disabled={pending}
           >
             <option value="">Kein Hub-Verein</option>
@@ -205,7 +214,7 @@ export function ExternalTeamLogoEditor({
                 }),
               )
             }
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+            className={adminCompactSecondaryButtonClass}
           >
             Hub-Verein verknüpfen
           </button>
@@ -222,7 +231,7 @@ export function ExternalTeamLogoEditor({
                   }),
                 )
               }
-              className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+              className={adminCompactSecondaryButtonClass}
             >
               Hub-Verein-Verknüpfung entfernen
             </button>
@@ -230,10 +239,8 @@ export function ExternalTeamLogoEditor({
         </div>
       </section>
 
-      <section className="mt-4 border border-line bg-white p-4">
-        <h3 className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Eigenes Logo
-        </h3>
+      <section className={`mt-4 ${adminCardShellClass} p-4`}>
+        <h3 className={adminSectionTitleClass}>Eigenes Logo</h3>
         <p className="mt-2 text-[13px] text-muted">
           Funktioniert auch ohne Hub-Verein. Speichert direkt auf dem Turnierteam.
         </p>
@@ -272,7 +279,7 @@ export function ExternalTeamLogoEditor({
           <button
             type="submit"
             disabled={pending || !fileName}
-            className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+            className={`w-fit ${adminCompactPrimaryButtonClass}`}
           >
             {pending ? "Lade hoch…" : "Logo hochladen"}
           </button>
@@ -283,7 +290,7 @@ export function ExternalTeamLogoEditor({
           <input
             value={logoUrl}
             onChange={(event) => setLogoUrl(event.target.value)}
-            className="h-10 border border-line bg-white px-3"
+            className={adminFilterControlClass}
             placeholder="https://…"
             disabled={pending}
           />
@@ -305,7 +312,7 @@ export function ExternalTeamLogoEditor({
               return result;
             })
           }
-          className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className={`mt-3 ${adminCompactSecondaryButtonClass}`}
         >
           URL speichern
         </button>
@@ -329,7 +336,7 @@ export function ExternalTeamLogoEditor({
               return result;
             })
           }
-          className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className={adminCompactSecondaryButtonClass}
         >
           Logo entfernen
         </button>
@@ -337,7 +344,7 @@ export function ExternalTeamLogoEditor({
           type="button"
           disabled={pending || candidates.length === 0 || !participant.customLogoUrl}
           onClick={openApplyPanel}
-          className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className={adminCompactSecondaryButtonClass}
         >
           Für ausgewählte Teams übernehmen
         </button>
@@ -345,7 +352,7 @@ export function ExternalTeamLogoEditor({
           type="button"
           disabled={pending}
           onClick={onCancel}
-          className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+          className={adminCompactSecondaryButtonClass}
         >
           Schließen
         </button>
@@ -359,10 +366,8 @@ export function ExternalTeamLogoEditor({
       ) : null}
 
       {showApply ? (
-        <div className="mt-4 border border-line bg-white p-4">
-          <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-            Logo auf Teams übernehmen
-          </p>
+        <div className={`mt-4 ${adminCardShellClass} p-4`}>
+          <p className={adminSectionTitleClass}>Logo auf Teams übernehmen</p>
           <p className="mt-2 text-[13px] text-muted">
             Übernimmt die eigene Logo-URL auf die markierten Teams. Kein Hub-Verein erforderlich.
             Vorschläge (gleiche club_id oder exakter Vereinsname) sind vorausgewählt.
@@ -406,7 +411,7 @@ export function ExternalTeamLogoEditor({
                   }),
                 )
               }
-              className="inline-flex h-9 items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+              className={adminPrimaryButtonClass}
             >
               Übernahme bestätigen
             </button>
@@ -414,7 +419,7 @@ export function ExternalTeamLogoEditor({
               type="button"
               disabled={pending}
               onClick={() => setShowApply(false)}
-              className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+              className={adminSecondaryButtonClass}
             >
               Abbrechen
             </button>

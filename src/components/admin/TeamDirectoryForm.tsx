@@ -3,6 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Field, TextAreaInput, TextInput } from "@/components/apply/FormControls";
+import {
+  adminCardShellClass,
+  adminFilterControlClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { AGE_GROUPS } from "@/types/tournament";
 import {
   saveTeamDirectoryEntryAction,
@@ -10,8 +16,7 @@ import {
 } from "@/lib/team-directory/actions";
 import type { TeamDirectoryDuplicateMatch, TeamDirectorySaveInput } from "@/types/team-directory";
 
-const selectClassName =
-  "h-11 w-full border border-line bg-white px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
+const selectClassName = adminFilterControlClass;
 
 type TeamDirectoryFormProps = {
   initialValues: Partial<TeamDirectorySaveInput> & { id?: string };
@@ -115,7 +120,7 @@ export function TeamDirectoryForm({
 
   return (
     <form
-      className="border border-line bg-white p-5 sm:p-6"
+      className={`${adminCardShellClass} p-4 sm:p-5`}
       onSubmit={(event) => {
         event.preventDefault();
         void submit(false);
@@ -224,7 +229,7 @@ export function TeamDirectoryForm({
       </div>
 
       {duplicates.length > 0 ? (
-        <div className="mt-6 border border-line bg-surface px-4 py-4">
+        <div className={`mt-6 ${adminCardShellClass} bg-surface/70 px-4 py-4`}>
           <p className="text-[14px] font-medium text-ink">Möglicherweise bereits vorhanden</p>
           <ul className="mt-3 grid gap-2">
             {duplicates.map((duplicate) => (
@@ -245,7 +250,7 @@ export function TeamDirectoryForm({
             type="button"
             onClick={() => void submit(true)}
             disabled={saving}
-            className="mt-4 border border-line bg-white px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-60"
+            className={`mt-4 ${adminSecondaryButtonClass}`}
           >
             Trotzdem neuen Datensatz anlegen
           </button>
@@ -262,7 +267,7 @@ export function TeamDirectoryForm({
         <button
           type="submit"
           disabled={saving}
-          className="bg-brand-yellow px-5 py-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           {saving ? "Speichern…" : submitLabel}
         </button>
@@ -270,7 +275,7 @@ export function TeamDirectoryForm({
           <button
             type="button"
             onClick={onCancel}
-            className="border border-line bg-white px-5 py-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+            className={adminSecondaryButtonClass}
           >
             Abbrechen
           </button>

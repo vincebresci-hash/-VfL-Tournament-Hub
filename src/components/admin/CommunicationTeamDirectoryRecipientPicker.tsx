@@ -3,6 +3,12 @@
 import { useMemo } from "react";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import {
+  adminCardShellClass,
+  adminCompactSecondaryButtonClass,
+  adminTableHeaderBarClass,
+  adminTableRowHoverClass,
+} from "@/components/admin/AdminPanel";
+import {
   collectUniqueDirectoryFilterValues,
   filterVisibleDirectoryEntries,
   formatDirectoryContactName,
@@ -66,7 +72,7 @@ export function CommunicationTeamDirectoryRecipientPicker({
   }
 
   return (
-    <div className="mt-6 border border-line bg-surface px-4 py-4">
+    <div className={`mt-6 ${adminCardShellClass} bg-surface/50 px-4 py-4`}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
@@ -81,7 +87,7 @@ export function CommunicationTeamDirectoryRecipientPicker({
             type="button"
             onClick={selectAllVisible}
             disabled={selectableVisibleIds.length === 0}
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold text-ink hover:bg-surface disabled:opacity-60"
+            className={adminCompactSecondaryButtonClass}
           >
             Alle sichtbaren auswählen
           </button>
@@ -89,7 +95,7 @@ export function CommunicationTeamDirectoryRecipientPicker({
             type="button"
             onClick={clearSelection}
             disabled={selectedEntryIds.length === 0}
-            className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold text-ink hover:bg-surface disabled:opacity-60"
+            className={adminCompactSecondaryButtonClass}
           >
             Auswahl aufheben
           </button>
@@ -198,21 +204,21 @@ export function CommunicationTeamDirectoryRecipientPicker({
         </Field>
       </div>
 
-      <div className="mt-4 overflow-x-auto border border-line bg-white">
+      <div className={`mt-4 overflow-x-auto ${adminCardShellClass}`}>
         <table className="min-w-full text-left text-[14px]">
-          <thead className="border-b border-line bg-surface text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+          <thead className={adminTableHeaderBarClass}>
             <tr>
-              <th className="px-3 py-3">Auswahl</th>
-              <th className="px-3 py-3">Verein</th>
-              <th className="px-3 py-3">Mannschaft</th>
-              <th className="px-3 py-3">Altersklasse</th>
-              <th className="px-3 py-3">Jahrgang</th>
-              <th className="px-3 py-3">Liga</th>
-              <th className="px-3 py-3">Kategorie</th>
-              <th className="px-3 py-3">Stärke</th>
-              <th className="px-3 py-3">Ansprechpartner</th>
-              <th className="px-3 py-3">E-Mail</th>
-              <th className="px-3 py-3">Hub</th>
+              <th className="px-3 py-2.5">Auswahl</th>
+              <th className="px-3 py-2.5">Verein</th>
+              <th className="px-3 py-2.5">Mannschaft</th>
+              <th className="px-3 py-2.5">Altersklasse</th>
+              <th className="px-3 py-2.5">Jahrgang</th>
+              <th className="px-3 py-2.5">Liga</th>
+              <th className="px-3 py-2.5">Kategorie</th>
+              <th className="px-3 py-2.5">Stärke</th>
+              <th className="px-3 py-2.5">Ansprechpartner</th>
+              <th className="px-3 py-2.5">E-Mail</th>
+              <th className="px-3 py-2.5">Hub</th>
             </tr>
           </thead>
           <tbody>
@@ -227,7 +233,7 @@ export function CommunicationTeamDirectoryRecipientPicker({
                 const selectable = isDirectoryEntrySelectable(entry);
 
                 return (
-                  <tr key={entry.id} className="border-b border-line last:border-b-0">
+                  <tr key={entry.id} className={adminTableRowHoverClass}>
                     <td className="px-3 py-3 align-top">
                       <input
                         type="checkbox"

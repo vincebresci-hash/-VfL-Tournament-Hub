@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { adminCardShellClass } from "@/components/admin/AdminPanel";
 import {
   getEffectiveTournamentStatus,
   getSuggestedTournamentStatusFromCapacity,
@@ -47,7 +48,7 @@ export function TournamentStatusCapacityNotice({
     <div
       className={
         className ??
-        "border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
+        `${adminCardShellClass} border-[#d9b0b0] bg-[#fff5f5] px-4 py-3.5 text-[13px] leading-6 text-[#9a2b2b]`
       }
     >
       <p>{warning}</p>

@@ -1,5 +1,6 @@
 "use client";
 
+import { adminCardShellClass } from "@/components/admin/AdminPanel";
 import { summarizeRecipientPreview } from "@/lib/communications/recipient-picker";
 import type { CommunicationRecipientPreviewRow } from "@/lib/communications/recipient-picker";
 
@@ -15,7 +16,7 @@ export function CommunicationRecipientPreview({
   const summary = summarizeRecipientPreview(recipients, selectedTeamCount);
 
   return (
-    <div className="mt-6 border border-line bg-surface px-4 py-4">
+    <div className={`mt-6 ${adminCardShellClass} bg-surface/50 px-4 py-4`}>
       <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
         Versand-Zusammenfassung
       </p>

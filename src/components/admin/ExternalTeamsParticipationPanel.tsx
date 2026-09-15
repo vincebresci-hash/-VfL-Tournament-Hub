@@ -2,7 +2,16 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  adminCardShellClass,
+  adminCompactPrimaryButtonClass,
+  adminCompactSecondaryButtonClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+  adminStatusBadgeClass,
+} from "@/components/admin/AdminPanel";
 import {
   confirmAllDetectedExternalTeamsAction,
   confirmExternalTeamsAction,
@@ -92,7 +101,7 @@ export function ExternalTeamsParticipationPanel({
             onClick={() =>
               runAction(() => confirmAllDetectedExternalTeamsAction(tournamentId))
             }
-            className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+            className={adminPrimaryButtonClass}
           >
             {pending ? "Bestätige…" : "Alle MeinTurnierplan-Teams bestätigen"}
           </button>
@@ -100,17 +109,17 @@ export function ExternalTeamsParticipationPanel({
       ) : null}
 
       {error ? (
-        <p className="mt-4 border border-line bg-white px-4 py-3 text-[14px] text-brand-red">
+        <p className={`mt-4 ${adminCardShellClass} px-4 py-3 text-[14px] text-brand-red`}>
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="mt-4 border border-line bg-white px-4 py-3 text-[14px] text-ink">{notice}</p>
+        <p className={`mt-4 ${adminCardShellClass} px-4 py-3 text-[14px] text-ink`}>{notice}</p>
       ) : null}
 
       <div className="mt-5 grid gap-3">
         {activeTeams.map((team) => (
-          <article key={team.id} className="border border-line bg-white p-4">
+          <article key={team.id} className={adminMobileCardClass}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="font-display text-base font-bold tracking-wide text-ink uppercase">
@@ -118,7 +127,7 @@ export function ExternalTeamsParticipationPanel({
                 </p>
                 <p className="mt-1 text-[13px] text-muted">Quelle: MeinTurnierplan</p>
               </div>
-              <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
+              <p className={`${adminStatusBadgeClass} bg-surface text-ink`}>
                 {statusLabel(team.participationStatus)}
               </p>
             </div>
@@ -139,7 +148,7 @@ export function ExternalTeamsParticipationPanel({
                       }),
                     )
                   }
-                  className="inline-flex h-10 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:opacity-50"
+                  className={adminCompactPrimaryButtonClass}
                 >
                   Teilnahme bestätigen
                 </button>
@@ -156,7 +165,7 @@ export function ExternalTeamsParticipationPanel({
                       }),
                     )
                   }
-                  className="inline-flex h-10 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:opacity-50"
+                  className={adminCompactSecondaryButtonClass}
                 >
                   Ablehnen
                 </button>

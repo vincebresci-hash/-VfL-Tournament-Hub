@@ -1,6 +1,12 @@
 "use client";
 
 import type { ReactNode } from "react";
+import {
+  adminCardShellClass,
+  adminPrimaryButtonClass,
+  adminSectionTitleClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
 
 type ConfirmModalProps = {
   open: boolean;
@@ -37,12 +43,9 @@ export function ConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className="relative w-full max-w-md border border-line bg-white p-6 shadow-[0_8px_24px_rgba(16,20,28,0.08)]"
+        className={`relative w-full max-w-md ${adminCardShellClass} p-5 sm:p-6`}
       >
-        <h2
-          id="confirm-title"
-          className="font-display text-xl font-bold tracking-wide text-ink uppercase"
-        >
+        <h2 id="confirm-title" className={adminSectionTitleClass}>
           {title}
         </h2>
         {children ? <div className="mt-4">{children}</div> : null}
@@ -50,14 +53,14 @@ export function ConfirmModal({
           <button
             type="button"
             onClick={onCancel}
-            className="inline-flex h-10 items-center px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+            className={adminTextLinkClass}
           >
             {cancelLabel}
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
+            className={adminPrimaryButtonClass}
           >
             {confirmLabel}
           </button>

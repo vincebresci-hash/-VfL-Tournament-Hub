@@ -2,6 +2,14 @@
 
 import { useMemo, useState } from "react";
 import {
+  adminCardShellClass,
+  adminFilterControlClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
+import {
   checkMeinTurnierplanConnectionAction,
   importMeinTurnierplanGroupsAction,
   loadMeinTurnierplanPreviewForTournamentAction,
@@ -170,7 +178,7 @@ export function MeinTurnierplanAdminTools({
   return (
     <div className="mt-5 grid gap-4">
       {hasWidgetUrl && !hasNumericId ? (
-        <p className="border border-line bg-white px-4 py-3 text-[13px] leading-6 text-muted">
+        <p className={`${adminCardShellClass} px-4 py-3 text-[13px] leading-6 text-muted`}>
           Live-Widgets funktionieren mit den hinterlegten Widget-URLs. Für Gruppen &
           Teams wird die numerische Turnier-ID oder der id-Parameter der Widget-URL
           verwendet.
@@ -182,7 +190,7 @@ export function MeinTurnierplanAdminTools({
           type="button"
           disabled={checking}
           onClick={handleCheckConnection}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:cursor-not-allowed disabled:opacity-50"
+          className={adminSecondaryButtonClass}
         >
           {checking ? "Prüfe…" : "Verbindung prüfen"}
         </button>
@@ -190,7 +198,7 @@ export function MeinTurnierplanAdminTools({
           type="button"
           disabled={loadingPreview}
           onClick={handleLoadPreview}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:cursor-not-allowed disabled:opacity-50"
+          className={adminSecondaryButtonClass}
         >
           {loadingPreview ? "Lade…" : "Gruppen & Teams laden"}
         </button>
@@ -201,22 +209,20 @@ export function MeinTurnierplanAdminTools({
       ) : null}
 
       {error ? (
-        <p className="border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-900">
+        <p
+          className={`${adminCardShellClass} border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[14px] text-[#9a2b2b]`}
+        >
           {error}
         </p>
       ) : null}
 
       {notice ? (
-        <p className="border border-line bg-white px-4 py-3 text-[14px] text-ink">
-          {notice}
-        </p>
+        <p className={`${adminCardShellClass} px-4 py-3 text-[14px] text-ink`}>{notice}</p>
       ) : null}
 
       {preview ? (
-        <section className="border border-line bg-white p-5">
-          <h3 className="font-display text-base font-bold tracking-wide text-ink uppercase">
-            MeinTurnierplan Rohdaten erkannt
-          </h3>
+        <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+          <h3 className={adminSectionTitleClass}>MeinTurnierplan Rohdaten erkannt</h3>
           {previewMeta ? (
             <dl className="mt-3 grid gap-2 text-[13px] text-muted sm:grid-cols-2">
               <div>
@@ -277,7 +283,7 @@ export function MeinTurnierplanAdminTools({
                 <button
                   type="button"
                   onClick={() => setShowImport(true)}
-                  className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066]"
+                  className={adminPrimaryButtonClass}
                 >
                   In Hub übernehmen
                 </button>
@@ -289,7 +295,7 @@ export function MeinTurnierplanAdminTools({
                     unzugeordnet.
                   </p>
                   {mappingGroups.map((group, groupIndex) => (
-                    <div key={group.name} className="border border-line p-4">
+                    <div key={group.name} className={adminMobileCardClass}>
                       <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
                         {group.name}
                       </p>
@@ -311,7 +317,7 @@ export function MeinTurnierplanAdminTools({
                                   event.target.value || null,
                                 )
                               }
-                              className="h-10 w-full border border-line bg-white px-3 text-[14px] text-ink"
+                              className={adminFilterControlClass}
                             >
                               <option value="">Nicht zugeordnet</option>
                               {acceptedOptions.map((option) => (
@@ -330,7 +336,7 @@ export function MeinTurnierplanAdminTools({
                       type="button"
                       disabled={importing}
                       onClick={handleImport}
-                      className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+                      className={adminPrimaryButtonClass}
                     >
                       {importing ? "Übernehme…" : "Zuordnung bestätigen & importieren"}
                     </button>
@@ -338,7 +344,7 @@ export function MeinTurnierplanAdminTools({
                       type="button"
                       disabled={importing}
                       onClick={() => setShowImport(false)}
-                      className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                      className={adminSecondaryButtonClass}
                     >
                       Abbrechen
                     </button>

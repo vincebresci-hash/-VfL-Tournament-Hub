@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import {
+  adminCardShellClass,
+  adminCompactPrimaryButtonClass,
+  adminCompactSecondaryButtonClass,
+  adminFilterControlClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
   updateApplicationParticipantLogoAction,
@@ -101,22 +108,24 @@ export function ApplicationParticipantLogoEditor({
   }
 
   return (
-    <div className="mt-4 border border-line bg-surface p-4">
-      <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-        Logo bearbeiten
-      </p>
+    <div className={`mt-4 ${adminCardShellClass} bg-surface/50 p-4 sm:p-5`}>
+      <p className={adminSectionTitleClass}>Logo bearbeiten</p>
       <p className="mt-2 text-[13px] leading-6 text-muted">
         Eigenes Logo nur für diesen Bewerbungsteilnehmer. Das globale Vereinslogo bleibt
         unverändert. Ohne Override wird weiter das Vereinslogo (falls vorhanden) genutzt.
       </p>
 
       {localError ? (
-        <p className="mt-3 border border-[#d9b0b0] bg-[#fff5f5] px-3 py-2 text-[13px] text-[#9a2b2b]">
+        <p
+          className={`mt-3 ${adminCardShellClass} border-[#d9b0b0] bg-[#fff5f5] px-3 py-2 text-[13px] text-[#9a2b2b]`}
+        >
           {localError}
         </p>
       ) : null}
       {localNotice ? (
-        <p className="mt-3 border border-line bg-white px-3 py-2 text-[13px] text-ink">{localNotice}</p>
+        <p className={`mt-3 ${adminCardShellClass} px-3 py-2 text-[13px] text-ink`}>
+          {localNotice}
+        </p>
       ) : null}
 
       <div className="mt-4 flex items-center gap-3">
@@ -132,10 +141,8 @@ export function ApplicationParticipantLogoEditor({
         </div>
       </div>
 
-      <section className="mt-5 border border-line bg-white p-4">
-        <h3 className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          Eigenes Bewerbungs-Logo
-        </h3>
+      <section className={`mt-5 ${adminCardShellClass} p-4`}>
+        <h3 className={adminSectionTitleClass}>Eigenes Bewerbungs-Logo</h3>
 
         <form
           className="mt-3 grid gap-3"
@@ -171,7 +178,7 @@ export function ApplicationParticipantLogoEditor({
           <button
             type="submit"
             disabled={pending || !fileName}
-            className="inline-flex h-9 w-fit items-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-50"
+            className={`w-fit ${adminCompactPrimaryButtonClass}`}
           >
             {pending ? "Lade hoch…" : "Logo hochladen"}
           </button>
@@ -182,7 +189,7 @@ export function ApplicationParticipantLogoEditor({
           <input
             value={logoUrl}
             onChange={(event) => setLogoUrl(event.target.value)}
-            className="h-10 border border-line bg-white px-3"
+            className={adminFilterControlClass}
             placeholder="https://…"
             disabled={pending}
           />
@@ -204,7 +211,7 @@ export function ApplicationParticipantLogoEditor({
               return result;
             })
           }
-          className="mt-3 inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className={`mt-3 ${adminCompactSecondaryButtonClass}`}
         >
           URL speichern
         </button>
@@ -228,7 +235,7 @@ export function ApplicationParticipantLogoEditor({
               return result;
             })
           }
-          className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase disabled:opacity-50"
+          className={adminCompactSecondaryButtonClass}
         >
           Logo entfernen
         </button>
@@ -236,7 +243,7 @@ export function ApplicationParticipantLogoEditor({
           type="button"
           disabled={pending}
           onClick={onCancel}
-          className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+          className={adminCompactSecondaryButtonClass}
         >
           Schließen
         </button>

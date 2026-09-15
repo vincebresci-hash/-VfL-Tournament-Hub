@@ -11,6 +11,12 @@ import {
 } from "@/lib/communications/recipient-picker";
 import { paymentStatusLabel } from "@/lib/payments/labels";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
+import {
+  adminCardShellClass,
+  adminCompactSecondaryButtonClass,
+  adminTableHeaderBarClass,
+  adminTableRowHoverClass,
+} from "@/components/admin/AdminPanel";
 import { APPLICATION_STATUSES } from "@/types/application";
 import type { CommunicationType } from "@/types/communication";
 
@@ -74,7 +80,7 @@ export function CommunicationRecipientPicker({
   }
 
   return (
-    <div className="mt-6 border border-line bg-surface px-4 py-4">
+    <div className={`mt-6 ${adminCardShellClass} bg-surface/50 px-4 py-4`}>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
@@ -92,7 +98,7 @@ export function CommunicationRecipientPicker({
               type="button"
               onClick={selectAllVisible}
               disabled={selectableVisibleIds.length === 0}
-              className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold text-ink hover:bg-surface disabled:opacity-60"
+              className={adminCompactSecondaryButtonClass}
             >
               Alle sichtbaren auswählen
             </button>
@@ -100,7 +106,7 @@ export function CommunicationRecipientPicker({
               type="button"
               onClick={clearSelection}
               disabled={selectedApplicationIds.length === 0}
-              className="inline-flex h-9 items-center border border-line bg-white px-3 text-[12px] font-semibold text-ink hover:bg-surface disabled:opacity-60"
+              className={adminCompactSecondaryButtonClass}
             >
               Auswahl aufheben
             </button>
@@ -178,18 +184,18 @@ export function CommunicationRecipientPicker({
         </Field>
       </div>
 
-      <div className="mt-4 overflow-x-auto border border-line bg-white">
+      <div className={`mt-4 overflow-x-auto ${adminCardShellClass}`}>
         <table className="min-w-full text-left text-[14px]">
-          <thead className="border-b border-line bg-surface text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+          <thead className={adminTableHeaderBarClass}>
             <tr>
-              {selectionEnabled ? <th className="px-3 py-3">Auswahl</th> : null}
-              <th className="px-3 py-3">Team</th>
-              <th className="px-3 py-3">Verein</th>
-              <th className="px-3 py-3">Altersklasse</th>
-              <th className="px-3 py-3">Status</th>
-              <th className="px-3 py-3">Hub</th>
-              <th className="px-3 py-3">E-Mail</th>
-              <th className="px-3 py-3">Zahlung</th>
+              {selectionEnabled ? <th className="px-3 py-2.5">Auswahl</th> : null}
+              <th className="px-3 py-2.5">Team</th>
+              <th className="px-3 py-2.5">Verein</th>
+              <th className="px-3 py-2.5">Altersklasse</th>
+              <th className="px-3 py-2.5">Status</th>
+              <th className="px-3 py-2.5">Hub</th>
+              <th className="px-3 py-2.5">E-Mail</th>
+              <th className="px-3 py-2.5">Zahlung</th>
             </tr>
           </thead>
           <tbody>
@@ -210,7 +216,7 @@ export function CommunicationRecipientPicker({
                 );
 
                 return (
-                  <tr key={application.id} className="border-b border-line last:border-b-0">
+                  <tr key={application.id} className={adminTableRowHoverClass}>
                     {selectionEnabled ? (
                       <td className="px-3 py-3 align-top">
                         <input
