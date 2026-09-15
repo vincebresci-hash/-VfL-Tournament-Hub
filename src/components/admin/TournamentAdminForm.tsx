@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import {
+  adminCardShellClass,
+  adminDestructiveButtonClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { ageGroupImageSrc, slugifyTournamentName } from "@/lib/tournaments";
 import { MEIN_TURNIERPLAN_DEFAULT_LABEL, extractNumericMeinTurnierplanTournamentIdFromUrl, suggestTableWidgetUrlFromMatches } from "@/lib/mein-turnierplan";
 import {
@@ -267,21 +274,21 @@ export function TournamentAdminForm({
   const archived = Boolean(tournament?.archivedAt);
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-8">
+    <form onSubmit={handleSubmit} className="grid gap-4">
       {error ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-ink">{notice}</p>
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-ink`}>{notice}</p>
       ) : null}
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Stammdaten
         </h2>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field id="tournament-name" label="Turniername">
             <TextInput
               id="tournament-name"
@@ -361,11 +368,11 @@ export function TournamentAdminForm({
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Beschreibung
         </h2>
-        <div className="mt-5 grid gap-5">
+        <div className="mt-4 grid gap-4">
           <Field id="tournament-short" label="Kurzbeschreibung" optional>
             <TextAreaInput
               id="tournament-short"
@@ -385,11 +392,11 @@ export function TournamentAdminForm({
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Status und Kapazität
         </h2>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field id="tournament-max" label="Maximale Teams">
             <TextInput
               id="tournament-max"
@@ -467,15 +474,15 @@ export function TournamentAdminForm({
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Öffentliche Turnierinformationen
         </h2>
         <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted">
           Diese Felder erscheinen auf der Turnierseite nur, wenn sie ausgefüllt
           sind. Leere Felder werden nicht angezeigt.
         </p>
-        <div className="mt-5 grid gap-5">
+        <div className="mt-4 grid gap-4">
           <Field id="tournament-play-format" label="Spielmodus" optional>
             <TextAreaInput
               id="tournament-play-format"
@@ -542,15 +549,15 @@ export function TournamentAdminForm({
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           MeinTurnierplan
         </h2>
         <p className="mt-2 max-w-2xl text-[13px] leading-6 text-muted">
           Optionaler externer Live-Spielplan für den Spieltag. Es findet keine
           automatische Synchronisation mit dem internen Spielplan statt.
         </p>
-        <div className="mt-5 grid gap-5">
+        <div className="mt-4 grid gap-4">
           <label
             htmlFor="tournament-mtp-enabled"
             className="flex items-center justify-between gap-4 border border-line px-4 py-3"
@@ -695,11 +702,11 @@ export function TournamentAdminForm({
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Hero-/Turnierbild
         </h2>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field id="tournament-image-preset" label="Vorhandenes Bild">
             <SelectInput
               id="tournament-image-preset"
@@ -740,14 +747,14 @@ export function TournamentAdminForm({
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-70"
+          className={adminPrimaryButtonClass}
         >
           {submitting ? "Wird gespeichert…" : tournament ? "Änderungen speichern" : "Turnier anlegen"}
         </button>
         {tournament ? (
           <Link
             href={`/admin/turniere/${tournament.id}`}
-            className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+            className={adminSecondaryButtonClass}
           >
             Teilnehmer
           </Link>
@@ -755,21 +762,21 @@ export function TournamentAdminForm({
       </div>
 
       {tournament ? (
-        <section className="border border-line bg-white p-5 sm:p-6">
-          <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+        <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+          <h2 className={adminSectionTitleClass}>
             Archivieren / Löschen
           </h2>
           <p className="mt-3 max-w-2xl text-[14px] leading-6 text-muted">
             Turniere mit Bewerbungen werden nicht hart gelöscht. Archivierte Turniere bleiben
             im Adminbereich sichtbar, erscheinen aber nicht mehr öffentlich.
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             {archived ? (
               <button
                 type="button"
                 disabled={submitting}
                 onClick={() => setConfirm("restore")}
-                className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                className={adminSecondaryButtonClass}
               >
                 Wiederherstellen
               </button>
@@ -778,7 +785,7 @@ export function TournamentAdminForm({
                 type="button"
                 disabled={submitting}
                 onClick={() => setConfirm("archive")}
-                className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                className={adminSecondaryButtonClass}
               >
                 Archivieren
               </button>
@@ -787,7 +794,7 @@ export function TournamentAdminForm({
               type="button"
               disabled={submitting || applicationCount > 0}
               onClick={() => setConfirm("delete")}
-              className="inline-flex h-11 items-center px-4 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:opacity-40"
+              className={adminDestructiveButtonClass}
             >
               Löschen
             </button>

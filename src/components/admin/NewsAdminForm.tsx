@@ -6,6 +6,14 @@ import { useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import {
+  AdminPageHeader,
+  adminCardShellClass,
+  adminDestructiveButtonClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
+import {
   archiveNewsPostAction,
   createNewsPostAction,
   restoreNewsPostAction,
@@ -127,21 +135,19 @@ export function NewsAdminForm({ post, tournaments }: NewsAdminFormProps) {
     <div className="mx-auto max-w-3xl">
       <Link
         href="/admin/news"
-        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+        className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
       >
         ← Alle News
       </Link>
 
-      <h1 className="mt-6 font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-        {post ? "News bearbeiten" : "Neue News"}
-      </h1>
-      {status ? (
-        <p className="mt-2 text-[14px] text-muted">
-          Status: {newsPostStatusLabel[status]}
-        </p>
-      ) : null}
+      <div className="mt-4">
+        <AdminPageHeader
+          title={post ? "News bearbeiten" : "Neue News"}
+          description={status ? `Status: ${newsPostStatusLabel[status]}` : undefined}
+        />
+      </div>
 
-      <form className="mt-8 grid gap-5 border border-line bg-white p-5 sm:p-6">
+      <form className={`mt-5 grid gap-4 ${adminCardShellClass} p-4 sm:p-5`}>
         <Field id="news-title" label="Titel">
           <TextInput
             id="news-title"
@@ -244,7 +250,7 @@ export function NewsAdminForm({ post, tournaments }: NewsAdminFormProps) {
               type="button"
               onClick={() => setConfirm(status === "archived" ? "restore" : "archive")}
               disabled={submitting}
-              className="inline-flex h-10 items-center px-4 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+              className={adminDestructiveButtonClass}
             >
               {status === "archived" ? "Wiederherstellen" : "Archivieren"}
             </button>
@@ -259,7 +265,7 @@ export function NewsAdminForm({ post, tournaments }: NewsAdminFormProps) {
               onClick={(event) => {
                 void handleSubmit(event as unknown as FormEvent<HTMLFormElement>, "draft");
               }}
-              className="inline-flex h-10 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+              className={adminSecondaryButtonClass}
             >
               {submitting ? "Speichern…" : "Entwurf speichern"}
             </button>
@@ -269,7 +275,7 @@ export function NewsAdminForm({ post, tournaments }: NewsAdminFormProps) {
               onClick={(event) => {
                 void handleSubmit(event as unknown as FormEvent<HTMLFormElement>, "publish");
               }}
-              className="inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60"
+              className={adminPrimaryButtonClass}
             >
               {submitting ? "Speichern…" : "Veröffentlichen"}
             </button>

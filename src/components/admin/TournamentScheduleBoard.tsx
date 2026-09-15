@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
-import { AdminCard } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  adminCardShellClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import {
   deleteTournamentMatchAction,
@@ -93,12 +98,12 @@ export function TournamentScheduleBoard({
   return (
     <div className="grid gap-5">
       {error ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]" role="alert">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-muted">{notice}</p>
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted">{notice}</p>
       ) : null}
 
       <AdminCard title="Spielparameter">
@@ -175,7 +180,7 @@ export function TournamentScheduleBoard({
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex h-11 w-fit items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-60"
+            className={`${adminPrimaryButtonClass} w-fit`}
           >
             Einstellungen speichern
           </button>
@@ -197,7 +202,7 @@ export function TournamentScheduleBoard({
               type="button"
               disabled={pending}
               onClick={() => setConfirmClear(true)}
-              className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+              className={adminSecondaryButtonClass}
             >
               Spielplan löschen
             </button>
@@ -382,7 +387,7 @@ function MatchEditor({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex h-10 items-center bg-brand-yellow px-3 text-[11px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           Spiel speichern
         </button>
@@ -490,7 +495,7 @@ function AddMatchForm({
         <button
           type="submit"
           disabled={pending || teams.length < 2}
-          className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           Spiel hinzufügen
         </button>

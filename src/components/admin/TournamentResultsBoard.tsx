@@ -2,7 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { AdminCard } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  adminCardShellClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { TextInput } from "@/components/apply/FormControls";
 import { saveMatchResultAction } from "@/lib/db/schedule-actions";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
@@ -36,7 +41,7 @@ export function TournamentResultsBoard({
   return (
     <div className="grid gap-5">
       {error ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]" role="alert">
           {error}
         </p>
       ) : null}
@@ -115,7 +120,7 @@ function ResultRow({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 border border-line p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+    <form onSubmit={handleSubmit} className={`grid gap-3 ${adminMobileCardClass} lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center`}>
       <div>
         <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
           {groupName} · {fieldName} · {formatBerlinClock(match.scheduledAt)}
@@ -143,7 +148,7 @@ function ResultRow({
         <button
           type="submit"
           disabled={pending}
-          className="inline-flex h-11 items-center bg-brand-yellow px-3 text-[11px] font-semibold tracking-[0.08em] text-navy uppercase disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           Ergebnis speichern
         </button>

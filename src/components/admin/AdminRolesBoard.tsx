@@ -1,4 +1,7 @@
-import { AdminCard } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  adminMobileCardClass,
+} from "@/components/admin/AdminPanel";
 import type { Permission } from "@/types/rbac";
 
 type AdminRolesBoardProps = {
@@ -7,14 +10,14 @@ type AdminRolesBoardProps = {
 
 export function AdminRolesBoard({ matrix }: AdminRolesBoardProps) {
   return (
-    <div className="mt-8 grid gap-6">
+    <div className="mt-5 grid gap-4 lg:grid-cols-2">
       {matrix.map((role) => (
         <AdminCard key={role.roleKey} title={`${role.roleName} (${role.roleKey})`}>
           <ul className="grid gap-2 sm:grid-cols-2">
             {role.permissions.map((permission) => (
               <li
                 key={permission}
-                className="border border-line px-3 py-2 text-[13px] text-ink"
+                className={`${adminMobileCardClass} py-2.5 text-[12px] font-medium text-ink`}
               >
                 {permission}
               </li>

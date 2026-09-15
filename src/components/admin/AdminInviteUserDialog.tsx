@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { AdminInviteUserForm } from "@/components/admin/AdminInviteUserForm";
-import { adminPrimaryButtonClass } from "@/components/admin/AdminPanel";
+import {
+  adminCardShellClass,
+  adminPrimaryButtonClass,
+  adminSectionTitleClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
 import type { RbacRole } from "@/types/rbac";
 
 type ClubOption = { id: string; name: string };
@@ -37,10 +42,10 @@ export function AdminInviteUserDialog({ roles, clubs, teams }: AdminInviteUserDi
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/40 p-4 sm:p-8">
-      <div className="w-full max-w-2xl border border-line bg-white p-5 sm:p-6">
+      <div className={`w-full max-w-2xl ${adminCardShellClass} p-4 sm:p-6`}>
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
+            <h2 className={adminSectionTitleClass}>
               Benutzer einladen
             </h2>
             <p className="mt-2 text-[14px] text-muted">
@@ -51,7 +56,7 @@ export function AdminInviteUserDialog({ roles, clubs, teams }: AdminInviteUserDi
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+            className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
           >
             Schließen
           </button>

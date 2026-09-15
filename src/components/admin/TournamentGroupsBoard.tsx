@@ -3,7 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
-import { AdminCard } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  adminCardShellClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import {
   assignTeamToGroupAction,
@@ -94,12 +101,12 @@ export function TournamentGroupsBoard({
   return (
     <div className="grid gap-5">
       {error ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]" role="alert">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-muted">{notice}</p>
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted">{notice}</p>
       ) : null}
 
       <AdminCard title="Gruppen anlegen">
@@ -108,7 +115,7 @@ export function TournamentGroupsBoard({
             type="button"
             disabled={pending}
             onClick={() => void handleAddGroup()}
-            className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             + Gruppe hinzufügen
           </button>
@@ -164,7 +171,7 @@ export function TournamentGroupsBoard({
           });
 
           return (
-            <div key={group.id} className="border border-line bg-white p-5 sm:p-6">
+            <div key={group.id} className={`${adminCardShellClass} p-4 sm:p-5`}>
               <div className="flex flex-wrap items-end gap-3">
                 <Field id={`group-name-${group.id}`} label="Gruppenname">
                   <TextInput
@@ -179,7 +186,7 @@ export function TournamentGroupsBoard({
                   type="button"
                   disabled={pending}
                   onClick={() => void handleRename(group.id)}
-                  className="inline-flex h-11 items-center border border-line px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase"
+                  className={adminSecondaryButtonClass}
                 >
                   Umbenennen
                 </button>
@@ -243,9 +250,9 @@ function GroupColumn({
   hideTitle?: boolean;
 }) {
   return (
-    <section className={hideTitle ? "" : "border border-line bg-white p-5 sm:p-6"}>
+    <section className={hideTitle ? "" : `${adminCardShellClass} p-4 sm:p-5`}>
       {hideTitle ? null : (
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">{title}</h2>
+        <h2 className={adminSectionTitleClass}>{title}</h2>
       )}
       {participants.length === 0 ? (
         <p className={`${hideTitle ? "" : "mt-4"} text-[14px] text-muted`}>Keine Teams in diesem Bereich.</p>
@@ -258,7 +265,7 @@ function GroupColumn({
             }
 
             return (
-              <li key={participant.id} className="border border-line p-3">
+              <li key={participant.id} className={`${adminMobileCardClass} p-3`}>
                 <p className="text-[14px] font-semibold text-ink">{participant.displayName}</p>
                 <p className="mt-1 text-[12px] text-muted">
                   {participantSourceLabel(participant.source)}
