@@ -4,9 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AdminEmpty,
+  adminCompactSecondaryButtonClass,
   adminFilterControlClass,
   adminFilterShellClass,
-  adminTextLinkClass,
+  adminMobileCardClass,
+  adminTableHeaderBarClass,
+  adminTableRowHoverClass,
+  adminTableShellClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
@@ -149,19 +153,16 @@ export function TeamDirectoryBoard({ entries, ready }: TeamDirectoryBoardProps) 
           </AdminEmpty>
         </div>
       ) : (
-        <div className="mt-6">
-          <p className="mb-4 text-[13px] text-muted">
+        <div className="mt-5">
+          <p className="mb-3 text-[13px] text-muted">
             {visible.length} {visible.length === 1 ? "Team" : "Teams"}
           </p>
 
-          <div className="grid gap-3 lg:hidden">
+          <div className="grid gap-2.5 lg:hidden">
             {visible.map((entry) => (
-              <article
-                key={`mobile-${entry.id}`}
-                className="border border-line bg-white p-4"
-              >
+              <article key={`mobile-${entry.id}`} className={adminMobileCardClass}>
                 <div className="min-w-0">
-                  <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
+                  <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase">
                     {entry.teamName}
                     {entry.archivedAt ? (
                       <span className="ml-2 text-[11px] font-semibold text-muted normal-case tracking-normal">
@@ -169,50 +170,58 @@ export function TeamDirectoryBoard({ entries, ready }: TeamDirectoryBoardProps) 
                       </span>
                     ) : null}
                   </p>
-                  <p className="mt-1 truncate text-[13px] text-muted">{entry.clubName}</p>
+                  <p className="mt-0.5 truncate text-[13px] text-muted">{entry.clubName}</p>
                 </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
+                <dl className="mt-3 grid grid-cols-2 gap-2.5 text-[13px]">
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Altersklasse
                     </dt>
-                    <dd className="mt-1">{displayValue(entry.ageGroup)}</dd>
+                    <dd className="mt-0.5 text-ink">{displayValue(entry.ageGroup)}</dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Herkunft
                     </dt>
-                    <dd className="mt-1">{hubLabel(entry)}</dd>
+                    <dd className="mt-0.5 text-ink">{hubLabel(entry)}</dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Ansprechpartner
                     </dt>
-                    <dd className="mt-1 truncate">{displayValue(contactName(entry))}</dd>
+                    <dd className="mt-0.5 truncate text-muted">
+                      {displayValue(contactName(entry))}
+                    </dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       E-Mail
                     </dt>
-                    <dd className="mt-1 break-all">{displayValue(entry.contactEmail)}</dd>
+                    <dd className="mt-0.5 break-all text-muted">
+                      {displayValue(entry.contactEmail)}
+                    </dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Liga
                     </dt>
-                    <dd className="mt-1 truncate">{displayValue(entry.league)}</dd>
+                    <dd className="mt-0.5 truncate text-muted">
+                      {displayValue(entry.league)}
+                    </dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Kategorie
                     </dt>
-                    <dd className="mt-1 truncate">{displayValue(entry.internalCategory)}</dd>
+                    <dd className="mt-0.5 truncate text-muted">
+                      {displayValue(entry.internalCategory)}
+                    </dd>
                   </div>
                   <div className="min-w-0 col-span-2">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Letzte Teilnahme
                     </dt>
-                    <dd className="mt-1 truncate">
+                    <dd className="mt-0.5 truncate text-muted">
                       {entry.lastParticipationAt
                         ? `${displayValue(entry.lastTournamentName)} · ${formatDateDe(entry.lastParticipationAt.slice(0, 10))}`
                         : "—"}
@@ -221,7 +230,7 @@ export function TeamDirectoryBoard({ entries, ready }: TeamDirectoryBoardProps) 
                 </dl>
                 <Link
                   href={`/admin/team-datenbank/${entry.id}`}
-                  className={`${adminTextLinkClass} mt-4`}
+                  className={`${adminCompactSecondaryButtonClass} mt-3`}
                 >
                   Ansehen
                 </Link>
@@ -229,87 +238,90 @@ export function TeamDirectoryBoard({ entries, ready }: TeamDirectoryBoardProps) 
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto border border-line bg-white lg:block">
-            <table className="w-full min-w-[1100px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-line bg-surface">
-                  {[
-                    "Team",
-                    "Verein",
-                    "Altersklasse",
-                    "Hub / extern",
-                    "Ansprechpartner",
-                    "E-Mail",
-                    "Liga",
-                    "Kategorie",
-                    "Letzte Teilnahme",
-                    "Aktionen",
-                  ].map((heading) => (
-                    <th
-                      key={heading}
-                      className="px-4 py-3 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((entry) => (
-                  <tr
-                    key={`desktop-${entry.id}`}
-                    className="border-b border-line last:border-b-0 hover:bg-surface/70"
-                  >
-                    <td className="max-w-[160px] px-4 py-3 text-[14px] font-medium text-ink">
-                      <span className="block truncate">{entry.teamName}</span>
-                      {entry.archivedAt ? (
-                        <span className="mt-1 block text-[11px] text-muted">(archiviert)</span>
-                      ) : null}
-                    </td>
-                    <td className="max-w-[160px] px-4 py-3 text-[14px] text-muted">
-                      <span className="block truncate">{entry.clubName}</span>
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-ink">
-                      {displayValue(entry.ageGroup)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-ink">{hubLabel(entry)}</td>
-                    <td className="max-w-[140px] px-4 py-3 text-[14px] text-muted">
-                      <span className="block truncate">
-                        {displayValue(contactName(entry))}
-                      </span>
-                    </td>
-                    <td className="max-w-[180px] px-4 py-3 text-[14px] text-muted">
-                      <span className="block truncate">
-                        {displayValue(entry.contactEmail)}
-                      </span>
-                    </td>
-                    <td className="max-w-[120px] px-4 py-3 text-[14px] text-muted">
-                      <span className="block truncate">{displayValue(entry.league)}</span>
-                    </td>
-                    <td className="max-w-[120px] px-4 py-3 text-[14px] text-muted">
-                      <span className="block truncate">
-                        {displayValue(entry.internalCategory)}
-                      </span>
-                    </td>
-                    <td className="max-w-[180px] px-4 py-3 text-[14px] text-muted">
-                      <span className="block truncate">
-                        {entry.lastParticipationAt
-                          ? `${displayValue(entry.lastTournamentName)} · ${formatDateDe(entry.lastParticipationAt.slice(0, 10))}`
-                          : "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/team-datenbank/${entry.id}`}
-                        className={adminTextLinkClass}
-                      >
-                        Ansehen
-                      </Link>
-                    </td>
+          <div className={adminTableShellClass}>
+            <div className={adminTableHeaderBarClass}>
+              <p>Teams</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-[13px]">
+                <thead className="border-b border-line bg-white text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                  <tr>
+                    {[
+                      "Team",
+                      "Verein",
+                      "Altersklasse",
+                      "Hub / extern",
+                      "Ansprechpartner",
+                      "E-Mail",
+                      "Liga",
+                      "Kategorie",
+                      "Letzte Teilnahme",
+                      "Aktionen",
+                    ].map((heading) => (
+                      <th key={heading} className="px-3.5 py-2.5">
+                        {heading}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visible.map((entry) => (
+                    <tr key={`desktop-${entry.id}`} className={adminTableRowHoverClass}>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] font-medium text-ink">
+                        <span className="block truncate">{entry.teamName}</span>
+                        {entry.archivedAt ? (
+                          <span className="mt-0.5 block text-[11px] text-muted">
+                            (archiviert)
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">{entry.clubName}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-ink">
+                        {displayValue(entry.ageGroup)}
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-ink">
+                        {hubLabel(entry)}
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(contactName(entry))}
+                        </span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(entry.contactEmail)}
+                        </span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">{displayValue(entry.league)}</span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(entry.internalCategory)}
+                        </span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {entry.lastParticipationAt
+                            ? `${displayValue(entry.lastTournamentName)} · ${formatDateDe(entry.lastParticipationAt.slice(0, 10))}`
+                            : "—"}
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <Link
+                          href={`/admin/team-datenbank/${entry.id}`}
+                          className={adminCompactSecondaryButtonClass}
+                        >
+                          Ansehen
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

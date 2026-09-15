@@ -5,6 +5,7 @@ import { getNewsPostStatus, newsPostStatusLabel } from "@/lib/news";
 import { formatDateTimeDe } from "@/lib/format";
 import {
   AdminEmpty,
+  adminCardShellClass,
   adminSecondaryButtonClass,
   adminStatusBadgeClass,
 } from "@/components/admin/AdminPanel";
@@ -31,7 +32,7 @@ export function NewsAdminBoard({ posts }: NewsAdminBoardProps) {
   const router = useRouter();
 
   return (
-    <div className="grid gap-3">
+    <div className="grid gap-2.5">
       {posts.length === 0 ? (
         <AdminEmpty>Noch keine News vorhanden.</AdminEmpty>
       ) : (
@@ -41,19 +42,19 @@ export function NewsAdminBoard({ posts }: NewsAdminBoardProps) {
           return (
             <article
               key={post.id}
-              className="border border-line bg-white p-5 sm:flex sm:items-start sm:justify-between sm:gap-4"
+              className={`${adminCardShellClass} p-4 sm:flex sm:items-start sm:justify-between sm:gap-4 sm:p-5`}
             >
               <div className="min-w-0">
-                <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
+                <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-lg">
                   {post.title}
                 </p>
-                <p className="mt-1 text-[13px] text-muted">
+                <p className="mt-0.5 text-[13px] text-muted">
                   {post.publishedAt
                     ? `Veröffentlichung: ${formatDateTimeDe(post.publishedAt)}`
                     : "Noch nicht veröffentlicht"}
                 </p>
                 {post.tournamentName ? (
-                  <p className="mt-1 truncate text-[13px] text-muted">
+                  <p className="mt-0.5 truncate text-[13px] text-muted">
                     Turnier: {post.tournamentName}
                   </p>
                 ) : null}
@@ -63,7 +64,7 @@ export function NewsAdminBoard({ posts }: NewsAdminBoardProps) {
                   {newsPostStatusLabel[status]}
                 </p>
               </div>
-              <div className="mt-4 flex gap-3 sm:mt-0">
+              <div className="mt-4 flex gap-2 sm:mt-0">
                 <button
                   type="button"
                   onClick={() => router.push(`/admin/news/${post.id}/bearbeiten`)}

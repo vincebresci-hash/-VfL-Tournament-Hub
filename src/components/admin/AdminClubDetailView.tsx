@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
 import { ClubRecordStatusBadge } from "@/components/admin/ClubRecordStatusBadge";
-import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  adminIdentityHeroClass,
+  adminMobileCardClass,
+  adminTableRowHoverClass,
+  adminTextLinkClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import { userRoleLabel } from "@/lib/admin";
 import { formatDateDe } from "@/lib/format";
 import type { AdminClubDetail } from "@/types/admin";
@@ -15,26 +23,31 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
     <div className="mx-auto max-w-5xl">
       <Link
         href="/admin/vereine"
-        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+        className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
       >
         ← Alle Vereine
       </Link>
 
-      <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-            {club.name}
-          </h1>
-          <p className="mt-2 text-[15px] text-muted">
-            Registriert am {formatDateDe(club.createdAt.slice(0, 10))}
-          </p>
+      <div className={`mt-4 ${adminIdentityHeroClass}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
+              {club.name}
+            </h1>
+            <p className="mt-1 text-[15px] text-muted">
+              Registriert am {formatDateDe(club.createdAt.slice(0, 10))}
+            </p>
+            <p className="mt-2 text-[13px] text-muted">
+              {club.teamCount} Teams · {club.applicationCount} Bewerbungen
+            </p>
+          </div>
+          <ClubRecordStatusBadge status={club.status} />
         </div>
-        <ClubRecordStatusBadge status={club.status} />
       </div>
 
-      <div className="mt-8 grid gap-5">
+      <div className="mt-5 grid gap-4">
         <AdminCard title="Stammdaten">
-          <dl className="grid gap-4 sm:grid-cols-2">
+          <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
             <AdminInfo label="Vereinsname" value={club.name} />
             <AdminInfo label="Ort" value={displayValue(club.city)} />
             <AdminInfo label="Website" value={displayValue(club.website)} />
@@ -50,15 +63,12 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
           {club.members.length === 0 ? (
             <p className="text-[14px] text-muted">Keine zugehörigen Profile gefunden.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px] border-collapse text-left">
-                <thead>
-                  <tr className="border-b border-line">
+            <div className="overflow-x-auto rounded-lg border border-line/70">
+              <table className="w-full min-w-[640px] border-collapse text-left text-[13px]">
+                <thead className="border-b border-line bg-surface/70 text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                  <tr>
                     {["Name", "E-Mail", "Rolle", "Hinweis"].map((heading) => (
-                      <th
-                        key={heading}
-                        className="py-2 pr-4 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase"
-                      >
+                      <th key={heading} className="px-3.5 py-2.5 text-left">
                         {heading}
                       </th>
                     ))}
@@ -66,17 +76,17 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
                 </thead>
                 <tbody>
                   {club.members.map((member) => (
-                    <tr key={member.id} className="border-b border-line last:border-b-0">
-                      <td className="py-3 pr-4 text-[14px] text-ink">
+                    <tr key={member.id} className={adminTableRowHoverClass}>
+                      <td className="px-3.5 py-2.5 text-[14px] text-ink">
                         {displayValue(`${member.firstName} ${member.lastName}`.trim())}
                       </td>
-                      <td className="py-3 pr-4 text-[14px] text-muted">
+                      <td className="px-3.5 py-2.5 text-[14px] text-muted">
                         {displayValue(member.email)}
                       </td>
-                      <td className="py-3 pr-4 text-[14px] text-ink">
+                      <td className="px-3.5 py-2.5 text-[14px] text-ink">
                         {userRoleLabel[member.role]}
                       </td>
-                      <td className="py-3 text-[13px] text-muted">
+                      <td className="px-3.5 py-2.5 text-[13px] text-muted">
                         {member.isCreator ? "Registrierung" : "Mitglied"}
                       </td>
                     </tr>
@@ -95,7 +105,7 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
               {club.teams.map((team) => (
                 <div
                   key={team.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border border-line px-4 py-3"
+                  className={`${adminMobileCardClass} flex flex-wrap items-center justify-between gap-3`}
                 >
                   <div>
                     <p className="text-[14px] font-medium text-ink">{team.name}</p>
@@ -108,7 +118,7 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
                   </div>
                   <Link
                     href={`/admin/teams/${team.id}`}
-                    className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+                    className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
                   >
                     Ansehen
                   </Link>
@@ -126,7 +136,7 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
               {club.applications.map((application) => (
                 <div
                   key={application.id}
-                  className="flex flex-wrap items-center justify-between gap-3 border border-line px-4 py-3"
+                  className={`${adminMobileCardClass} flex flex-wrap items-center justify-between gap-3`}
                 >
                   <div>
                     <p className="text-[14px] font-medium text-ink">
@@ -141,7 +151,7 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
                     <ApplicationStatusBadge status={application.status} />
                     <Link
                       href={`/admin/bewerbungen/${application.id}`}
-                      className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+                      className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
                     >
                       Ansehen
                     </Link>
@@ -158,7 +168,10 @@ export function AdminClubDetailView({ club }: AdminClubDetailViewProps) {
           ) : (
             <ul className="grid gap-2">
               {club.tournaments.map((tournament) => (
-                <li key={tournament.id} className="flex flex-wrap justify-between gap-2 text-[14px]">
+                <li
+                  key={tournament.id}
+                  className={`${adminMobileCardClass} flex flex-wrap justify-between gap-2 text-[14px]`}
+                >
                   <span className="text-ink">{tournament.name}</span>
                   <span className="text-muted">
                     {tournament.applicationCount}{" "}

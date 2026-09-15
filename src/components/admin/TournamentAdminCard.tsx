@@ -1,7 +1,9 @@
 import Link from "next/link";
 import {
+  adminCardShellClass,
   adminCompactPrimaryButtonClass,
   adminCompactSecondaryButtonClass,
+  adminStatusBadgeClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
@@ -35,7 +37,7 @@ export function TournamentAdminCard({
       : `${confirmedTeams} / ${tournament.maxTeams} bestätigt`;
 
   return (
-    <article className="border border-line bg-white p-4 sm:p-5">
+    <article className={`${adminCardShellClass} p-4 sm:p-5`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-xl font-bold tracking-wide text-ink uppercase">
@@ -50,7 +52,9 @@ export function TournamentAdminCard({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {tournament.archivedAt ? (
-            <span className="inline-flex bg-[#e8eaee] px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+            <span
+              className={`${adminStatusBadgeClass} bg-[#e8eaee] text-muted`}
+            >
               Archiviert
             </span>
           ) : null}
@@ -59,7 +63,7 @@ export function TournamentAdminCard({
       </div>
 
       <TournamentStatusCapacityNotice
-        className="mt-4 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
+        className="mt-4 rounded-lg border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
         dbStatus={tournament.status}
         maxTeams={tournament.maxTeams}
         confirmedParticipants={confirmedTeams}
@@ -76,7 +80,7 @@ export function TournamentAdminCard({
         />
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4 text-[13px] text-muted sm:grid-cols-4">
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line/70 pt-4 text-[13px] text-muted sm:grid-cols-4">
         <Stat label="Uhrzeit" value={start ?? "—"} />
         <Stat label="Ort" value={tournament.location || "—"} />
         <Stat
@@ -129,8 +133,8 @@ function PriorityStat({
     <div
       className={
         emphasize
-          ? "min-w-0 border border-brand-yellow/70 bg-[#fff8e0] px-3 py-2"
-          : "min-w-0 border border-line bg-white px-3 py-2"
+          ? "min-w-0 rounded-lg border border-brand-yellow/70 bg-[#fff8e0] px-3 py-2"
+          : "min-w-0 rounded-lg border border-line bg-surface/40 px-3 py-2"
       }
     >
       <p className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
@@ -149,7 +153,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
         {label}
       </dt>
-      <dd className="mt-1 truncate text-ink">{value}</dd>
+      <dd className="mt-0.5 truncate text-ink">{value}</dd>
     </div>
   );
 }

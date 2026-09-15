@@ -4,9 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AdminEmpty,
+  adminCompactSecondaryButtonClass,
   adminFilterControlClass,
   adminFilterShellClass,
-  adminTextLinkClass,
+  adminMobileCardClass,
+  adminTableHeaderBarClass,
+  adminTableRowHoverClass,
+  adminTableShellClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
@@ -131,33 +135,37 @@ export function AdminTeamsBoard({ teams, tournaments }: AdminTeamsBoardProps) {
           </AdminEmpty>
         </div>
       ) : (
-        <div className="mt-6">
-          <div className="grid gap-3 lg:hidden">
+        <div className="mt-5">
+          <p className="mb-3 text-[13px] text-muted">
+            {visible.length} {visible.length === 1 ? "Team" : "Teams"}
+          </p>
+
+          <div className="grid gap-2.5 lg:hidden">
             {visible.map((team) => (
-              <article key={team.id} className="border border-line bg-white p-4">
+              <article key={team.id} className={adminMobileCardClass}>
                 <div className="min-w-0">
-                  <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
+                  <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase">
                     {team.name}
                   </p>
-                  <p className="mt-1 truncate text-[13px] text-muted">{team.clubName}</p>
+                  <p className="mt-0.5 truncate text-[13px] text-muted">{team.clubName}</p>
                 </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
+                <dl className="mt-3 grid grid-cols-2 gap-2.5 text-[13px]">
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Altersklasse
                     </dt>
-                    <dd className="mt-1">{displayValue(team.ageGroup)}</dd>
+                    <dd className="mt-0.5 text-ink">{displayValue(team.ageGroup)}</dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Bewerbungen
                     </dt>
-                    <dd className="mt-1">{team.applicationCount}</dd>
+                    <dd className="mt-0.5 text-ink">{team.applicationCount}</dd>
                   </div>
                 </dl>
                 <Link
                   href={`/admin/teams/${team.id}`}
-                  className={`${adminTextLinkClass} mt-4`}
+                  className={`${adminCompactSecondaryButtonClass} mt-3`}
                 >
                   Ansehen
                 </Link>
@@ -165,66 +173,69 @@ export function AdminTeamsBoard({ teams, tournaments }: AdminTeamsBoardProps) {
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto border border-line bg-white lg:block">
-            <table className="w-full min-w-[980px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-line bg-surface">
-                  {[
-                    "Team",
-                    "Verein",
-                    "Altersklasse",
-                    "Jahrgang",
-                    "Trainer",
-                    "Bewerbungen",
-                    "Erstellt",
-                    "Aktionen",
-                  ].map((heading) => (
-                    <th
-                      key={heading}
-                      className="px-4 py-3 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((team) => (
-                  <tr
-                    key={team.id}
-                    className="border-b border-line last:border-b-0 hover:bg-surface/70"
-                  >
-                    <td className="px-4 py-3 text-[14px] font-medium text-ink">
-                      {team.name}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">{team.clubName}</td>
-                    <td className="px-4 py-3 text-[14px] text-ink">
-                      {displayValue(team.ageGroup)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {displayValue(team.birthYear)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {displayValue(team.trainerName)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-ink">
-                      {team.applicationCount}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {formatDateDe(team.createdAt.slice(0, 10))}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/teams/${team.id}`}
-                        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
-                      >
-                        Ansehen
-                      </Link>
-                    </td>
+          <div className={adminTableShellClass}>
+            <div className={adminTableHeaderBarClass}>
+              <p>Teams</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-[13px]">
+                <thead className="border-b border-line bg-white text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                  <tr>
+                    {[
+                      "Team",
+                      "Verein",
+                      "Altersklasse",
+                      "Jahrgang",
+                      "Trainer",
+                      "Bewerbungen",
+                      "Erstellt",
+                      "Aktionen",
+                    ].map((heading) => (
+                      <th key={heading} className="px-3.5 py-2.5">
+                        {heading}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visible.map((team) => (
+                    <tr key={team.id} className={adminTableRowHoverClass}>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] font-medium text-ink">
+                        <span className="block truncate">{team.name}</span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">{team.clubName}</span>
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-ink">
+                        {displayValue(team.ageGroup)}
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-muted">
+                        {displayValue(team.birthYear)}
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(team.trainerName)}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-ink">
+                        {team.applicationCount}
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-muted">
+                        {formatDateDe(team.createdAt.slice(0, 10))}
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <Link
+                          href={`/admin/teams/${team.id}`}
+                          className={adminCompactSecondaryButtonClass}
+                        >
+                          Ansehen
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

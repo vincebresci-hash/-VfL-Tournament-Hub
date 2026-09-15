@@ -4,9 +4,13 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AdminEmpty,
+  adminCompactSecondaryButtonClass,
   adminFilterControlClass,
   adminFilterShellClass,
-  adminTextLinkClass,
+  adminMobileCardClass,
+  adminTableHeaderBarClass,
+  adminTableRowHoverClass,
+  adminTableShellClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
@@ -66,38 +70,42 @@ export function AdminClubsBoard({ clubs }: AdminClubsBoardProps) {
           </AdminEmpty>
         </div>
       ) : (
-        <div className="mt-6">
-          <div className="grid gap-3 lg:hidden">
+        <div className="mt-5">
+          <p className="mb-3 text-[13px] text-muted">
+            {visible.length} {visible.length === 1 ? "Verein" : "Vereine"}
+          </p>
+
+          <div className="grid gap-2.5 lg:hidden">
             {visible.map((club) => (
-              <article key={club.id} className="border border-line bg-white p-4">
+              <article key={club.id} className={adminMobileCardClass}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
+                    <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase">
                       {club.name}
                     </p>
-                    <p className="mt-1 truncate text-[13px] text-muted">
+                    <p className="mt-0.5 truncate text-[13px] text-muted">
                       {displayValue(club.contactName)}
                     </p>
                   </div>
                   <ClubRecordStatusBadge status={club.status} />
                 </div>
-                <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
+                <dl className="mt-3 grid grid-cols-2 gap-2.5 text-[13px]">
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Teams
                     </dt>
-                    <dd className="mt-1">{club.teamCount}</dd>
+                    <dd className="mt-0.5 text-ink">{club.teamCount}</dd>
                   </div>
                   <div className="min-w-0">
                     <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                       Bewerbungen
                     </dt>
-                    <dd className="mt-1">{club.applicationCount}</dd>
+                    <dd className="mt-0.5 text-ink">{club.applicationCount}</dd>
                   </div>
                 </dl>
                 <Link
                   href={`/admin/vereine/${club.id}`}
-                  className={`${adminTextLinkClass} mt-4`}
+                  className={`${adminCompactSecondaryButtonClass} mt-3`}
                 >
                   Ansehen
                 </Link>
@@ -105,70 +113,77 @@ export function AdminClubsBoard({ clubs }: AdminClubsBoardProps) {
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto border border-line bg-white lg:block">
-            <table className="w-full min-w-[980px] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-line bg-surface">
-                  {[
-                    "Verein",
-                    "Ansprechpartner",
-                    "E-Mail",
-                    "Telefon",
-                    "Teams",
-                    "Bewerbungen",
-                    "Registriert",
-                    "Status",
-                    "Aktionen",
-                  ].map((heading) => (
-                    <th
-                      key={heading}
-                      className="px-4 py-3 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase"
-                    >
-                      {heading}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {visible.map((club) => (
-                  <tr
-                    key={club.id}
-                    className="border-b border-line last:border-b-0 hover:bg-surface/70"
-                  >
-                    <td className="px-4 py-3 text-[14px] font-medium text-ink">
-                      {club.name}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {displayValue(club.contactName)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {displayValue(club.contactEmail)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {displayValue(club.contactPhone)}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-ink">{club.teamCount}</td>
-                    <td className="px-4 py-3 text-[14px] text-ink">
-                      {club.applicationCount}
-                    </td>
-                    <td className="px-4 py-3 text-[14px] text-muted">
-                      {formatDateDe(club.createdAt.slice(0, 10))}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ClubRecordStatusBadge status={club.status} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/admin/vereine/${club.id}`}
-                        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
-                      >
-                        Ansehen
-                      </Link>
-                    </td>
+          <div className={adminTableShellClass}>
+            <div className={adminTableHeaderBarClass}>
+              <p>Vereine</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-[13px]">
+                <thead className="border-b border-line bg-white text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                  <tr>
+                    {[
+                      "Verein",
+                      "Ansprechpartner",
+                      "E-Mail",
+                      "Telefon",
+                      "Teams",
+                      "Bewerbungen",
+                      "Registriert",
+                      "Status",
+                      "Aktionen",
+                    ].map((heading) => (
+                      <th key={heading} className="px-3.5 py-2.5">
+                        {heading}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {visible.map((club) => (
+                    <tr key={club.id} className={adminTableRowHoverClass}>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] font-medium text-ink">
+                        <span className="block truncate">{club.name}</span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(club.contactName)}
+                        </span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(club.contactEmail)}
+                        </span>
+                      </td>
+                      <td className="min-w-0 px-3.5 py-2.5 text-[14px] text-muted">
+                        <span className="block truncate">
+                          {displayValue(club.contactPhone)}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-ink">
+                        {club.teamCount}
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-ink">
+                        {club.applicationCount}
+                      </td>
+                      <td className="whitespace-nowrap px-3.5 py-2.5 text-[14px] text-muted">
+                        {formatDateDe(club.createdAt.slice(0, 10))}
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <ClubRecordStatusBadge status={club.status} />
+                      </td>
+                      <td className="px-3.5 py-2.5">
+                        <Link
+                          href={`/admin/vereine/${club.id}`}
+                          className={adminCompactSecondaryButtonClass}
+                        >
+                          Ansehen
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

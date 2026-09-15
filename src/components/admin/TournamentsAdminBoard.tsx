@@ -46,7 +46,7 @@ export function TournamentsAdminBoard({ tournaments }: TournamentsAdminBoardProp
         </AdminNotice>
       )}
 
-      <div className="mt-8 grid gap-4">
+      <div className="mt-6 grid gap-2.5">
         {list.length === 0 ? (
           <AdminEmpty>Noch keine Turniere in der Datenbank.</AdminEmpty>
         ) : (
