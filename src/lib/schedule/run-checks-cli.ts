@@ -35,6 +35,7 @@ import { runRbacChecks } from "@/lib/rbac/rbac-checks";
 import { runRbacDomainRlsChecks } from "@/lib/rbac/rbac-domain-rls-checks";
 import { runRbacSecurityDefinerChecks } from "@/lib/rbac/rbac-security-definer-checks";
 import { runUserManagementChecks } from "@/lib/rbac/user-management-checks";
+import { runAvatarUploadChecks } from "@/lib/storage/avatar-upload-checks";
 import { runInvitationChecks } from "@/lib/rbac/invitation-checks";
 import { runInvitationAuthErrorChecks } from "@/lib/rbac/invitation-auth-errors-checks";
 import { runInvitationServiceGrantsChecks } from "@/lib/rbac/invitation-service-grants-checks";
@@ -105,6 +106,7 @@ try {
   const rbacDomainRlsChecks = runRbacDomainRlsChecks();
   const rbacSecurityDefinerChecks = runRbacSecurityDefinerChecks();
   const userManagementChecks = runUserManagementChecks();
+  const avatarUploadChecks = runAvatarUploadChecks();
   const invitationChecks = runInvitationChecks();
   const invitationAuthErrorChecks = runInvitationAuthErrorChecks();
   const invitationServiceGrantsChecks = runInvitationServiceGrantsChecks();
@@ -168,6 +170,7 @@ try {
   console.log(`rbac-domain-rls-checks: ${rbacDomainRlsChecks}`);
   console.log(`rbac-security-definer-checks: ${rbacSecurityDefinerChecks}`);
   console.log(`user-management-checks: ${userManagementChecks}`);
+  console.log(`avatar-upload-checks: ${avatarUploadChecks}`);
   console.log(`invitation-checks: ${invitationChecks}`);
   console.log(`invitation-auth-error-checks: ${invitationAuthErrorChecks}`);
   console.log(`invitation-service-grants-checks: ${invitationServiceGrantsChecks}`);

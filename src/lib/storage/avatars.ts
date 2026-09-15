@@ -6,7 +6,6 @@ import {
   formatSafeStorageError,
   isAllowedClubLogoMimeType,
   resolveClubLogoMimeType,
-  validateClubLogoFile,
 } from "@/lib/storage/club-logos";
 
 export const AVATARS_BUCKET = "avatars";
@@ -37,6 +36,11 @@ export function avatarObjectPathFromPublicUrl(avatarUrl: string) {
   return path || null;
 }
 
+/**
+ * Avatar size/MIME gate (1 MB; PNG/JPEG/WebP).
+ * Reads name/type via property access — never object-spread a File/Blob, because
+ * those getters are non-enumerable and would be dropped (false MIME rejections).
+ */
 export function validateAvatarFile(file: { name?: string; size: number; type?: string }): string | null {
   if (!file || file.size <= 0) {
     return "Bitte eine Bilddatei auswählen.";
@@ -50,7 +54,7 @@ export function validateAvatarFile(file: { name?: string; size: number; type?: s
     return "Erlaubt sind PNG, JPEG oder WebP.";
   }
 
-  return validateClubLogoFile({ ...file, size: Math.min(file.size, AVATAR_MAX_BYTES) });
+  return null;
 }
 
 export async function uploadAvatarFile(input: {
