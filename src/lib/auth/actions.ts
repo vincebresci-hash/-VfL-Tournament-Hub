@@ -252,3 +252,42 @@ export async function uploadAvatarAction(
   revalidatePath("/admin/profil");
   return { error: null, avatarUrl: publicUrl };
 }
+
+/** Clears the signed-in user's own avatar only (same auth boundary as uploadAvatarAction). */
+export async function removeAvatarAction(): Promise<{ error: string | null }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Bitte zuerst anmelden." };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ avatar_url: null, updated_at: new Date().toISOString() })
+    .eq("id", user.id);
+
+  if (updateError) {
+    return {
+      error: toUserFacingDbError("Profilbild konnte nicht entfernt werden.", updateError),
+    };
+  }
+
+  await deleteManagedAvatarIfOwned({
+    supabase,
+    avatarUrl: profile?.avatar_url,
+    userId: user.id,
+  });
+
+  revalidatePath("/verein/profil");
+  revalidatePath("/admin/profil");
+  return { error: null };
+}

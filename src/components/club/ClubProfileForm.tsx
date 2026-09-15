@@ -111,6 +111,7 @@ export function ClubProfileForm({ workspace }: ClubProfileFormProps) {
             currentUrl={avatarUrl}
             displayName={displayNameValue}
             onUploaded={(url) => setAvatarUrl(url)}
+            onRemoved={() => setAvatarUrl(null)}
           />
         </div>
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
