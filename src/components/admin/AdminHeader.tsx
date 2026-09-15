@@ -9,7 +9,7 @@ type AdminHeaderProps = {
 
 export function AdminHeader({ open, onToggle }: AdminHeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white px-4 lg:hidden">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white/95 px-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] backdrop-blur-sm lg:hidden">
       <p className="text-[12px] font-semibold tracking-[0.1em] text-ink uppercase">
         Admin
       </p>

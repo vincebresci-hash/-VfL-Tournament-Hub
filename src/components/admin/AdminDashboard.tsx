@@ -5,8 +5,11 @@ import {
   AdminEmpty,
   AdminNotice,
   AdminPageHeader,
+  adminCardShellClass,
+  adminCompactSecondaryButtonClass,
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
+  adminSectionTitleClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
@@ -217,9 +220,7 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
 
       {showApplications ? (
         <section className="mt-8">
-          <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-            Offene Aufgaben
-          </h2>
+          <h2 className={adminSectionTitleClass}>Offene Aufgaben</h2>
           <p className="mt-1 text-[14px] text-muted">
             Was jetzt Aufmerksamkeit braucht — basierend auf bestehenden Kennzahlen.
           </p>
@@ -228,14 +229,14 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
               <AdminEmpty>Aktuell keine offenen Bewerbungsaufgaben.</AdminEmpty>
             </div>
           ) : (
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
               {openTasks.map((task) => (
                 <article
                   key={task.key}
-                  className="flex flex-col border border-line border-l-4 border-l-brand-yellow bg-white p-5"
+                  className={`${adminCardShellClass} flex flex-col border-l-4 border-l-brand-yellow p-4 sm:p-5`}
                 >
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                    <p className="font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-lg">
                       {task.title}
                     </p>
                     <p className="font-display text-3xl font-bold tracking-wide text-navy">
@@ -254,7 +255,7 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
           {showNewApplications ? (
             <div className="mt-6">
               <div className="flex items-end justify-between gap-3">
-                <h3 className="font-display text-base font-bold tracking-wide text-ink uppercase">
+                <h3 className="font-display text-[13px] font-bold tracking-[0.04em] text-ink uppercase sm:text-[15px]">
                   Neueste Bewerbungen
                 </h3>
                 <Link href="/admin/bewerbungen" className={adminTextLinkClass}>
@@ -268,10 +269,10 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
                   latestApplications.map((application) => (
                     <article
                       key={application.id}
-                      className="flex flex-wrap items-center justify-between gap-3 border border-line bg-white px-4 py-3"
+                      className={`${adminCardShellClass} flex flex-wrap items-center justify-between gap-3 px-4 py-3`}
                     >
                       <div className="min-w-0">
-                        <p className="font-medium text-ink">{application.clubName}</p>
+                        <p className="truncate font-medium text-ink">{application.clubName}</p>
                         <p className="mt-0.5 text-[13px] text-muted">
                           {application.ageGroup}
                           {application.selfRatedStrength
@@ -279,11 +280,11 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
                             : ""}
                         </p>
                       </div>
-                      <div className="flex flex-wrap items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
                         <ApplicationStatusBadge status={application.status} />
                         <Link
                           href={`/admin/bewerbungen/${application.id}`}
-                          className={adminTextLinkClass}
+                          className={adminCompactSecondaryButtonClass}
                         >
                           Ansehen
                         </Link>
@@ -298,10 +299,8 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
       ) : null}
 
       {quickActions.length > 0 ? (
-        <section className="mt-10">
-          <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-            Schnellaktionen
-          </h2>
+        <section className={`mt-8 ${adminCardShellClass} p-4 sm:p-5`}>
+          <h2 className={adminSectionTitleClass}>Schnellaktionen</h2>
           <p className="mt-1 text-[14px] text-muted">Häufige nächste Schritte.</p>
           <div className="mt-4 flex flex-wrap gap-2">
             {quickActions.map((action) => (
@@ -318,12 +317,10 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
       ) : null}
 
       {showTournaments ? (
-        <section className="mt-10">
+        <section className="mt-8">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                Aktive Turniere
-              </h2>
+              <h2 className={adminSectionTitleClass}>Aktive Turniere</h2>
               <p className="mt-1 text-[14px] text-muted">
                 Relevante Turniere mit Status und Kapazität.
               </p>
@@ -332,18 +329,18 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
               Alle Turniere →
             </Link>
           </div>
-          <div className="mt-4 grid gap-3">
+          <div className="mt-4 grid gap-2.5">
             {tournaments.length === 0 ? (
               <AdminEmpty>Keine aktuellen Turniere in der Datenbank.</AdminEmpty>
             ) : (
               tournaments.map((tournament) => (
                 <article
                   key={tournament.id}
-                  className="flex flex-col gap-4 border border-line bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+                  className={`${adminCardShellClass} flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start gap-2 sm:items-center sm:gap-3">
-                      <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                      <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-lg">
                         {tournament.name}
                       </p>
                       <StatusBadge status={tournament.status} />
@@ -392,30 +389,44 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
       ) : null}
 
       {showStats && ready ? (
-        <section className="mt-10">
-          <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-            Statistik
-          </h2>
+        <section className="mt-8">
+          <h2 className={adminSectionTitleClass}>Statistik</h2>
           <p className="mt-1 text-[13px] text-muted">Kennzahlen im Überblick.</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
             {showApplications ? (
               <>
-                <AdminStatCard value={stats.newApplications} label="Neue Bewerbungen" compact />
-                <AdminStatCard value={stats.confirmedTeams} label="Bestätigte Teilnehmer" compact />
-                <AdminStatCard value={stats.waitlistCount} label="Wartelistenplätze" compact />
-                <AdminStatCard value={stats.underReview} label="In Prüfung" compact />
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.newApplications} label="Neue Bewerbungen" compact />
+                </div>
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.confirmedTeams} label="Bestätigte Teilnehmer" compact />
+                </div>
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.waitlistCount} label="Wartelistenplätze" compact />
+                </div>
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.underReview} label="In Prüfung" compact />
+                </div>
               </>
             ) : null}
             {showTournaments ? (
               <>
-                <AdminStatCard value={stats.activeTournaments} label="Aktive Turniere" compact />
-                <AdminStatCard value={stats.availableSlots} label="Freie Turnierplätze" compact />
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.activeTournaments} label="Aktive Turniere" compact />
+                </div>
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.availableSlots} label="Freie Turnierplätze" compact />
+                </div>
               </>
             ) : null}
             {isSuperAdmin ? (
               <>
-                <AdminStatCard value={stats.registeredClubs} label="Registrierte Vereine" compact />
-                <AdminStatCard value={stats.registeredTeams} label="Registrierte Teams" compact />
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.registeredClubs} label="Registrierte Vereine" compact />
+                </div>
+                <div className={`${adminCardShellClass} overflow-hidden [&>article]:border-0`}>
+                  <AdminStatCard value={stats.registeredTeams} label="Registrierte Teams" compact />
+                </div>
               </>
             ) : null}
           </div>
@@ -423,10 +434,8 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
       ) : null}
 
       {visibleLinks.length > 0 ? (
-        <section className="mt-10">
-          <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-            Weitere Bereiche
-          </h2>
+        <section className="mt-8">
+          <h2 className={adminSectionTitleClass}>Weitere Bereiche</h2>
           <p className="mt-1 text-[13px] text-muted">
             Schnelleinstiege — ergänzend zu Sidebar und Schnellaktionen.
           </p>
@@ -435,7 +444,7 @@ export function AdminDashboard({ data, permissions, isSuperAdmin }: AdminDashboa
               <Link
                 key={link.href}
                 href={link.href}
-                className="border border-line bg-white px-4 py-3 transition-colors hover:border-navy/20"
+                className={`${adminCardShellClass} px-4 py-3.5 transition-colors hover:border-navy/20`}
               >
                 <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
                   {link.label}

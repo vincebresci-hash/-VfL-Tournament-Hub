@@ -8,6 +8,14 @@ import {
   AdminCard,
   AdminInfo,
   AdminNotice,
+  adminCardShellClass,
+  adminDestructiveButtonClass,
+  adminIdentityHeroClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSectionTitleClass,
+  adminStatusBadgeClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
 import { AdminUserPermissionsCard } from "@/components/admin/AdminUsersBoard";
@@ -140,7 +148,55 @@ export function AdminUserDetail({
   }
 
   return (
-    <div className="mt-8 grid gap-6">
+    <div className="mt-5 grid gap-4">
+      <div className={adminIdentityHeroClass}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-line bg-surface">
+            {user.avatarUrl ? (
+              <Image
+                src={user.avatarUrl}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="64px"
+                unoptimized
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-muted">
+                {displayNameValue.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
+              {displayNameValue}
+            </h1>
+            <p className="mt-1 truncate text-[15px] text-muted">{user.email}</p>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className={`${adminStatusBadgeClass} bg-navy text-white`}>
+                {userRoleLabel[user.profileRole]}
+              </span>
+              <span
+                className={`${adminStatusBadgeClass} ${
+                  user.accountStatus === "active"
+                    ? "bg-[#e8f5ee] text-[#1f6b3f]"
+                    : user.accountStatus === "inactive"
+                      ? "bg-[#f2e8e8] text-[#8a3b3b]"
+                      : "bg-surface text-ink"
+                }`}
+              >
+                {accountStatusLabel(user.accountStatus)}
+              </span>
+              {user.clubName ? (
+                <span className={`${adminStatusBadgeClass} bg-surface text-ink`}>
+                  {user.clubName}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {error ? (
         <AdminNotice>
           <span className="text-[#9a2b2b]">{error}</span>
@@ -192,41 +248,23 @@ export function AdminUserDetail({
       ) : null}
 
       <AdminCard title="Profil">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <div className="relative h-20 w-20 overflow-hidden border border-line bg-background">
-            {user.avatarUrl ? (
-              <Image
-                src={user.avatarUrl}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="80px"
-                unoptimized
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-muted">
-                {displayNameValue.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-          </div>
-          <dl className="grid flex-1 gap-4 sm:grid-cols-2">
-            <AdminInfo label="E-Mail" value={user.email} />
-            <AdminInfo label="Profilrolle" value={userRoleLabel[user.profileRole]} />
-            <AdminInfo label="Verein" value={displayValue(user.clubName)} />
-            <AdminInfo label="Status" value={accountStatusLabel(user.accountStatus)} />
-            <AdminInfo
-              label="Account seit"
-              value={formatDateDe(user.createdAt.slice(0, 10))}
-            />
-            <AdminInfo label="Telefon" value={displayValue(user.phone)} />
-            <AdminInfo label="Funktion" value={displayValue(user.jobTitle)} />
-          </dl>
-        </div>
+        <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <AdminInfo label="E-Mail" value={user.email} />
+          <AdminInfo label="Profilrolle" value={userRoleLabel[user.profileRole]} />
+          <AdminInfo label="Verein" value={displayValue(user.clubName)} />
+          <AdminInfo label="Status" value={accountStatusLabel(user.accountStatus)} />
+          <AdminInfo
+            label="Account seit"
+            value={formatDateDe(user.createdAt.slice(0, 10))}
+          />
+          <AdminInfo label="Telefon" value={displayValue(user.phone)} />
+          <AdminInfo label="Funktion" value={displayValue(user.jobTitle)} />
+        </dl>
       </AdminCard>
 
       {canManageUsers ? (
         <form
-          className="border border-line bg-white p-5 sm:p-6"
+          className={`${adminCardShellClass} p-4 sm:p-5`}
           onSubmit={(event) => {
             event.preventDefault();
             void runAction(
@@ -243,10 +281,8 @@ export function AdminUserDetail({
             );
           }}
         >
-          <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-            Profil bearbeiten
-          </h2>
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <h2 className={adminSectionTitleClass}>Profil bearbeiten</h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Field id="user-first-name" label="Vorname">
               <TextInput
                 id="user-first-name"
@@ -286,7 +322,7 @@ export function AdminUserDetail({
           <button
             type="submit"
             disabled={saving}
-            className="mt-6 inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-70"
+            className={`mt-5 ${adminPrimaryButtonClass}`}
           >
             {saving ? "Wird gespeichert…" : "Profil speichern"}
           </button>
@@ -301,7 +337,7 @@ export function AdminUserDetail({
                 id="user-club"
                 value={clubId}
                 onChange={(event) => setClubId(event.target.value)}
-                className="h-11 w-full border border-line bg-white px-3 text-[14px] text-ink"
+                className="h-10 w-full rounded-lg border border-line bg-white px-3 text-[14px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
               >
                 <option value="">Kein Verein</option>
                 {clubs.map((club) => (
@@ -324,7 +360,7 @@ export function AdminUserDetail({
                   "Vereinszuordnung gespeichert.",
                 )
               }
-              className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase"
+              className={adminSecondaryButtonClass}
             >
               Speichern
             </button>
@@ -344,7 +380,7 @@ export function AdminUserDetail({
             {user.roles.map((role) => (
               <li
                 key={`${role.key}-${role.clubId ?? "platform"}`}
-                className="flex items-start justify-between gap-3 border border-line px-3 py-3"
+                className={`${adminMobileCardClass} flex items-start justify-between gap-3`}
               >
                 <span>
                   <span className="block text-[14px] font-medium text-ink">
@@ -370,7 +406,7 @@ export function AdminUserDetail({
                         "Rolle entfernt.",
                       )
                     }
-                    className="shrink-0 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
+                    className="shrink-0 text-[11px] font-semibold tracking-[0.06em] text-[#9a2b2b] uppercase"
                   >
                     Entfernen
                   </button>
@@ -389,7 +425,7 @@ export function AdminUserDetail({
                 id="assign-role"
                 value={selectedRole}
                 onChange={(event) => setSelectedRole(event.target.value as RbacRoleKey | "")}
-                className="h-11 w-full border border-line bg-white px-3 text-[14px] text-ink"
+                className="h-10 w-full rounded-lg border border-line bg-white px-3 text-[14px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
               >
                 <option value="">Rolle wählen…</option>
                 {assignableRoles.map((role) => (
@@ -416,7 +452,7 @@ export function AdminUserDetail({
                   "Rolle zugewiesen.",
                 )
               }
-              className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase"
+              className={adminSecondaryButtonClass}
             >
               Zuweisen
             </button>
@@ -434,7 +470,7 @@ export function AdminUserDetail({
             {user.teamAssignments.map((assignment) => (
               <li
                 key={assignment.teamId}
-                className="flex items-center justify-between border border-line px-3 py-2"
+                className={`${adminMobileCardClass} flex items-center justify-between`}
               >
                 <span className="text-[14px] text-ink">
                   {assignment.teamName}
@@ -455,7 +491,7 @@ export function AdminUserDetail({
                         "Team entfernt.",
                       )
                     }
-                    className="text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
+                    className="text-[11px] font-semibold tracking-[0.06em] text-[#9a2b2b] uppercase"
                   >
                     Entfernen
                   </button>
@@ -471,7 +507,7 @@ export function AdminUserDetail({
                 id="assign-team"
                 value={selectedTeamId}
                 onChange={(event) => setSelectedTeamId(event.target.value)}
-                className="h-11 w-full border border-line bg-white px-3 text-[14px] text-ink"
+                className="h-10 w-full rounded-lg border border-line bg-white px-3 text-[14px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
               >
                 <option value="">Team wählen…</option>
                 {assignableTeams.map((team) => (
@@ -495,7 +531,7 @@ export function AdminUserDetail({
                   "Team zugewiesen.",
                 )
               }
-              className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase"
+              className={adminSecondaryButtonClass}
             >
               Team zuweisen
             </button>
@@ -514,7 +550,7 @@ export function AdminUserDetail({
                 user.isActive ? "Benutzer deaktiviert." : "Benutzer aktiviert.",
               )
             }
-            className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:bg-background disabled:opacity-70"
+            className={adminSecondaryButtonClass}
           >
             {user.isActive ? "Benutzer deaktivieren" : "Benutzer aktivieren"}
           </button>
@@ -531,7 +567,7 @@ export function AdminUserDetail({
             type="button"
             disabled={saving}
             onClick={() => setDeleteStep("warning")}
-            className="inline-flex h-11 items-center border border-[#d8b4b4] px-4 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:bg-[#fff5f5] disabled:opacity-70"
+            className={adminDestructiveButtonClass}
           >
             Benutzer löschen
           </button>
@@ -571,7 +607,7 @@ export function AdminUserDetail({
         <AdminCard title="Audit-Protokoll">
           <ul className="space-y-2">
             {auditEntries.map((entry) => (
-              <li key={entry.id} className="border border-line px-3 py-2 text-[13px] text-ink">
+              <li key={entry.id} className={`${adminMobileCardClass} text-[13px] text-ink`}>
                 <span className="font-medium">{entry.action}</span>
                 <span className="text-muted">
                   {" "}

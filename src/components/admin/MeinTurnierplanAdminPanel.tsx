@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import {
   acceptedTeamsFromApplications,
   MeinTurnierplanAdminTools,
@@ -89,14 +95,14 @@ export function MeinTurnierplanAdminPanel({
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy"
+            className={adminPrimaryButtonClass}
           >
             Öffnen
           </a>
         ) : null}
         <Link
           href={`/admin/turniere/${tournament.id}/bearbeiten`}
-          className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+          className={adminSecondaryButtonClass}
         >
           Bearbeiten
         </Link>

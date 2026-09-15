@@ -2,14 +2,26 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { PaymentStatusPanel } from "@/components/admin/PaymentStatusPanel";
 import { TeamDirectorySavePanel } from "@/components/admin/TeamDirectorySavePanel";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { InternalRating } from "@/components/admin/InternalRating";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
-import { AdminNotice, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  AdminNotice,
+  adminCardShellClass,
+  adminDestructiveButtonClass,
+  adminIdentityHeroClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSectionTitleClass,
+  adminTextLinkClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import {
   getClubTypeLabel,
   getStatusDecisionCopy,
@@ -75,95 +87,121 @@ export function ApplicationDetail({
     <div className="mx-auto max-w-5xl">
       <Link
         href="/admin/bewerbungen"
-        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+        className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
       >
         ← Alle Bewerbungen
       </Link>
 
-      <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-            {application.clubName}
-          </h1>
-          <p className="mt-2 text-[15px] text-muted">{application.teamName}</p>
+      <div className={`mt-4 ${adminIdentityHeroClass}`}>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
+              {application.clubName}
+            </h1>
+            <p className="mt-1 truncate text-[15px] text-muted">
+              {application.teamName}
+            </p>
+            <p className="mt-2 text-[13px] text-muted">
+              {tournament.name} · {formatDateDe(tournament.date)}
+            </p>
+          </div>
+          <ApplicationStatusBadge status={application.applicationStatus} />
         </div>
-        <ApplicationStatusBadge status={application.applicationStatus} />
       </div>
 
       {notice ? <AdminNotice>{notice}</AdminNotice> : null}
       {statusError ? (
-        <p className="mt-6 border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p
+          className={`mt-5 ${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`}
+          role="alert"
+        >
           {statusError}
         </p>
       ) : null}
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <div className="grid gap-5">
-          <DetailCard title="Verein">
-            <Info label="Vereinsname" value={application.clubName} />
-            <Info label="Ort" value={application.clubCity} />
-            {application.website ? (
-              <Info label="Website" value={application.website} />
-            ) : null}
-            {application.clubType ? (
-              <Info
-                label="Vereinstyp"
-                value={getClubTypeLabel(application.clubType)}
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid gap-4">
+          <AdminCard title="Verein">
+            <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2">
+              <AdminInfo label="Vereinsname" value={application.clubName} />
+              <AdminInfo label="Ort" value={application.clubCity} />
+              {application.website ? (
+                <AdminInfo label="Website" value={application.website} />
+              ) : null}
+              {application.clubType ? (
+                <AdminInfo
+                  label="Vereinstyp"
+                  value={getClubTypeLabel(application.clubType)}
+                />
+              ) : null}
+            </dl>
+          </AdminCard>
+
+          <AdminCard title="Mannschaft">
+            <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2 lg:grid-cols-3">
+              <AdminInfo label="Mannschaftsname" value={application.teamName} />
+              <AdminInfo label="Altersklasse" value={application.ageGroup} />
+              <AdminInfo label="Jahrgang" value={String(application.birthYear)} />
+              <AdminInfo label="Liga" value={displayValue(application.league)} />
+              <AdminInfo
+                label="Staffel"
+                value={application.division ?? "Keine Angabe"}
               />
-            ) : null}
-          </DetailCard>
-
-          <DetailCard title="Mannschaft">
-            <Info label="Mannschaftsname" value={application.teamName} />
-            <Info label="Altersklasse" value={application.ageGroup} />
-            <Info label="Jahrgang" value={String(application.birthYear)} />
-            <Info label="Liga" value={displayValue(application.league)} />
-            <Info label="Staffel" value={application.division ?? "Keine Angabe"} />
-            <Info
-              label="Selbsteinschätzung Spielstärke"
-              value={`${application.selfRatedStrength}/5`}
-            />
-            <Info
-              label="Beschreibung"
-              value={application.teamDescription ?? "Keine Angabe"}
-            />
-          </DetailCard>
-
-          <DetailCard title="Ansprechpartner">
-            <Info label="Vorname" value={application.contactFirstName} />
-            <Info label="Nachname" value={application.contactLastName} />
-            <Info label="Funktion" value={application.contactRole} />
-            <Info label="E-Mail" value={application.contactEmail} />
-            <Info label="Telefon" value={displayValue(application.contactPhone)} />
-            {application.alternativePhone ? (
-              <Info
-                label="Alternative Telefonnummer"
-                value={application.alternativePhone}
+              <AdminInfo
+                label="Selbsteinschätzung Spielstärke"
+                value={`${application.selfRatedStrength}/5`}
               />
-            ) : null}
-          </DetailCard>
+              <AdminInfo
+                label="Beschreibung"
+                value={application.teamDescription ?? "Keine Angabe"}
+              />
+            </dl>
+          </AdminCard>
 
-          <DetailCard title="Turnier">
-            <Info label="Turniername" value={tournament.name} />
-            <Info label="Datum" value={formatDateDe(tournament.date)} />
-            <Info label="Ort" value={tournament.location} />
-            <Info label="Altersklasse" value={tournament.ageGroup} />
-          </DetailCard>
+          <AdminCard title="Ansprechpartner">
+            <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2">
+              <AdminInfo label="Vorname" value={application.contactFirstName} />
+              <AdminInfo label="Nachname" value={application.contactLastName} />
+              <AdminInfo label="Funktion" value={application.contactRole} />
+              <AdminInfo label="E-Mail" value={application.contactEmail} />
+              <AdminInfo
+                label="Telefon"
+                value={displayValue(application.contactPhone)}
+              />
+              {application.alternativePhone ? (
+                <AdminInfo
+                  label="Alternative Telefonnummer"
+                  value={application.alternativePhone}
+                />
+              ) : null}
+            </dl>
+          </AdminCard>
 
-          <DetailCard title="Hinweise">
-            <Info
-              label="Bemerkungen"
-              value={application.notes ?? "Keine Angabe"}
-            />
-            <Info
-              label="Begleitpersonen"
-              value={
-                application.staffCount === null
-                  ? "Keine Angabe"
-                  : String(application.staffCount)
-              }
-            />
-          </DetailCard>
+          <AdminCard title="Turnier">
+            <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2">
+              <AdminInfo label="Turniername" value={tournament.name} />
+              <AdminInfo label="Datum" value={formatDateDe(tournament.date)} />
+              <AdminInfo label="Ort" value={tournament.location} />
+              <AdminInfo label="Altersklasse" value={tournament.ageGroup} />
+            </dl>
+          </AdminCard>
+
+          <AdminCard title="Hinweise">
+            <dl className="grid gap-x-5 gap-y-3.5 sm:grid-cols-2">
+              <AdminInfo
+                label="Bemerkungen"
+                value={application.notes ?? "Keine Angabe"}
+              />
+              <AdminInfo
+                label="Begleitpersonen"
+                value={
+                  application.staffCount === null
+                    ? "Keine Angabe"
+                    : String(application.staffCount)
+                }
+              />
+            </dl>
+          </AdminCard>
 
           <PaymentStatusPanel
             applicationId={application.id}
@@ -197,13 +235,11 @@ export function ApplicationDetail({
           />
         </div>
 
-        <aside className="grid gap-5 lg:sticky lg:top-8 lg:self-start">
-          <section className="border border-line bg-white p-5">
-            <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-              Entscheidung
-            </h2>
+        <aside className="grid gap-4 lg:sticky lg:top-8 lg:self-start">
+          <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+            <h2 className={adminSectionTitleClass}>Entscheidung</h2>
             {summary.isFull ? (
-              <p className="mt-3 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+              <p className="mt-3 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
                 Turnier ausgebucht
               </p>
             ) : null}
@@ -220,8 +256,8 @@ export function ApplicationDetail({
                     onClick={() => setPendingStatus(decision.status)}
                     className={
                       decision.status === "accepted"
-                        ? "inline-flex h-10 items-center justify-center bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60"
-                        : "inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                        ? adminPrimaryButtonClass
+                        : adminSecondaryButtonClass
                     }
                   >
                     {decision.label}
@@ -231,16 +267,14 @@ export function ApplicationDetail({
             </div>
           </section>
 
-          <section className="border border-line bg-white p-5">
-            <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-              Verwaltung
-            </h2>
+          <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+            <h2 className={adminSectionTitleClass}>Verwaltung</h2>
             <p className="mt-3 text-[13px] leading-5 text-muted">
               Archivieren blendet die Bewerbung nur in der Admin-Liste aus. Status,
               Turnierteilnahme und Kapazität bleiben unverändert.
             </p>
             {application.archivedAt ? (
-              <p className="mt-3 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+              <p className="mt-3 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
                 Archiviert
               </p>
             ) : null}
@@ -250,7 +284,7 @@ export function ApplicationDetail({
                   type="button"
                   disabled={saving}
                   onClick={() => setConfirmAction("restore")}
-                  className="inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                  className={adminSecondaryButtonClass}
                 >
                   Wiederherstellen
                 </button>
@@ -259,7 +293,7 @@ export function ApplicationDetail({
                   type="button"
                   disabled={saving}
                   onClick={() => setConfirmAction("archive")}
-                  className="inline-flex h-10 items-center justify-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                  className={adminSecondaryButtonClass}
                 >
                   Archivieren
                 </button>
@@ -268,33 +302,37 @@ export function ApplicationDetail({
                 type="button"
                 disabled={saving}
                 onClick={() => setConfirmAction("delete")}
-                className="inline-flex h-10 items-center justify-center border border-[#c45c5c]/40 px-3 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:border-[#9a2b2b]/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
+                className={adminDestructiveButtonClass}
               >
                 Bewerbung löschen
               </button>
             </div>
           </section>
 
-          <section className="border border-line bg-white p-5">
-            <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-              Turnierfeld
-            </h2>
-            <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
-              <Info label="Max Teams" value={String(tournament.maxTeams)} />
-              <Info label="Bestätigt" value={String(summary.confirmedTeams)} />
-              <Info label="Freie Plätze" value={String(summary.availableSlots)} />
-              <Info
+          <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+            <h2 className={adminSectionTitleClass}>Turnierfeld</h2>
+            <dl className="mt-4 grid grid-cols-2 gap-3">
+              <AdminInfo label="Max Teams" value={String(tournament.maxTeams)} />
+              <AdminInfo label="Bestätigt" value={String(summary.confirmedTeams)} />
+              <AdminInfo
+                label="Freie Plätze"
+                value={String(summary.availableSlots)}
+              />
+              <AdminInfo
                 label="Offene Bewerbungen"
                 value={String(summary.openApplications)}
               />
-              <Info label="Warteliste" value={String(summary.waitlistCount)} />
+              <AdminInfo label="Warteliste" value={String(summary.waitlistCount)} />
             </dl>
             <p className="mt-5 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
               Kategorie bestätigt
             </p>
             <div className="mt-3 grid grid-cols-4 gap-2 text-center">
               {(["S", "A", "B", "C"] as const).map((category) => (
-                <div key={category} className="bg-surface px-2 py-2">
+                <div
+                  key={category}
+                  className="rounded-lg bg-surface px-2 py-2"
+                >
                   <p className="text-[11px] font-semibold text-muted">{category}</p>
                   <p className="mt-1 font-display text-lg font-bold text-ink">
                     {summary.composition[category]}
@@ -427,34 +465,6 @@ export function ApplicationDetail({
           </p>
         ) : null}
       </ConfirmModal>
-    </div>
-  );
-}
-
-function DetailCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="border border-line bg-white p-5 sm:p-6">
-      <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-        {title}
-      </h2>
-      <dl className="mt-4 grid gap-4 sm:grid-cols-2">{children}</dl>
-    </section>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
-        {label}
-      </dt>
-      <dd className="mt-1 text-[14px] leading-6 text-ink">{value}</dd>
     </div>
   );
 }

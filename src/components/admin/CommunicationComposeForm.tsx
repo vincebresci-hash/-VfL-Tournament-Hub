@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
-import { AdminCard } from "@/components/admin/AdminPanel";
+import { AdminCard, adminMobileCardClass, adminPrimaryButtonClass, adminTextLinkClass } from "@/components/admin/AdminPanel";
 import { CommunicationRecipientPicker } from "@/components/admin/CommunicationRecipientPicker";
 import { CommunicationTeamDirectoryRecipientPicker } from "@/components/admin/CommunicationTeamDirectoryRecipientPicker";
 import { CommunicationRecipientPreview } from "@/components/admin/CommunicationRecipientPreview";
@@ -380,7 +380,7 @@ export function CommunicationComposeForm({
               {(["tournament-applications", "team-directory"] as const).map((source) => (
                 <label
                   key={source}
-                  className="inline-flex items-center gap-2 border border-line bg-white px-4 py-3 text-[14px] text-ink"
+                  className={`inline-flex items-center gap-2 ${adminMobileCardClass} py-2.5 text-[14px] text-ink`}
                 >
                   <input
                     type="radio"
@@ -518,13 +518,13 @@ export function CommunicationComposeForm({
         <button
           type="submit"
           disabled={!canSend || submitting || previewRecipients.length === 0}
-          className="inline-flex h-11 items-center justify-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-70"
+          className={adminPrimaryButtonClass}
         >
           {submitting ? "Wird gesendet…" : "Jetzt senden"}
         </button>
         <Link
           href="/admin/kommunikation"
-          className="text-[14px] font-semibold text-ink underline decoration-brand-yellow underline-offset-2"
+          className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
         >
           Abbrechen
         </Link>

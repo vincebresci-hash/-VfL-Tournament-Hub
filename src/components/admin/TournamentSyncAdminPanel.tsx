@@ -3,7 +3,17 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AdminCard, AdminInfo, displayValue } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  adminCardShellClass,
+  adminFilterControlClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+  adminSecondaryButtonClass,
+  adminSectionTitleClass,
+  displayValue,
+} from "@/components/admin/AdminPanel";
 import {
   checkMeinTurnierplanConnectionAction,
 } from "@/lib/db/mein-turnierplan-actions";
@@ -211,25 +221,25 @@ export function TournamentSyncAdminPanel({
       <div className="mt-5 flex flex-wrap gap-3">
         <Link
           href={`/admin/turniere/${tournament.id}/gruppen`}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+          className={adminSecondaryButtonClass}
         >
           Manuell: Gruppen
         </Link>
         <Link
           href={`/admin/turniere/${tournament.id}/spielplan`}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+          className={adminSecondaryButtonClass}
         >
           Manuell: Spielplan
         </Link>
         <Link
           href={`/admin/turniere/${tournament.id}/ergebnisse`}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+          className={adminSecondaryButtonClass}
         >
           Manuell: Ergebnisse
         </Link>
         <Link
           href={`/admin/turniere/${tournament.id}/ko-runde`}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
+          className={adminSecondaryButtonClass}
         >
           Manuell: KO
         </Link>
@@ -240,7 +250,7 @@ export function TournamentSyncAdminPanel({
           type="button"
           disabled={checking}
           onClick={handleCheckConnection}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:opacity-50"
+          className={adminSecondaryButtonClass}
         >
           {checking ? "Prüfe…" : "Verbindung prüfen"}
         </button>
@@ -248,7 +258,7 @@ export function TournamentSyncAdminPanel({
           type="button"
           disabled={loadingPreview}
           onClick={handleLoadPreview}
-          className="inline-flex h-11 items-center border border-line bg-white px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20 disabled:opacity-50"
+          className={adminSecondaryButtonClass}
         >
           {loadingPreview ? "Lade…" : "Vorschau laden"}
         </button>
@@ -256,14 +266,14 @@ export function TournamentSyncAdminPanel({
           type="button"
           disabled={loadingPreview}
           onClick={handleLoadPreview}
-          className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+          className={adminPrimaryButtonClass}
         >
           Jetzt synchronisieren
         </button>
       </div>
 
       {detectedExternalTeamCount > 0 ? (
-        <div className="mt-5 border border-line bg-white px-4 py-4">
+        <div className={`mt-5 ${adminCardShellClass} px-4 py-4`}>
           <p className="text-[14px] text-ink">
             {detectedExternalTeamCount} Teams erkannt · {detectedExternalTeamCount} noch nicht
             als Teilnehmer bestätigt
@@ -284,17 +294,15 @@ export function TournamentSyncAdminPanel({
               setNotice(result.notice);
               router.refresh();
             }}
-            className="mt-3 inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+            className={`mt-3 ${adminPrimaryButtonClass}`}
           >
             Alle als Teilnehmer bestätigen
           </button>
         </div>
       ) : null}
 
-      <div className="mt-5 border border-dashed border-line bg-white px-4 py-3">
-        <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-          PDF importieren
-        </p>
+      <div className={`mt-5 ${adminCardShellClass} border-dashed px-4 py-3`}>
+        <p className={adminSectionTitleClass}>PDF importieren</p>
         <p className="mt-2 text-[13px] leading-6 text-muted">
           Als separate Importfunktion vorbereitet (Upload → Extraktion → Vorschau → Mapping →
           Bestätigung). Noch nicht aktiv – wird nicht mit MeinTurnierplan-Sync vermischt.
@@ -302,26 +310,26 @@ export function TournamentSyncAdminPanel({
         <button
           type="button"
           disabled
-          className="mt-3 inline-flex h-10 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase opacity-60"
+          className={`mt-3 ${adminSecondaryButtonClass}`}
         >
           PDF importieren
         </button>
       </div>
 
       {error ? (
-        <p className="mt-5 border border-red-200 bg-red-50 px-4 py-3 text-[14px] text-red-900">
+        <p
+          className={`mt-5 ${adminCardShellClass} border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[14px] text-[#9a2b2b]`}
+        >
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="mt-5 border border-line bg-white px-4 py-3 text-[14px] text-ink">{notice}</p>
+        <p className={`mt-5 ${adminCardShellClass} px-4 py-3 text-[14px] text-ink`}>{notice}</p>
       ) : null}
 
       {preview ? (
-        <section className="mt-6 border border-line bg-white p-5">
-          <h3 className="font-display text-base font-bold tracking-wide text-ink uppercase">
-            Synchronisations-Vorschau
-          </h3>
+        <section className={`mt-6 ${adminCardShellClass} p-4 sm:p-5`}>
+          <h3 className={adminSectionTitleClass}>Synchronisations-Vorschau</h3>
           <p className="mt-2 text-[14px] text-ink">
             {preview.tournamentName ?? "MeinTurnierplan"} · Quelle {preview.queryId}
           </p>
@@ -393,7 +401,7 @@ export function TournamentSyncAdminPanel({
             {mappings.map((mapping) => (
               <div
                 key={mapping.externalId}
-                className="grid gap-2 border border-line p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center"
+                className={`grid gap-2 ${adminMobileCardClass} sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center`}
               >
                 <div>
                   <p className="text-[14px] text-ink">{mapping.externalName}</p>
@@ -406,7 +414,7 @@ export function TournamentSyncAdminPanel({
                   onChange={(event) =>
                     updateMapping(mapping.externalId, event.target.value || null)
                   }
-                  className="h-10 w-full border border-line bg-white px-3 text-[14px] text-ink"
+                  className={adminFilterControlClass}
                 >
                   <option value="">Als externes Turnierteam führen</option>
                   {acceptedTeams.map((team) => (
@@ -424,7 +432,7 @@ export function TournamentSyncAdminPanel({
               type="button"
               disabled={syncing}
               onClick={handleConfirmSync}
-              className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+              className={adminPrimaryButtonClass}
             >
               {syncing ? "Synchronisiere…" : "Synchronisation bestätigen"}
             </button>
@@ -432,7 +440,7 @@ export function TournamentSyncAdminPanel({
               type="button"
               disabled={syncing}
               onClick={() => setPreview(null)}
-              className="inline-flex h-11 items-center border border-line px-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+              className={adminSecondaryButtonClass}
             >
               Abbrechen
             </button>

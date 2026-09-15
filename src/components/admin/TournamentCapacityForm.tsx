@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, TextInput } from "@/components/apply/FormControls";
+import { adminPrimaryButtonClass } from "@/components/admin/AdminPanel";
 import { updateTournamentMaxTeamsAction } from "@/lib/db/admin-actions";
 
 type TournamentCapacityFormProps = {
@@ -52,7 +53,7 @@ export function TournamentCapacityForm({
       <button
         type="submit"
         disabled={submitting}
-        className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60"
+        className={adminPrimaryButtonClass}
       >
         {submitting ? "Speichern…" : "Speichern"}
       </button>

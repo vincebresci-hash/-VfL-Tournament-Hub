@@ -6,9 +6,10 @@ import { useState } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import {
   AdminEmpty,
+  adminCardShellClass,
   adminDestructiveButtonClass,
+  adminSecondaryButtonClass,
   adminStatusBadgeClass,
-  adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { emailTemplateTypeLabel } from "@/lib/admin";
 import { deleteEmailTemplateAction } from "@/lib/db/admin-actions";
@@ -41,7 +42,7 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
 
   return (
     <div>
-      <p className="mb-6 max-w-2xl text-[14px] leading-6 text-muted">
+      <p className="mb-5 max-w-2xl text-[14px] leading-6 text-muted">
         Status-Mails nutzen die aktiven Vorlagen. Inaktive Vorlagen werden nicht
         versendet, der Status wird trotzdem gespeichert.
       </p>
@@ -55,17 +56,17 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
       {templates.length === 0 ? (
         <AdminEmpty>Noch keine E-Mail-Vorlagen vorhanden.</AdminEmpty>
       ) : (
-        <div className="grid gap-3">
+        <div className="grid gap-2.5">
           {templates.map((template) => (
             <article
               key={template.id}
-              className="border border-line bg-white p-5 sm:flex sm:items-start sm:justify-between sm:gap-4"
+              className={`${adminCardShellClass} p-4 sm:flex sm:items-start sm:justify-between sm:gap-4 sm:p-5`}
             >
-              <div>
-                <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+              <div className="min-w-0">
+                <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-lg">
                   {template.name}
                 </p>
-                <p className="mt-1 text-[13px] text-muted">
+                <p className="mt-0.5 truncate text-[13px] text-muted">
                   {emailTemplateTypeLabel[template.type]} · {template.subject}
                 </p>
                 <p
@@ -78,8 +79,11 @@ export function EmailTemplatesBoard({ templates }: EmailTemplatesBoardProps) {
                   {template.active ? "Aktiv" : "Inaktiv"}
                 </p>
               </div>
-              <div className="mt-4 flex flex-wrap gap-3 sm:mt-0">
-                <Link href={`/admin/emails/${template.id}`} className={adminTextLinkClass}>
+              <div className="mt-4 flex flex-wrap gap-2 sm:mt-0">
+                <Link
+                  href={`/admin/emails/${template.id}`}
+                  className={adminSecondaryButtonClass}
+                >
                   Bearbeiten
                 </Link>
                 <button

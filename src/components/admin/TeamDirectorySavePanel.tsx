@@ -3,6 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import {
+  adminCardShellClass,
+  adminPrimaryButtonClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { TeamDirectoryForm } from "@/components/admin/TeamDirectoryForm";
 import { getTeamDirectorySavePreviewAction } from "@/lib/team-directory/actions";
 import type { TeamDirectoryDuplicateMatch } from "@/types/team-directory";
@@ -51,12 +56,10 @@ export function TeamDirectorySavePanel({
   }
 
   return (
-    <section className="border border-line bg-white p-5">
+    <section className={`${adminCardShellClass} p-4 sm:p-5`}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-            Team-Datenbank
-          </h2>
+          <h2 className={adminSectionTitleClass}>Team-Datenbank</h2>
           <p className="mt-2 text-[14px] text-muted">
             Team bewusst als Archiv-/CRM-Datensatz speichern. Die Bewerbung bleibt
             unverändert.
@@ -66,7 +69,7 @@ export function TeamDirectorySavePanel({
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className="bg-brand-yellow px-4 py-2 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+            className={adminPrimaryButtonClass}
           >
             In Team-Datenbank übernehmen
           </button>
@@ -82,7 +85,9 @@ export function TeamDirectorySavePanel({
             </p>
           ) : null}
           {duplicates.length > 0 && !loading ? (
-            <div className="mb-4 border border-line bg-surface px-4 py-3 text-[13px] text-muted">
+            <div
+              className={`mb-4 ${adminCardShellClass} bg-surface/70 px-4 py-3 text-[13px] text-muted`}
+            >
               Mögliche vorhandene Einträge:{" "}
               {duplicates.map((duplicate) => (
                 <Link

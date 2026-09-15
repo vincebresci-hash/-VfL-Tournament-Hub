@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { TextAreaInput } from "@/components/apply/FormControls";
+import {
+  adminCardShellClass,
+  adminFilterControlClass,
+  adminPrimaryButtonClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { updateApplicationPaymentAction } from "@/lib/payments/actions";
 import {
   formatCurrencyEur,
@@ -42,10 +48,8 @@ export function PaymentStatusPanel({
 
   if (!canManage) {
     return (
-      <section className="border border-line bg-white p-5">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-          Zahlungsstatus
-        </h2>
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>Zahlungsstatus</h2>
         <p className="mt-3 text-[14px] text-muted">
           Status: {paymentStatusAdminOptions.find((o) => o.value === payment.paymentStatus)?.label}
         </p>
@@ -91,20 +95,18 @@ export function PaymentStatusPanel({
   }
 
   return (
-    <section className="border border-line bg-white p-5">
-      <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-        Zahlungsstatus
-      </h2>
+    <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+      <h2 className={adminSectionTitleClass}>Zahlungsstatus</h2>
       <p className="mt-2 text-[12px] leading-5 text-muted">
         Die Teilnahme bleibt angenommen. Der Zahlungsstatus beeinflusst weder
         Kapazität noch Warteliste.
       </p>
 
-      <form onSubmit={handleSubmit} className="mt-5 grid gap-4">
+      <form onSubmit={handleSubmit} className="mt-4 grid gap-4 sm:grid-cols-2">
         <div>
           <label
             htmlFor="payment-status"
-            className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase"
+            className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase"
           >
             Zahlungsstatus
           </label>
@@ -112,7 +114,7 @@ export function PaymentStatusPanel({
             id="payment-status"
             value={paymentStatus}
             onChange={(event) => setPaymentStatus(event.target.value as PaymentStatus)}
-            className="mt-2 h-11 w-full border border-line bg-white px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+            className={`mt-1.5 ${adminFilterControlClass}`}
           >
             {paymentStatusAdminOptions.map((option) => (
               <option key={option.value} value={option.value}>
@@ -125,7 +127,7 @@ export function PaymentStatusPanel({
         <div>
           <label
             htmlFor="participation-fee"
-            className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase"
+            className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase"
           >
             Startgebühr (EUR)
           </label>
@@ -135,7 +137,7 @@ export function PaymentStatusPanel({
             value={participationFeeInput}
             onChange={(event) => setParticipationFeeInput(event.target.value)}
             placeholder="z. B. 100,00"
-            className="mt-2 h-11 w-full border border-line bg-white px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+            className={`mt-1.5 ${adminFilterControlClass}`}
           />
           {payment.participationFee != null ? (
             <p className="mt-2 text-[12px] text-muted">
@@ -147,7 +149,7 @@ export function PaymentStatusPanel({
         <div>
           <label
             htmlFor="paid-at"
-            className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase"
+            className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase"
           >
             Bezahlt am
           </label>
@@ -156,18 +158,18 @@ export function PaymentStatusPanel({
             type="date"
             value={paidAtInput}
             onChange={(event) => setPaidAtInput(event.target.value)}
-            className="mt-2 h-11 w-full border border-line bg-white px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+            className={`mt-1.5 ${adminFilterControlClass}`}
           />
         </div>
 
-        <div>
+        <div className="sm:col-span-2">
           <label
             htmlFor="payment-note"
-            className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase"
+            className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase"
           >
             Notiz
           </label>
-          <div className="mt-2">
+          <div className="mt-1.5">
             <TextAreaInput
               id="payment-note"
               value={paymentNote}
@@ -178,23 +180,25 @@ export function PaymentStatusPanel({
         </div>
 
         {error ? (
-          <p className="text-[13px] text-[#9a2b2b]" role="alert">
+          <p className="text-[13px] text-[#9a2b2b] sm:col-span-2" role="alert">
             {error}
           </p>
         ) : null}
         {notice ? (
-          <p className="text-[13px] text-ink" role="status">
+          <p className="text-[13px] text-ink sm:col-span-2" role="status">
             {notice}
           </p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="inline-flex h-11 items-center justify-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-70"
-        >
-          {saving ? "Speichern…" : "Speichern"}
-        </button>
+        <div className="sm:col-span-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className={adminPrimaryButtonClass}
+          >
+            {saving ? "Speichern…" : "Speichern"}
+          </button>
+        </div>
       </form>
     </section>
   );

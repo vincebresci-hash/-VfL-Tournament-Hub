@@ -39,6 +39,27 @@ export const adminFilterControlClass =
 export const adminStatusBadgeClass =
   "inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.06em] uppercase";
 
+/** Table wrapper — PR-UI-8 finance/list chrome (admin lists). */
+export const adminTableShellClass = `hidden overflow-hidden ${adminCardShellClass} lg:block`;
+
+/** Identity / account hero accent card (admin detail pages). */
+export const adminIdentityHeroClass = `${adminCardShellClass} border-l-4 border-l-brand-yellow p-4 sm:p-5`;
+
+/** Compact mobile list card with navy accent rail. */
+export const adminMobileCardClass = `${adminCardShellClass} border-l-4 border-l-navy/15 p-3.5`;
+
+/** Dense table row hover. */
+export const adminTableRowHoverClass =
+  "border-b border-line/70 last:border-b-0 transition-colors hover:bg-surface/70";
+
+/** Section title inside cards/forms. */
+export const adminSectionTitleClass =
+  "font-display text-[15px] font-bold tracking-[0.04em] text-ink uppercase sm:text-base";
+
+/** Soft table header bar. */
+export const adminTableHeaderBarClass =
+  "border-b border-line bg-surface/70 px-4 py-2.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase";
+
 export function AdminPageHeader({
   title,
   description,

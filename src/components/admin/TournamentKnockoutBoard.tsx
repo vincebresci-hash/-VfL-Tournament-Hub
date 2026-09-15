@@ -3,7 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
-import { AdminCard, AdminEmpty } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminEmpty,
+  adminCardShellClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import {
   completeTournamentAction,
@@ -117,15 +122,15 @@ export function TournamentKnockoutBoard({
   return (
     <div className="grid gap-5">
       {error ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-[#9a2b2b]" role="alert">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-muted">{notice}</p>
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted`}>{notice}</p>
       ) : null}
       {!progress.complete ? (
-        <p className="border border-line bg-white px-5 py-4 text-[14px] text-muted">
+        <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted`}>
           Die Gruppenphase ist noch nicht vollständig abgeschlossen.
         </p>
       ) : null}
@@ -222,8 +227,8 @@ export function TournamentKnockoutBoard({
                     }
 
                     return (
-                      <section key={round} className="border border-line bg-white p-5">
-                        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                      <section key={round} className={`${adminCardShellClass} p-4 sm:p-5`}>
+                        <h2 className={adminSectionTitleClass}>
                           {knockoutRoundLabel[round]}
                         </h2>
                         <div className="mt-4 grid gap-4">
@@ -266,8 +271,8 @@ export function TournamentKnockoutBoard({
                 }
 
                 return (
-                  <section key={round} className="border border-line bg-white p-5">
-                    <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                  <section key={round} className={`${adminCardShellClass} p-4 sm:p-5`}>
+                    <h2 className={adminSectionTitleClass}>
                       {knockoutRoundLabel[round]}
                     </h2>
                     <div className="mt-4 grid gap-4">

@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApplicationFiltersPanel } from "@/components/admin/ApplicationFilters";
 import { ApplicationTable } from "@/components/admin/ApplicationTable";
-import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
+import {
+  AdminNotice,
+  AdminPageHeader,
+  adminCardShellClass,
+} from "@/components/admin/AdminPanel";
 import { useAdminData } from "@/components/admin/AdminDataProvider";
 import {
   applicationStatusFilters,
@@ -77,23 +81,26 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
         />
       </div>
 
-      <div className="mt-4 border border-line bg-white px-4 py-3">
-        <p className="text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+      <div className={`mt-4 ${adminCardShellClass} px-4 py-3.5`}>
+        <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
           Übersicht ({filters.archive === "archived" ? "Archiviert" : "Aktiv"})
         </p>
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          <div className="min-w-0 border border-line px-3 py-2">
+          <div className="min-w-0 rounded-lg border border-line bg-surface/40 px-3 py-2">
             <p className="font-display text-xl font-bold text-ink">
               {filters.archive === "archived" ? archivedCount : activeCount}
             </p>
-            <p className="mt-1 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+            <p className="mt-0.5 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
               {filters.archive === "archived" ? "Archiviert" : "Aktiv"}
             </p>
           </div>
           {applicationStatusFilters.map((filter) => (
-            <div key={filter.id} className="min-w-0 border border-line px-3 py-2">
+            <div
+              key={filter.id}
+              className="min-w-0 rounded-lg border border-line bg-surface/40 px-3 py-2"
+            >
               <p className="font-display text-xl font-bold text-ink">{counts[filter.id]}</p>
-              <p className="mt-1 truncate text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+              <p className="mt-0.5 truncate text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
                 {filter.label}
               </p>
             </div>
@@ -105,7 +112,7 @@ export function ApplicationsBoard({ tournaments }: ApplicationsBoardProps) {
         </p>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-5">
         <ApplicationTable applications={visible} tournaments={boardTournaments} />
       </div>
     </div>

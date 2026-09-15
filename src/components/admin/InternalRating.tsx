@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  adminCardShellClass,
+  adminFilterControlClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { INTERNAL_CATEGORIES, TEAM_STRENGTHS } from "@/types/application";
 import type { InternalCategory, TeamStrength } from "@/types/application";
 
@@ -12,8 +17,7 @@ type InternalRatingProps = {
   onNotesChange: (value: string) => void;
 };
 
-const controlClassName =
-  "h-10 w-full border border-line bg-white px-3 text-[14px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow";
+const controlClassName = adminFilterControlClass;
 
 export function InternalRating({
   category,
@@ -24,10 +28,8 @@ export function InternalRating({
   onNotesChange,
 }: InternalRatingProps) {
   return (
-    <section className="border border-line bg-white p-5 sm:p-6">
-      <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-        Interne Bewertung
-      </h2>
+    <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+      <h2 className={adminSectionTitleClass}>Interne Bewertung</h2>
       <p className="mt-2 text-[13px] leading-6 text-muted">
         Getrennt von der Selbsteinschätzung des Vereins. Nur intern sichtbar.
       </p>
@@ -90,7 +92,7 @@ export function InternalRating({
           value={notes ?? ""}
           onChange={(event) => onNotesChange(event.target.value)}
           placeholder="Sehr starker Jahrgang. Bereits mehrfach positiv aufgefallen."
-          className="mt-2 min-h-28 w-full border border-line bg-white px-3 py-3 text-[14px] text-ink placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+          className="mt-2 min-h-28 w-full rounded-lg border border-line bg-white px-3 py-3 text-[14px] text-ink placeholder:text-muted/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
         />
       </label>
     </section>

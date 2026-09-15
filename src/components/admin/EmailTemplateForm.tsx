@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, SelectInput, TextAreaInput, TextInput } from "@/components/apply/FormControls";
 import { ConfirmModal } from "@/components/admin/ConfirmModal";
+import {
+  AdminPageHeader,
+  adminCardShellClass,
+  adminDestructiveButtonClass,
+  adminPrimaryButtonClass,
+  adminTextLinkClass,
+} from "@/components/admin/AdminPanel";
 import { emailTemplateTypeLabel } from "@/lib/admin";
 import {
   createEmailTemplateAction,
@@ -85,22 +92,19 @@ export function EmailTemplateForm({ template }: EmailTemplateFormProps) {
     <div className="mx-auto max-w-3xl">
       <Link
         href="/admin/emails"
-        className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+        className={`${adminTextLinkClass} text-muted hover:text-brand-blue`}
       >
         ← Alle Vorlagen
       </Link>
 
-      <h1 className="mt-6 font-display text-3xl font-bold tracking-wide text-ink uppercase sm:text-4xl">
-        {template ? "Vorlage bearbeiten" : "Neue Vorlage"}
-      </h1>
-      <p className="mt-2 text-[15px] leading-7 text-muted">
-        Platzhalter: {"{{contact_first_name}}"}, {"{{contact_last_name}}"},{" "}
-        {"{{club_name}}"}, {"{{team_name}}"}, {"{{tournament_name}}"},{" "}
-        {"{{age_group}}"}, {"{{tournament_date}}"}, {"{{location}}"},{" "}
-        {"{{application_status}}"}.
-      </p>
+      <div className="mt-4">
+        <AdminPageHeader
+          title={template ? "Vorlage bearbeiten" : "Neue Vorlage"}
+          description={'Platzhalter: {{contact_first_name}}, {{contact_last_name}}, {{club_name}}, {{team_name}}, {{tournament_name}}, {{age_group}}, {{tournament_date}}, {{location}}, {{application_status}}.'}
+        />
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 grid gap-5 border border-line bg-white p-5 sm:p-6">
+      <form onSubmit={handleSubmit} className={`mt-5 grid gap-4 ${adminCardShellClass} p-4 sm:p-5`}>
         <Field id="template-name" label="Name">
           <TextInput
             id="template-name"
@@ -170,7 +174,7 @@ export function EmailTemplateForm({ template }: EmailTemplateFormProps) {
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="inline-flex h-10 items-center px-4 text-[12px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+              className={adminDestructiveButtonClass}
             >
               Löschen
             </button>
@@ -178,7 +182,7 @@ export function EmailTemplateForm({ template }: EmailTemplateFormProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60"
+            className={adminPrimaryButtonClass}
           >
             {submitting ? "Speichern…" : "Speichern"}
           </button>

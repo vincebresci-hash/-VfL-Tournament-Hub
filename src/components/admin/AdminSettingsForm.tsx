@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
+import {
+  adminCardShellClass,
+  adminPrimaryButtonClass,
+  adminSectionTitleClass,
+} from "@/components/admin/AdminPanel";
 import { applicationStatusLabel } from "@/lib/admin";
 import { saveAppSettingsAction } from "@/lib/db/admin-actions";
 import { MANUAL_ADMIN_APPLICATION_STATUSES } from "@/types/application";
@@ -24,7 +29,7 @@ function ToggleField({
   onChange: (value: boolean) => void;
 }) {
   return (
-    <label htmlFor={id} className="flex items-center justify-between gap-4 border border-line px-4 py-3">
+    <label htmlFor={id} className="flex items-center justify-between gap-4 rounded-lg border border-line px-4 py-3">
       <span className="text-[14px] text-ink">{label}</span>
       <input
         id={id}
@@ -63,12 +68,12 @@ export function AdminSettingsForm({ settings }: AdminSettingsFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-8 grid gap-8">
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+    <form onSubmit={handleSubmit} className="mt-5 grid gap-4">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Allgemein
         </h2>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field id="platform-name" label="Plattformname">
             <TextInput
               id="platform-name"
@@ -109,11 +114,11 @@ export function AdminSettingsForm({ settings }: AdminSettingsFormProps) {
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Bewerbungen
         </h2>
-        <div className="mt-5 grid gap-3">
+        <div className="mt-4 grid gap-3">
           <ToggleField
             id="applications-enabled"
             label="Bewerbungen global aktivieren"
@@ -141,11 +146,11 @@ export function AdminSettingsForm({ settings }: AdminSettingsFormProps) {
         </div>
       </section>
 
-      <section className="border border-line bg-white p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+      <section className={`${adminCardShellClass} p-4 sm:p-5`}>
+        <h2 className={adminSectionTitleClass}>
           Admin
         </h2>
-        <div className="mt-5 grid gap-5">
+        <div className="mt-4 grid gap-4">
           <ToggleField
             id="dashboard-new"
             label="Neue Bewerbungen im Dashboard anzeigen"
@@ -187,7 +192,7 @@ export function AdminSettingsForm({ settings }: AdminSettingsFormProps) {
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex h-10 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:opacity-60"
+          className={adminPrimaryButtonClass}
         >
           {submitting ? "Speichern…" : "Speichern"}
         </button>

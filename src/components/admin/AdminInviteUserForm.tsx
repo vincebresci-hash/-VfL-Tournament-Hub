@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Field, TextAreaInput, TextInput } from "@/components/apply/FormControls";
-import { AdminNotice } from "@/components/admin/AdminPanel";
+import { AdminNotice, adminMobileCardClass, adminPrimaryButtonClass, adminSecondaryButtonClass } from "@/components/admin/AdminPanel";
 import { inviteUserAction } from "@/lib/rbac/invitation-actions";
 import { ROLE_EXPLANATIONS } from "@/lib/rbac/role-labels";
 import type { RbacRole, RbacRoleKey } from "@/types/rbac";
@@ -146,7 +146,7 @@ export function AdminInviteUserForm({
             setClubId(event.target.value);
             setSelectedTeams([]);
           }}
-          className="h-11 w-full border border-line bg-white px-3 text-[15px] text-ink"
+          className="h-10 w-full rounded-lg border border-line bg-white px-3 text-[15px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
         >
           <option value="">Kein Verein</option>
           {clubs.map((club) => (
@@ -165,7 +165,7 @@ export function AdminInviteUserForm({
           {roles.map((role) => (
             <label
               key={role.id}
-              className="flex cursor-pointer items-start gap-3 border border-line px-3 py-3"
+              className={`flex cursor-pointer items-start gap-3 ${adminMobileCardClass}`}
             >
               <input
                 type="checkbox"
@@ -203,7 +203,7 @@ export function AdminInviteUserForm({
             {availableTeams.map((team) => (
               <label
                 key={team.id}
-                className="flex cursor-pointer items-center gap-3 border border-line px-3 py-2"
+                className={`flex cursor-pointer items-center gap-3 ${adminMobileCardClass} py-2.5`}
               >
                 <input
                   type="checkbox"
@@ -233,14 +233,14 @@ export function AdminInviteUserForm({
         <button
           type="submit"
           disabled={saving || selectedRoles.length === 0}
-          className="inline-flex h-11 items-center bg-brand-yellow px-5 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-70"
+          className={adminPrimaryButtonClass}
         >
           {saving ? "Wird gesendet…" : "Einladung senden"}
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex h-11 items-center border border-line px-5 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+          className={adminSecondaryButtonClass}
         >
           Abbrechen
         </button>

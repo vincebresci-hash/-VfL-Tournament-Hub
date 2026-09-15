@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ApplicationStatusBadge } from "@/components/admin/ApplicationStatusBadge";
-import { AdminCard, AdminInfo, adminCompactSecondaryButtonClass, displayValue } from "@/components/admin/AdminPanel";
+import { AdminCard, AdminInfo, adminCardShellClass, adminCompactSecondaryButtonClass, adminIdentityHeroClass, adminMobileCardClass, adminSectionTitleClass, adminTextLinkClass, displayValue } from "@/components/admin/AdminPanel";
 import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
 import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityForm";
 import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
@@ -103,7 +103,7 @@ export function AdminTournamentDetailView({
       stageStatus={stageStatus}
       current={current}
     >
-      <section className="border border-line border-l-4 border-l-brand-yellow bg-white p-4 sm:p-5">
+      <section className={adminIdentityHeroClass}>
         <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
           Turnierübersicht
         </p>
@@ -138,7 +138,7 @@ export function AdminTournamentDetailView({
       </div>
 
       <TournamentStatusCapacityNotice
-        className="mt-5 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]"
+        className={`mt-5 ${adminCardShellClass} border-[#d9b0b0] bg-[#fff5f5] px-4 py-3.5 text-[13px] leading-6 text-[#9a2b2b]`}
         dbStatus={tournament.status}
         maxTeams={tournament.maxTeams}
         confirmedParticipants={capacity.confirmedTeams}
@@ -146,16 +146,14 @@ export function AdminTournamentDetailView({
       />
 
       {capacity.availableSlots > 0 && capacity.waitingListCount > 0 ? (
-        <p className="mt-5 border border-line bg-white px-4 py-3 text-[13px] leading-6 text-ink">
+        <p className={`mt-5 ${adminCardShellClass} px-4 py-3.5 text-[13px] leading-6 text-ink`}>
           Freier Startplatz – Wartelistenmannschaft auswählen ({capacity.waitingListCount}{" "}
           auf der Warteliste).
         </p>
       ) : null}
 
       <section className="mt-6">
-        <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-          Bereiche
-        </h2>
+        <h2 className={adminSectionTitleClass}>Bereiche</h2>
         <p className="mt-1 text-[13px] text-muted">
           Schnellzugriff auf die bestehenden Turnierbereiche.
         </p>
@@ -164,7 +162,7 @@ export function AdminTournamentDetailView({
             <Link
               key={item.href}
               href={item.href}
-              className="border border-line bg-white px-4 py-3 transition-colors hover:border-navy/20"
+              className={`${adminCardShellClass} px-4 py-3.5 transition-colors hover:border-navy/20`}
             >
               <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
                 {item.label}
@@ -175,7 +173,7 @@ export function AdminTournamentDetailView({
         </div>
       </section>
 
-      <div className="mt-8 grid gap-5">
+      <div className="mt-6 grid gap-4">
         <AdminCard title="Kapazität">
           <TournamentCapacityForm slug={tournament.slug} maxTeams={tournament.maxTeams} />
         </AdminCard>
@@ -220,17 +218,17 @@ export function AdminTournamentDetailView({
               ) : (
                 <div className="grid gap-3">
                   {items.map((application) => (
-                    <article key={application.id} className="border border-line p-4">
+                    <article key={application.id} className={adminMobileCardClass}>
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                          <p className="font-display text-[15px] font-bold tracking-wide text-ink uppercase">
                             {application.clubName}
                           </p>
                           <p className="mt-1 text-[14px] text-ink">{application.teamName}</p>
                         </div>
                         <ApplicationStatusBadge status={application.applicationStatus} />
                       </div>
-                      <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <dl className="mt-4 grid gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
                         <AdminInfo label="Altersklasse" value={application.ageGroup} />
                         <AdminInfo label="Jahrgang" value={String(application.birthYear)} />
                         <AdminInfo label="Spielklasse" value={displayValue(application.league)} />
@@ -251,7 +249,7 @@ export function AdminTournamentDetailView({
                       </dl>
                       <Link
                         href={`/admin/bewerbungen/${application.id}`}
-                        className="mt-4 inline-flex text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+                        className={`mt-4 ${adminTextLinkClass} text-muted hover:text-brand-blue`}
                       >
                         Bewerbung öffnen →
                       </Link>
@@ -280,8 +278,8 @@ function CapacityStat({
     <article
       className={
         emphasize
-          ? "border border-brand-yellow/70 bg-[#fff8e0] px-5 py-5"
-          : "border border-line bg-white px-5 py-5"
+          ? `${adminCardShellClass} border-brand-yellow/70 bg-[#fff8e0] px-4 py-4 sm:px-5`
+          : `${adminCardShellClass} px-4 py-4 sm:px-5`
       }
     >
       <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">

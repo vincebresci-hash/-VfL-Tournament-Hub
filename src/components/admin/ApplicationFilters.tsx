@@ -70,10 +70,10 @@ export function ApplicationFiltersPanel({
             type="button"
             onClick={() => update("archive", filter.id)}
             className={cn(
-              "h-9 px-3 text-[11px] font-semibold tracking-[0.08em] uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow",
+              "h-9 rounded-lg px-3 text-[11px] font-semibold tracking-[0.08em] uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow",
               filters.archive === filter.id
                 ? "bg-navy text-white"
-                : "border border-line bg-white text-muted hover:text-ink",
+                : "border border-line bg-white text-muted hover:border-navy/25 hover:text-ink",
             )}
           >
             {filter.label}
@@ -88,10 +88,10 @@ export function ApplicationFiltersPanel({
             type="button"
             onClick={() => update("status", filter.id)}
             className={cn(
-              "h-9 px-3 text-[11px] font-semibold tracking-[0.08em] uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow",
+              "h-9 rounded-lg px-3 text-[11px] font-semibold tracking-[0.08em] uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow",
               filters.status === filter.id
                 ? "bg-navy text-white"
-                : "border border-line bg-white text-muted hover:text-ink",
+                : "border border-line bg-white text-muted hover:border-navy/25 hover:text-ink",
             )}
           >
             {filter.label}
@@ -189,7 +189,7 @@ export function ApplicationFiltersPanel({
       <button
         type="button"
         onClick={() => onChange(emptyApplicationFilters)}
-        className="mt-4 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+        className="mt-4 inline-flex h-9 items-center rounded-md px-1 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
       >
         Filter zurücksetzen
       </button>

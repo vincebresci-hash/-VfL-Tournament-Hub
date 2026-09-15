@@ -9,6 +9,9 @@ import {
   AdminEmpty,
   adminCompactPrimaryButtonClass,
   adminCompactSecondaryButtonClass,
+  adminMobileCardClass,
+  adminTableHeaderBarClass,
+  adminTableRowHoverClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { cancellationOnTimeLabel } from "@/lib/cancellations/deadline";
@@ -94,49 +97,50 @@ export function CancellationRequestsBoard({ requests }: CancellationRequestsBoar
           <AdminEmpty>Keine offenen Absageanfragen.</AdminEmpty>
         ) : (
           <>
-            <div className="grid gap-3 lg:hidden">
+            <div className="grid gap-2.5 lg:hidden">
               {pending.map((request) => (
-                <article
-                  key={`mobile-${request.id}`}
-                  className="border border-line bg-white p-4"
-                >
+                <article key={`mobile-${request.id}`} className={adminMobileCardClass}>
                   <div className="min-w-0">
-                    <p className="truncate font-display text-lg font-bold tracking-wide text-ink uppercase">
+                    <p className="truncate font-display text-[15px] font-bold tracking-wide text-ink uppercase">
                       {request.clubName}
                     </p>
-                    <p className="mt-1 truncate text-[13px] text-muted">{request.teamName}</p>
+                    <p className="mt-0.5 truncate text-[13px] font-medium text-ink">
+                      {request.teamName}
+                    </p>
                   </div>
-                  <dl className="mt-4 grid grid-cols-2 gap-3 text-[13px] text-muted">
+                  <dl className="mt-3 grid grid-cols-2 gap-2.5 text-[13px]">
                     <div className="min-w-0 col-span-2">
                       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                         Turnier
                       </dt>
-                      <dd className="mt-1">
+                      <dd className="mt-0.5">
                         <Link
                           href={`/admin/turniere/${request.tournamentSlug}`}
                           className="font-medium text-ink hover:text-brand-blue"
                         >
                           <span className="block truncate">{request.tournamentName}</span>
                         </Link>
-                        <p className="mt-1 text-[12px]">{formatDateDe(request.tournamentDate)}</p>
+                        <p className="mt-0.5 text-[12px] text-muted">
+                          {formatDateDe(request.tournamentDate)}
+                        </p>
                       </dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                         Ansprechpartner
                       </dt>
-                      <dd className="mt-1">
+                      <dd className="mt-0.5 text-muted">
                         {request.contactFirstName} {request.contactLastName}
-                        <p className="mt-1 break-all">{request.contactEmail}</p>
+                        <p className="mt-0.5 break-all">{request.contactEmail}</p>
                       </dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                         Anfrage
                       </dt>
-                      <dd className="mt-1">
+                      <dd className="mt-0.5 text-muted">
                         {formatDateTimeDe(request.requestedAt)}
-                        <p className="mt-1 uppercase tracking-[0.08em]">
+                        <p className="mt-0.5 uppercase tracking-[0.08em]">
                           {request.requestedByType === "club" ? "Vereinskonto" : "Extern"}
                         </p>
                       </dd>
@@ -145,85 +149,94 @@ export function CancellationRequestsBoard({ requests }: CancellationRequestsBoar
                       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                         Frist
                       </dt>
-                      <dd className="mt-1">
+                      <dd className="mt-0.5 text-muted">
                         {request.daysUntilTournament ?? "—"} Tage
-                        <p className="mt-1">{cancellationOnTimeLabel(request.isLateRequest)}</p>
+                        <p className="mt-0.5">
+                          {cancellationOnTimeLabel(request.isLateRequest)}
+                        </p>
                       </dd>
                     </div>
                     <div className="min-w-0">
                       <dt className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
                         Grund
                       </dt>
-                      <dd className="mt-1 break-words">{request.reason?.trim() || "—"}</dd>
+                      <dd className="mt-0.5 break-words text-muted">
+                        {request.reason?.trim() || "—"}
+                      </dd>
                     </div>
                   </dl>
-                  <div className="mt-4">{renderActions(request)}</div>
+                  <div className="mt-3">{renderActions(request)}</div>
                 </article>
               ))}
             </div>
 
-            <div className="hidden overflow-x-auto lg:block">
-              <table className="min-w-full text-left">
-                <thead className="border-b border-line text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
-                  <tr>
-                    <th className="px-3 py-3">Turnier</th>
-                    <th className="px-3 py-3">Mannschaft</th>
-                    <th className="px-3 py-3">Ansprechpartner</th>
-                    <th className="px-3 py-3">Anfrage</th>
-                    <th className="px-3 py-3">Frist</th>
-                    <th className="px-3 py-3">Grund</th>
-                    <th className="px-3 py-3">Aktionen</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pending.map((request) => (
-                    <tr
-                      key={`desktop-${request.id}`}
-                      className="border-b border-line last:border-0"
-                    >
-                      <td className="max-w-[180px] px-3 py-4 text-[14px]">
-                        <Link
-                          href={`/admin/turniere/${request.tournamentSlug}`}
-                          className="font-medium text-ink hover:text-brand-blue"
-                        >
-                          <span className="block truncate">{request.tournamentName}</span>
-                        </Link>
-                        <p className="mt-1 text-[12px] text-muted">
-                          {formatDateDe(request.tournamentDate)}
-                        </p>
-                      </td>
-                      <td className="max-w-[160px] px-3 py-4 text-[14px] text-ink">
-                        <span className="block truncate">{request.clubName}</span>
-                        <p className="mt-1 truncate text-[12px] text-muted">
-                          {request.teamName}
-                        </p>
-                      </td>
-                      <td className="max-w-[180px] px-3 py-4 text-[13px] text-muted">
-                        {request.contactFirstName} {request.contactLastName}
-                        <p className="mt-1 truncate">{request.contactEmail}</p>
-                      </td>
-                      <td className="px-3 py-4 text-[13px] text-muted">
-                        {formatDateTimeDe(request.requestedAt)}
-                        <p className="mt-1 uppercase tracking-[0.08em]">
-                          {request.requestedByType === "club" ? "Vereinskonto" : "Extern"}
-                        </p>
-                      </td>
-                      <td className="px-3 py-4 text-[13px] text-muted">
-                        {request.daysUntilTournament ?? "—"} Tage
-                        <p className="mt-1">
-                          {cancellationOnTimeLabel(request.isLateRequest)}
-                        </p>
-                      </td>
-                      <td className="max-w-[200px] px-3 py-4 text-[13px] text-muted">
-                        <span className="block break-words">
-                          {request.reason?.trim() || "—"}
-                        </span>
-                      </td>
-                      <td className="px-3 py-4">{renderActions(request)}</td>
+            <div className="hidden overflow-hidden rounded-lg border border-line lg:block">
+              <div className={adminTableHeaderBarClass}>
+                <p>Offene Anfragen</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-left text-[13px]">
+                  <thead className="border-b border-line bg-white text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Turnier</th>
+                      <th className="px-3.5 py-2.5">Mannschaft</th>
+                      <th className="px-3.5 py-2.5">Ansprechpartner</th>
+                      <th className="px-3.5 py-2.5">Anfrage</th>
+                      <th className="px-3.5 py-2.5">Frist</th>
+                      <th className="px-3.5 py-2.5">Grund</th>
+                      <th className="px-3.5 py-2.5">Aktionen</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {pending.map((request) => (
+                      <tr
+                        key={`desktop-${request.id}`}
+                        className={adminTableRowHoverClass}
+                      >
+                        <td className="min-w-0 max-w-[180px] px-3.5 py-2.5 text-[14px]">
+                          <Link
+                            href={`/admin/turniere/${request.tournamentSlug}`}
+                            className="font-medium text-ink hover:text-brand-blue"
+                          >
+                            <span className="block truncate">{request.tournamentName}</span>
+                          </Link>
+                          <p className="mt-0.5 text-[12px] text-muted">
+                            {formatDateDe(request.tournamentDate)}
+                          </p>
+                        </td>
+                        <td className="min-w-0 max-w-[160px] px-3.5 py-2.5 text-[14px] text-ink">
+                          <span className="block truncate">{request.clubName}</span>
+                          <p className="mt-0.5 truncate text-[12px] text-muted">
+                            {request.teamName}
+                          </p>
+                        </td>
+                        <td className="min-w-0 max-w-[180px] px-3.5 py-2.5 text-[13px] text-muted">
+                          {request.contactFirstName} {request.contactLastName}
+                          <p className="mt-0.5 truncate">{request.contactEmail}</p>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-[13px] text-muted">
+                          {formatDateTimeDe(request.requestedAt)}
+                          <p className="mt-0.5 uppercase tracking-[0.08em]">
+                            {request.requestedByType === "club" ? "Vereinskonto" : "Extern"}
+                          </p>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-[13px] text-muted">
+                          {request.daysUntilTournament ?? "—"} Tage
+                          <p className="mt-0.5">
+                            {cancellationOnTimeLabel(request.isLateRequest)}
+                          </p>
+                        </td>
+                        <td className="min-w-0 max-w-[200px] px-3.5 py-2.5 text-[13px] text-muted">
+                          <span className="block break-words">
+                            {request.reason?.trim() || "—"}
+                          </span>
+                        </td>
+                        <td className="px-3.5 py-2.5">{renderActions(request)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         )}

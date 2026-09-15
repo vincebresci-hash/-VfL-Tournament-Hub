@@ -3,7 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AdminCard, AdminInfo } from "@/components/admin/AdminPanel";
+import {
+  AdminCard,
+  AdminInfo,
+  adminCardShellClass,
+  adminMobileCardClass,
+  adminPrimaryButtonClass,
+} from "@/components/admin/AdminPanel";
 import { ApplicationParticipantLogoEditor } from "@/components/admin/ApplicationParticipantLogoEditor";
 import { ExternalTeamLogoEditor } from "@/components/admin/ExternalTeamLogoEditor";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
@@ -130,7 +136,7 @@ export function TournamentParticipantsPanel({
             resetForm();
             setShowForm(true);
           }}
-          className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] disabled:opacity-50"
+          className={adminPrimaryButtonClass}
         >
           Teilnehmer manuell hinzufügen
         </button>
@@ -138,7 +144,7 @@ export function TournamentParticipantsPanel({
 
       {showForm ? (
         <form
-          className="mt-5 grid gap-3 border border-line bg-white p-4"
+          className={`mt-5 grid gap-3 ${adminCardShellClass} p-4`}
           onSubmit={(event) => {
             event.preventDefault();
             const payload = {
@@ -277,12 +283,12 @@ export function TournamentParticipantsPanel({
       ) : null}
 
       {error ? (
-        <p className="mt-4 border border-line bg-white px-4 py-3 text-[14px] text-brand-red">
+        <p className={`mt-4 ${adminCardShellClass} px-4 py-3 text-[14px] text-brand-red`}>
           {error}
         </p>
       ) : null}
       {notice ? (
-        <p className="mt-4 border border-line bg-white px-4 py-3 text-[14px] text-ink">{notice}</p>
+        <p className={`mt-4 ${adminCardShellClass} px-4 py-3 text-[14px] text-ink`}>{notice}</p>
       ) : null}
 
       {sortedParticipants.length === 0 ? (
@@ -290,7 +296,7 @@ export function TournamentParticipantsPanel({
       ) : (
         <div className="mt-5 grid gap-3">
           {sortedParticipants.map((participant) => (
-            <article key={participant.id} className="border border-line bg-white p-4">
+            <article key={participant.id} className={adminMobileCardClass}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                   <ParticipantClubLogo
@@ -298,7 +304,7 @@ export function TournamentParticipantsPanel({
                     clubName={participant.clubName}
                   />
                   <div className="min-w-0">
-                    <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+                    <p className="font-display text-[15px] font-bold tracking-wide text-ink uppercase">
                       {participant.clubName}
                     </p>
                     <p className="mt-1 text-[14px] text-ink">{participant.teamName}</p>
