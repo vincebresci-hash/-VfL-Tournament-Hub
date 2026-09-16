@@ -46,6 +46,7 @@ const sampleRow = (overrides: Partial<CommunicationListRow> = {}): Communication
   failed_count: 0,
   created_at: "2026-09-01T10:00:00.000Z",
   sent_at: "2026-09-01T10:01:00.000Z",
+  archived_at: null,
   ...overrides,
 });
 
@@ -63,7 +64,7 @@ export function runCommunicationListChecks() {
       : "";
   assert(
     listCommunicationsBlock.includes('.from("tournament_communications")') &&
-      listCommunicationsBlock.includes("sent_count, failed_count, created_at, sent_at") &&
+      listCommunicationsBlock.includes("sent_count, failed_count, created_at, sent_at, archived_at") &&
       !listCommunicationsBlock.includes("tournaments (id, name, slug)"),
     "list query loads parent rows without embedded tournaments relation",
   );
@@ -141,9 +142,9 @@ export function runCommunicationListChecks() {
     "list page shows admin error state on query failure",
   );
   assert(
-    listPage.includes("<CommunicationListBoard communications={communications} />") &&
-      listPage.indexOf("error ?") <
-        listPage.indexOf("<CommunicationListBoard communications={communications} />"),
+    listPage.includes("<CommunicationListBoard") &&
+      listPage.includes("communications={communications}") &&
+      listPage.indexOf("error ?") < listPage.indexOf("<CommunicationListBoard"),
     "empty board is not rendered when list query failed",
   );
   assert(

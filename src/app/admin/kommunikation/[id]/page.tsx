@@ -3,6 +3,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CommunicationDetailView } from "@/components/admin/CommunicationDetailView";
 import { AdminPageHeader } from "@/components/admin/AdminPanel";
+import {
+  hasPermissionInAuthorization,
+  requireAdminSession,
+} from "@/lib/auth/guards";
+import { canManageSystem } from "@/lib/auth/roles";
 import { getCommunicationDetail } from "@/lib/communications/queries";
 
 type CommunicationDetailPageProps = {
@@ -29,11 +34,29 @@ export default async function AdminCommunicationDetailPage({
 }: CommunicationDetailPageProps) {
   const { id } = await params;
   const { notice } = await searchParams;
-  const communication = await getCommunicationDetail(id);
+  const [communication, adminAccess] = await Promise.all([
+    getCommunicationDetail(id),
+    requireAdminSession(),
+  ]);
 
   if (!communication) {
     notFound();
   }
+
+  const canManage =
+    !("error" in adminAccess && adminAccess.error) &&
+    adminAccess.session !== null &&
+    adminAccess.authorization !== null &&
+    (canManageSystem(adminAccess.session.user.role) ||
+      hasPermissionInAuthorization(
+        adminAccess.authorization,
+        adminAccess.session,
+        "communications.manage",
+      ));
+
+  const backHref = communication.archivedAt
+    ? "/admin/kommunikation?archive=archived"
+    : "/admin/kommunikation";
 
   return (
     <div>
@@ -43,7 +66,7 @@ export default async function AdminCommunicationDetailPage({
           description={`${communication.tournamentName} · ${communication.recipientCount} Empfänger`}
         />
         <Link
-          href="/admin/kommunikation"
+          href={backHref}
           className="text-[14px] font-semibold text-ink underline decoration-brand-yellow underline-offset-2"
         >
           Zurück zur Übersicht
@@ -54,7 +77,7 @@ export default async function AdminCommunicationDetailPage({
           {notice}
         </p>
       ) : null}
-      <CommunicationDetailView communication={communication} />
+      <CommunicationDetailView communication={communication} canManage={canManage} />
     </div>
   );
 }

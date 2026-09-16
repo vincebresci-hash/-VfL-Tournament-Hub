@@ -58,6 +58,8 @@ export type CommunicationRecipientPreview = {
   recipientContactFirstName: string | null;
 };
 
+export type CommunicationArchiveFilter = "active" | "archived";
+
 export type CommunicationListItem = {
   id: string;
   tournamentId: string;
@@ -76,6 +78,7 @@ export type CommunicationListItem = {
   confirmedCount: number;
   createdAt: string;
   sentAt: string | null;
+  archivedAt: string | null;
 };
 
 export type CommunicationRecipientDetail = {
