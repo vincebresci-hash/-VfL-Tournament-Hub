@@ -15,5 +15,5 @@ export default async function ClubTeamsPage() {
     redirect(CLUB_LOGIN);
   }
 
-  return <ClubTeamsBoard teams={workspace.teams} />;
+  return <ClubTeamsBoard club={workspace.club} teams={workspace.teams} />;
 }

@@ -1,19 +1,29 @@
 "use client";
 
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { IconClose, IconMenu } from "@/components/ui/icons";
 
 type ClubHeaderProps = {
   open: boolean;
   clubName: string;
+  clubLogoUrl?: string | null;
   onToggle: () => void;
 };
 
-export function ClubHeader({ open, clubName, onToggle }: ClubHeaderProps) {
+export function ClubHeader({
+  open,
+  clubName,
+  clubLogoUrl = null,
+  onToggle,
+}: ClubHeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-white px-4 lg:hidden">
-      <p className="truncate text-[12px] font-semibold tracking-[0.1em] text-ink uppercase">
-        {clubName}
-      </p>
+      <div className="flex min-w-0 items-center gap-2.5">
+        <ParticipantClubLogo logoUrl={clubLogoUrl} clubName={clubName} size="sm" />
+        <p className="truncate text-[12px] font-semibold tracking-[0.1em] text-ink uppercase">
+          {clubName}
+        </p>
+      </div>
       <button
         type="button"
         onClick={onToggle}

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/brand/Logo";
+import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { IconLogout } from "@/components/ui/icons";
 import { signOutAction } from "@/lib/auth/actions";
 import { clubNavigation } from "@/lib/club/navigation";
@@ -11,10 +12,15 @@ import { CLUB_NAME, HUB_NAME } from "@/lib/constants";
 
 type ClubSidebarProps = {
   clubName: string;
+  clubLogoUrl?: string | null;
   onNavigate?: () => void;
 };
 
-export function ClubSidebar({ clubName, onNavigate }: ClubSidebarProps) {
+export function ClubSidebar({
+  clubName,
+  clubLogoUrl = null,
+  onNavigate,
+}: ClubSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -34,6 +40,16 @@ export function ClubSidebar({ clubName, onNavigate }: ClubSidebarProps) {
           </span>
         </span>
       </Link>
+
+      <div className="mx-3 mb-3 flex items-center gap-3 border border-line bg-surface/50 px-3 py-2.5">
+        <ParticipantClubLogo logoUrl={clubLogoUrl} clubName={clubName} size="sm" />
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold tracking-[0.1em] text-ink/55 uppercase">
+            Verein
+          </p>
+          <p className="truncate text-[13px] font-semibold text-ink">{clubName}</p>
+        </div>
+      </div>
 
       <nav aria-label="Verein" className="mt-1 flex-1 px-3">
         <ul className="space-y-1">
