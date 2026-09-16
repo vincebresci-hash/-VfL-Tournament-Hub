@@ -277,14 +277,53 @@ export async function archiveCommunicationAction(
     };
   }
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("tournament_communications")
     .update({ archived_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .is("archived_at", null)
+    .neq("status", "sending")
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     return {
       error: toUserFacingDbError("Die Nachricht konnte nicht archiviert werden.", error),
+    };
+  }
+
+  if (!updated) {
+    const { data: latest, error: latestError } = await supabase
+      .from("tournament_communications")
+      .select("id, status, archived_at")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (latestError || !latest) {
+      return {
+        error: toUserFacingDbError(
+          "Die Nachricht wurde nicht gefunden.",
+          latestError,
+        ),
+      };
+    }
+
+    if (latest.archived_at) {
+      return {
+        error: null,
+        notice: "Die Nachricht ist bereits archiviert.",
+        communicationId: latest.id,
+      };
+    }
+
+    if (latest.status === "sending") {
+      return {
+        error: "Laufende Versände können nicht archiviert werden.",
+      };
+    }
+
+    return {
+      error: "Die Nachricht konnte nicht archiviert werden.",
     };
   }
 
@@ -294,7 +333,7 @@ export async function archiveCommunicationAction(
   return {
     error: null,
     notice: "Nachricht archiviert.",
-    communicationId: id,
+    communicationId: updated.id,
   };
 }
 

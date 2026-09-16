@@ -89,7 +89,49 @@ export function runCommunicationArchiveChecks() {
       archiveBlock.includes("archived_at: new Date()"),
     "archive sets archived_at",
   );
+
+  // Atomic TOCTOU guard: NOT-SENDING must be on the UPDATE itself
+  const archiveUpdateStart = archiveBlock.indexOf(".update({ archived_at:");
+  assert(archiveUpdateStart >= 0, "archive UPDATE sets archived_at");
+  const archiveUpdateTail = archiveBlock.slice(archiveUpdateStart);
+  const archiveUpdateEndCandidates = [
+    archiveUpdateTail.indexOf("if (error)"),
+    archiveUpdateTail.indexOf("if (!updated)"),
+    archiveUpdateTail.indexOf("revalidatePath"),
+  ].filter((index) => index >= 0);
+  const archiveUpdateEnd =
+    archiveUpdateEndCandidates.length > 0
+      ? Math.min(...archiveUpdateEndCandidates)
+      : archiveUpdateTail.length;
+  const archiveUpdateBlock = archiveUpdateTail.slice(0, archiveUpdateEnd);
+  assert(
+    archiveUpdateBlock.includes('.neq("status", "sending")'),
+    "archive UPDATE has atomic NOT-SENDING guard",
+  );
+  assert(
+    archiveUpdateBlock.includes('.is("archived_at", null)'),
+    "archive UPDATE only targets active (non-archived) rows",
+  );
+  assert(
+    archiveUpdateBlock.includes('.select("id")'),
+    "archive UPDATE returns affected row for result interpretation",
+  );
+  assert(
+    archiveBlock.includes("if (!updated)") &&
+      archiveBlock.includes('latest.status === "sending"') &&
+      archiveBlock.includes("Laufende Versände können nicht archiviert werden."),
+    "zero-row archive UPDATE is interpreted as concurrent sending when applicable",
+  );
+  assert(
+    archiveBlock.includes("Die Nachricht ist bereits archiviert."),
+    "already-archived archive path remains idempotent",
+  );
+
   assert(restoreBlock.includes("archived_at: null"), "restore clears archived_at");
+  assert(
+    !restoreBlock.includes('.neq("status", "sending")'),
+    "restore remains unchanged without sending TOCTOU guard",
+  );
   assert(
     !archiveBlock.includes("sent_at") &&
       !archiveBlock.includes("sent_count") &&
