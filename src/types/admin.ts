@@ -16,6 +16,7 @@ export const EMAIL_TEMPLATE_TYPES = [
   "cancellation-request-submitted",
   "cancellation-confirmed",
   "cancellation-rejected",
+  "participation-access-recovery",
   "follow-up",
   "general",
 ] as const;
