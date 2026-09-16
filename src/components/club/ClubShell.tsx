@@ -7,12 +7,14 @@ import { cn } from "@/lib/cn";
 
 type ClubShellProps = {
   clubName: string;
+  clubLogoUrl?: string | null;
   databaseReady?: boolean;
   children: ReactNode;
 };
 
 export function ClubShell({
   clubName,
+  clubLogoUrl = null,
   databaseReady = true,
   children,
 }: ClubShellProps) {
@@ -39,7 +41,7 @@ export function ClubShell({
     <div className="min-h-full bg-background lg:flex">
       <aside id="club-sidebar" className="hidden w-64 shrink-0 lg:block">
         <div className="sticky top-0 h-screen">
-          <ClubSidebar clubName={clubName} />
+          <ClubSidebar clubName={clubName} clubLogoUrl={clubLogoUrl} />
         </div>
       </aside>
 
@@ -58,13 +60,18 @@ export function ClubShell({
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <ClubSidebar clubName={clubName} onNavigate={() => setOpen(false)} />
+        <ClubSidebar
+          clubName={clubName}
+          clubLogoUrl={clubLogoUrl}
+          onNavigate={() => setOpen(false)}
+        />
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
         <ClubHeader
           open={open}
           clubName={clubName}
+          clubLogoUrl={clubLogoUrl}
           onToggle={() => setOpen((current) => !current)}
         />
         <main id="inhalt" className="flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
