@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CommunicationArchiveControls } from "@/components/admin/CommunicationArchiveControls";
+import { CommunicationHardDeleteControls } from "@/components/admin/CommunicationHardDeleteControls";
 import {
   AdminCard,
   AdminInfo,
@@ -81,11 +82,18 @@ export function CommunicationDetailView({
               </span>
             ) : null}
             {canManage ? (
-              <CommunicationArchiveControls
-                communicationId={communication.id}
-                archived={archived}
-                sending={communication.status === "sending"}
-              />
+              <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                <CommunicationArchiveControls
+                  communicationId={communication.id}
+                  archived={archived}
+                  sending={communication.status === "sending"}
+                />
+                {archived ? (
+                  <CommunicationHardDeleteControls
+                    communicationId={communication.id}
+                  />
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>

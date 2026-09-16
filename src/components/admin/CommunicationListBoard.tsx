@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CommunicationArchiveControls } from "@/components/admin/CommunicationArchiveControls";
+import { CommunicationHardDeleteControls } from "@/components/admin/CommunicationHardDeleteControls";
 import {
   AdminEmpty,
   adminCompactSecondaryButtonClass,
@@ -160,12 +161,20 @@ export function CommunicationListBoard({
                   Ansehen
                 </Link>
                 {canManage ? (
-                  <CommunicationArchiveControls
-                    communicationId={item.id}
-                    archived={archived}
-                    sending={item.status === "sending"}
-                    compact
-                  />
+                  <>
+                    <CommunicationArchiveControls
+                      communicationId={item.id}
+                      archived={archived}
+                      sending={item.status === "sending"}
+                      compact
+                    />
+                    {archived ? (
+                      <CommunicationHardDeleteControls
+                        communicationId={item.id}
+                        compact
+                      />
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             </article>
@@ -254,12 +263,20 @@ export function CommunicationListBoard({
                     </td>
                     <td className="px-3.5 py-2.5">
                       {canManage ? (
-                        <CommunicationArchiveControls
-                          communicationId={item.id}
-                          archived={archived}
-                          sending={item.status === "sending"}
-                          compact
-                        />
+                        <div className="flex flex-col items-start gap-1.5">
+                          <CommunicationArchiveControls
+                            communicationId={item.id}
+                            archived={archived}
+                            sending={item.status === "sending"}
+                            compact
+                          />
+                          {archived ? (
+                            <CommunicationHardDeleteControls
+                              communicationId={item.id}
+                              compact
+                            />
+                          ) : null}
+                        </div>
                       ) : (
                         <Link
                           href={`/admin/kommunikation/${item.id}`}
