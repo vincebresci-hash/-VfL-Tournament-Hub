@@ -4,12 +4,16 @@ import { revalidatePath } from "next/cache";
 import {
   requireCommunicationsManage,
   requireCommunicationsView,
+  requirePermissionAccess,
   requireTeamsView,
 } from "@/lib/rbac/action-access";
+import { createClient } from "@/lib/supabase/server";
+import { toUserFacingDbError } from "@/lib/db/errors";
 import { getCommunicationTeamDirectoryAccess } from "@/lib/communications/access";
 import {
   COMMUNICATION_RECIPIENT_SOURCES,
   COMMUNICATION_TYPES,
+  type CommunicationArchiveFilter,
   type CommunicationComposeInput,
   type CommunicationRecipientFilter,
   type CommunicationRecipientSource,
@@ -233,13 +237,134 @@ export async function sendCommunicationAction(
   };
 }
 
-export async function loadCommunicationsAction() {
+export async function archiveCommunicationAction(
+  communicationId: string,
+): Promise<CommunicationActionResult> {
+  const access = await requirePermissionAccess("communications.manage");
+  if (access.error || !access.session) {
+    return { error: access.error ?? "Keine Berechtigung für diese Aktion." };
+  }
+
+  const id = communicationId.trim();
+  if (!id) {
+    return { error: "Kommunikation nicht gefunden." };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("tournament_communications")
+    .select("id, status, archived_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return {
+      error: toUserFacingDbError("Die Nachricht wurde nicht gefunden.", loadError),
+    };
+  }
+
+  if (current.status === "sending") {
+    return {
+      error: "Laufende Versände können nicht archiviert werden.",
+    };
+  }
+
+  if (current.archived_at) {
+    return {
+      error: null,
+      notice: "Die Nachricht ist bereits archiviert.",
+      communicationId: current.id,
+    };
+  }
+
+  const { error } = await supabase
+    .from("tournament_communications")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Die Nachricht konnte nicht archiviert werden.", error),
+    };
+  }
+
+  revalidatePath("/admin/kommunikation");
+  revalidatePath(`/admin/kommunikation/${id}`);
+
+  return {
+    error: null,
+    notice: "Nachricht archiviert.",
+    communicationId: id,
+  };
+}
+
+export async function restoreCommunicationAction(
+  communicationId: string,
+): Promise<CommunicationActionResult> {
+  const access = await requirePermissionAccess("communications.manage");
+  if (access.error || !access.session) {
+    return { error: access.error ?? "Keine Berechtigung für diese Aktion." };
+  }
+
+  const id = communicationId.trim();
+  if (!id) {
+    return { error: "Kommunikation nicht gefunden." };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("tournament_communications")
+    .select("id, archived_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return {
+      error: toUserFacingDbError("Die Nachricht wurde nicht gefunden.", loadError),
+    };
+  }
+
+  if (!current.archived_at) {
+    return {
+      error: null,
+      notice: "Die Nachricht ist nicht archiviert.",
+      communicationId: current.id,
+    };
+  }
+
+  const { error } = await supabase
+    .from("tournament_communications")
+    .update({ archived_at: null })
+    .eq("id", id);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError(
+        "Die Nachricht konnte nicht wiederhergestellt werden.",
+        error,
+      ),
+    };
+  }
+
+  revalidatePath("/admin/kommunikation");
+  revalidatePath(`/admin/kommunikation/${id}`);
+
+  return {
+    error: null,
+    notice: "Nachricht wiederhergestellt.",
+    communicationId: id,
+  };
+}
+
+export async function loadCommunicationsAction(input?: {
+  archive?: CommunicationArchiveFilter;
+}) {
   const access = await requireCommunicationsView();
   if (access.error) {
     return { communications: [], ready: false, error: access.error };
   }
 
-  const result = await listCommunications();
+  const result = await listCommunications({ archive: input?.archive ?? "active" });
   return { ...result, error: result.error };
 }
 

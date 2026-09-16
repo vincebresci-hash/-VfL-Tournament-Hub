@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { CommunicationArchiveControls } from "@/components/admin/CommunicationArchiveControls";
 import {
   AdminCard,
   AdminInfo,
   adminCardShellClass,
   adminIdentityHeroClass,
   adminMobileCardClass,
+  adminStatusBadgeClass,
   adminTableRowHoverClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
@@ -25,6 +27,7 @@ import type { CommunicationDetail } from "@/types/communication";
 
 type CommunicationDetailViewProps = {
   communication: CommunicationDetail;
+  canManage: boolean;
 };
 
 function isIncompleteRecipientStatus(status: string) {
@@ -33,6 +36,7 @@ function isIncompleteRecipientStatus(status: string) {
 
 export function CommunicationDetailView({
   communication,
+  canManage,
 }: CommunicationDetailViewProps) {
   const incompleteRecipients = communication.recipients.filter((recipient) =>
     isIncompleteRecipientStatus(recipient.sendStatus),
@@ -47,25 +51,44 @@ export function CommunicationDetailView({
     (recipient) => recipient.confirmedAt != null,
   ).length;
   const interrupted = isInterruptedCommunication(communication);
+  const archived = Boolean(communication.archivedAt);
 
   return (
     <div className="mt-5 grid gap-4">
       <div className={adminIdentityHeroClass}>
-        <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
-          Kommunikation
-        </p>
-        <h1 className="mt-2 truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
-          {communication.subject}
-        </h1>
-        <p className="mt-1 text-[14px] text-muted">
-          {communication.tournamentName} ·{" "}
-          {communicationTypeLabel(communication.type)}
-          {communication.important ? " · Wichtig" : ""}
-        </p>
-        <p className="mt-2 text-[13px] text-muted">
-          {communicationAdminStatusLabel(communication)} ·{" "}
-          {formatDateTimeDe(communication.sentAt ?? communication.createdAt)}
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold tracking-[0.1em] text-muted uppercase">
+              Kommunikation
+            </p>
+            <h1 className="mt-2 truncate font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
+              {communication.subject}
+            </h1>
+            <p className="mt-1 text-[14px] text-muted">
+              {communication.tournamentName} ·{" "}
+              {communicationTypeLabel(communication.type)}
+              {communication.important ? " · Wichtig" : ""}
+            </p>
+            <p className="mt-2 text-[13px] text-muted">
+              {communicationAdminStatusLabel(communication)} ·{" "}
+              {formatDateTimeDe(communication.sentAt ?? communication.createdAt)}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {archived ? (
+              <span className={`${adminStatusBadgeClass} bg-surface text-ink`}>
+                Archiviert
+              </span>
+            ) : null}
+            {canManage ? (
+              <CommunicationArchiveControls
+                communicationId={communication.id}
+                archived={archived}
+                sending={communication.status === "sending"}
+              />
+            ) : null}
+          </div>
+        </div>
       </div>
 
       {interrupted ? (
@@ -94,6 +117,14 @@ export function CommunicationDetailView({
           <AdminInfo
             label="Status"
             value={communicationAdminStatusLabel(communication)}
+          />
+          <AdminInfo
+            label="Archiv"
+            value={
+              communication.archivedAt
+                ? `Archiviert · ${formatDateTimeDe(communication.archivedAt)}`
+                : "Aktiv"
+            }
           />
           <AdminInfo label="Betreff" value={communication.subject} />
           <AdminInfo

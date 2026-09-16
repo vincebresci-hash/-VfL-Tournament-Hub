@@ -11,6 +11,7 @@ import { toTeamDirectoryEntry } from "@/lib/team-directory/mappers";
 import type { CommunicationEligibleApplication } from "@/lib/communications/recipient-picker";
 import type { CommunicationEligibleDirectoryEntry } from "@/lib/communications/team-directory-recipient-picker";
 import type {
+  CommunicationArchiveFilter,
   CommunicationDetail,
   CommunicationListItem,
   CommunicationRecipientPreview,
@@ -185,19 +186,28 @@ async function loadConfirmedCountsByCommunicationId(
   return aggregateConfirmedCounts(data ?? []);
 }
 
-export async function listCommunications(): Promise<{
+export async function listCommunications(input?: {
+  archive?: CommunicationArchiveFilter;
+}): Promise<{
   communications: CommunicationListItem[];
   ready: boolean;
   error: string | null;
 }> {
+  const archive: CommunicationArchiveFilter = input?.archive ?? "active";
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, recipient_source, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at",
+      "id, tournament_id, recipient_source, type, subject, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, archived_at",
     )
-    .neq("status", "draft")
-    .order("created_at", { ascending: false });
+    .neq("status", "draft");
+
+  query =
+    archive === "archived"
+      ? query.not("archived_at", "is", null)
+      : query.is("archived_at", null);
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     if (isMissingRelationError(error)) {
@@ -239,7 +249,7 @@ export async function getCommunicationDetail(
   const { data, error } = await supabase
     .from("tournament_communications")
     .select(
-      "id, tournament_id, recipient_source, type, subject, body, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, tournaments (id, name, slug), communication_recipients (id, application_id, team_directory_entry_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, confirmed_at, error_message)",
+      "id, tournament_id, recipient_source, type, subject, body, important, require_confirmation, recipient_filter, status, recipient_count, sent_count, failed_count, created_at, sent_at, archived_at, tournaments (id, name, slug), communication_recipients (id, application_id, team_directory_entry_id, recipient_email, recipient_team_name, recipient_club_name, send_status, sent_at, confirmed_at, error_message)",
     )
     .eq("id", communicationId)
     .maybeSingle();
@@ -288,6 +298,7 @@ export async function getCommunicationDetail(
     confirmedCount,
     createdAt: data.created_at,
     sentAt: data.sent_at,
+    archivedAt: data.archived_at ?? null,
     recipients: recipients
       .map((recipient) => ({
         id: recipient.id,

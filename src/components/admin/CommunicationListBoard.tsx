@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CommunicationArchiveControls } from "@/components/admin/CommunicationArchiveControls";
 import {
   AdminEmpty,
   adminCompactSecondaryButtonClass,
@@ -18,29 +19,51 @@ import {
   communicationTypeLabel,
 } from "@/lib/communications/labels";
 import { formatDateTimeDe } from "@/lib/format";
-import type { CommunicationListItem } from "@/types/communication";
+import type {
+  CommunicationArchiveFilter,
+  CommunicationListItem,
+} from "@/types/communication";
 
 type CommunicationListBoardProps = {
   communications: CommunicationListItem[];
+  archiveFilter: CommunicationArchiveFilter;
+  canManage: boolean;
 };
 
 export function CommunicationListBoard({
   communications,
+  archiveFilter,
+  canManage,
 }: CommunicationListBoardProps) {
+  const isArchive = archiveFilter === "archived";
+
   if (communications.length === 0) {
-    return <AdminEmpty>Noch keine Kommunikationen versendet.</AdminEmpty>;
+    return (
+      <AdminEmpty>
+        {isArchive
+          ? "Keine archivierten Nachrichten."
+          : "Noch keine Kommunikationen versendet."}
+      </AdminEmpty>
+    );
   }
 
   return (
     <div className="mt-5">
       <p className="mb-3 text-[13px] text-muted">
         {communications.length}{" "}
-        {communications.length === 1 ? "Kommunikation" : "Kommunikationen"}
+        {communications.length === 1
+          ? isArchive
+            ? "archivierte Kommunikation"
+            : "Kommunikation"
+          : isArchive
+            ? "archivierte Kommunikationen"
+            : "Kommunikationen"}
       </p>
 
       <div className="grid gap-2.5 lg:hidden">
         {communications.map((item) => {
           const statusHint = communicationAdminStatusHint(item);
+          const archived = Boolean(item.archivedAt);
 
           return (
             <article key={`mobile-${item.id}`} className={adminMobileCardClass}>
@@ -56,6 +79,11 @@ export function CommunicationListBoard({
                   {item.important ? (
                     <span className="ml-2 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase">
                       Wichtig
+                    </span>
+                  ) : null}
+                  {archived ? (
+                    <span className="ml-2 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                      Archiviert
                     </span>
                   ) : null}
                 </p>
@@ -124,12 +152,22 @@ export function CommunicationListBoard({
                   </dd>
                 </div>
               </dl>
-              <Link
-                href={`/admin/kommunikation/${item.id}`}
-                className={`${adminCompactSecondaryButtonClass} mt-3`}
-              >
-                Ansehen
-              </Link>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/admin/kommunikation/${item.id}`}
+                  className={adminCompactSecondaryButtonClass}
+                >
+                  Ansehen
+                </Link>
+                {canManage ? (
+                  <CommunicationArchiveControls
+                    communicationId={item.id}
+                    archived={archived}
+                    sending={item.status === "sending"}
+                    compact
+                  />
+                ) : null}
+              </div>
             </article>
           );
         })}
@@ -137,24 +175,26 @@ export function CommunicationListBoard({
 
       <div className={adminTableShellClass}>
         <div className={adminTableHeaderBarClass}>
-          <p>Kommunikationen</p>
+          <p>{isArchive ? "Archiv" : "Kommunikationen"}</p>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] table-fixed border-collapse text-left text-[13px]">
+          <table className="w-full min-w-[1080px] table-fixed border-collapse text-left text-[13px]">
             <thead className="border-b border-line bg-white text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
               <tr>
-                <th className="w-[28%] px-3.5 py-2.5">Betreff</th>
-                <th className="w-[18%] px-3.5 py-2.5">Turnier</th>
-                <th className="w-[14%] px-3.5 py-2.5">Status</th>
+                <th className="w-[24%] px-3.5 py-2.5">Betreff</th>
+                <th className="w-[16%] px-3.5 py-2.5">Turnier</th>
+                <th className="w-[12%] px-3.5 py-2.5">Status</th>
                 <th className="w-[8%] px-3.5 py-2.5">Gesendet</th>
                 <th className="w-[10%] px-3.5 py-2.5">Fehlgeschlagen</th>
                 <th className="w-[12%] px-3.5 py-2.5">Empfang bestätigt</th>
                 <th className="w-[10%] px-3.5 py-2.5">Datum</th>
+                <th className="w-[8%] px-3.5 py-2.5">Aktion</th>
               </tr>
             </thead>
             <tbody>
               {communications.map((item) => {
                 const statusHint = communicationAdminStatusHint(item);
+                const archived = Boolean(item.archivedAt);
 
                 return (
                   <tr key={`desktop-${item.id}`} className={adminTableRowHoverClass}>
@@ -170,6 +210,11 @@ export function CommunicationListBoard({
                         {item.important ? (
                           <span className="ml-2 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase">
                             Wichtig
+                          </span>
+                        ) : null}
+                        {archived ? (
+                          <span className="ml-2 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                            Archiviert
                           </span>
                         ) : null}
                       </p>
@@ -206,6 +251,23 @@ export function CommunicationListBoard({
                     </td>
                     <td className="whitespace-nowrap px-3.5 py-2.5 text-muted">
                       {formatDateTimeDe(item.sentAt ?? item.createdAt)}
+                    </td>
+                    <td className="px-3.5 py-2.5">
+                      {canManage ? (
+                        <CommunicationArchiveControls
+                          communicationId={item.id}
+                          archived={archived}
+                          sending={item.status === "sending"}
+                          compact
+                        />
+                      ) : (
+                        <Link
+                          href={`/admin/kommunikation/${item.id}`}
+                          className={adminCompactSecondaryButtonClass}
+                        >
+                          Ansehen
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 );

@@ -20,6 +20,7 @@ export type CommunicationListRow = {
   failed_count: number;
   created_at: string;
   sent_at: string | null;
+  archived_at: string | null;
 };
 
 export type TournamentLookup = {
@@ -107,6 +108,7 @@ export function buildCommunicationListItems(input: {
       confirmedCount: input.confirmedCountsByCommunicationId.get(row.id) ?? 0,
       createdAt: row.created_at,
       sentAt: row.sent_at,
+      archivedAt: row.archived_at,
     };
   });
 }
