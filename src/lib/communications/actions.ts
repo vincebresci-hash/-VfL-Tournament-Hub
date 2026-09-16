@@ -337,6 +337,87 @@ export async function archiveCommunicationAction(
   };
 }
 
+export async function deleteArchivedCommunicationAction(
+  communicationId: string,
+): Promise<CommunicationActionResult> {
+  const access = await requirePermissionAccess("communications.manage");
+  if (access.error || !access.session) {
+    return { error: access.error ?? "Keine Berechtigung für diese Aktion." };
+  }
+
+  const id = communicationId.trim();
+  if (!id) {
+    return { error: "Kommunikation nicht gefunden." };
+  }
+
+  const supabase = await createClient();
+  const { data: current, error: loadError } = await supabase
+    .from("tournament_communications")
+    .select("id, status, archived_at")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (loadError || !current) {
+    return {
+      error: toUserFacingDbError("Die Nachricht wurde nicht gefunden.", loadError),
+    };
+  }
+
+  if (!current.archived_at) {
+    return {
+      error: "Nur archivierte Nachrichten können endgültig gelöscht werden.",
+    };
+  }
+
+  if (current.status === "sending") {
+    return {
+      error: "Laufende Versände können nicht gelöscht werden.",
+    };
+  }
+
+  const { data: outcome, error } = await supabase.rpc(
+    "hard_delete_archived_communication",
+    { p_communication_id: id },
+  );
+
+  if (error) {
+    return {
+      error: toUserFacingDbError(
+        "Die Nachricht konnte nicht gelöscht werden.",
+        error,
+      ),
+    };
+  }
+
+  if (outcome === "deleted") {
+    revalidatePath("/admin/kommunikation");
+    revalidatePath("/admin/kommunikation?archive=archived");
+    revalidatePath(`/admin/kommunikation/${id}`);
+
+    return {
+      error: null,
+      notice: "Nachricht endgültig gelöscht.",
+      communicationId: id,
+    };
+  }
+
+  if (outcome === "not_found") {
+    return { error: "Die Nachricht wurde nicht gefunden." };
+  }
+
+  if (outcome === "sending") {
+    return { error: "Laufende Versände können nicht gelöscht werden." };
+  }
+
+  if (outcome === "not_archived") {
+    return {
+      error: "Nur archivierte Nachrichten können endgültig gelöscht werden.",
+    };
+  }
+
+  return { error: "Die Nachricht konnte nicht gelöscht werden." };
+}
+
 export async function restoreCommunicationAction(
   communicationId: string,
 ): Promise<CommunicationActionResult> {

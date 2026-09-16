@@ -1061,6 +1061,10 @@ export type Database = {
         Args: { p_application_id: string };
         Returns: Json;
       };
+      hard_delete_archived_communication: {
+        Args: { p_communication_id: string };
+        Returns: string;
+      };
       count_active_super_admins: {
         Args: { p_exclude_user_id?: string | null };
         Returns: number;

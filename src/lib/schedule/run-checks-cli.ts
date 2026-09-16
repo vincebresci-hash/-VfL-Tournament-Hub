@@ -55,6 +55,7 @@ import { runCommunicationListChecks } from "@/lib/communications/communication-l
 import { runCommunicationTableGrantChecks } from "@/lib/communications/communication-table-grant-checks";
 import { runCommunicationInterruptedChecks } from "@/lib/communications/communication-interrupted-checks";
 import { runCommunicationArchiveChecks } from "@/lib/communications/communication-archive-checks";
+import { runCommunicationHardDeleteChecks } from "@/lib/communications/communication-hard-delete-checks";
 import { runHelpChatChecks } from "@/lib/help/help-chat-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
@@ -124,6 +125,7 @@ try {
   const communicationTableGrantChecks = runCommunicationTableGrantChecks();
   const communicationInterruptedChecks = runCommunicationInterruptedChecks();
   const communicationArchiveChecks = runCommunicationArchiveChecks();
+  const communicationHardDeleteChecks = runCommunicationHardDeleteChecks();
   const helpChatChecks = runHelpChatChecks();
   const communicationReceiptChecks = runCommunicationReceiptChecks();
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
@@ -189,6 +191,7 @@ try {
   console.log(`communication-table-grant-checks: ${communicationTableGrantChecks}`);
   console.log(`communication-interrupted-checks: ${communicationInterruptedChecks}`);
   console.log(`communication-archive-checks: ${communicationArchiveChecks}`);
+  console.log(`communication-hard-delete-checks: ${communicationHardDeleteChecks}`);
   console.log(`help-chat-checks: ${helpChatChecks}`);
   console.log(`communication-receipt-checks: ${communicationReceiptChecks}`);
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);

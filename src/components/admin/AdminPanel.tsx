@@ -28,6 +28,10 @@ export const adminCompactPrimaryButtonClass =
 export const adminCompactSecondaryButtonClass =
   "inline-flex h-8 items-center justify-center rounded-md border border-line bg-white px-3 text-[11px] font-semibold tracking-[0.06em] text-ink uppercase transition-colors hover:border-navy/25 hover:bg-surface focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60";
 
+/** Compact destructive action for dense list/table rows. */
+export const adminCompactDestructiveButtonClass =
+  "inline-flex h-8 items-center justify-center rounded-md border border-[#d9b0b0] bg-[#fff5f5] px-3 text-[11px] font-semibold tracking-[0.06em] text-[#9a2b2b] uppercase transition-colors hover:bg-[#fdecec] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#9a2b2b] disabled:opacity-60";
+
 /** Shared filter/search shell for admin list pages. */
 export const adminFilterShellClass = `${adminCardShellClass} p-3.5 sm:p-4`;
 
