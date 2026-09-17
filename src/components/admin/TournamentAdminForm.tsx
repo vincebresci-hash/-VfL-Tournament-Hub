@@ -51,6 +51,7 @@ const emptyValues: AdminTournamentInput = {
   status: "coming-soon",
   applicationsOpen: true,
   waitlistEnabled: true,
+  allowMultipleTeams: false,
   applicationStart: "",
   applicationDeadline: "",
   imageUrl: ageGroupImageSrc.U10,
@@ -100,6 +101,7 @@ function recordToInput(tournament: AdminTournamentRecord): AdminTournamentInput 
     status: tournament.status,
     applicationsOpen: tournament.applicationsOpen,
     waitlistEnabled: tournament.waitlistEnabled,
+    allowMultipleTeams: tournament.allowMultipleTeams,
     applicationStart: toDateTimeLocal(tournament.applicationStart),
     applicationDeadline: toDateTimeLocal(tournament.applicationDeadline),
     imageUrl: tournament.imageUrl ?? ageGroupImageSrc.U10,
@@ -453,6 +455,26 @@ export function TournamentAdminForm({
               checked={values.waitlistEnabled}
               onChange={(event) => update("waitlistEnabled", event.target.checked)}
               className="h-4 w-4 accent-brand-yellow"
+            />
+          </label>
+          <label
+            htmlFor="tournament-allow-multiple-teams"
+            className="flex items-start justify-between gap-4 border border-line px-4 py-3"
+          >
+            <span className="min-w-0">
+              <span className="block text-[14px] text-ink">
+                Mehrere Teams pro Verein erlauben
+              </span>
+              <span className="mt-1 block text-[12px] text-muted">
+                Steuert, ob bei diesem Turnier Mehrfachmeldungen zugelassen werden.
+              </span>
+            </span>
+            <input
+              id="tournament-allow-multiple-teams"
+              type="checkbox"
+              checked={values.allowMultipleTeams}
+              onChange={(event) => update("allowMultipleTeams", event.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-brand-yellow"
             />
           </label>
           <Field id="tournament-app-start" label="Bewerbungsstart" optional>

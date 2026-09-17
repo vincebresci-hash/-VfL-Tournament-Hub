@@ -60,6 +60,7 @@ import { runHelpChatChecks } from "@/lib/help/help-chat-checks";
 import { runApplicationCapacityDisplayChecks } from "@/lib/application-capacity-display-checks";
 import { runPublicApplicationStatusDisplayChecks } from "@/lib/public-application-status-display-checks";
 import { runPublicTournamentAnonVisibilityChecks } from "@/lib/tournaments/public-tournament-anon-visibility-checks";
+import { runAllowMultipleTeamsSettingChecks } from "@/lib/tournaments/allow-multiple-teams-setting-checks";
 import { runNewsSelfChecks } from "@/lib/news-checks";
 import { runAdminScheduleParticipantChecks } from "@/lib/schedule/admin-schedule-participants-checks";
 import {
@@ -131,6 +132,7 @@ try {
   const applicationCapacityDisplayChecks = runApplicationCapacityDisplayChecks();
   const publicApplicationStatusDisplayChecks = runPublicApplicationStatusDisplayChecks();
   const publicTournamentAnonVisibilityChecks = runPublicTournamentAnonVisibilityChecks();
+  const allowMultipleTeamsSettingChecks = runAllowMultipleTeamsSettingChecks();
   const newsSelfChecks = runNewsSelfChecks();
   const adminScheduleParticipantChecks = runAdminScheduleParticipantChecks();
   const statusEmailIdempotencyChecks = runStatusEmailIdempotencySelfChecks();
@@ -197,6 +199,7 @@ try {
   console.log(`application-capacity-display-checks: ${applicationCapacityDisplayChecks}`);
   console.log(`public-application-status-display-checks: ${publicApplicationStatusDisplayChecks}`);
   console.log(`public-tournament-anon-visibility-checks: ${publicTournamentAnonVisibilityChecks}`);
+  console.log(`allow-multiple-teams-setting-checks: ${allowMultipleTeamsSettingChecks}`);
   console.log(`news-self-checks: ${newsSelfChecks}`);
   console.log(`admin-schedule-participant-checks: ${adminScheduleParticipantChecks}`);
   console.log(`status-email-idempotency-checks: ${statusEmailIdempotencyChecks}`);

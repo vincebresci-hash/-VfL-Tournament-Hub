@@ -682,6 +682,7 @@ function parseTournamentInput(input: AdminTournamentInput): {
     status: (typeof TOURNAMENT_STATUSES)[number];
     applications_open: boolean;
     waitlist_enabled: boolean;
+    allow_multiple_teams: boolean;
     application_start: string | null;
     application_deadline: string | null;
     image_url: string | null;
@@ -771,6 +772,7 @@ function parseTournamentInput(input: AdminTournamentInput): {
       status: input.status,
       applications_open: Boolean(input.applicationsOpen),
       waitlist_enabled: Boolean(input.waitlistEnabled),
+      allow_multiple_teams: Boolean(input.allowMultipleTeams),
       application_start: parseOptionalDateTime(input.applicationStart),
       application_deadline: parseOptionalDateTime(input.applicationDeadline),
       image_url: parseOptionalText(input.imageUrl),
