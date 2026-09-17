@@ -27,22 +27,41 @@ import {
   guestApplicationFieldSnapshot,
   optionalApplicationText,
 } from "@/lib/applications/guest-application-fields";
+import {
+  MULTI_TEAM_APPLICATION_MAX,
+  buildGuestMultiTeamNames,
+  formatMultiTeamNamesForEmail,
+} from "@/lib/applications/multi-team-names";
 
 export type SubmitApplicationResult = {
   error: string | null;
   applicationId?: string | null;
+  applicationIds?: string[];
 };
 
 export async function submitTournamentApplicationAction(input: {
   tournamentSlug: string;
   teamId?: string | null;
+  teamIds?: string[] | null;
+  teamCount?: number | null;
   values: ApplicationFormValues;
 }): Promise<SubmitApplicationResult> {
   if (isHoneypotFilled(input.values)) {
     return { error: "Die Bewerbung konnte nicht gespeichert werden." };
   }
 
-  const errors = validateApplicationForm(input.values);
+  const earlyTeamIds = uniqueNonEmptyIds(input.teamIds);
+  const valuesForValidation =
+    earlyTeamIds.length >= 2
+      ? {
+          ...input.values,
+          teamName: input.values.teamName.trim() || "Mannschaft",
+          birthYear: input.values.birthYear.trim() || "2016",
+          selfRatedStrength: input.values.selfRatedStrength || "3",
+        }
+      : input.values;
+
+  const errors = validateApplicationForm(valuesForValidation);
   if (Object.keys(errors).length > 0) {
     return { error: "Bitte prüfe die markierten Felder." };
   }
@@ -74,26 +93,89 @@ export async function submitTournamentApplicationAction(input: {
   }
 
   const session = await getAuthSession();
-  const isClubUser = Boolean(
-    session && canAccessClub(session.user.role),
-  );
+  const isClubUser = Boolean(session && canAccessClub(session.user.role));
+  const allowMultipleTeams = tournament.allowMultipleTeams === true;
 
-  const result = isClubUser
-    ? await submitClubApplication(input, tournament.id)
-    : await submitGuestApplication(input, tournament.id);
+  const distinctTeamIds = uniqueNonEmptyIds(input.teamIds);
+  const requestedTeamCount = normalizeRequestedTeamCount(input.teamCount);
+
+  // Crafted multi-team requests must not bypass a disabled flag.
+  if (!allowMultipleTeams) {
+    if (distinctTeamIds.length > 1 || (requestedTeamCount != null && requestedTeamCount > 1)) {
+      return {
+        error: "Mehrfachmeldungen sind für dieses Turnier nicht freigeschaltet.",
+      };
+    }
+  }
+
+  let result: SubmitApplicationResult;
+  let emailTeamName = input.values.teamName.trim();
+
+  if (allowMultipleTeams && isClubUser && distinctTeamIds.length >= 2) {
+    if (distinctTeamIds.length > MULTI_TEAM_APPLICATION_MAX) {
+      return { error: "Es können höchstens 3 Mannschaften gleichzeitig gemeldet werden." };
+    }
+    result = await submitClubMultiTeamApplication(
+      tournament.id,
+      distinctTeamIds,
+      input.values,
+    );
+    if (!result.error && result.applicationIds?.length) {
+      emailTeamName = formatMultiTeamNamesForEmail(
+        await resolveTeamNamesForEmail(distinctTeamIds),
+      );
+    }
+  } else if (
+    allowMultipleTeams &&
+    !isClubUser &&
+    requestedTeamCount != null &&
+    requestedTeamCount >= 2
+  ) {
+    if (requestedTeamCount > MULTI_TEAM_APPLICATION_MAX) {
+      return { error: "Es können höchstens 3 Mannschaften gleichzeitig gemeldet werden." };
+    }
+    const teamNames = buildGuestMultiTeamNames(
+      input.values.teamName,
+      requestedTeamCount,
+    );
+    result = await submitGuestMultiTeamApplication(tournament.id, input.values, teamNames);
+    emailTeamName = formatMultiTeamNamesForEmail(teamNames);
+  } else {
+    // OFF path and ON+1: exact existing single-application semantics.
+    result = isClubUser
+      ? await submitClubApplication(
+          {
+            tournamentSlug: input.tournamentSlug,
+            teamId: distinctTeamIds[0] ?? input.teamId ?? null,
+            values: input.values,
+          },
+          tournament.id,
+        )
+      : await submitGuestApplication(
+          {
+            tournamentSlug: input.tournamentSlug,
+            teamId: null,
+            values: input.values,
+          },
+          tournament.id,
+        );
+  }
 
   if (result.error) {
     return result;
   }
 
-  if (settings.applicationConfirmationEnabled && result.applicationId) {
+  const confirmationApplicationId =
+    result.applicationId ?? result.applicationIds?.[0] ?? null;
+
+  if (settings.applicationConfirmationEnabled && confirmationApplicationId) {
     try {
       await sendApplicationReceivedEmail({
-        applicationId: result.applicationId,
+        applicationId: confirmationApplicationId,
         contactEmail: input.values.contactEmail,
         contactFirstName: input.values.contactFirstName,
         clubName: input.values.clubName,
-        teamName: input.values.teamName,
+        teamName: emailTeamName || input.values.teamName,
         tournament,
       });
     } catch (error) {
@@ -109,7 +191,149 @@ export async function submitTournamentApplicationAction(input: {
   revalidatePath("/verein/teams");
   revalidatePath("/admin/bewerbungen");
   revalidatePath("/admin");
-  return { error: null, applicationId: result.applicationId };
+  return {
+    error: null,
+    applicationId: confirmationApplicationId,
+    applicationIds: result.applicationIds,
+  };
+}
+
+function uniqueNonEmptyIds(ids: string[] | null | undefined): string[] {
+  if (!ids?.length) {
+    return [];
+  }
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const id of ids) {
+    const trimmed = id?.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    result.push(trimmed);
+  }
+  return result;
+}
+
+function normalizeRequestedTeamCount(value: number | null | undefined): number | null {
+  if (value == null) {
+    return null;
+  }
+  if (!Number.isInteger(value)) {
+    return null;
+  }
+  return value;
+}
+
+async function resolveTeamNamesForEmail(teamIds: string[]): Promise<string[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("teams")
+    .select("id, name")
+    .in("id", teamIds);
+
+  const byId = new Map(
+    ((data ?? []) as Array<{ id: string; name: string }>).map((row) => [
+      row.id,
+      row.name,
+    ]),
+  );
+
+  return teamIds.map((id) => byId.get(id)?.trim() || "Mannschaft");
+}
+
+async function submitClubMultiTeamApplication(
+  tournamentId: string,
+  teamIds: string[],
+  values: ApplicationFormValues,
+): Promise<SubmitApplicationResult> {
+  const ensured = await ensureClubForCurrentUser();
+  if (ensured.error === "database-missing") {
+    return { error: toUserFacingDbError("Speichern nicht möglich.") };
+  }
+
+  const session = await getAuthSession();
+  if (!session || !canAccessClub(session.user.role) || !session.user.clubId) {
+    return { error: "Dein Verein konnte nicht zugeordnet werden." };
+  }
+
+  const snapshot = applicationSnapshot(values);
+  const payload: Json = { ...snapshot };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_club_applications", {
+    p_tournament_id: tournamentId,
+    p_team_ids: teamIds,
+    p_payload: payload,
+  });
+
+  if (error || !data) {
+    if (isDuplicateTeamApplicationViolation(error)) {
+      return { error: DUPLICATE_TEAM_APPLICATION_MESSAGE };
+    }
+    return {
+      error: toUserFacingDbError(
+        error?.message?.includes("bereits")
+          ? DUPLICATE_TEAM_APPLICATION_MESSAGE
+          : "Die Bewerbung konnte nicht gespeichert werden.",
+        error,
+      ),
+    };
+  }
+
+  const applicationIds = Array.isArray(data) ? data.map(String) : [];
+  if (applicationIds.length !== teamIds.length) {
+    return { error: "Die Bewerbung konnte nicht gespeichert werden." };
+  }
+
+  if (values.contactPhone.trim()) {
+    await supabase
+      .from("clubs")
+      .update({ contact_phone: values.contactPhone.trim() })
+      .eq("id", session.user.clubId);
+  }
+
+  return {
+    error: null,
+    applicationId: applicationIds[0],
+    applicationIds,
+  };
+}
+
+async function submitGuestMultiTeamApplication(
+  tournamentId: string,
+  values: ApplicationFormValues,
+  teamNames: string[],
+): Promise<SubmitApplicationResult> {
+  const snapshot = applicationSnapshot(values);
+  const payload: Json = {
+    tournament_id: tournamentId,
+    ...snapshot,
+  };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("create_guest_applications", {
+    p_payload: payload,
+    p_team_names: teamNames,
+  });
+
+  if (error || !data) {
+    return {
+      error: toUserFacingDbError(
+        "Die Bewerbung konnte nicht gespeichert werden.",
+        error,
+      ),
+    };
+  }
+
+  const applicationIds = Array.isArray(data) ? data.map(String) : [];
+  if (applicationIds.length !== teamNames.length) {
+    return { error: "Die Bewerbung konnte nicht gespeichert werden." };
+  }
+
+  return {
+    error: null,
+    applicationId: applicationIds[0],
+    applicationIds,
+  };
 }
 
 async function submitClubApplication(

@@ -207,14 +207,16 @@ export function runAllowMultipleTeamsSettingChecks() {
 
   // E) Regression — PR-A must not change applicant / capacity / payment / cancel paths
   assert(
-    !applicationActions.includes("allow_multiple_teams") &&
-      !applicationActions.includes("allowMultipleTeams"),
-    "application submission is unchanged by allow_multiple_teams",
+    !applicationActions.includes("team_count") ||
+      applicationActions.includes("allowMultipleTeams"),
+    "application submission may reference allowMultipleTeams only with PR-B multi-team path",
   );
+  // PR-B intentionally wires allowMultipleTeams into application submission.
+  // Capacity / cancel / public list regressions remain covered below.
   assert(
     applicationActions.includes("create_guest_application") ||
       applicationActions.includes("submitGuestApplication"),
-    "guest application path remains present",
+    "guest application path must remain present",
   );
   assert(
     !capacity.includes("allow_multiple_teams") &&
@@ -231,8 +233,8 @@ export function runAllowMultipleTeamsSettingChecks() {
     "cancellation actions unchanged",
   );
   assert(
-    !publicTournamentType.includes("allowMultipleTeams"),
-    "public Tournament type does not expose allowMultipleTeams in PR-A",
+    publicTournamentType.includes("allowMultipleTeams"),
+    "public Tournament type exposes allowMultipleTeams for apply-page gating (PR-B)",
   );
 
   const applyFormCandidates = [
@@ -243,11 +245,11 @@ export function runAllowMultipleTeamsSettingChecks() {
   for (const candidate of applyFormCandidates) {
     try {
       const source = read(candidate);
+      // PR-A migration/admin setting remains additive; PR-B may gate UI on the flag.
       assert(
-        !source.includes("allowMultipleTeams") &&
-          !source.includes("allow_multiple_teams") &&
-          !source.includes("Mehrere Teams pro Verein"),
-        `${candidate} must not surface multi-team UI in PR-A`,
+        source.includes("allowMultipleTeams") ||
+          !source.includes("Mehrere Teams pro Verein erlauben"),
+        `${candidate} must not use admin-only multi-team label`,
       );
     } catch {
       // File may not exist under that path; skip.

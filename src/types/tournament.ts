@@ -63,6 +63,7 @@ export type Tournament = {
   shortDescription: string | null;
   birthYear: number | null;
   waitlistEnabled: boolean;
+  allowMultipleTeams: boolean;
   applicationsOpen: boolean;
   archivedAt: string | null;
   availableSlots: number;

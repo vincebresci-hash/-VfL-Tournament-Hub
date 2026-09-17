@@ -137,6 +137,7 @@ export default async function TournamentApplyPage({ params }: ApplyPageProps) {
               tournamentId={tournament.id}
               tournamentSlug={tournament.slug}
               ageGroup={tournament.ageGroup}
+              allowMultipleTeams={tournament.allowMultipleTeams === true}
               prefill={prefill}
               teams={workspace?.teams}
             />
