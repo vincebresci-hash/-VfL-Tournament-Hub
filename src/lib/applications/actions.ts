@@ -32,6 +32,10 @@ import {
   buildGuestMultiTeamNames,
   formatMultiTeamNamesForEmail,
 } from "@/lib/applications/multi-team-names";
+import {
+  describeRpcUuidArrayShape,
+  parseBatchApplicationIds,
+} from "@/lib/applications/rpc-uuid-array";
 
 export type SubmitApplicationResult = {
   error: string | null;
@@ -266,7 +270,13 @@ async function submitClubMultiTeamApplication(
     p_payload: payload,
   });
 
-  if (error || !data) {
+  if (error) {
+    console.error("create_club_applications failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     if (isDuplicateTeamApplicationViolation(error)) {
       return { error: DUPLICATE_TEAM_APPLICATION_MESSAGE };
     }
@@ -280,10 +290,16 @@ async function submitClubMultiTeamApplication(
     };
   }
 
-  const applicationIds = Array.isArray(data) ? data.map(String) : [];
-  if (applicationIds.length !== teamIds.length) {
+  const parsed = parseBatchApplicationIds(data, teamIds.length);
+  if (!parsed.ok) {
+    console.error("create_club_applications unexpected result shape", {
+      reason: parsed.reason,
+      expectedCount: teamIds.length,
+      ...describeRpcUuidArrayShape(data),
+    });
     return { error: "Die Bewerbung konnte nicht gespeichert werden." };
   }
+  const applicationIds = parsed.ids;
 
   if (values.contactPhone.trim()) {
     await supabase
@@ -315,7 +331,13 @@ async function submitGuestMultiTeamApplication(
     p_team_names: teamNames,
   });
 
-  if (error || !data) {
+  if (error) {
+    console.error("create_guest_applications failed", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
     return {
       error: toUserFacingDbError(
         "Die Bewerbung konnte nicht gespeichert werden.",
@@ -324,10 +346,16 @@ async function submitGuestMultiTeamApplication(
     };
   }
 
-  const applicationIds = Array.isArray(data) ? data.map(String) : [];
-  if (applicationIds.length !== teamNames.length) {
+  const parsed = parseBatchApplicationIds(data, teamNames.length);
+  if (!parsed.ok) {
+    console.error("create_guest_applications unexpected result shape", {
+      reason: parsed.reason,
+      expectedCount: teamNames.length,
+      ...describeRpcUuidArrayShape(data),
+    });
     return { error: "Die Bewerbung konnte nicht gespeichert werden." };
   }
+  const applicationIds = parsed.ids;
 
   return {
     error: null,

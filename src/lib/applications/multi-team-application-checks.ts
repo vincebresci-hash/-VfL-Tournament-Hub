@@ -188,6 +188,15 @@ export function runMultiTeamApplicationChecks() {
     "existing single-team helpers remain",
   );
   assert(
+    actions.includes("parseBatchApplicationIds") &&
+      actions.includes('from "@/lib/applications/rpc-uuid-array"'),
+    "batch paths normalize PostgREST uuid[] return shapes",
+  );
+  assert(
+    !actions.includes("Array.isArray(data) ? data.map(String) : []"),
+    "no fragile Array.isArray-only batch id parsing",
+  );
+  assert(
     actions.includes("sendApplicationReceivedEmail") &&
       actions.includes("formatMultiTeamNamesForEmail"),
     "one confirmation email uses combined team names",
