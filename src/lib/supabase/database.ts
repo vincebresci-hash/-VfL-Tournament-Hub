@@ -133,6 +133,7 @@ export type TournamentRow = {
   short_description: string | null;
   birth_year: number | null;
   waitlist_enabled: boolean;
+  allow_multiple_teams: boolean;
   applications_open: boolean;
   archived_at: string | null;
   match_duration_minutes?: number | null;

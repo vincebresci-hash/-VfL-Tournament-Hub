@@ -222,6 +222,7 @@ export type AdminTournamentRecord = {
   shortDescription: string | null;
   birthYear: number | null;
   waitlistEnabled: boolean;
+  allowMultipleTeams: boolean;
   applicationsOpen: boolean;
   applicationStart: string | null;
   applicationDeadline: string | null;
@@ -269,6 +270,7 @@ export type AdminTournamentInput = {
   status: "coming-soon" | "active" | "full" | "completed";
   applicationsOpen: boolean;
   waitlistEnabled: boolean;
+  allowMultipleTeams: boolean;
   applicationStart: string;
   applicationDeadline: string;
   imageUrl: string;
