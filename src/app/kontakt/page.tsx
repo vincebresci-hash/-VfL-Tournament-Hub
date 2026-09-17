@@ -139,6 +139,76 @@ export default async function KontaktPage() {
           </div>
         </aside>
       </div>
+
+      <section className="mt-8 border border-line bg-white p-6 sm:p-8">
+        <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
+          Absage
+        </p>
+        <h2 className="mt-3 font-display text-2xl font-bold tracking-wide text-ink uppercase">
+          Teilnahme absagen
+        </h2>
+        <p className="mt-3 max-w-3xl text-[15px] leading-7 text-muted">
+          Du möchtest eure Teilnahme an einem Turnier absagen? Aus
+          Sicherheitsgründen erfolgt eine Absage nicht über eine öffentliche
+          Mannschaftssuche.
+        </p>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+          <div className="border border-line p-5 sm:p-6">
+            <h3 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+              Über die Zusage-E-Mail
+            </h3>
+            <p className="mt-3 text-[15px] leading-7 text-muted">
+              Nach der Annahme eurer Bewerbung habt ihr von uns eine
+              Zusage-E-Mail erhalten. Öffnet dort den Link „Teilnahme
+              verwalten“. Über diesen persönlichen und sicheren Link könnt
+              ihr eine Absageanfrage für die betreffende Mannschaft stellen.
+            </p>
+          </div>
+
+          <div className="border border-line p-5 sm:p-6">
+            <h3 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
+              Über euer Vereinskonto
+            </h3>
+            <p className="mt-3 text-[15px] leading-7 text-muted">
+              Wenn ihr ein Vereinskonto im Tournament Hub nutzt, könnt ihr die
+              betreffende Bewerbung in eurem Vereinsbereich öffnen und dort
+              eine Absageanfrage stellen.
+            </p>
+            <Link
+              href="/verein/bewerbungen"
+              className="mt-5 inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066]"
+            >
+              Zu meinen Bewerbungen
+            </Link>
+          </div>
+        </div>
+
+        <div className="mt-8 border border-line bg-background p-5 sm:p-6">
+          <p className="text-[15px] leading-7 text-ink">
+            Eine Absageanfrage storniert die Teilnahme nicht automatisch. Die
+            Anfrage wird zunächst von uns geprüft.
+          </p>
+          <p className="mt-3 text-[15px] leading-7 text-muted">
+            Bei einer Absage weniger als 14 Tage vor dem Turnier ist die Angabe
+            eines Grundes erforderlich.
+          </p>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-2xl text-[14px] leading-6 text-muted">
+            Zusage-E-Mail oder persönlichen Link nicht mehr zur Hand? Dann
+            kontaktiert uns bitte direkt. Wir helfen euch bei der Zuordnung
+            eurer Teilnahme.
+          </p>
+          <a
+            href={`mailto:${email}?subject=${encodeURIComponent("Absage / Teilnahme zuordnen")}`}
+            className="inline-flex h-11 shrink-0 items-center border border-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-navy hover:text-white"
+          >
+            Kontakt aufnehmen
+          </a>
+        </div>
+      </section>
     </ContentPage>
   );
 }
