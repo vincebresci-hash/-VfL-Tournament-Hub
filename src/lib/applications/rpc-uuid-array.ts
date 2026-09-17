@@ -12,7 +12,7 @@ const UUID_RE =
 
 export type BatchUuidParseResult =
   | { ok: true; ids: string[] }
-  | { ok: false; reason: "null" | "malformed" | "count-mismatch" };
+  | { ok: false; reason: "null" | "malformed" | "count-mismatch" | "duplicate" };
 
 function isUuidString(value: unknown): value is string {
   return typeof value === "string" && UUID_RE.test(value);
@@ -119,6 +119,11 @@ export function parseBatchApplicationIds(
 
   if (ids.length !== expectedCount) {
     return { ok: false, reason: "count-mismatch" };
+  }
+
+  // Do not silently deduplicate — N requested applications need N distinct IDs.
+  if (new Set(ids).size !== ids.length) {
+    return { ok: false, reason: "duplicate" };
   }
 
   return { ok: true, ids };

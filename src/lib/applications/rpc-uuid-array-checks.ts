@@ -46,6 +46,44 @@ export function runRpcUuidArrayChecks() {
     "one UUID when two expected → failure",
   );
 
+  // Distinctness — never silently dedupe
+  assert(
+    parseBatchApplicationIds([ID_A, ID_B], 2).ok === true,
+    "two distinct UUIDs → success",
+  );
+  assert(
+    parseBatchApplicationIds([ID_A, ID_B, ID_C], 3).ok === true,
+    "three distinct UUIDs → success",
+  );
+  assert(
+    parseBatchApplicationIds([ID_A, ID_A], 2).ok === false &&
+      (parseBatchApplicationIds([ID_A, ID_A], 2) as { ok: false; reason: string }).reason ===
+        "duplicate",
+    "[id,id] expected 2 → failure (no dedupe)",
+  );
+  assert(
+    parseBatchApplicationIds([ID_A, ID_B, ID_B], 3).ok === false &&
+      (parseBatchApplicationIds([ID_A, ID_B, ID_B], 3) as { ok: false; reason: string }).reason ===
+        "duplicate",
+    "[id1,id2,id2] expected 3 → failure",
+  );
+  assert(
+    parseBatchApplicationIds(`{${ID_A},${ID_A}}`, 2).ok === false &&
+      (parseBatchApplicationIds(`{${ID_A},${ID_A}}`, 2) as { ok: false; reason: string })
+        .reason === "duplicate",
+    "duplicate Postgres literal → failure",
+  );
+  assert(
+    parseBatchApplicationIds({ create_guest_applications: [ID_A, ID_A] }, 2).ok === false &&
+      (
+        parseBatchApplicationIds({ create_guest_applications: [ID_A, ID_A] }, 2) as {
+          ok: false;
+          reason: string;
+        }
+      ).reason === "duplicate",
+    "duplicate wrapped array → failure",
+  );
+
   // Null / undefined
   assert(
     parseBatchApplicationIds(null, 2).ok === false &&
