@@ -28,6 +28,7 @@ import { runDuplicateApplicationChecks } from "@/lib/applications/duplicate-appl
 import { runApplicationArchiveDeleteChecks } from "@/lib/applications/application-archive-delete-checks";
 import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-application-fields-checks";
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
+import { runMultiTeamApplicationChecks } from "@/lib/applications/multi-team-application-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runTeamOperationsP2Checks } from "@/lib/team-operations-p2-checks";
@@ -102,6 +103,7 @@ try {
   const applicationArchiveDeleteChecks = runApplicationArchiveDeleteChecks();
   const guestApplicationFieldsChecks = runGuestApplicationFieldsChecks();
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
+  const multiTeamApplicationChecks = runMultiTeamApplicationChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const teamOperationsP2Checks = runTeamOperationsP2Checks();
@@ -169,6 +171,7 @@ try {
   console.log(`application-archive-delete-checks: ${applicationArchiveDeleteChecks}`);
   console.log(`guest-application-fields-checks: ${guestApplicationFieldsChecks}`);
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
+  console.log(`multi-team-application-checks: ${multiTeamApplicationChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
   console.log(`team-operations-p2-checks: ${teamOperationsP2Checks}`);

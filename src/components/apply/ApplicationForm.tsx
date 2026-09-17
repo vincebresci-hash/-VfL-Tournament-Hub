@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   Field,
   SelectInput,
@@ -29,6 +29,10 @@ import {
   type ApplicationFormValues,
 } from "@/lib/application";
 import { submitTournamentApplicationAction } from "@/lib/applications/actions";
+import {
+  MULTI_TEAM_APPLICATION_MAX,
+  buildGuestMultiTeamNames,
+} from "@/lib/applications/multi-team-names";
 import type { Team } from "@/types/auth";
 import type { AgeGroup } from "@/types/tournament";
 
@@ -36,6 +40,7 @@ type ApplicationFormProps = {
   tournamentId: string;
   tournamentSlug: string;
   ageGroup: AgeGroup;
+  allowMultipleTeams?: boolean;
   prefill?: Partial<ApplicationFormValues>;
   teams?: Team[];
 };
@@ -43,6 +48,7 @@ type ApplicationFormProps = {
 export function ApplicationForm({
   tournamentSlug,
   ageGroup,
+  allowMultipleTeams = false,
   prefill,
   teams = [],
 }: ApplicationFormProps) {
@@ -52,10 +58,29 @@ export function ApplicationForm({
     ...prefill,
     ageGroup,
   }));
-  const [selectedTeamId, setSelectedTeamId] = useState(prefill && teams[0] ? teams.find((team) => team.name === prefill.teamName)?.id ?? "" : "");
+  const [selectedTeamId, setSelectedTeamId] = useState(
+    prefill && teams[0]
+      ? (teams.find((team) => team.name === prefill.teamName)?.id ?? "")
+      : "",
+  );
+  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
+  const [teamCount, setTeamCount] = useState(1);
   const [errors, setErrors] = useState<ApplicationFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const eligibleTeams = useMemo(() => {
+    const matching = teams.filter((team) => team.ageGroup === ageGroup);
+    return matching.length > 0 ? matching : teams;
+  }, [teams, ageGroup]);
+
+  const clubMultiSelectEnabled =
+    allowMultipleTeams && eligibleTeams.length >= 2;
+  const guestQuantityEnabled =
+    allowMultipleTeams && !clubMultiSelectEnabled && teams.length === 0;
+  // Authenticated club with 0–1 eligible teams: keep exact single-team UX (no invented quantity).
+  const showGuestNamePreview =
+    guestQuantityEnabled && teamCount > 1 && values.teamName.trim().length > 0;
 
   function update<K extends keyof ApplicationFormValues>(
     field: K,
@@ -71,9 +96,57 @@ export function ApplicationForm({
     }
   }
 
+  function toggleClubTeam(teamId: string) {
+    setSelectedTeamIds((current) => {
+      if (current.includes(teamId)) {
+        return current.filter((id) => id !== teamId);
+      }
+      if (current.length >= MULTI_TEAM_APPLICATION_MAX) {
+        return current;
+      }
+      return [...current, teamId];
+    });
+    setSelectedTeamId("");
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const nextErrors = validateApplicationForm(values);
+    if (submitting) {
+      return;
+    }
+
+    if (clubMultiSelectEnabled && selectedTeamIds.length > MULTI_TEAM_APPLICATION_MAX) {
+      setFormError("Es können höchstens 3 Mannschaften gleichzeitig gemeldet werden.");
+      return;
+    }
+
+    if (guestQuantityEnabled && (teamCount < 1 || teamCount > MULTI_TEAM_APPLICATION_MAX)) {
+      setFormError("Bitte eine gültige Anzahl Mannschaften wählen.");
+      return;
+    }
+
+    const clubBatchPending =
+      clubMultiSelectEnabled && selectedTeamIds.length >= 2;
+    const firstSelectedTeam = clubBatchPending
+      ? eligibleTeams.find((team) => team.id === selectedTeamIds[0])
+      : undefined;
+    const valuesForValidation: ApplicationFormValues = clubBatchPending
+      ? {
+          ...values,
+          teamName:
+            values.teamName.trim() ||
+            firstSelectedTeam?.name ||
+            "Mannschaft",
+          birthYear:
+            values.birthYear.trim() ||
+            (firstSelectedTeam ? String(firstSelectedTeam.birthYear) : "2016"),
+          selfRatedStrength:
+            values.selfRatedStrength ||
+            (firstSelectedTeam ? String(firstSelectedTeam.strength) : ""),
+        }
+      : values;
+
+    const nextErrors = validateApplicationForm(valuesForValidation);
     setErrors(nextErrors);
     setFormError(null);
 
@@ -88,10 +161,22 @@ export function ApplicationForm({
     }
 
     setSubmitting(true);
+
+    const clubBatch = clubMultiSelectEnabled && selectedTeamIds.length >= 2;
+    const guestBatch = guestQuantityEnabled && teamCount >= 2;
+
     const result = await submitTournamentApplicationAction({
       tournamentSlug,
-      teamId: selectedTeamId || null,
-      values: { ...values, ageGroup },
+      teamId: clubBatch
+        ? null
+        : selectedTeamIds[0] || selectedTeamId || null,
+      teamIds: clubBatch
+        ? selectedTeamIds
+        : selectedTeamIds.length === 1
+          ? selectedTeamIds
+          : undefined,
+      teamCount: guestBatch ? teamCount : guestQuantityEnabled ? 1 : undefined,
+      values: { ...valuesForValidation, ageGroup },
     });
 
     if (result.error) {
@@ -170,7 +255,80 @@ export function ApplicationForm({
       </FormSection>
 
       <FormSection title="Mannschaft" icon={<IconUsers className="h-4 w-4 text-brand-yellow" />}>
-        {teams.length > 0 ? (
+        {guestQuantityEnabled ? (
+          <Field
+            id="teamCount"
+            label="Anzahl Mannschaften"
+            hint="Maximal 3 Mannschaften in einem Bewerbungsvorgang."
+          >
+            <SelectInput
+              id="teamCount"
+              name="teamCount"
+              value={String(teamCount)}
+              onChange={(event) => {
+                const next = Number.parseInt(event.target.value, 10);
+                setTeamCount(
+                  Number.isInteger(next) && next >= 1 && next <= MULTI_TEAM_APPLICATION_MAX
+                    ? next
+                    : 1,
+                );
+              }}
+            >
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+            </SelectInput>
+          </Field>
+        ) : null}
+
+        {clubMultiSelectEnabled ? (
+          <div className="grid gap-3">
+            <p className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+              Mannschaften auswählen
+            </p>
+            <p className="text-[13px] leading-6 text-muted">
+              Wähle bis zu {MULTI_TEAM_APPLICATION_MAX} bestehende Mannschaften. Jede
+              Auswahl erzeugt eine eigene Bewerbung.
+            </p>
+            <div className="grid gap-2">
+              {eligibleTeams.map((team) => {
+                const checked = selectedTeamIds.includes(team.id);
+                const disabled =
+                  !checked && selectedTeamIds.length >= MULTI_TEAM_APPLICATION_MAX;
+                return (
+                  <label
+                    key={team.id}
+                    htmlFor={`multi-team-${team.id}`}
+                    className={cn(
+                      "flex items-center justify-between gap-3 border border-line px-3 py-2.5 text-[14px] text-ink",
+                      disabled && "opacity-50",
+                    )}
+                  >
+                    <span>
+                      {team.name} · {team.ageGroup}
+                    </span>
+                    <input
+                      id={`multi-team-${team.id}`}
+                      type="checkbox"
+                      checked={checked}
+                      disabled={disabled || submitting}
+                      onChange={() => toggleClubTeam(team.id)}
+                      className="h-4 w-4 accent-brand-yellow"
+                    />
+                  </label>
+                );
+              })}
+            </div>
+            {selectedTeamIds.length === 0 ? (
+              <p className="text-[13px] text-muted">
+                Ohne Mehrfachauswahl kannst du unten wie bisher eine einzelne
+                Mannschaft melden.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!clubMultiSelectEnabled && teams.length > 0 ? (
           <Field id="existingTeam" label="Vorhandenes Team" optional>
             <SelectInput
               id="existingTeam"
@@ -201,58 +359,80 @@ export function ApplicationForm({
             </SelectInput>
           </Field>
         ) : null}
-        <Field id="teamName" label="Mannschaftsname" error={errors.teamName}>
-          <TextInput
-            id="teamName"
-            name="teamName"
-            placeholder="VfL Kirchheim U10"
-            value={values.teamName}
-            error={errors.teamName}
-            onChange={(event) => update("teamName", event.target.value)}
-          />
-        </Field>
-        <div className="grid gap-5 sm:grid-cols-2">
-        <div>
-          <p className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
-            Altersklasse
-          </p>
-          <p className="mt-2 flex h-11 items-center border border-line bg-surface px-3 text-[15px] text-muted">
-            {ageGroup}
-          </p>
-        </div>
-          <Field id="birthYear" label="Jahrgang" error={errors.birthYear}>
-            <TextInput
-              id="birthYear"
-              name="birthYear"
-              inputMode="numeric"
-              placeholder="2016"
-              value={values.birthYear}
-              error={errors.birthYear}
-              onChange={(event) => update("birthYear", event.target.value)}
-            />
-          </Field>
-        </div>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="league" label="Aktuelle Spielklasse / Liga" optional error={errors.league}>
-            <TextInput
-              id="league"
-              name="league"
-              placeholder="Bezirksstaffel"
-              value={values.league}
-              error={errors.league}
-              onChange={(event) => update("league", event.target.value)}
-            />
-          </Field>
-          <Field id="division" label="Staffel / Gruppe" optional>
-            <TextInput
-              id="division"
-              name="division"
-              placeholder="Staffel 2"
-              value={values.division}
-              onChange={(event) => update("division", event.target.value)}
-            />
-          </Field>
-        </div>
+
+        {clubMultiSelectEnabled && selectedTeamIds.length >= 2 ? null : (
+          <>
+            <Field id="teamName" label="Mannschaftsname" error={errors.teamName}>
+              <TextInput
+                id="teamName"
+                name="teamName"
+                placeholder="VfL Kirchheim U10"
+                value={values.teamName}
+                error={errors.teamName}
+                onChange={(event) => update("teamName", event.target.value)}
+              />
+            </Field>
+            {showGuestNamePreview ? (
+              <p className="text-[13px] leading-6 text-muted">
+                Es werden gemeldet:{" "}
+                {buildGuestMultiTeamNames(values.teamName, teamCount).join(", ")}
+              </p>
+            ) : null}
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <p className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+                  Altersklasse
+                </p>
+                <p className="mt-2 flex h-11 items-center border border-line bg-surface px-3 text-[15px] text-muted">
+                  {ageGroup}
+                </p>
+              </div>
+              <Field id="birthYear" label="Jahrgang" error={errors.birthYear}>
+                <TextInput
+                  id="birthYear"
+                  name="birthYear"
+                  inputMode="numeric"
+                  placeholder="2016"
+                  value={values.birthYear}
+                  error={errors.birthYear}
+                  onChange={(event) => update("birthYear", event.target.value)}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field id="league" label="Aktuelle Spielklasse / Liga" optional error={errors.league}>
+                <TextInput
+                  id="league"
+                  name="league"
+                  placeholder="Bezirksstaffel"
+                  value={values.league}
+                  error={errors.league}
+                  onChange={(event) => update("league", event.target.value)}
+                />
+              </Field>
+              <Field id="division" label="Staffel / Gruppe" optional>
+                <TextInput
+                  id="division"
+                  name="division"
+                  placeholder="Staffel 2"
+                  value={values.division}
+                  onChange={(event) => update("division", event.target.value)}
+                />
+              </Field>
+            </div>
+          </>
+        )}
+
+        {clubMultiSelectEnabled && selectedTeamIds.length >= 2 ? (
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.1em] text-ink uppercase">
+              Altersklasse
+            </p>
+            <p className="mt-2 flex h-11 items-center border border-line bg-surface px-3 text-[15px] text-muted">
+              {ageGroup}
+            </p>
+          </div>
+        ) : null}
       </FormSection>
 
       <FormSection title="Spielstärke" icon={<IconTrophy className="h-4 w-4 text-brand-yellow" />}>

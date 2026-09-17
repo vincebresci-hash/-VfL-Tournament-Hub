@@ -1118,6 +1118,18 @@ export type Database = {
         Args: { p_payload: Json };
         Returns: string;
       };
+      create_guest_applications: {
+        Args: { p_payload: Json; p_team_names: string[] };
+        Returns: string[];
+      };
+      create_club_applications: {
+        Args: {
+          p_tournament_id: string;
+          p_team_ids: string[];
+          p_payload: Json;
+        };
+        Returns: string[];
+      };
       active_email_template: {
         Args: { p_type: EmailTemplateTypeRow };
         Returns: ActiveEmailTemplateRow[];
