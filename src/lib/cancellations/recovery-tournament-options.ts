@@ -50,10 +50,9 @@ export async function listGuestCancellationRecoveryTournamentOptions(
     return [];
   }
 
-  const { data, error } = await service
-    .from("tournaments")
-    .select("id, name, date")
-    .order("date", { ascending: true });
+  const { data, error } = await service.rpc(
+    "list_guest_cancellation_recovery_tournaments",
+  );
 
   if (error) {
     const parts = [
@@ -72,17 +71,10 @@ export async function listGuestCancellationRecoveryTournamentOptions(
   }
 
   const rows = data as RecoveryTournamentRow[];
-  const eligible = rows
+  return rows
     .filter((row) => isTournamentWithinGuestRecoveryWindow(row.date, now))
     .map((row) => ({
       id: row.id,
       label: `${row.name} · ${formatDateDe(row.date)}`,
     }));
-
-  logRecoveryTournaments(
-    "query_success",
-    `fetched_count=${rows.length}; eligible_count=${eligible.length}`,
-  );
-
-  return eligible;
 }
