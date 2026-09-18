@@ -189,7 +189,7 @@ export function runGuestCancellationRecoveryChecks() {
     "preserves tournament+30d expiry semantics",
   );
 
-  // --- Rate limits ---
+  // --- Rate limits (check THEN record; COUNT(*) >= max ⇒ exactly max allowed) ---
   assert(
     migration.includes(RECOVERY_RATE_LIMIT.emailAction),
     "email rate-limit action type",
@@ -210,21 +210,80 @@ export function runGuestCancellationRecoveryChecks() {
   assert(migration.includes("interval '1 hour'"), "hourly rate-limit window");
   assert(
     migration.includes("guest_cancellation_recovery_email',\n    v_email_key,\n    3,"),
-    "email 3/hour",
+    "email max=3 ⇒ attempts 1–3 allowed, 4 blocked",
   );
   assert(
     migration.includes(
       "guest_cancellation_recovery_tournament_email',\n    v_combo_key,\n    5,",
     ),
-    "combo 5/hour",
+    "tournament+email max=5 ⇒ attempts 1–5 allowed, 6 blocked",
   );
   assert(
     migration.includes("guest_cancellation_recovery_ip',\n       v_ip_key,\n       10,"),
-    "ip 10/hour",
+    "ip max=10 ⇒ attempts 1–10 allowed, 11 blocked",
+  );
+
+  const firstCheckIdx = migration.indexOf("is_public_action_rate_limited(");
+  const firstRecordIdx = migration.indexOf("record_public_action_attempt(");
+  assert(
+    firstCheckIdx >= 0 &&
+      firstRecordIdx >= 0 &&
+      firstCheckIdx < firstRecordIdx,
+    "rate-limit CHECK appears before RECORD",
+  );
+  assert(
+    migration.includes("CHECK then RECORD") ||
+      migration.includes("Check then RECORD") ||
+      migration.includes("CHECK then RECORD (COUNT(*) >= max)"),
+    "documents check-then-record semantics",
+  );
+  assert(
+    migration.includes(
+      "Count this request even if identity ultimately does not match",
+    ),
+    "no-match attempts still recorded after check passes",
   );
   assert(
     actions.includes("hashRateLimitIdentifier"),
     "rate-limit keys hashed in app",
+  );
+
+  // Base helper semantics (existing): COUNT(*) >= max
+  const baseCancellationMigration = read(
+    "supabase/migrations/20260829160000_cancellation_requests.sql",
+  );
+  assert(
+    baseCancellationMigration.includes("COUNT(*)::integer >= p_max_attempts"),
+    "base helper uses COUNT >= max",
+  );
+  const submitFnStart = baseCancellationMigration.indexOf(
+    "CREATE OR REPLACE FUNCTION public.submit_cancellation_request_external",
+  );
+  const submitSlice = baseCancellationMigration.slice(submitFnStart, submitFnStart + 2500);
+  assert(
+    submitSlice.includes("is_public_action_rate_limited") &&
+      submitSlice.includes("record_public_action_attempt") &&
+      submitSlice.indexOf("is_public_action_rate_limited") <
+        submitSlice.indexOf("record_public_action_attempt"),
+    "existing cancellation_submit uses check-then-record",
+  );
+
+  // Email failure: accepted fail-closed (design D) — revoke new hash; do not restore old
+  assert(
+    actions.includes("email_failed_revoking_token") &&
+      actions.includes("revoke_secure_access_token_by_hash"),
+    "email failure revokes newly minted token hash",
+  );
+  assert(
+    actions.includes("Accepted fail-closed tradeoff") ||
+      migration.includes("Email-failure tradeoff (accepted)"),
+    "documents accepted email-failure token tradeoff",
+  );
+  assert(
+    !actions.includes("revoked_at = null") &&
+      !actions.includes('revoked_at: null') &&
+      !migration.includes("revoked_at = NULL"),
+    "does not restore revoked old tokens on email failure",
   );
 
   // --- Grants: service_role only; no anon ---

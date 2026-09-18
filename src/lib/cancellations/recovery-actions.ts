@@ -183,6 +183,9 @@ export async function requestGuestCancellationRecoveryAction(
   });
 
   if (!sendResult.ok) {
+    // Accepted fail-closed tradeoff: new token is revoked; previous active token was
+    // already rotated away in the RPC. Do not restore old tokens (concurrency /
+    // unique active-purpose index). Application unchanged; no cancellation_requests.
     logRecovery(
       "email_failed_revoking_token",
       sendResult.error ?? (sendResult.skipped ? "skipped" : "send_failed"),

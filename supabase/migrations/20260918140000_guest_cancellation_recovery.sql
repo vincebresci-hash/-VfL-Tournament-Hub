@@ -168,22 +168,8 @@ BEGIN
   v_combo_key := p_tournament_email_identifier_hash;
   v_ip_key := NULLIF(btrim(COALESCE(p_ip_identifier_hash, '')), '');
 
-  -- Record attempts first so limited callers stay limited
-  PERFORM public.record_public_action_attempt(
-    'guest_cancellation_recovery_email',
-    v_email_key
-  );
-  PERFORM public.record_public_action_attempt(
-    'guest_cancellation_recovery_tournament_email',
-    v_combo_key
-  );
-  IF v_ip_key IS NOT NULL THEN
-    PERFORM public.record_public_action_attempt(
-      'guest_cancellation_recovery_ip',
-      v_ip_key
-    );
-  END IF;
-
+  -- Existing project semantics: CHECK then RECORD (COUNT(*) >= max).
+  -- With max=3 this allows exactly 3 successful path entries / hour, blocks the 4th.
   IF public.is_public_action_rate_limited(
     'guest_cancellation_recovery_email',
     v_email_key,
@@ -216,6 +202,22 @@ BEGIN
   IF v_rate_limited THEN
     RETURN NEXT;
     RETURN;
+  END IF;
+
+  -- Count this request even if identity ultimately does not match (0 / >1 / ineligible).
+  PERFORM public.record_public_action_attempt(
+    'guest_cancellation_recovery_email',
+    v_email_key
+  );
+  PERFORM public.record_public_action_attempt(
+    'guest_cancellation_recovery_tournament_email',
+    v_combo_key
+  );
+  IF v_ip_key IS NOT NULL THEN
+    PERFORM public.record_public_action_attempt(
+      'guest_cancellation_recovery_ip',
+      v_ip_key
+    );
   END IF;
 
   -- Exact guest match count (accepted, non-archived, club_id IS NULL)
@@ -272,7 +274,13 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Atomic rotate for THIS application only (purpose = cancellation)
+  -- Atomic rotate for THIS application only (purpose = cancellation).
+  -- Email-failure tradeoff (accepted): if the trusted server later fails to deliver
+  -- the recovery email, it revokes the newly minted hash. The previous active token
+  -- for this application was already revoked here, so the application may temporarily
+  -- have no active participation token until another successful recovery.
+  -- Alternatives (dual-active tokens / restore-old) conflict with
+  -- secure_access_tokens_active_per_application_purpose or introduce concurrency races.
   UPDATE public.secure_access_tokens
   SET revoked_at = now()
   WHERE application_id = v_app.id
