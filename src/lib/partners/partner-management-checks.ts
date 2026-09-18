@@ -345,6 +345,12 @@ export function runPartnerManagementChecks() {
     "logo object-contain behavior",
   );
   assert(
+    partnerGrid.includes("PartnerSectionHeader") &&
+      !partnerGrid.includes("tracking-[0.14em] text-brand-blue uppercase") &&
+      !/>\s*Partner\s*</.test(partnerGrid),
+    "homepage partner section has no blue Partner eyebrow",
+  );
+  assert(
     partnerGrid.includes('rel="noopener noreferrer"') &&
       partnerGrid.includes('target="_blank"'),
     "external links use safe rel",

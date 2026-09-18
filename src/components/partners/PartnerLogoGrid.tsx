@@ -143,12 +143,9 @@ export function PartnerSectionHeader({
       )}
     >
       <div className="min-w-0">
-        <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-blue uppercase">
-          Partner
-        </p>
         <h2
           className={cn(
-            "mt-1.5 font-display font-bold tracking-wide text-ink uppercase",
+            "font-display font-bold tracking-wide text-ink uppercase",
             compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl",
           )}
         >
