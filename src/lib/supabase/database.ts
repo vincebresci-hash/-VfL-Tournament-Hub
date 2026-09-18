@@ -377,6 +377,13 @@ export type PartnerRow = {
   updated_at: string;
 };
 
+export type TournamentPartnerRow = {
+  id: string;
+  tournament_id: string;
+  partner_id: string;
+  created_at: string;
+};
+
 export type AppSettingRow = {
   id: string;
   key: string;
@@ -754,6 +761,30 @@ export type Database = {
         PartnerRow,
         Partial<PartnerRow> & { name: string },
         Partial<PartnerRow>
+      >;
+      tournament_partners: Table<
+        TournamentPartnerRow,
+        Partial<TournamentPartnerRow> & {
+          tournament_id: string;
+          partner_id: string;
+        },
+        Partial<TournamentPartnerRow>,
+        [
+          {
+            foreignKeyName: "tournament_partners_tournament_id_fkey";
+            columns: ["tournament_id"];
+            isOneToOne: false;
+            referencedRelation: "tournaments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "tournament_partners_partner_id_fkey";
+            columns: ["partner_id"];
+            isOneToOne: false;
+            referencedRelation: "partners";
+            referencedColumns: ["id"];
+          },
+        ]
       >;
       team_directory_entries: Table<
         TeamDirectoryEntryRow,
