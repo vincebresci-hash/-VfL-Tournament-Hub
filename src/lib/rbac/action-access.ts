@@ -90,6 +90,14 @@ export function requireNewsManage() {
   return requirePermissionAccess("news.manage");
 }
 
+export function requirePartnersView() {
+  return requirePermissionAccess("partners.view");
+}
+
+export function requirePartnersManage() {
+  return requirePermissionAccess("partners.manage");
+}
+
 export function requireClubsManage() {
   return requirePermissionAccess("clubs.manage");
 }

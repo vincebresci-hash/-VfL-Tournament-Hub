@@ -366,6 +366,17 @@ export type NewsPostRow = {
   archived_at: string | null;
 };
 
+export type PartnerRow = {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  website_url: string | null;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AppSettingRow = {
   id: string;
   key: string;
@@ -738,6 +749,11 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ]
+      >;
+      partners: Table<
+        PartnerRow,
+        Partial<PartnerRow> & { name: string },
+        Partial<PartnerRow>
       >;
       team_directory_entries: Table<
         TeamDirectoryEntryRow,

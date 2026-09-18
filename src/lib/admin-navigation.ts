@@ -6,6 +6,7 @@ import {
   IconClubs,
   IconDatabase,
   IconGrid,
+  IconHeart,
   IconMail,
   IconMessage,
   IconNews,
@@ -60,6 +61,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
       { href: "/admin/vereine", label: "Vereine", icon: IconClubs },
       { href: "/admin/teams", label: "Hub-Teams", icon: IconUsers },
       { href: "/admin/team-datenbank", label: "Team-Datenbank", icon: IconDatabase },
+      { href: "/admin/partner", label: "Partner", icon: IconHeart },
     ],
   },
   {
