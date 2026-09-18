@@ -268,13 +268,13 @@ export function runPartnerManagementChecks() {
     actions.includes('input.mode === "url"') &&
       actions.includes("normalizePartnerLogoUrl") &&
       actions.includes("isManagedPartnerLogoUrl(previousLogoUrl)") &&
-      /mode === "url"[\s\S]*update\(\{ logo_url: nextLogoUrl \}\)[\s\S]*isManagedPartnerLogoUrl\(previousLogoUrl\)[\s\S]*deleteManagedPartnerLogoIfOwned/s.test(
+      /mode === "url"[\s\S]*update\(\{ logo_url: nextLogoUrl \}\)[\s\S]*isManagedPartnerLogoUrl\(previousLogoUrl\)[\s\S]*deleteManagedPartnerLogoIfOwned/.test(
         actions,
       ),
     "managed → URL cleanup only after DB success",
   );
   assert(
-    /mode === "upload"[\s\S]*isManagedPartnerLogoUrl\(previousLogoUrl\)[\s\S]*deleteManagedPartnerLogoIfOwned/s.test(
+    /mode === "upload"[\s\S]*isManagedPartnerLogoUrl\(previousLogoUrl\)[\s\S]*deleteManagedPartnerLogoIfOwned/.test(
       actions,
     ) &&
       actions.includes("Previous external URL → never attempt Storage deletion"),
