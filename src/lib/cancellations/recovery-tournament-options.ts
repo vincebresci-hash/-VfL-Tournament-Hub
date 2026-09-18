@@ -15,6 +15,17 @@ type RecoveryTournamentRow = {
   date: string;
 };
 
+function logRecoveryTournaments(outcome: string, detail?: string) {
+  if (detail) {
+    console.info(
+      `[guest-cancellation-recovery-tournaments] ${outcome}: ${detail}`,
+    );
+    return;
+  }
+
+  console.info(`[guest-cancellation-recovery-tournaments] ${outcome}`);
+}
+
 /**
  * Server-only tournament metadata for /kontakt/absage.
  *
@@ -29,7 +40,13 @@ export async function listGuestCancellationRecoveryTournamentOptions(
   let service;
   try {
     service = createServiceRoleClient();
-  } catch {
+  } catch (error) {
+    const name = error instanceof Error ? error.name : "unknown";
+    const message = error instanceof Error ? error.message : "unknown";
+    logRecoveryTournaments(
+      "service_role_unavailable",
+      `${name}: ${message}`,
+    );
     return [];
   }
 
@@ -38,14 +55,34 @@ export async function listGuestCancellationRecoveryTournamentOptions(
     .select("id, name, date")
     .order("date", { ascending: true });
 
-  if (error || !data) {
+  if (error) {
+    const parts = [
+      error.code ? `code=${error.code}` : null,
+      error.message ? `message=${error.message}` : null,
+      error.details ? `details=${error.details}` : null,
+      error.hint ? `hint=${error.hint}` : null,
+    ].filter(Boolean);
+    logRecoveryTournaments("query_error", parts.join("; ") || "unknown");
     return [];
   }
 
-  return (data as RecoveryTournamentRow[])
+  if (!data) {
+    logRecoveryTournaments("empty_data_without_error");
+    return [];
+  }
+
+  const rows = data as RecoveryTournamentRow[];
+  const eligible = rows
     .filter((row) => isTournamentWithinGuestRecoveryWindow(row.date, now))
     .map((row) => ({
       id: row.id,
       label: `${row.name} · ${formatDateDe(row.date)}`,
     }));
+
+  logRecoveryTournaments(
+    "query_success",
+    `fetched_count=${rows.length}; eligible_count=${eligible.length}`,
+  );
+
+  return eligible;
 }
