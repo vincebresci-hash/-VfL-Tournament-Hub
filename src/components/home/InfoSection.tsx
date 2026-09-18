@@ -75,6 +75,7 @@ const ctaClassName =
 
 export async function InfoSection() {
   const partners = await listPublicActivePartners();
+  const hasPartners = partners.length > 0;
 
   return (
     <section
@@ -82,10 +83,18 @@ export async function InfoSection() {
       aria-label="Informationen"
     >
       <Container>
-        <div className="mb-8 rounded-[16px] border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f7f8fa_100%)] p-5 sm:mb-10 sm:p-7 lg:p-8">
+        <div
+          className={cn(
+            "mb-6 rounded-[16px] border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f7f8fa_100%)] sm:mb-8",
+            hasPartners
+              ? "p-5 sm:p-7 lg:p-8"
+              : "px-5 py-4 sm:px-6 sm:py-5",
+          )}
+        >
           <PartnerSectionHeader
             title="Unsere Partner"
             description="Gemeinsam für den Jugendfußball."
+            compact={!hasPartners}
             action={
               <Link
                 href="/partner"
@@ -96,8 +105,8 @@ export async function InfoSection() {
             }
           />
 
-          <div className="mt-6 sm:mt-7">
-            {partners.length > 0 ? (
+          <div className={hasPartners ? "mt-6 sm:mt-7" : "mt-3"}>
+            {hasPartners ? (
               <PartnerLogoGrid partners={partners} size="home" />
             ) : (
               <PartnerEmptyState

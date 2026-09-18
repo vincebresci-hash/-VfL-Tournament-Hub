@@ -241,8 +241,10 @@ export function runPartnerManagementChecks() {
     "homepage uses central partner data",
   );
   assert(
-    !infoSection.includes("Starke Partner aus der Region"),
-    "no duplicate homepage partner section / old bullets",
+    !infoSection.includes("Starke Partner aus der Region") &&
+      !infoSection.includes("Partner entdecken") &&
+      !infoSection.includes("IconClubs"),
+    "exactly one homepage Partner showcase (old card removed)",
   );
   assert(
     infoSection.includes("Für Vereine") &&
@@ -261,7 +263,7 @@ export function runPartnerManagementChecks() {
     "stub wording removed",
   );
 
-  // 24–25 design + links
+  // 24–25 design + links + compact empty
   assert(
     partnerGrid.includes("object-contain") && logoEditor.includes("object-contain"),
     "logo object-contain behavior",
@@ -274,6 +276,27 @@ export function runPartnerManagementChecks() {
   assert(
     partnerPage.includes('rel="noopener noreferrer"'),
     "partner page external link safe",
+  );
+  assert(
+    partnerGrid.includes("[&>li:nth-child(n+5)]:hidden") &&
+      partnerGrid.includes("xl:[&>li:nth-child(n+7)]:hidden"),
+    "homepage preview limit via CSS",
+  );
+  assert(
+    !partnerGrid.includes("border-dashed") &&
+      partnerGrid.includes("Zur Partnerseite") === false,
+    "empty state not a giant dashed box in grid helper",
+  );
+  assert(
+    infoSection.includes("compact={!hasPartners}") ||
+      infoSection.includes("compact={!hasPartners}") ||
+      infoSection.includes("hasPartners"),
+    "homepage Partner empty state compact",
+  );
+  assert(
+    partnerGrid.includes("flex flex-col gap-2 sm:flex-row") &&
+      !partnerGrid.includes("py-8 text-center"),
+    "PartnerEmptyState compact layout",
   );
 
   // 26–30 regression scope

@@ -19,7 +19,7 @@ export function PartnerLogoCard({
   const isPage = size === "page";
   const logoBoxClass = isPage
     ? "flex h-28 w-full items-center justify-center sm:h-32"
-    : "flex h-20 w-full items-center justify-center sm:h-24";
+    : "flex h-[4.5rem] w-full items-center justify-center sm:h-20";
 
   const content = (
     <>
@@ -34,7 +34,7 @@ export function PartnerLogoCard({
             className="max-h-full max-w-full object-contain"
           />
         ) : (
-          <span className="px-3 text-center font-display text-sm font-bold tracking-wide text-navy/70 uppercase">
+          <span className="px-3 text-center font-display text-[12px] font-bold tracking-wide text-navy/70 uppercase sm:text-sm">
             {partner.name}
           </span>
         )}
@@ -50,16 +50,21 @@ export function PartnerLogoCard({
             </span>
           ) : null}
         </div>
+      ) : partner.logoUrl ? (
+        <p className="mt-2 truncate text-center text-[11px] font-medium tracking-[0.04em] text-muted">
+          {partner.name}
+        </p>
       ) : null}
     </>
   );
 
   const cardClass = cn(
-    "rounded-[12px] border border-line bg-white p-4 sm:p-5",
+    "h-full rounded-[12px] border border-line bg-white p-4 sm:p-5",
     "shadow-[0_1px_2px_rgba(16,20,28,0.04)]",
     "motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-200",
     "[@media(hover:hover)]:hover:-translate-y-0.5",
-    "[@media(hover:hover)]:hover:border-navy/15",
+    "[@media(hover:hover)]:hover:scale-[1.01]",
+    "[@media(hover:hover)]:hover:border-brand-yellow/70",
     "[@media(hover:hover)]:hover:shadow-[0_10px_22px_rgba(16,20,28,0.08)]",
     "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow",
     className,
@@ -88,6 +93,10 @@ type PartnerLogoGridProps = {
   className?: string;
 };
 
+/**
+ * Homepage preview: CSS-only hide after 4 (mobile/tablet) / 6 (xl+).
+ * /partner shows the complete active list.
+ */
 export function PartnerLogoGrid({
   partners,
   size = "home",
@@ -102,12 +111,19 @@ export function PartnerLogoGrid({
       className={cn(
         size === "page"
           ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          : "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-4",
+          : cn(
+              "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3",
+              // Mobile + tablet preview: up to 4
+              "[&>li:nth-child(n+5)]:hidden",
+              // Desktop preview: up to 6
+              "xl:[&>li:nth-child(n+5)]:block",
+              "xl:[&>li:nth-child(n+7)]:hidden",
+            ),
         className,
       )}
     >
       {partners.map((partner) => (
-        <li key={partner.id}>
+        <li key={partner.id} className="min-w-0">
           <PartnerLogoCard partner={partner} size={size} />
         </li>
       ))}
@@ -119,22 +135,41 @@ export function PartnerSectionHeader({
   title,
   description,
   action,
+  compact = false,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
+  compact?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div
+      className={cn(
+        "flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between",
+        compact ? "gap-2" : "sm:gap-3",
+      )}
+    >
       <div className="min-w-0">
         <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-blue uppercase">
           Partner
         </p>
-        <h2 className="mt-2 font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
+        <h2
+          className={cn(
+            "mt-1.5 font-display font-bold tracking-wide text-ink uppercase",
+            compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl",
+          )}
+        >
           {title}
         </h2>
         {description ? (
-          <p className="mt-2 max-w-2xl text-[15px] leading-7 text-muted">
+          <p
+            className={cn(
+              "max-w-2xl text-muted",
+              compact
+                ? "mt-1 text-[14px] leading-6"
+                : "mt-2 text-[15px] leading-7",
+            )}
+          >
             {description}
           </p>
         ) : null}
@@ -154,12 +189,12 @@ export function PartnerEmptyState({
   ctaLabel?: string;
 }) {
   return (
-    <div className="rounded-[12px] border border-dashed border-line bg-white/70 px-5 py-8 text-center">
-      <p className="text-[15px] leading-7 text-muted">{message}</p>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+      <p className="text-[14px] leading-6 text-muted">{message}</p>
       {ctaHref && ctaLabel ? (
         <Link
           href={ctaHref}
-          className="mt-4 inline-flex min-h-11 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+          className="inline-flex min-h-10 shrink-0 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
         >
           {ctaLabel}
         </Link>
