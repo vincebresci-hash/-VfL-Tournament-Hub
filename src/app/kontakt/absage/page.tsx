@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ContentPage } from "@/components/layout/ContentPage";
 import { GuestCancellationRecoveryForm } from "@/components/cancellation/GuestCancellationRecoveryForm";
-import { listPublicTournaments } from "@/lib/db/tournament-queries";
-import { formatDateDe } from "@/lib/format";
+import { listGuestCancellationRecoveryTournamentOptions } from "@/lib/cancellations/recovery-tournament-options";
 import { withCanonical } from "@/lib/site";
 
 export const metadata: Metadata = withCanonical("/kontakt/absage", {
@@ -13,11 +12,7 @@ export const metadata: Metadata = withCanonical("/kontakt/absage", {
 export const dynamic = "force-dynamic";
 
 export default async function KontaktAbsagePage() {
-  const tournaments = await listPublicTournaments();
-  const options = tournaments.map((tournament) => ({
-    id: tournament.id,
-    label: `${tournament.name} · ${formatDateDe(tournament.date)}`,
-  }));
+  const options = await listGuestCancellationRecoveryTournamentOptions();
 
   return (
     <ContentPage

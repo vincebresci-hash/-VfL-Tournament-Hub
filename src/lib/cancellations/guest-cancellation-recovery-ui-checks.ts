@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GUEST_CANCELLATION_RECOVERY_PUBLIC_MESSAGE } from "@/lib/cancellations/recovery-constants";
+import { isTournamentWithinGuestRecoveryWindow } from "@/lib/cancellations/recovery-tournament-window";
 
 function assert(condition: unknown, message: string) {
   if (!condition) {
@@ -19,6 +20,13 @@ export function runGuestCancellationRecoveryUiChecks() {
     "src/components/cancellation/GuestCancellationRecoveryForm.tsx",
   );
   const recoveryActions = read("src/lib/cancellations/recovery-actions.ts");
+  const recoveryOptions = read(
+    "src/lib/cancellations/recovery-tournament-options.ts",
+  );
+  const recoveryWindow = read(
+    "src/lib/cancellations/recovery-tournament-window.ts",
+  );
+  const publicTournamentQueries = read("src/lib/db/tournament-queries.ts");
   const guidanceChecks = read(
     "src/lib/cancellations/public-cancellation-guidance-checks.ts",
   );
@@ -78,8 +86,10 @@ export function runGuestCancellationRecoveryUiChecks() {
   assert(
     !form.includes("autocomplete from") &&
       !form.includes("listPublicApplications") &&
-      !absage.includes("applications"),
-    "no participant/application search",
+      !absage.includes("applications") &&
+      !recoveryOptions.includes('.from("applications")') &&
+      !recoveryOptions.includes("from('applications')"),
+    "no applications query used for selector",
   );
   assert(
     !form.includes("datalist") && !form.includes("suggest"),
@@ -179,10 +189,100 @@ export function runGuestCancellationRecoveryUiChecks() {
     "C1 guidance checks still enforce form-free /kontakt",
   );
 
-  // Public tournament helper only
+  // Recovery tournament selector (archived-window fix)
   assert(
-    absage.includes("listPublicTournaments"),
-    "tournament options from public tournament helper",
+    absage.includes("listGuestCancellationRecoveryTournamentOptions"),
+    "absage uses recovery tournament options helper",
+  );
+  assert(
+    !absage.includes("listPublicTournaments"),
+    "absage does not use listPublicTournaments",
+  );
+  assert(
+    recoveryOptions.includes('import "server-only"') ||
+      recoveryOptions.includes("import 'server-only'"),
+    "recovery tournament helper is server-only",
+  );
+  assert(
+    recoveryOptions.includes("createServiceRoleClient"),
+    "recovery tournament helper uses trusted server client",
+  );
+  assert(
+    recoveryOptions.includes('select("id, name, date")') ||
+      recoveryOptions.includes("select('id, name, date')"),
+    "recovery selector returns only safe tournament metadata",
+  );
+  assert(
+    !recoveryOptions.includes("contact_email") &&
+      !recoveryOptions.includes("club_name") &&
+      !recoveryOptions.includes("team_name") &&
+      !recoveryOptions.includes("application_id") &&
+      !recoveryOptions.includes("confirmedTeams") &&
+      !recoveryOptions.includes("waitlist"),
+    "no participant/team/contact data returned",
+  );
+  assert(
+    !recoveryOptions.includes("applications_open") &&
+      !recoveryOptions.includes("applicationsOpen") &&
+      !recoveryOptions.includes('.eq("applications_open"'),
+    "applications_open=false does not exclude recovery tournament",
+  );
+  assert(
+    !recoveryOptions.includes("archived_at") &&
+      !recoveryOptions.includes("archivedAt") &&
+      !recoveryOptions.includes("includeArchived") &&
+      !recoveryOptions.includes('.is("archived_at"'),
+    "archived tournament within C2A recovery window CAN be selected",
+  );
+  assert(
+    recoveryOptions.includes("isTournamentWithinGuestRecoveryWindow") &&
+      recoveryWindow.includes("secureAccessTokenExpiresAt"),
+    "selector uses C2A recovery expiry window",
+  );
+  assert(
+    !recoveryOptions.includes("clubName") &&
+      !recoveryOptions.includes("teamName") &&
+      !recoveryOptions.includes("contactEmail") &&
+      !recoveryOptions.includes("honeypot") &&
+      !recoveryOptions.includes("tournamentId"),
+    "selector result is independent of supplied identity",
+  );
+
+  // Pure window semantics aligned with C2A (date UTC + 30 days > now)
+  const now = new Date(Date.UTC(2026, 8, 18)); // 2026-09-18
+  assert(
+    isTournamentWithinGuestRecoveryWindow("2026-09-01", now),
+    "within-window tournament date remains selectable",
+  );
+  assert(
+    !isTournamentWithinGuestRecoveryWindow("2026-08-01", now),
+    "tournament outside C2A expiry window is not offered",
+  );
+  assert(
+    !isTournamentWithinGuestRecoveryWindow(null, now),
+    "missing tournament date is not offered",
+  );
+
+  // Global public helper unchanged for archived exclusion
+  assert(
+    publicTournamentQueries.includes(
+      "export async function listPublicTournaments",
+    ),
+    "listPublicTournaments still exists",
+  );
+  assert(
+    publicTournamentQueries.includes("fetchTournamentRows({ includeArchived: false })"),
+    "no global listPublicTournaments behavior changed",
+  );
+
+  // C2A action still owns matching/RPC; selector is metadata-only
+  assert(
+    recoveryActions.includes("issue_guest_cancellation_recovery_token"),
+    "C2A action unchanged (RPC still present)",
+  );
+  assert(
+    recoveryActions.includes("GUEST_CANCELLATION_RECOVERY_PUBLIC_MESSAGE"),
+    "neutral response unchanged in C2A action",
   );
 
   return "ok";
