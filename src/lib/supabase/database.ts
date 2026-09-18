@@ -1198,6 +1198,34 @@ export type Database = {
         };
         Returns: string;
       };
+      issue_guest_cancellation_recovery_token: {
+        Args: {
+          p_tournament_id: string;
+          p_contact_email: string;
+          p_club_name: string;
+          p_team_name: string;
+          p_token_hash: string;
+          p_email_identifier_hash: string;
+          p_tournament_email_identifier_hash: string;
+          p_ip_identifier_hash?: string | null;
+        };
+        Returns: Array<{
+          should_send: boolean;
+          contact_email: string | null;
+          contact_first_name: string | null;
+          tournament_name: string | null;
+          tournament_date: string | null;
+          team_name: string | null;
+          club_name: string | null;
+        }>;
+      };
+      revoke_secure_access_token_by_hash: {
+        Args: {
+          p_token_hash: string;
+          p_purpose?: "cancellation" | "communication_confirm";
+        };
+        Returns: boolean;
+      };
       validate_secure_access_token: {
         Args: {
           p_token_hash: string;

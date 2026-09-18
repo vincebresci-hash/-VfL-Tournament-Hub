@@ -33,6 +33,7 @@ import { runRpcUuidArrayChecks } from "@/lib/applications/rpc-uuid-array-checks"
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runPublicCancellationGuidanceChecks } from "@/lib/cancellations/public-cancellation-guidance-checks";
+import { runGuestCancellationRecoveryChecks } from "@/lib/cancellations/guest-cancellation-recovery-checks";
 import { runTeamOperationsP2Checks } from "@/lib/team-operations-p2-checks";
 import { runRbacChecks } from "@/lib/rbac/rbac-checks";
 import { runRbacDomainRlsChecks } from "@/lib/rbac/rbac-domain-rls-checks";
@@ -110,6 +111,7 @@ try {
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const publicCancellationGuidanceChecks = runPublicCancellationGuidanceChecks();
+  const guestCancellationRecoveryChecks = runGuestCancellationRecoveryChecks();
   const teamOperationsP2Checks = runTeamOperationsP2Checks();
   const rbacChecks = runRbacChecks();
   const rbacDomainRlsChecks = runRbacDomainRlsChecks();
@@ -180,6 +182,7 @@ try {
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
   console.log(`public-cancellation-guidance-checks: ${publicCancellationGuidanceChecks}`);
+  console.log(`guest-cancellation-recovery-checks: ${guestCancellationRecoveryChecks}`);
   console.log(`team-operations-p2-checks: ${teamOperationsP2Checks}`);
   console.log(`rbac-checks: ${rbacChecks}`);
   console.log(`rbac-domain-rls-checks: ${rbacDomainRlsChecks}`);
