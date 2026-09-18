@@ -70,6 +70,62 @@ export function normalizePartnerWebsiteUrl(
   }
 }
 
+/**
+ * Absolute logo URL only (http/https). Empty is invalid for URL-save mode
+ * (removal uses explicit remove). Never fetches the URL.
+ */
+export function normalizePartnerLogoUrl(
+  value: string | null | undefined,
+): { ok: true; url: string } | { ok: false; error: string } {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) {
+    return {
+      ok: false,
+      error: "Bitte eine Logo-URL angeben.",
+    };
+  }
+
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith("javascript:") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("file:") ||
+    lower.startsWith("vbscript:")
+  ) {
+    return { ok: false, error: "Ungültige Logo-URL." };
+  }
+
+  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) {
+    return {
+      ok: false,
+      error: "Logo-URL muss absolut mit http:// oder https:// beginnen.",
+    };
+  }
+
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return {
+      ok: false,
+      error: "Logo-URL muss mit http:// oder https:// beginnen.",
+    };
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return {
+        ok: false,
+        error: "Logo-URL muss mit http:// oder https:// beginnen.",
+      };
+    }
+    if (!url.hostname.includes(".")) {
+      return { ok: false, error: "Bitte eine gültige Logo-URL angeben." };
+    }
+    return { ok: true, url: url.toString() };
+  } catch {
+    return { ok: false, error: "Bitte eine gültige Logo-URL angeben." };
+  }
+}
+
 export function validatePartnerInput(
   input: PartnerInput,
 ): { error: string | null; value: null } | {

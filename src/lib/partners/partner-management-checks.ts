@@ -4,6 +4,7 @@ import { RBAC_PERMISSIONS } from "@/types/rbac";
 import { ROLE_PERMISSIONS } from "@/lib/rbac/permissions";
 import {
   comparePartnersForPublicOrder,
+  normalizePartnerLogoUrl,
   normalizePartnerWebsiteUrl,
   validatePartnerInput,
 } from "@/lib/partners/partner";
@@ -215,6 +216,81 @@ export function runPartnerManagementChecks() {
     "upload upsert false + managed delete",
   );
 
+  // Upload hardening + Logo-URL fallback (no SSRF, no migration)
+  assert(
+    actions.includes('mode: "upload" | "url" | "remove"') &&
+      actions.includes('input.mode === "url"') &&
+      logoEditor.includes('mode: "url"') &&
+      logoEditor.includes("Logo-URL übernehmen"),
+    "URL mode exists in action + UI",
+  );
+  assert(
+    actions.includes("getFormDataUploadFile") &&
+      actions.includes("meta.received") &&
+      actions.includes("auth.getUser()") &&
+      actions.includes("Keine gültige Admin-Session"),
+    "upload uses FormData meta + getUser before Storage write",
+  );
+  assert(
+    actions.includes("Bitte eine Bilddatei auswählen.") &&
+      actions.includes("Die hochgeladene Datei ist leer oder ungültig.") &&
+      actions.includes("Logo-Upload fehlgeschlagen."),
+    "upload errors surface safely",
+  );
+  assert(
+    !actions.includes("fetch(") &&
+      !partnerLib.includes("fetch(") &&
+      !logoEditor.includes("fetch("),
+    "no server-side fetch for remote logo URL",
+  );
+  assert(
+    partnerLib.includes("normalizePartnerLogoUrl") &&
+      normalizePartnerLogoUrl("https://cdn.example.de/logo.png").ok === true &&
+      normalizePartnerLogoUrl("http://cdn.example.de/logo.png").ok === true,
+    "only http/https logo URLs accepted",
+  );
+  assert(normalizePartnerLogoUrl("javascript:alert(1)").ok === false, "logo rejects javascript:");
+  assert(normalizePartnerLogoUrl("data:image/png;base64,xx").ok === false, "logo rejects data:");
+  assert(normalizePartnerLogoUrl("file:///tmp/x.png").ok === false, "logo rejects file:");
+  assert(normalizePartnerLogoUrl("vbscript:msgbox(1)").ok === false, "logo rejects vbscript:");
+  assert(
+    normalizePartnerLogoUrl("/relative/logo.png").ok === false &&
+      normalizePartnerLogoUrl("../logo.png").ok === false &&
+      normalizePartnerLogoUrl("cdn.example.de/logo.png").ok === false,
+    "relative / bare logo URLs rejected",
+  );
+  assert(
+    normalizePartnerLogoUrl("").ok === false &&
+      normalizePartnerLogoUrl("   ").ok === false,
+    "empty logo URL does not silently remove",
+  );
+  assert(
+    actions.includes('input.mode === "url"') &&
+      actions.includes("normalizePartnerLogoUrl") &&
+      actions.includes("isManagedPartnerLogoUrl(previousLogoUrl)") &&
+      /mode === "url"[\s\S]*update\(\{ logo_url: nextLogoUrl \}\)[\s\S]*isManagedPartnerLogoUrl\(previousLogoUrl\)[\s\S]*deleteManagedPartnerLogoIfOwned/s.test(
+        actions,
+      ),
+    "managed → URL cleanup only after DB success",
+  );
+  assert(
+    /mode === "upload"[\s\S]*isManagedPartnerLogoUrl\(previousLogoUrl\)[\s\S]*deleteManagedPartnerLogoIfOwned/s.test(
+      actions,
+    ) &&
+      actions.includes("Previous external URL → never attempt Storage deletion"),
+    "external URL → file never attempts external Storage deletion",
+  );
+  assert(
+    actions.includes('input.mode === "remove"') && logoEditor.includes("Logo entfernen"),
+    "existing remove-logo still works",
+  );
+  assert(
+    !migration.includes("logo_url_external") &&
+      !migration.includes("ALTER TABLE public.partners ADD") &&
+      database.includes("logo_url: string | null"),
+    "no new DB column/migration for logo URL",
+  );
+
   // 20 website http(s)
   assert(normalizePartnerWebsiteUrl("").ok && normalizePartnerWebsiteUrl("").ok && (normalizePartnerWebsiteUrl("") as { url: string | null }).url === null, "empty website ok");
   assert(normalizePartnerWebsiteUrl("javascript:alert(1)").ok === false, "reject javascript");
@@ -330,8 +406,14 @@ export function runPartnerManagementChecks() {
   assert(rbacTypes.includes('"partners.view"'), "rbac types partners.view");
   assert(permissions.includes('"partners.manage"'), "role map partners.manage");
   assert(adminForm.includes("Partnername"), "admin create/edit fields");
-  assert(logoEditor.includes("Logo ersetzen") && logoEditor.includes("Logo entfernen"), "logo replace/remove");
+  assert(
+    logoEditor.includes("Logo hochladen") &&
+      logoEditor.includes("Logo-URL übernehmen") &&
+      logoEditor.includes("Logo entfernen"),
+    "logo upload/url/remove controls",
+  );
   assert(partnerLib.includes("normalizePartnerWebsiteUrl"), "website helper");
+  assert(partnerLib.includes("normalizePartnerLogoUrl"), "logo URL helper");
 
   // empty states
   assert(

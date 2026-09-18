@@ -26,6 +26,7 @@ export function PartnerLogoEditor({
   onDone,
 }: PartnerLogoEditorProps) {
   const [pending, startTransition] = useTransition();
+  const [urlInput, setUrlInput] = useState(savedLogoUrl ?? "");
   const [fileName, setFileName] = useState<string | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [optimisticLogoUrl, setOptimisticLogoUrl] = useState<string | null | undefined>(
@@ -41,6 +42,16 @@ export function PartnerLogoEditor({
       }
     };
   }, [filePreviewUrl]);
+
+  function clearFilePreview() {
+    setFileName(null);
+    setFilePreviewUrl((current) => {
+      if (current) {
+        URL.revokeObjectURL(current);
+      }
+      return null;
+    });
+  }
 
   function onFileSelected(next: File | null) {
     setLocalError(null);
@@ -78,6 +89,7 @@ export function PartnerLogoEditor({
         setLocalNotice(result.notice);
         if (result.logoUrl !== undefined) {
           setOptimisticLogoUrl(result.logoUrl);
+          setUrlInput(result.logoUrl ?? "");
         }
         onDone(result);
       } catch (error) {
@@ -97,7 +109,8 @@ export function PartnerLogoEditor({
         Partner-Logo
       </h2>
       <p className="mt-1.5 text-[12px] leading-5 text-muted">
-        PNG, JPEG oder WebP · max. 2 MB. Partner kann auch ohne Logo gespeichert werden.
+        Datei-Upload oder optionale externe Logo-URL. Partner kann auch ohne Logo gespeichert
+        werden.
       </p>
 
       <div className="mt-3 border-t border-line/70 pt-3">
@@ -141,7 +154,7 @@ export function PartnerLogoEditor({
             run(async () => {
               const result = await uploadPartnerLogoFormAction(formData);
               if (!result.error) {
-                setFileName(null);
+                clearFilePreview();
               }
               return {
                 error: result.error,
@@ -154,7 +167,10 @@ export function PartnerLogoEditor({
           <input type="hidden" name="partnerId" value={partnerId} />
           <label className="grid gap-1 text-[13px] text-ink">
             <span className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase">
-              Datei auswählen
+              Datei hochladen
+            </span>
+            <span className="text-[12px] text-muted">
+              PNG, JPEG oder WebP · max. 2 MB
             </span>
             <input
               type="file"
@@ -172,21 +188,74 @@ export function PartnerLogoEditor({
             disabled={pending || !fileName}
             className="inline-flex h-9 w-fit items-center rounded-md bg-brand-yellow px-3 text-[12px] font-semibold tracking-[0.06em] text-navy uppercase transition-colors hover:bg-[#ffe066] disabled:opacity-50"
           >
-            {pending ? "Lade hoch…" : currentLogoUrl ? "Logo ersetzen" : "Logo hochladen"}
+            {pending ? "Lade hoch…" : "Logo hochladen"}
           </button>
         </form>
+
+        <div
+          className="my-4 flex items-center gap-3 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase"
+          aria-hidden
+        >
+          <span className="h-px flex-1 bg-line" />
+          <span>Oder</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+
+        <div className="grid gap-3 rounded-lg border border-line bg-surface/30 p-3">
+          <label className="grid gap-1 text-[13px] text-ink">
+            <span className="text-[10px] font-semibold tracking-[0.08em] text-ink/50 uppercase">
+              Logo-URL
+            </span>
+            <span className="text-[12px] text-muted">
+              Optional: direkte URL zu einem extern gehosteten Partnerlogo
+            </span>
+            <input
+              value={urlInput}
+              onChange={(event) => setUrlInput(event.target.value)}
+              className="h-10 min-w-0 rounded-lg border border-line bg-white px-3"
+              placeholder="https://example.de/logo.png"
+              disabled={pending}
+              inputMode="url"
+              autoComplete="off"
+            />
+          </label>
+          <button
+            type="button"
+            disabled={pending || !urlInput.trim()}
+            onClick={() =>
+              run(async () => {
+                const result = await updatePartnerLogoAction({
+                  partnerId,
+                  mode: "url",
+                  logoUrl: urlInput,
+                });
+                if (!result.error) {
+                  clearFilePreview();
+                }
+                return result;
+              })
+            }
+            className="inline-flex h-9 w-fit items-center rounded-md border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.06em] text-ink uppercase transition-colors hover:bg-surface disabled:opacity-50"
+          >
+            Logo-URL übernehmen
+          </button>
+        </div>
 
         {currentLogoUrl ? (
           <button
             type="button"
             disabled={pending}
             onClick={() =>
-              run(async () =>
-                updatePartnerLogoAction({
+              run(async () => {
+                const result = await updatePartnerLogoAction({
                   partnerId,
                   mode: "remove",
-                }),
-              )
+                });
+                if (!result.error) {
+                  clearFilePreview();
+                }
+                return result;
+              })
             }
             className="mt-3 inline-flex h-9 items-center rounded-md border border-line bg-white px-3 text-[12px] font-semibold tracking-[0.06em] text-ink uppercase transition-colors hover:bg-surface disabled:opacity-50"
           >
