@@ -208,6 +208,21 @@ export function runGuestCancellationRecoveryUiChecks() {
     "recovery tournament helper uses trusted server client",
   );
   assert(
+    recoveryOptions.includes("service_role_unavailable") &&
+      recoveryOptions.includes("query_error") &&
+      recoveryOptions.includes("empty_data_without_error") &&
+      recoveryOptions.includes("query_success") &&
+      recoveryOptions.includes("fetched_count=") &&
+      recoveryOptions.includes("eligible_count="),
+    "recovery tournament helper logs diagnostic branch events server-side",
+  );
+  assert(
+    recoveryOptions.includes("[guest-cancellation-recovery-tournaments]") &&
+      !absage.includes("[guest-cancellation-recovery-tournaments]") &&
+      !form.includes("[guest-cancellation-recovery-tournaments]"),
+    "diagnostic logs stay server-only (not in public UI sources)",
+  );
+  assert(
     recoveryOptions.includes('select("id, name, date")') ||
       recoveryOptions.includes("select('id, name, date')"),
     "recovery selector returns only safe tournament metadata",
