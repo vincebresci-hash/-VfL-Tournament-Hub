@@ -18,6 +18,8 @@ export const RBAC_PERMISSIONS = [
   "results.manage",
   "news.view",
   "news.manage",
+  "partners.view",
+  "partners.manage",
   "clubs.view",
   "clubs.manage",
   "teams.view",

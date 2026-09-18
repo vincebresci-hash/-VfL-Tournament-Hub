@@ -38,6 +38,8 @@ export const ROLE_PERMISSIONS: Record<RbacRoleKey, readonly Permission[]> = {
     "communications.manage",
     "news.view",
     "news.manage",
+    "partners.view",
+    "partners.manage",
   ],
   CLUB_ADMIN: [
     "clubs.view",

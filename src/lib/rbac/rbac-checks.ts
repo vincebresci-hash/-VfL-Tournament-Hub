@@ -138,6 +138,9 @@ export function runRbacChecks() {
   assert(adminAccess.includes("NAV_PERMISSIONS"), "nav permission map preserved");
   assert(adminAccess.includes('"/admin/teams"'), "teams route permission unchanged");
   assert(adminAccess.includes('"/admin/team-datenbank"'), "team directory route permission unchanged");
+  assert(adminAccess.includes('"/admin/partner"'), "partner route permission mapped");
+  assert(adminNavigation.includes('href: "/admin/partner"'), "partner nav item");
+  assert(adminNavigation.includes('label: "Partner"'), "partner nav label");
 
   // SUPER_ADMIN
   assert(
@@ -387,7 +390,7 @@ export function runRbacChecks() {
     "inactive privileged user BLOCKED",
   );
 
-  assert(RBAC_PERMISSIONS.length >= 26, "permission catalog complete");
+  assert(RBAC_PERMISSIONS.length >= 28, "permission catalog complete");
   assert(ROLE_PERMISSIONS.SUPER_ADMIN.length === RBAC_PERMISSIONS.length, "super admin all perms");
 
   // TOURNAMENT_MANAGER

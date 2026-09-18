@@ -2,6 +2,11 @@ import type { ComponentType, SVGProps } from "react";
 import Link from "next/link";
 import { CoverImage } from "@/components/brand/CoverImage";
 import { Container } from "@/components/layout/Container";
+import {
+  PartnerEmptyState,
+  PartnerLogoGrid,
+  PartnerSectionHeader,
+} from "@/components/partners/PartnerLogoGrid";
 import { cn } from "@/lib/cn";
 import {
   CLUB_CITY,
@@ -10,9 +15,9 @@ import {
   CLUB_STREET,
 } from "@/data/club";
 import { media } from "@/lib/constants";
+import { listPublicActivePartners } from "@/lib/partners/queries";
 import {
   IconCheck,
-  IconClubs,
   IconPin,
   IconShield,
   IconUsers,
@@ -51,18 +56,6 @@ const columns: InfoColumn[] = [
       "Fußball aus Leidenschaft",
     ],
   },
-  {
-    title: "Unsere Partner",
-    href: "/partner",
-    linkLabel: "Partner entdecken →",
-    icon: IconClubs,
-    items: [
-      "Gemeinsam für den Jugendfußball",
-      "Starke Partner aus der Region",
-      "Unterstützung unserer Jugendturniere",
-      "Gemeinsam für Nachwuchs & Verein",
-    ],
-  },
 ];
 
 const cardClassName = cn(
@@ -74,19 +67,49 @@ const cardClassName = cn(
   "[@media(hover:hover)]:hover:shadow-[0_8px_18px_rgba(16,20,28,0.07)]",
 );
 
-const cardBodyClassName = "flex flex-1 flex-col px-5 py-5 sm:px-6 sm:py-6 lg:px-7 lg:py-7";
+const cardBodyClassName =
+  "flex flex-1 flex-col px-5 py-5 sm:px-6 sm:py-6 lg:px-7 lg:py-7";
 
 const ctaClassName =
   "mt-3 inline-flex min-h-11 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow sm:mt-3.5 lg:mt-4";
 
-export function InfoSection() {
+export async function InfoSection() {
+  const partners = await listPublicActivePartners();
+
   return (
     <section
       className="bg-background pt-2 pb-12 sm:pt-3 lg:pb-16"
       aria-label="Informationen"
     >
       <Container>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4 xl:grid-cols-4 xl:gap-5">
+        <div className="mb-8 rounded-[16px] border border-line bg-[linear-gradient(180deg,#ffffff_0%,#f7f8fa_100%)] p-5 sm:mb-10 sm:p-7 lg:p-8">
+          <PartnerSectionHeader
+            title="Unsere Partner"
+            description="Gemeinsam für den Jugendfußball."
+            action={
+              <Link
+                href="/partner"
+                className="inline-flex min-h-11 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+              >
+                Alle Partner →
+              </Link>
+            }
+          />
+
+          <div className="mt-6 sm:mt-7">
+            {partners.length > 0 ? (
+              <PartnerLogoGrid partners={partners} size="home" />
+            ) : (
+              <PartnerEmptyState
+                message="Unsere Partner werden hier in Kürze vorgestellt."
+                ctaHref="/partner"
+                ctaLabel="Zur Partnerseite →"
+              />
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4 xl:grid-cols-3 xl:gap-5">
           {columns.map((column) => {
             const Icon = column.icon;
 
