@@ -30,6 +30,9 @@ export function runGuestCancellationRecoveryUiChecks() {
   const guidanceChecks = read(
     "src/lib/cancellations/public-cancellation-guidance-checks.ts",
   );
+  const recoveryTournamentsMigration = read(
+    "supabase/migrations/20260918180000_guest_cancellation_recovery_tournaments.sql",
+  );
 
   // 1–2 CTA on /kontakt
   assert(kontakt.includes("Absage anfragen"), "/kontakt contains Absage anfragen");
@@ -208,24 +211,33 @@ export function runGuestCancellationRecoveryUiChecks() {
     "recovery tournament helper uses trusted server client",
   );
   assert(
+    recoveryOptions.includes('rpc(\n    "list_guest_cancellation_recovery_tournaments"') ||
+      recoveryOptions.includes(
+        'rpc("list_guest_cancellation_recovery_tournaments"',
+      ) ||
+      recoveryOptions.includes(
+        "rpc('list_guest_cancellation_recovery_tournaments'",
+      ),
+    "helper uses RPC list_guest_cancellation_recovery_tournaments",
+  );
+  assert(
+    !recoveryOptions.includes('.from("tournaments")') &&
+      !recoveryOptions.includes("from('tournaments')") &&
+      !recoveryOptions.includes('.select("id, name, date")'),
+    "helper no longer directly selects tournaments",
+  );
+  assert(
     recoveryOptions.includes("service_role_unavailable") &&
       recoveryOptions.includes("query_error") &&
-      recoveryOptions.includes("empty_data_without_error") &&
-      recoveryOptions.includes("query_success") &&
-      recoveryOptions.includes("fetched_count=") &&
-      recoveryOptions.includes("eligible_count="),
-    "recovery tournament helper logs diagnostic branch events server-side",
+      !recoveryOptions.includes("query_success") &&
+      !recoveryOptions.includes("fetched_count="),
+    "recovery tournament helper keeps failure logs without success noise",
   );
   assert(
     recoveryOptions.includes("[guest-cancellation-recovery-tournaments]") &&
       !absage.includes("[guest-cancellation-recovery-tournaments]") &&
       !form.includes("[guest-cancellation-recovery-tournaments]"),
     "diagnostic logs stay server-only (not in public UI sources)",
-  );
-  assert(
-    recoveryOptions.includes('select("id, name, date")') ||
-      recoveryOptions.includes("select('id, name, date')"),
-    "recovery selector returns only safe tournament metadata",
   );
   assert(
     !recoveryOptions.includes("contact_email") &&
@@ -239,20 +251,20 @@ export function runGuestCancellationRecoveryUiChecks() {
   assert(
     !recoveryOptions.includes("applications_open") &&
       !recoveryOptions.includes("applicationsOpen") &&
-      !recoveryOptions.includes('.eq("applications_open"'),
+      !recoveryTournamentsMigration.includes("applications_open"),
     "applications_open=false does not exclude recovery tournament",
   );
   assert(
     !recoveryOptions.includes("archived_at") &&
       !recoveryOptions.includes("archivedAt") &&
       !recoveryOptions.includes("includeArchived") &&
-      !recoveryOptions.includes('.is("archived_at"'),
+      !recoveryTournamentsMigration.includes("archived_at"),
     "archived tournament within C2A recovery window CAN be selected",
   );
   assert(
     recoveryOptions.includes("isTournamentWithinGuestRecoveryWindow") &&
       recoveryWindow.includes("secureAccessTokenExpiresAt"),
-    "selector uses C2A recovery expiry window",
+    "JS defense-in-depth recovery window remains",
   );
   assert(
     !recoveryOptions.includes("clubName") &&
@@ -261,6 +273,73 @@ export function runGuestCancellationRecoveryUiChecks() {
       !recoveryOptions.includes("honeypot") &&
       !recoveryOptions.includes("tournamentId"),
     "selector result is independent of supplied identity",
+  );
+
+  // Narrow SECURITY DEFINER RPC migration
+  assert(
+    recoveryTournamentsMigration.includes(
+      "list_guest_cancellation_recovery_tournaments",
+    ),
+    "migration defines recovery tournaments RPC",
+  );
+  assert(
+    recoveryTournamentsMigration.includes("id uuid") &&
+      recoveryTournamentsMigration.includes("name text") &&
+      recoveryTournamentsMigration.includes("date date") &&
+      !recoveryTournamentsMigration.includes("contact_email") &&
+      !recoveryTournamentsMigration.includes("application_id"),
+    "RPC returns only id, name, date",
+  );
+  assert(
+    recoveryTournamentsMigration.includes("SECURITY DEFINER"),
+    "SECURITY DEFINER present",
+  );
+  assert(
+    recoveryTournamentsMigration.includes("SET search_path = public"),
+    "search_path fixed to public",
+  );
+  assert(
+    recoveryTournamentsMigration.includes("REVOKE ALL ON FUNCTION") &&
+      recoveryTournamentsMigration.includes("FROM PUBLIC"),
+    "PUBLIC execute revoked",
+  );
+  assert(
+    recoveryTournamentsMigration.includes("FROM anon"),
+    "anon execute revoked",
+  );
+  assert(
+    recoveryTournamentsMigration.includes("FROM authenticated"),
+    "authenticated execute revoked",
+  );
+  assert(
+    recoveryTournamentsMigration.includes(
+      "GRANT EXECUTE ON FUNCTION public.list_guest_cancellation_recovery_tournaments()",
+    ) && recoveryTournamentsMigration.includes("TO service_role"),
+    "service_role execute granted",
+  );
+  assert(
+    !recoveryTournamentsMigration.includes("GRANT SELECT ON TABLE public.tournaments") &&
+      !recoveryTournamentsMigration.includes("GRANT SELECT ON public.tournaments"),
+    "no SELECT grant on tournaments added",
+  );
+  assert(
+    !recoveryTournamentsMigration.includes("FROM public.applications") &&
+      !recoveryTournamentsMigration.includes("JOIN public.applications") &&
+      !recoveryTournamentsMigration.includes("from applications"),
+    "no applications join",
+  );
+  assert(
+    !recoveryTournamentsMigration.includes("p_contact") &&
+      !recoveryTournamentsMigration.includes("p_club") &&
+      !recoveryTournamentsMigration.includes("p_team") &&
+      !recoveryTournamentsMigration.includes("p_email"),
+    "no identity parameters",
+  );
+  assert(
+    recoveryTournamentsMigration.includes(
+      "((t.date::timestamp AT TIME ZONE 'UTC') + interval '30 days') > now()",
+    ),
+    "C2A date+30d semantics aligned",
   );
 
   // Pure window semantics aligned with C2A (date UTC + 30 days > now)

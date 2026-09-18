@@ -1219,6 +1219,14 @@ export type Database = {
           club_name: string | null;
         }>;
       };
+      list_guest_cancellation_recovery_tournaments: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          id: string;
+          name: string;
+          date: string;
+        }>;
+      };
       revoke_secure_access_token_by_hash: {
         Args: {
           p_token_hash: string;
