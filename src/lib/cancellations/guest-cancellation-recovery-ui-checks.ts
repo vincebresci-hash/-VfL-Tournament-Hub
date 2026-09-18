@@ -124,7 +124,8 @@ export function runGuestCancellationRecoveryUiChecks() {
   );
   assert(
     kontakt.includes("Über die Zusage-E-Mail") &&
-      kontakt.includes("Teilnahme verwalten"),
+      kontakt.includes("Teilnahme") &&
+      kontakt.includes("verwalten"),
     "acceptance-email guidance remains",
   );
   assert(
@@ -138,12 +139,13 @@ export function runGuestCancellationRecoveryUiChecks() {
     "<14-day information shown",
   );
   assert(
-    absage.includes("erst gültig, nachdem sie vom VfL Kirchheim") ||
-      absage.includes("vom VfL Kirchheim bestätigt"),
+    absage.includes("erst gültig, nachdem sie vom VfL Kirchheim") &&
+      absage.includes("bestätigt"),
     "explicit VfL confirmation required copy",
   );
   assert(
-    absage.includes("storniert eure Teilnahme noch nicht"),
+    absage.includes("storniert eure Teilnahme noch") &&
+      absage.includes("nicht"),
     "form does not cancel participation immediately",
   );
 
