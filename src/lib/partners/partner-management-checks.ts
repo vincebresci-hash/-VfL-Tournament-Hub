@@ -354,9 +354,29 @@ export function runPartnerManagementChecks() {
     "partner page external link safe",
   );
   assert(
-    partnerGrid.includes("[&>li:nth-child(n+5)]:hidden") &&
-      partnerGrid.includes("xl:[&>li:nth-child(n+7)]:hidden"),
-    "homepage preview limit via CSS",
+    infoSection.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT = 3") &&
+      infoSection.includes("partners.slice(0, HOMEPAGE_PARTNER_PREVIEW_LIMIT)") &&
+      infoSection.includes("previewPartners") &&
+      !partnerGrid.includes("[&>li:nth-child(n+5)]:hidden") &&
+      !partnerGrid.includes("xl:[&>li:nth-child(n+7)]:hidden"),
+    "homepage preview max 3 (data slice, not CSS 4/6 hide)",
+  );
+  assert(
+    partnerPage.includes("listPublicActivePartners") &&
+      partnerPage.includes('<PartnerLogoGrid partners={partners} size="page" />') &&
+      !partnerPage.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT") &&
+      !partnerPage.includes(".slice(0,"),
+    "/partner still shows all active partners",
+  );
+  assert(
+    infoSection.includes('href="/partner"') &&
+      infoSection.includes("Alle Partner →"),
+    "Alle Partner link preserved to /partner",
+  );
+  assert(
+    partnerGrid.includes("min-[480px]:grid-cols-3") ||
+      partnerGrid.includes("sm:grid-cols-3"),
+    "homepage home grid is a single even 3-column row on larger screens",
   );
   assert(
     !partnerGrid.includes("border-dashed") &&

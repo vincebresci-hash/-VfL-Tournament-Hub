@@ -73,9 +73,13 @@ const cardBodyClassName =
 const ctaClassName =
   "mt-3 inline-flex min-h-11 items-center text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow sm:mt-3.5 lg:mt-4";
 
+/** Homepage "Unsere Partner" preview — first N of the public sorted active list. */
+export const HOMEPAGE_PARTNER_PREVIEW_LIMIT = 3;
+
 export async function InfoSection() {
   const partners = await listPublicActivePartners();
-  const hasPartners = partners.length > 0;
+  const previewPartners = partners.slice(0, HOMEPAGE_PARTNER_PREVIEW_LIMIT);
+  const hasPartners = previewPartners.length > 0;
 
   return (
     <section
@@ -107,7 +111,7 @@ export async function InfoSection() {
 
           <div className={hasPartners ? "mt-6 sm:mt-7" : "mt-3"}>
             {hasPartners ? (
-              <PartnerLogoGrid partners={partners} size="home" />
+              <PartnerLogoGrid partners={previewPartners} size="home" />
             ) : (
               <PartnerEmptyState
                 message="Unsere Partner werden hier in Kürze vorgestellt."

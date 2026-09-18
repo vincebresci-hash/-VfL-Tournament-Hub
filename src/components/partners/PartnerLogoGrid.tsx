@@ -94,7 +94,7 @@ type PartnerLogoGridProps = {
 };
 
 /**
- * Homepage preview: CSS-only hide after 4 (mobile/tablet) / 6 (xl+).
+ * Homepage preview: caller passes at most 3 partners (one even row on sm+).
  * /partner shows the complete active list.
  */
 export function PartnerLogoGrid({
@@ -111,14 +111,7 @@ export function PartnerLogoGrid({
       className={cn(
         size === "page"
           ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          : cn(
-              "grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3",
-              // Mobile + tablet preview: up to 4
-              "[&>li:nth-child(n+5)]:hidden",
-              // Desktop preview: up to 6
-              "xl:[&>li:nth-child(n+5)]:block",
-              "xl:[&>li:nth-child(n+7)]:hidden",
-            ),
+          : "grid grid-cols-1 gap-3 min-[480px]:grid-cols-3 sm:gap-4",
         className,
       )}
     >
