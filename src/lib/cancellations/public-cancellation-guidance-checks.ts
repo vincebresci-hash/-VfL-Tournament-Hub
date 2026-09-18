@@ -41,15 +41,24 @@ export function runPublicCancellationGuidanceChecks() {
     page.includes("persönlichen Link nicht mehr zur Hand"),
     "lost-link help note",
   );
+  assert(page.includes("Absage anfragen"), "recovery CTA label");
+  assert(
+    page.includes('href="/kontakt/absage"'),
+    "recovery CTA points to /kontakt/absage",
+  );
   assert(
     page.includes("mailto:${email}") || page.includes("mailto:${email}?"),
     "reuses existing contact mailto",
   );
 
-  // Security: no public cancellation form / lookup / generic token link
-  assert(!page.includes("<form"), "no public cancellation form");
+  // Security: /kontakt itself remains form-free; recovery form is on /kontakt/absage
+  assert(!page.includes("<form"), "no public cancellation form on /kontakt");
   assert(!page.includes("application_id"), "no application_id input");
   assert(!page.includes("action="), "no form action");
+  assert(
+    !page.includes("requestGuestCancellationRecoveryAction"),
+    "no recovery action wiring on /kontakt",
+  );
   assert(
     !page.includes('href="/teilnahme"') &&
       !page.includes("href='/teilnahme'") &&

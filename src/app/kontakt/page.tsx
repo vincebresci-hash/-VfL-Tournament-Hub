@@ -197,16 +197,24 @@ export default async function KontaktPage() {
 
         <div className="mt-6 flex flex-col gap-4 border-t border-line pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-2xl text-[14px] leading-6 text-muted">
-            Zusage-E-Mail oder persönlichen Link nicht mehr zur Hand? Dann
-            kontaktiert uns bitte direkt. Wir helfen euch bei der Zuordnung
-            eurer Teilnahme.
+            Zusage-E-Mail oder persönlichen Link nicht mehr zur Hand? Ohne
+            Vereinskonto könnt ihr einen neuen sicheren Zugangslink anfordern.
+            Alternativ kontaktiert uns bitte direkt.
           </p>
-          <a
-            href={`mailto:${email}?subject=${encodeURIComponent("Absage / Teilnahme zuordnen")}`}
-            className="inline-flex h-11 shrink-0 items-center border border-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-navy hover:text-white"
-          >
-            Kontakt aufnehmen
-          </a>
+          <div className="flex flex-col gap-3 sm:flex-row sm:shrink-0">
+            <Link
+              href="/kontakt/absage"
+              className="inline-flex h-11 items-center justify-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066]"
+            >
+              Absage anfragen
+            </Link>
+            <a
+              href={`mailto:${email}?subject=${encodeURIComponent("Absage / Teilnahme zuordnen")}`}
+              className="inline-flex h-11 items-center justify-center border border-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-navy hover:text-white"
+            >
+              Kontakt aufnehmen
+            </a>
+          </div>
         </div>
       </section>
     </ContentPage>
