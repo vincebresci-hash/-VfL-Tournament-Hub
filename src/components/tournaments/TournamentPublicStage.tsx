@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { StandingsTable } from "@/components/tournaments/StandingsTable";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
-import { hasDistinctTeamName, publicTeamLabel, teamLabel } from "@/lib/schedule/names";
+import { publicTeamLabel, teamLabel } from "@/lib/schedule/names";
 import {
   computeKnockoutPlacements,
   knockoutRoundLabel,
@@ -16,7 +16,7 @@ import { MeinTurnierplanLiveSection } from "@/components/tournaments/MeinTurnier
 import { MeinTurnierplanWidget } from "@/components/tournaments/MeinTurnierplanWidget";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { MeinTurnierplanSourceHint } from "@/components/tournaments/MeinTurnierplanSourceHint";
-import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
+import { TournamentParticipantCards } from "@/components/tournaments/TournamentParticipantCards";
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import {
   resolveGruppenTab,
@@ -242,9 +242,17 @@ export function TournamentPublicStage({
 
       {current === "teilnehmer" ? (
         <section className="mt-8">
-          <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
-            Teilnehmer
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
+              Teilnehmer
+            </h2>
+            {teilnehmerTab.source === "hub" && stage.roster.length > 0 ? (
+              <p className="text-[13px] font-medium tracking-wide text-muted">
+                {stage.roster.length}{" "}
+                {stage.roster.length === 1 ? "Team" : "Teams"}
+              </p>
+            ) : null}
+          </div>
           {teilnehmerTab.source === "mein-turnierplan" ? (
             <>
               <ul className="mt-4 grid gap-3">
@@ -268,28 +276,7 @@ export function TournamentPublicStage({
           ) : stage.roster.length === 0 ? (
             <p className="mt-4 text-[15px] text-muted">Noch keine bestätigten Teams.</p>
           ) : (
-            <ul className="mt-4 grid gap-3">
-              {stage.roster.map((entry) => (
-                <li key={entry.applicationId} className="border border-line bg-white px-4 py-3">
-                  <div className="flex items-start gap-3">
-                    <ParticipantClubLogo logoUrl={entry.logoUrl} clubName={entry.clubName} />
-                    <div className="min-w-0">
-                      <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                        {entry.clubName.trim() || publicTeamLabel(entry.clubName, entry.teamName)}
-                      </p>
-                      {hasDistinctTeamName(entry.clubName, entry.teamName) ? (
-                        <p className="mt-1 text-[14px] text-ink">{entry.teamName}</p>
-                      ) : null}
-                      <p className="mt-2 text-[13px] text-muted">
-                        {entry.ageGroup ?? "Altersklasse"}
-                        {entry.birthYear ? ` · Jahrgang ${entry.birthYear}` : ""}
-                        {entry.groupName ? ` · ${entry.groupName}` : ""}
-                      </p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <TournamentParticipantCards roster={stage.roster} />
           )}
         </section>
       ) : null}
