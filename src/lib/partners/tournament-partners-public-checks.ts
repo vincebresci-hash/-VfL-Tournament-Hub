@@ -128,14 +128,25 @@ export function runTournamentPartnersPublicChecks() {
     "TournamentPublicStage implementation unchanged for Partners",
   );
 
-  // section before stage on page
+  // section after hero / MeinTurnierplan, before facts
   const sectionIdx = tournamentDetail.indexOf(
     "<TournamentPartnersSection partners={tournamentPartners} />",
   );
+  const factsIdx = tournamentDetail.indexOf("{facts.length > 0 ? (");
   const stageIdx = tournamentDetail.indexOf("<TournamentPublicStage");
   assert(
-    sectionIdx > 0 && stageIdx > sectionIdx,
-    "Partner section rendered before TournamentPublicStage",
+    sectionIdx > 0 &&
+      factsIdx > sectionIdx &&
+      stageIdx > factsIdx,
+    "Partner section rendered after hero and before facts grid",
+  );
+
+  assert(
+    section.includes('size="tournament"') &&
+      partnerGrid.includes('"tournament"') &&
+      partnerGrid.includes("flex flex-wrap gap-3") &&
+      partnerGrid.includes("max-w-[17.5rem]"),
+    "tournament Partner layout is compact (not homepage full-width cards)",
   );
 
   // 15–19 homepage / partner / admin / V1 unchanged

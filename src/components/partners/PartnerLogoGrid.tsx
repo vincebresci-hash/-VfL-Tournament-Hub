@@ -6,8 +6,8 @@ import type { PublicPartner } from "@/types/partner";
 
 type PartnerLogoCardProps = {
   partner: PublicPartner;
-  /** Larger card treatment for /partner page. */
-  size?: "home" | "page";
+  /** Larger card treatment for /partner page. Compact horizontal for tournament detail. */
+  size?: "home" | "page" | "tournament";
   className?: string;
 };
 
@@ -17,6 +17,63 @@ export function PartnerLogoCard({
   className,
 }: PartnerLogoCardProps) {
   const isPage = size === "page";
+  const isTournament = size === "tournament";
+
+  if (isTournament) {
+    const content = (
+      <>
+        <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line/80 bg-surface">
+          {partner.logoUrl ? (
+            <Image
+              src={partner.logoUrl}
+              alt={`${partner.name} Logo`}
+              width={64}
+              height={48}
+              unoptimized
+              className="max-h-full max-w-full object-contain p-1"
+            />
+          ) : (
+            <span className="px-1 text-center font-display text-[10px] font-bold tracking-wide text-navy/70 uppercase">
+              {partner.name.slice(0, 3)}
+            </span>
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-display text-[13px] font-bold tracking-[0.04em] text-ink uppercase">
+            {partner.name}
+          </span>
+        </span>
+      </>
+    );
+
+    const cardClass = cn(
+      "flex h-full items-center gap-3 rounded-[10px] border border-line bg-white px-3 py-2.5",
+      "shadow-[0_1px_2px_rgba(16,20,28,0.04)]",
+      "motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-200",
+      "[@media(hover:hover)]:hover:-translate-y-0.5",
+      "[@media(hover:hover)]:hover:border-brand-yellow/70",
+      "[@media(hover:hover)]:hover:shadow-[0_8px_18px_rgba(16,20,28,0.07)]",
+      "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow",
+      className,
+    );
+
+    if (partner.websiteUrl) {
+      return (
+        <a
+          href={partner.websiteUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(cardClass, "block")}
+          aria-label={`${partner.name} Website`}
+        >
+          {content}
+        </a>
+      );
+    }
+
+    return <div className={cardClass}>{content}</div>;
+  }
+
   const logoBoxClass = isPage
     ? "flex h-28 w-full items-center justify-center sm:h-32"
     : "flex h-[4.5rem] w-full items-center justify-center sm:h-20";
@@ -89,13 +146,14 @@ export function PartnerLogoCard({
 
 type PartnerLogoGridProps = {
   partners: PublicPartner[];
-  size?: "home" | "page";
+  size?: "home" | "page" | "tournament";
   className?: string;
 };
 
 /**
  * Homepage preview: caller passes at most 3 partners (one even row on sm+).
  * /partner shows the complete active list.
+ * Tournament detail uses compact horizontal tiles (size="tournament").
  */
 export function PartnerLogoGrid({
   partners,
@@ -111,12 +169,20 @@ export function PartnerLogoGrid({
       className={cn(
         size === "page"
           ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          : "grid grid-cols-1 gap-3 min-[480px]:grid-cols-3 sm:gap-4",
+          : size === "tournament"
+            ? "flex flex-wrap gap-3"
+            : "grid grid-cols-1 gap-3 min-[480px]:grid-cols-3 sm:gap-4",
         className,
       )}
     >
       {partners.map((partner) => (
-        <li key={partner.id} className="min-w-0">
+        <li
+          key={partner.id}
+          className={cn(
+            "min-w-0",
+            size === "tournament" && "w-full max-w-[17.5rem] sm:w-[15.75rem]",
+          )}
+        >
           <PartnerLogoCard partner={partner} size={size} />
         </li>
       ))}

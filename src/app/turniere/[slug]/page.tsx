@@ -232,6 +232,8 @@ export default async function TournamentDetailPage({
             />
           ) : null}
 
+          <TournamentPartnersSection partners={tournamentPartners} />
+
           {facts.length > 0 ? (
             <dl className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {facts.map((fact) => (
@@ -270,8 +272,6 @@ export default async function TournamentDetailPage({
               ))}
             </section>
           ) : null}
-
-          <TournamentPartnersSection partners={tournamentPartners} />
 
           <TournamentPublicStage
             slug={tournament.slug}
