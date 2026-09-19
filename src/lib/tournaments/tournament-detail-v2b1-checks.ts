@@ -122,11 +122,15 @@ export function runTournamentDetailV2B1Checks() {
   );
 
   // 14–19 content paths still present (no B2 redesign markers that remove content)
+  const participantCards = read(
+    "src/components/tournaments/TournamentParticipantCards.tsx",
+  );
   assert(
     stage.includes("Noch keine bestätigten Teams.") &&
-      stage.includes("ParticipantClubLogo") &&
-      stage.includes("hasDistinctTeamName"),
-    "participant rendering path retained",
+      stage.includes("TournamentParticipantCards") &&
+      participantCards.includes("ParticipantClubLogo") &&
+      participantCards.includes("hasDistinctTeamName"),
+    "participant rendering path retained (hub cards + logo + team label)",
   );
   assert(
     stage.includes("Noch keine Teams zugeordnet.") &&
