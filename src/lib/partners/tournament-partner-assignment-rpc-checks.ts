@@ -175,7 +175,7 @@ export function runTournamentPartnerAssignmentRpcChecks() {
     !tournamentAdminForm.includes("Partner") &&
       !tournamentAdminForm.includes("partner") &&
       !tournamentAdminForm.includes("setTournamentPartner"),
-    "no admin UI yet",
+    "TournamentAdminForm remains free of Partner assignment (dedicated card)",
   );
   assert(
     !tournamentDetail.includes("Partner des Turniers") &&

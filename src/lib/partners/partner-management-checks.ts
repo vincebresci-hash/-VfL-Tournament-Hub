@@ -417,7 +417,7 @@ export function runPartnerManagementChecks() {
   assert(
     !tournamentAdminForm.includes("partner") &&
       !tournamentAdminForm.includes("Partner"),
-    "tournament UI unchanged (Phase 2A has no assignment UI)",
+    "TournamentAdminForm unchanged (Partner assignment is a separate card)",
   );
   assert(
     !actions.includes("tournament") &&
