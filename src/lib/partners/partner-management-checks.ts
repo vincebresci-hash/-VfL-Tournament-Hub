@@ -402,21 +402,27 @@ export function runPartnerManagementChecks() {
   );
 
   // 26–30 regression scope
+  // Phase 2A adds tournament_partners in a separate migration; V1 partners
+  // migration must still not create the junction or denormalized FKs.
   assert(
     !/CREATE TABLE[\s\S]*tournament_partners/i.test(migration) &&
-      !/tournament_id\s+uuid/i.test(migration) &&
-      !database.includes("tournament_partners:"),
-    "no tournament-partner relation",
+      !/tournament_id\s+uuid/i.test(migration),
+    "partners V1 migration still has no tournament-partner relation",
+  );
+  assert(
+    database.includes("tournament_partners: Table<") ||
+      database.includes("partners: Table<"),
+    "database types partners present",
   );
   assert(
     !tournamentAdminForm.includes("partner") &&
       !tournamentAdminForm.includes("Partner"),
-    "tournament UI unchanged",
+    "tournament UI unchanged (Phase 2A has no assignment UI)",
   );
   assert(
     !actions.includes("tournament") &&
-      !queries.includes("tournament"),
-    "partner module has no tournament coupling",
+      !actions.includes("tournament_partners"),
+    "partner mutation actions have no tournament coupling",
   );
   assert(
     recoveryActions.includes("issue_guest_cancellation_recovery_token") &&

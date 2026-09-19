@@ -3,6 +3,7 @@ import { runStatusEmailConcurrencySelfChecks } from "@/lib/email/status-mail-con
 import { runTournamentHubEmailDesignChecks } from "@/lib/email/tournament-hub-email-checks";
 import { runTeamDirectoryChecks } from "@/lib/team-directory/team-directory-checks";
 import { runPartnerManagementChecks } from "@/lib/partners/partner-management-checks";
+import { runTournamentPartnerAssignmentChecks } from "@/lib/partners/tournament-partner-assignment-checks";
 import { runScheduleSelfChecks } from "./run-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
@@ -151,6 +152,7 @@ try {
   const tournamentHubEmailDesignChecks = runTournamentHubEmailDesignChecks();
   const teamDirectoryChecks = runTeamDirectoryChecks();
   const partnerManagementChecks = runPartnerManagementChecks();
+  const tournamentPartnerAssignmentChecks = runTournamentPartnerAssignmentChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -224,6 +226,9 @@ try {
   console.log(`tournament-hub-email-design-checks: ${tournamentHubEmailDesignChecks}`);
   console.log(`team-directory-checks: ${teamDirectoryChecks}`);
   console.log(`partner-management-checks: ${partnerManagementChecks}`);
+  console.log(
+    `tournament-partner-assignment-checks: ${tournamentPartnerAssignmentChecks}`,
+  );
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
