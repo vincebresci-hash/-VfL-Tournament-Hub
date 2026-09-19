@@ -178,12 +178,12 @@ export function runTournamentPartnerAssignmentRpcChecks() {
     "TournamentAdminForm remains free of Partner assignment (dedicated card)",
   );
   assert(
-    !tournamentDetail.includes("Partner des Turniers") &&
-      !tournamentDetail.includes("listPublicActivePartnersForTournament") &&
+    tournamentDetail.includes("listPublicActivePartnersForTournament") &&
+      tournamentDetail.includes("TournamentPartnersSection") &&
       partnerPage.includes("listPublicActivePartners") &&
       infoSection.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT = 3") &&
       !partnerGrid.includes("tracking-[0.14em] text-brand-blue uppercase"),
-    "no public UI changes; homepage max-3 + eyebrow still intact",
+    "Phase 2C public Partner section present; homepage max-3 + eyebrow still intact",
   );
 
   assert(

@@ -228,11 +228,12 @@ export function runTournamentPartnerAssignmentChecks() {
     "tournament create/update flow unchanged",
   );
 
-  // 24–28 regression domains untouched
+  // 24–28 regression domains — Phase 2C public display is intentional
   assert(
-    !tournamentDetail.includes("listPublicActivePartnersForTournament") &&
-      !tournamentDetail.includes("Partner des Turniers"),
-    "Phase 2C public UI not present yet",
+    tournamentDetail.includes("listPublicActivePartnersForTournament") &&
+      tournamentDetail.includes("TournamentPartnersSection") &&
+      !tournamentDetail.includes("TournamentPartnerAssignmentCard"),
+    "Phase 2C public Partner section present; admin card not on public page",
   );
   assert(
     !queries.includes("setTournamentPartner") &&
