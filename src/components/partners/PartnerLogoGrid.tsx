@@ -22,15 +22,15 @@ export function PartnerLogoCard({
   if (isTournament) {
     const content = (
       <>
-        <span className="flex h-12 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-line/80 bg-surface">
+        <span className="flex h-14 w-[4.5rem] shrink-0 items-center justify-center overflow-hidden rounded-md border border-line/80 bg-surface">
           {partner.logoUrl ? (
             <Image
               src={partner.logoUrl}
               alt={`${partner.name} Logo`}
-              width={64}
-              height={48}
+              width={72}
+              height={56}
               unoptimized
-              className="max-h-full max-w-full object-contain p-1"
+              className="max-h-full max-w-full object-contain p-0.5"
             />
           ) : (
             <span className="px-1 text-center font-display text-[10px] font-bold tracking-wide text-navy/70 uppercase">
@@ -39,21 +39,16 @@ export function PartnerLogoCard({
           )}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-display text-[13px] font-bold tracking-[0.04em] text-ink uppercase">
+          <span className="block truncate font-display text-[13px] font-semibold tracking-normal text-ink">
             {partner.name}
           </span>
         </span>
       </>
     );
 
-    const cardClass = cn(
+    const baseCardClass = cn(
       "flex h-full items-center gap-3 rounded-[10px] border border-line bg-white px-3 py-2.5",
       "shadow-[0_1px_2px_rgba(16,20,28,0.04)]",
-      "motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-200",
-      "[@media(hover:hover)]:hover:-translate-y-0.5",
-      "[@media(hover:hover)]:hover:border-brand-yellow/70",
-      "[@media(hover:hover)]:hover:shadow-[0_8px_18px_rgba(16,20,28,0.07)]",
-      "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow",
       className,
     );
 
@@ -63,7 +58,14 @@ export function PartnerLogoCard({
           href={partner.websiteUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className={cn(cardClass, "block")}
+          className={cn(
+            baseCardClass,
+            "block motion-safe:transition-[box-shadow,border-color,background-color] motion-safe:duration-150",
+            "[@media(hover:hover)]:hover:border-brand-yellow/55",
+            "[@media(hover:hover)]:hover:bg-[#fafbfc]",
+            "[@media(hover:hover)]:hover:shadow-[0_2px_8px_rgba(16,20,28,0.06)]",
+            "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow",
+          )}
           aria-label={`${partner.name} Website`}
         >
           {content}
@@ -71,7 +73,7 @@ export function PartnerLogoCard({
       );
     }
 
-    return <div className={cardClass}>{content}</div>;
+    return <div className={baseCardClass}>{content}</div>;
   }
 
   const logoBoxClass = isPage
@@ -195,24 +197,34 @@ export function PartnerSectionHeader({
   description,
   action,
   compact = false,
+  /** Tournament detail: secondary heading vs major content H2s. Home/page unchanged. */
+  tone = "default",
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
   compact?: boolean;
+  tone?: "default" | "secondary";
 }) {
+  const isSecondary = tone === "secondary";
+
   return (
     <div
       className={cn(
         "flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between",
-        compact ? "gap-2" : "sm:gap-3",
+        compact || isSecondary ? "gap-1.5" : "sm:gap-3",
       )}
     >
       <div className="min-w-0">
         <h2
           className={cn(
-            "font-display font-bold tracking-wide text-ink uppercase",
-            compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl",
+            "font-display font-bold text-ink uppercase",
+            isSecondary
+              ? "text-base tracking-[0.08em] text-ink/85 sm:text-lg"
+              : cn(
+                  "tracking-wide",
+                  compact ? "text-xl sm:text-2xl" : "text-2xl sm:text-3xl",
+                ),
           )}
         >
           {title}
@@ -221,7 +233,7 @@ export function PartnerSectionHeader({
           <p
             className={cn(
               "max-w-2xl text-muted",
-              compact
+              compact || isSecondary
                 ? "mt-1 text-[14px] leading-6"
                 : "mt-2 text-[15px] leading-7",
             )}

@@ -235,15 +235,29 @@ export default async function TournamentDetailPage({
           <TournamentPartnersSection partners={tournamentPartners} />
 
           {facts.length > 0 ? (
-            <dl className="mt-10 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {facts.map((fact) => (
-                <div key={fact.label} className="border border-line bg-white px-4 py-3">
-                  <dt className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
-                    {fact.label}
-                  </dt>
-                  <dd className="mt-1 text-[15px] text-ink">{fact.value}</dd>
-                </div>
-              ))}
+            <dl className="mt-8 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+              {facts.map((fact) => {
+                const isFreeSlots = fact.label === "Freie Plätze";
+                return (
+                  <div
+                    key={fact.label}
+                    className="border border-line bg-white px-3.5 py-2.5"
+                  >
+                    <dt className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+                      {fact.label}
+                    </dt>
+                    <dd className="mt-0.5 text-[15px] leading-snug text-ink">
+                      {isFreeSlots ? (
+                        <span className="inline-flex items-center rounded-sm bg-brand-yellow/25 px-1.5 py-0.5 font-semibold text-navy tabular-nums">
+                          {fact.value}
+                        </span>
+                      ) : (
+                        fact.value
+                      )}
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
           ) : null}
 

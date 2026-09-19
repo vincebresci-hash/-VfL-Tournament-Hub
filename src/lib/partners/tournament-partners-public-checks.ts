@@ -149,6 +149,70 @@ export function runTournamentPartnersPublicChecks() {
     "tournament Partner layout is compact (not homepage full-width cards)",
   );
 
+  // Visual polish (tournament-scoped only)
+  assert(
+    section.includes('tone="secondary"') &&
+      section.includes('className="mt-6"') &&
+      partnerGrid.includes('tone?: "default" | "secondary"') &&
+      partnerGrid.includes('tone = "default"'),
+    "Partner heading uses secondary tone; shared header default unchanged",
+  );
+  assert(
+    /isTournament[\s\S]*?tracking-normal text-ink/.test(partnerGrid) &&
+      !/isTournament[\s\S]*?tracking-\[0\.04em\] text-ink uppercase/.test(
+        partnerGrid,
+      ),
+    "tournament Partner name uses natural casing (no CSS uppercase)",
+  );
+  assert(
+    partnerGrid.includes("h-14 w-[4.5rem]") &&
+      partnerGrid.includes("width={72}") &&
+      partnerGrid.includes("height={56}"),
+    "tournament Partner logo slightly more prominent within compact tile",
+  );
+  const tournamentBranch = partnerGrid.slice(
+    partnerGrid.indexOf("if (isTournament)"),
+    partnerGrid.indexOf("const logoBoxClass"),
+  );
+  assert(
+    tournamentBranch.includes("if (partner.websiteUrl)") &&
+      tournamentBranch.includes(
+        "[@media(hover:hover)]:hover:border-brand-yellow/55",
+      ) &&
+      !tournamentBranch.includes("hover:-translate-y") &&
+      /return <div className=\{baseCardClass\}>\{content\}<\/div>/.test(
+        tournamentBranch,
+      ),
+    "clickable tournament Partners get subtle hover; non-clickable do not",
+  );
+  assert(
+    infoSection.includes('size="home"') &&
+      !infoSection.includes('tone="secondary"') &&
+      partnerPage.includes('size="page"') &&
+      !partnerPage.includes('tone="secondary"') &&
+      partnerGrid.includes("tracking-[0.06em] text-ink uppercase") &&
+      partnerGrid.includes("hover:-translate-y-0.5") &&
+      partnerGrid.includes("hover:scale-[1.01]"),
+    "homepage and /partner Partner typography/hover defaults unchanged",
+  );
+
+  // Facts compact + Freie Plätze presentation-only emphasis
+  assert(
+    tournamentDetail.includes('label: "Freie Plätze"') &&
+      tournamentDetail.includes("getDisplayCapacity(tournament)") &&
+      tournamentDetail.includes('fact.label === "Freie Plätze"') &&
+      tournamentDetail.includes("bg-brand-yellow/25") &&
+      tournamentDetail.includes("px-3.5 py-2.5") &&
+      tournamentDetail.includes("gap-2.5 sm:grid-cols-2 xl:grid-cols-3"),
+    "facts grid more compact; Freie Plätze yellow accent is presentation-only",
+  );
+  assert(
+    !tournamentDetail.includes("availableSlots +") &&
+      !tournamentDetail.includes("availableSlots -") &&
+      tournamentDetail.includes("String(capacity.availableSlots)"),
+    "capacity value formatting unchanged (display String only)",
+  );
+
   // 15–19 homepage / partner / admin / V1 unchanged
   assert(
     infoSection.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT = 3") &&
