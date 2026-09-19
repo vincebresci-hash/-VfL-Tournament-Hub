@@ -1113,6 +1113,10 @@ export type Database = {
         Args: { p_communication_id: string };
         Returns: string;
       };
+      set_tournament_partner_assignments: {
+        Args: { p_tournament_id: string; p_partner_ids: string[] | null };
+        Returns: string[];
+      };
       count_active_super_admins: {
         Args: { p_exclude_user_id?: string | null };
         Returns: number;
