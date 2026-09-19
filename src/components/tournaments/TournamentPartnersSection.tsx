@@ -21,9 +21,13 @@ export function TournamentPartnersSection({
   }
 
   return (
-    <section className="mt-8">
-      <PartnerSectionHeader title="Partner & Sponsoren" compact />
-      <div className="mt-3">
+    <section className="mt-6">
+      <PartnerSectionHeader
+        title="Partner & Sponsoren"
+        compact
+        tone="secondary"
+      />
+      <div className="mt-2.5">
         <PartnerLogoGrid partners={partners} size="tournament" />
       </div>
     </section>
