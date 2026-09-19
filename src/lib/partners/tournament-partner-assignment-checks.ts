@@ -237,7 +237,7 @@ export function runTournamentPartnerAssignmentChecks() {
   assert(
     !queries.includes("setTournamentPartner") &&
       queries.includes("getAdminTournamentPartnerAssignmentState"),
-    "admin assignment state helper present; no mutation action yet",
+    "admin assignment state helper present; queries remain read-only",
   );
   assert(
     multiTeam.includes("allow_multiple_teams") ||

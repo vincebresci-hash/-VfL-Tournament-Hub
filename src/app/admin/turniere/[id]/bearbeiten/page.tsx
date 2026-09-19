@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { TournamentAdminForm } from "@/components/admin/TournamentAdminForm";
+import { TournamentPartnerAssignmentCard } from "@/components/admin/TournamentPartnerAssignmentCard";
 import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
 import { getTournamentOccupancy, listAdminApplications } from "@/lib/db/queries";
+import { getAdminTournamentPartnerAssignmentState } from "@/lib/partners/queries";
 
 type TournamentEditPageProps = {
   params: Promise<{ id: string }>;
@@ -38,7 +40,7 @@ export default async function AdminTournamentEditPage({
     notFound();
   }
 
-  const [applicationCount, occupancy] = await Promise.all([
+  const [applicationCount, occupancy, assignmentState] = await Promise.all([
     Promise.resolve(
       applicationsResult.applications.filter(
         (application) =>
@@ -47,6 +49,7 @@ export default async function AdminTournamentEditPage({
       ).length,
     ),
     getTournamentOccupancy(tournament.slug),
+    getAdminTournamentPartnerAssignmentState(tournament.id),
   ]);
 
   return (
@@ -58,11 +61,15 @@ export default async function AdminTournamentEditPage({
         Änderungen werden direkt in Supabase gespeichert und auf den öffentlichen
         Seiten übernommen.
       </p>
-      <div className="mt-8">
+      <div className="mt-8 space-y-6">
         <TournamentAdminForm
           tournament={tournament}
           applicationCount={applicationCount}
           confirmedParticipants={occupancy?.confirmedTeams ?? 0}
+        />
+        <TournamentPartnerAssignmentCard
+          tournamentId={tournament.id}
+          assignmentState={assignmentState}
         />
       </div>
     </div>
