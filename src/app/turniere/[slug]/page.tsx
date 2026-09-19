@@ -7,6 +7,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { TournamentPublicStage } from "@/components/tournaments/TournamentPublicStage";
+import { TournamentPartnersSection } from "@/components/tournaments/TournamentPartnersSection";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { formatDateDe, formatDateTimeDe, formatTimeDe } from "@/lib/format";
 import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
@@ -26,6 +27,7 @@ import {
   usesMeinTurnierplanAsPrimaryLive,
 } from "@/lib/mein-turnierplan";
 import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
+import { listPublicActivePartnersForTournament } from "@/lib/partners/queries";
 import { publicTeamLabel } from "@/lib/schedule/names";
 import { tournamentImageObjectPosition } from "@/data/tournaments";
 import { getSiteUrl, withCanonical } from "@/lib/site";
@@ -73,11 +75,13 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const [settings, stage, meinTurnierplanPublic] = await Promise.all([
-    getAppSettings(),
-    getPublicTournamentStage(tournament.slug, tournament.id),
-    getPublicMeinTurnierplanData(tournament),
-  ]);
+  const [settings, stage, meinTurnierplanPublic, tournamentPartners] =
+    await Promise.all([
+      getAppSettings(),
+      getPublicTournamentStage(tournament.slug, tournament.id),
+      getPublicMeinTurnierplanData(tournament),
+      listPublicActivePartnersForTournament(tournament.id),
+    ]);
   const applicationGate = {
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
@@ -266,6 +270,8 @@ export default async function TournamentDetailPage({
               ))}
             </section>
           ) : null}
+
+          <TournamentPartnersSection partners={tournamentPartners} />
 
           <TournamentPublicStage
             slug={tournament.slug}

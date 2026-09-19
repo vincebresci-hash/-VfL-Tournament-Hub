@@ -127,12 +127,13 @@ export function runTournamentPartnerAssignmentAdminChecks() {
     "submit handler aborts when not ready",
   );
 
-  // 13–17 no public / no migration / unchanged domains
+  // 13–17 public Phase 2C uses helper; admin card must not appear on public page
   assert(
-    !tournamentDetail.includes("Partner des Turniers") &&
-      !tournamentDetail.includes("listPublicActivePartnersForTournament") &&
-      !tournamentDetail.includes("TournamentPartnerAssignmentCard"),
-    "no public tournament Partner UI",
+    tournamentDetail.includes("listPublicActivePartnersForTournament") &&
+      tournamentDetail.includes("TournamentPartnersSection") &&
+      !tournamentDetail.includes("TournamentPartnerAssignmentCard") &&
+      !tournamentDetail.includes("setTournamentPartnerAssignmentsAction"),
+    "public tournament Partner display present; admin assignment UI not on public page",
   );
   const partnerMigrations = migrationFiles.filter((name) =>
     /partner/i.test(name),

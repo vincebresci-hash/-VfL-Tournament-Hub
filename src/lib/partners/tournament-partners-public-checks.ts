@@ -1,0 +1,197 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
+function read(relativePath: string) {
+  return readFileSync(join(process.cwd(), relativePath), "utf8");
+}
+
+function assert(condition: unknown, message: string): asserts condition {
+  if (!condition) {
+    throw new Error(`tournament-partners-public-checks: ${message}`);
+  }
+}
+
+export function runTournamentPartnersPublicChecks() {
+  const tournamentDetail = read("src/app/turniere/[slug]/page.tsx");
+  const section = read(
+    "src/components/tournaments/TournamentPartnersSection.tsx",
+  );
+  const stage = read("src/components/tournaments/TournamentPublicStage.tsx");
+  const queries = read("src/lib/partners/queries.ts");
+  const partnerLib = read("src/lib/partners/partner.ts");
+  const partnerGrid = read("src/components/partners/PartnerLogoGrid.tsx");
+  const infoSection = read("src/components/home/InfoSection.tsx");
+  const partnerPage = read("src/app/partner/page.tsx");
+  const assignmentCard = read(
+    "src/components/admin/TournamentPartnerAssignmentCard.tsx",
+  );
+  const assignmentActions = read(
+    "src/lib/partners/tournament-partner-assignment-actions.ts",
+  );
+  const partnerActions = read("src/lib/partners/actions.ts");
+  const tournamentAdminForm = read(
+    "src/components/admin/TournamentAdminForm.tsx",
+  );
+  const phase2a = read(
+    "supabase/migrations/20260918210000_tournament_partners_phase2a.sql",
+  );
+  const phase2ba = read(
+    "supabase/migrations/20260919200000_set_tournament_partner_assignments_rpc.sql",
+  );
+  const migrationFiles = readdirSync(join(process.cwd(), "supabase/migrations"))
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+
+  // 1–4 page wiring + section
+  assert(
+    tournamentDetail.includes("listPublicActivePartnersForTournament") &&
+      tournamentDetail.includes(
+        "listPublicActivePartnersForTournament(tournament.id)",
+      ),
+    "public tournament detail uses listPublicActivePartnersForTournament(tournament.id)",
+  );
+  assert(
+    tournamentDetail.includes("TournamentPartnersSection") &&
+      tournamentDetail.includes(
+        "<TournamentPartnersSection partners={tournamentPartners} />",
+      ),
+    "TournamentPartnersSection rendered on detail page",
+  );
+  assert(
+    section.includes("Partner & Sponsoren") &&
+      section.includes("PartnerLogoGrid") &&
+      section.includes("PartnerSectionHeader") &&
+      section.includes("partners.length === 0") &&
+      section.includes("return null"),
+    "TournamentPartnersSection exists with zero→null behavior",
+  );
+
+  // 5–6 zero partners / no empty heading path
+  assert(
+    /if \(partners\.length === 0\) \{\s*return null;\s*\}/.test(section) &&
+      !section.includes("Keine Partner") &&
+      !section.includes("PartnerEmptyState"),
+    "zero Partners returns null; no empty heading/card",
+  );
+
+  // 7–8 all assigned active; no homepage max-3 on detail
+  assert(
+    tournamentDetail.includes("partners={tournamentPartners}") &&
+      !tournamentDetail.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT") &&
+      !tournamentDetail.includes(".slice(") &&
+      !section.includes(".slice(") &&
+      !section.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT"),
+    "all assigned active Partners render; no homepage max-3 slice",
+  );
+
+  // 9–11 helper filters + ordering
+  const helperStart = queries.indexOf(
+    "export async function listPublicActivePartnersForTournament",
+  );
+  const helperEnd = queries.indexOf(
+    "export async function listAdminPartners",
+    helperStart,
+  );
+  const helper = queries.slice(helperStart, helperEnd);
+  assert(
+    helper.includes('.from("tournament_partners")') &&
+      helper.includes('.eq("tournament_id", id)') &&
+      helper.includes('.eq("partners.is_active", true)') &&
+      helper.includes("partners!inner"),
+    "public helper filters by tournament_id and is_active",
+  );
+  assert(
+    helper.includes("sort(comparePartnersForPublicOrder)") &&
+      partnerLib.includes("comparePartnersForPublicOrder"),
+    "deterministic Partner ordering unchanged",
+  );
+
+  // 12–13 website link safety + missing logo
+  assert(
+    partnerGrid.includes('rel="noopener noreferrer"') &&
+      partnerGrid.includes('target="_blank"'),
+    "website link safety remains noopener noreferrer",
+  );
+  assert(
+    partnerGrid.includes("partner.logoUrl") &&
+      partnerGrid.includes("object-contain") &&
+      /partner\.logoUrl \?[\s\S]*:[\s\S]*partner\.name/.test(partnerGrid),
+    "missing-logo fallback remains available",
+  );
+
+  // 14 stage unchanged by Partner section (no Partner imports in stage)
+  assert(
+    !stage.includes("Partner") &&
+      !stage.includes("partner") &&
+      !stage.includes("TournamentPartnersSection") &&
+      !stage.includes("listPublicActivePartnersForTournament"),
+    "TournamentPublicStage implementation unchanged for Partners",
+  );
+
+  // section before stage on page
+  const sectionIdx = tournamentDetail.indexOf(
+    "<TournamentPartnersSection partners={tournamentPartners} />",
+  );
+  const stageIdx = tournamentDetail.indexOf("<TournamentPublicStage");
+  assert(
+    sectionIdx > 0 && stageIdx > sectionIdx,
+    "Partner section rendered before TournamentPublicStage",
+  );
+
+  // 15–19 homepage / partner / admin / V1 unchanged
+  assert(
+    infoSection.includes("HOMEPAGE_PARTNER_PREVIEW_LIMIT = 3") &&
+      infoSection.includes("listPublicActivePartners()") &&
+      !infoSection.includes("listPublicActivePartnersForTournament"),
+    "homepage Partner section + max-3 unchanged",
+  );
+  assert(
+    partnerPage.includes("listPublicActivePartners") &&
+      !partnerPage.includes("listPublicActivePartnersForTournament") &&
+      !partnerPage.includes("TournamentPartnersSection"),
+    "/partner unchanged",
+  );
+  assert(
+    assignmentCard.includes("Partner & Sponsoren") &&
+      assignmentActions.includes("set_tournament_partner_assignments") &&
+      assignmentActions.includes("requireTournamentsManage()"),
+    "admin Partner assignment unchanged",
+  );
+  assert(
+    partnerActions.includes("requirePartnersManage") &&
+      partnerActions.includes("updatePartnerLogoAction") &&
+      !partnerActions.includes("listPublicActivePartnersForTournament") &&
+      !tournamentAdminForm.includes("TournamentPartnersSection"),
+    "Partner Management V1 unchanged",
+  );
+
+  // 20–21 no migration / RPC / RLS / RBAC drift in this phase
+  const partnerMigrations = migrationFiles.filter((name) =>
+    /partner/i.test(name),
+  );
+  assert(
+    partnerMigrations.length === 3 &&
+      partnerMigrations.includes("20260918200000_partners_management_v1.sql") &&
+      partnerMigrations.includes(
+        "20260918210000_tournament_partners_phase2a.sql",
+      ) &&
+      partnerMigrations.includes(
+        "20260919200000_set_tournament_partner_assignments_rpc.sql",
+      ),
+    "no Phase 2C migration added",
+  );
+  assert(
+    phase2a.includes("CREATE TABLE IF NOT EXISTS public.tournament_partners") &&
+      phase2ba.includes(
+        "CREATE OR REPLACE FUNCTION public.set_tournament_partner_assignments(",
+      ),
+    "Phase 2A / Phase 2B-A migrations unchanged presence",
+  );
+  assert(
+    !tournamentDetail.includes("service_role") &&
+      !section.includes("service_role"),
+    "no service_role on public Partner display",
+  );
+
+  return "ok";
+}
