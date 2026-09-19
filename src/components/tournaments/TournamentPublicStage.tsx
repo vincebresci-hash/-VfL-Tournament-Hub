@@ -185,21 +185,43 @@ export function TournamentPublicStage({
       ) : null}
 
       {showTabs ? (
-        <nav className="mt-10 flex flex-wrap gap-2" aria-label="Turnierbereiche">
-          {visibleTabs.map((item) => (
-            <Link
-              key={item.id}
-              href={item.id === "uebersicht" ? `/turniere/${slug}` : `/turniere/${slug}?tab=${item.id}`}
-              className={
-                current === item.id
-                  ? "inline-flex h-9 items-center bg-navy px-3 text-[11px] font-semibold tracking-[0.08em] text-white uppercase"
-                  : "inline-flex h-9 items-center border border-line bg-white px-3 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase hover:border-navy/20"
-              }
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="mt-8 sm:mt-10">
+          <h2 className="font-display text-lg font-bold tracking-[0.06em] text-ink uppercase sm:text-xl">
+            <span
+              className="mr-2 inline-block h-3.5 w-1 translate-y-0.5 bg-brand-yellow align-middle"
+              aria-hidden="true"
+            />
+            Turnier-Center
+          </h2>
+          <nav
+            className="mt-4 -mx-1 overflow-x-auto overscroll-x-contain px-1"
+            aria-label="Turnierbereiche"
+          >
+            <div className="flex w-max min-w-full flex-nowrap gap-2 pb-0.5">
+              {visibleTabs.map((item) => {
+                const active = current === item.id;
+                return (
+                  <Link
+                    key={item.id}
+                    href={
+                      item.id === "uebersicht"
+                        ? `/turniere/${slug}`
+                        : `/turniere/${slug}?tab=${item.id}`
+                    }
+                    aria-current={active ? "page" : undefined}
+                    className={
+                      active
+                        ? "inline-flex h-9 shrink-0 items-center rounded-md border border-navy bg-navy px-3.5 text-[11px] font-semibold tracking-[0.08em] text-white uppercase ring-1 ring-inset ring-brand-yellow/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                        : "inline-flex h-9 shrink-0 items-center rounded-md border border-line bg-white px-3.5 text-[11px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:border-navy/25 hover:bg-[#fafbfc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                    }
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+        </div>
       ) : null}
 
       {tournamentStatus === "completed" ? (
