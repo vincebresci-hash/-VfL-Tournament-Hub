@@ -8,6 +8,7 @@ import { runTournamentPartnerAssignmentRpcChecks } from "@/lib/partners/tourname
 import { runTournamentPartnerAssignmentAdminChecks } from "@/lib/partners/tournament-partner-assignment-admin-checks";
 import { runTournamentPartnersPublicChecks } from "@/lib/partners/tournament-partners-public-checks";
 import { runTournamentDetailV2AChecks } from "@/lib/tournaments/tournament-detail-v2a-checks";
+import { runTournamentDetailV2B1Checks } from "@/lib/tournaments/tournament-detail-v2b1-checks";
 import { runScheduleSelfChecks } from "./run-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
@@ -163,6 +164,7 @@ try {
     runTournamentPartnerAssignmentAdminChecks();
   const tournamentPartnersPublicChecks = runTournamentPartnersPublicChecks();
   const tournamentDetailV2AChecks = runTournamentDetailV2AChecks();
+  const tournamentDetailV2B1Checks = runTournamentDetailV2B1Checks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -249,6 +251,7 @@ try {
     `tournament-partners-public-checks: ${tournamentPartnersPublicChecks}`,
   );
   console.log(`tournament-detail-v2a-checks: ${tournamentDetailV2AChecks}`);
+  console.log(`tournament-detail-v2b1-checks: ${tournamentDetailV2B1Checks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
