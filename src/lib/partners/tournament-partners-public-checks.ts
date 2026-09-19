@@ -145,7 +145,8 @@ export function runTournamentPartnersPublicChecks() {
     section.includes('size="tournament"') &&
       partnerGrid.includes('"tournament"') &&
       partnerGrid.includes("flex flex-wrap gap-3") &&
-      partnerGrid.includes("max-w-[17.5rem]"),
+      (partnerGrid.includes("max-w-[17.5rem]") ||
+        partnerGrid.includes("w-[min(100%,15.75rem)]")),
     "tournament Partner layout is compact (not homepage full-width cards)",
   );
 
@@ -153,7 +154,8 @@ export function runTournamentPartnersPublicChecks() {
   assert(
     section.includes('tone="secondary"') &&
       (section.includes('className="mt-6"') ||
-        section.includes('className="mt-8 sm:mt-10"')) &&
+        section.includes('className="mt-8 sm:mt-10"') ||
+        section.includes('className="mt-7 sm:mt-8"')) &&
       partnerGrid.includes('tone?: "default" | "secondary"') &&
       partnerGrid.includes('tone = "default"'),
     "Partner heading uses secondary tone; shared header default unchanged",
@@ -203,7 +205,8 @@ export function runTournamentPartnersPublicChecks() {
     tournamentDetail.includes('label: "Freie Plätze"') &&
       tournamentDetail.includes("getDisplayCapacity(tournament)") &&
       infoGrid.includes('fact.label === "Freie Plätze"') &&
-      infoGrid.includes("bg-brand-yellow/25") &&
+      (infoGrid.includes("bg-brand-yellow/25") ||
+        infoGrid.includes("bg-brand-yellow/30")) &&
       tournamentDetail.includes("<TournamentInfoGrid"),
     "facts retained via TournamentInfoGrid; Freie Plätze yellow accent is presentation-only",
   );

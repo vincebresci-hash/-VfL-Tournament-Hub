@@ -119,8 +119,6 @@ export default async function TournamentDetailPage({
     capacity != null &&
     (applicationState === "open" || applicationState === "waitlist");
   const facts = [
-    tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
-    tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
     { label: "Datum", value: formatDateDe(tournament.date) },
     startTime ? { label: "Startzeit", value: startTime } : null,
     endTime ? { label: "Geplantes Ende", value: endTime } : null,
@@ -128,17 +126,19 @@ export default async function TournamentDetailPage({
       ? { label: "Veranstaltungsort", value: tournament.location }
       : null,
     nonempty(tournament.address) ? { label: "Adresse", value: tournament.address } : null,
+    tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
+    tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
+    capacity ? { label: "Max. Teams", value: String(capacity.maxTeams) } : null,
+    tournament.confirmedTeams > 0 || capacity
+      ? { label: "Bestätigte Teams", value: String(tournament.confirmedTeams) }
+      : null,
+    capacity ? { label: "Freie Plätze", value: String(capacity.availableSlots) } : null,
     tournament.applicationStart
       ? { label: "Bewerbungsstart", value: formatDateTimeDe(tournament.applicationStart) }
       : null,
     tournament.applicationDeadline
       ? { label: "Bewerbungsfrist", value: formatDateTimeDe(tournament.applicationDeadline) }
       : null,
-    capacity ? { label: "Max. Teams", value: String(capacity.maxTeams) } : null,
-    tournament.confirmedTeams > 0 || capacity
-      ? { label: "Bestätigte Teams", value: String(tournament.confirmedTeams) }
-      : null,
-    capacity ? { label: "Freie Plätze", value: String(capacity.availableSlots) } : null,
     tournament.waitlistEnabled || applicationState === "waitlist"
       ? {
           label: "Warteliste",
@@ -156,7 +156,7 @@ export default async function TournamentDetailPage({
     <div className="flex min-h-full flex-col">
       <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-background">
-        <Container className="py-10 sm:py-14 lg:py-16">
+        <Container className="py-8 sm:py-12 lg:py-14">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Link
               href="/turniere"

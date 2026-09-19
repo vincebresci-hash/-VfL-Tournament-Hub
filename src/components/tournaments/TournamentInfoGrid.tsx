@@ -16,7 +16,8 @@ export type TournamentInfoFact = {
   hint?: string;
 };
 
-const PRIMARY_LABELS = new Set([
+/** Natural tournament reading order for primary facts. */
+const PRIMARY_ORDER = [
   "Datum",
   "Startzeit",
   "Geplantes Ende",
@@ -24,7 +25,31 @@ const PRIMARY_LABELS = new Set([
   "Adresse",
   "Altersklasse",
   "Jahrgang",
-]);
+] as const;
+
+const PRIMARY_LABELS = new Set<string>(PRIMARY_ORDER);
+
+/** Quieter secondary reading order. */
+const SECONDARY_ORDER = [
+  "Max. Teams",
+  "Bestätigte Teams",
+  "Freie Plätze",
+  "Bewerbungsstart",
+  "Bewerbungsfrist",
+  "Warteliste",
+] as const;
+
+function sortByOrder(
+  facts: TournamentInfoFact[],
+  order: readonly string[],
+): TournamentInfoFact[] {
+  const rank = new Map(order.map((label, index) => [label, index]));
+  return [...facts].sort((a, b) => {
+    const ai = rank.get(a.label) ?? 999;
+    const bi = rank.get(b.label) ?? 999;
+    return ai - bi;
+  });
+}
 
 function iconForLabel(label: string): ReactNode {
   const className = "h-4 w-4 text-navy/65";
@@ -64,18 +89,27 @@ export function TournamentInfoGrid({ facts }: TournamentInfoGridProps) {
     return null;
   }
 
-  const primary = facts.filter((fact) => PRIMARY_LABELS.has(fact.label));
-  const secondary = facts.filter((fact) => !PRIMARY_LABELS.has(fact.label));
+  const primary = sortByOrder(
+    facts.filter((fact) => PRIMARY_LABELS.has(fact.label)),
+    PRIMARY_ORDER,
+  );
+  const secondary = sortByOrder(
+    facts.filter((fact) => !PRIMARY_LABELS.has(fact.label)),
+    SECONDARY_ORDER,
+  );
 
   return (
-    <section className="mt-10 sm:mt-12">
-      <h2 className="font-display text-xl font-bold tracking-[0.06em] text-ink uppercase sm:text-2xl">
-        <span className="mr-2 inline-block h-4 w-1 translate-y-0.5 bg-brand-yellow align-middle" aria-hidden="true" />
+    <section className="mt-7 sm:mt-8">
+      <h2 className="font-display text-lg font-bold tracking-[0.06em] text-ink uppercase sm:text-xl">
+        <span
+          className="mr-2 inline-block h-3.5 w-1 translate-y-0.5 bg-brand-yellow align-middle"
+          aria-hidden="true"
+        />
         Turnierinfos
       </h2>
 
       {primary.length > 0 ? (
-        <dl className="mt-5 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <dl className="mt-4 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {primary.map((fact) => (
             <InfoCard key={fact.label} fact={fact} emphasis="primary" />
           ))}
@@ -85,8 +119,8 @@ export function TournamentInfoGrid({ facts }: TournamentInfoGridProps) {
       {secondary.length > 0 ? (
         <dl
           className={cn(
-            "grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3",
-            primary.length > 0 ? "mt-3" : "mt-5",
+            "grid gap-2 sm:grid-cols-2 xl:grid-cols-3",
+            primary.length > 0 ? "mt-2.5" : "mt-4",
           )}
         >
           {secondary.map((fact) => (
@@ -110,12 +144,11 @@ function InfoCard({
   return (
     <div
       className={cn(
-        "rounded-[10px] border px-3.5 py-3",
-        isFreeSlots
-          ? "border-brand-yellow/60 bg-brand-yellow/25"
-          : emphasis === "primary"
-            ? "border-line bg-white shadow-[0_1px_2px_rgba(16,20,28,0.04)]"
-            : "border-line/80 bg-white/90",
+        "rounded-[10px] border bg-white",
+        emphasis === "primary"
+          ? "border-line px-3.5 py-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)]"
+          : "border-line/70 px-3 py-2.5",
+        isFreeSlots && "border-brand-yellow/45",
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -123,25 +156,24 @@ function InfoCard({
           {iconForLabel(fact.label)}
         </span>
         <div className="min-w-0 flex-1">
-          <dt
-            className={cn(
-              "text-[10px] font-semibold tracking-[0.1em] uppercase",
-              isFreeSlots ? "text-navy/70" : "text-muted",
-            )}
-          >
+          <dt className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
             {fact.label}
           </dt>
           <dd
             className={cn(
-              "mt-1 text-[15px] leading-snug",
-              isFreeSlots
-                ? "font-bold text-navy tabular-nums"
-                : emphasis === "primary"
-                  ? "font-semibold text-ink"
-                  : "text-ink",
+              "mt-0.5 leading-snug text-ink",
+              emphasis === "primary"
+                ? "text-[15px] font-semibold sm:text-base"
+                : "text-[14px]",
             )}
           >
-            {fact.value}
+            {isFreeSlots ? (
+              <span className="inline-flex items-center rounded-sm bg-brand-yellow/30 px-1.5 py-0.5 font-bold text-navy tabular-nums">
+                {fact.value}
+              </span>
+            ) : (
+              fact.value
+            )}
           </dd>
           {fact.hint ? (
             <p className="mt-0.5 text-[12px] leading-5 text-muted">{fact.hint}</p>

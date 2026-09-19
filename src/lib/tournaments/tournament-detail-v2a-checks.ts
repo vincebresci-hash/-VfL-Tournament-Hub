@@ -116,10 +116,10 @@ export function runTournamentDetailV2AChecks() {
     "all assigned active Partners render; no max-3",
   );
   assert(
-    partnersSection.includes('href="/partner"') &&
-      partnersSection.includes("Alle Partner anzeigen") &&
+    !partnersSection.includes('href="/partner"') &&
+      !partnersSection.includes("Alle Partner anzeigen") &&
       !partnersSection.includes("listPublicActivePartners("),
-    "/partner link is navigation only",
+    "tournament Partner section has no global /partner link",
   );
 
   // 12–14 facts + filledPublicInfo + description

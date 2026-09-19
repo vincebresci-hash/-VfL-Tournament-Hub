@@ -182,7 +182,7 @@ export function PartnerLogoGrid({
           key={partner.id}
           className={cn(
             "min-w-0",
-            size === "tournament" && "w-full max-w-[17.5rem] sm:w-[15.75rem]",
+            size === "tournament" && "w-[min(100%,15.75rem)]",
           )}
         >
           <PartnerLogoCard partner={partner} size={size} />
