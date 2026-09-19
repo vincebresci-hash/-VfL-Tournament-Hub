@@ -132,7 +132,7 @@ export function runTournamentPartnersPublicChecks() {
   const sectionIdx = tournamentDetail.indexOf(
     "<TournamentPartnersSection partners={tournamentPartners} />",
   );
-  const factsIdx = tournamentDetail.indexOf("{facts.length > 0 ? (");
+  const factsIdx = tournamentDetail.indexOf("<TournamentInfoGrid");
   const stageIdx = tournamentDetail.indexOf("<TournamentPublicStage");
   assert(
     sectionIdx > 0 &&
@@ -145,14 +145,17 @@ export function runTournamentPartnersPublicChecks() {
     section.includes('size="tournament"') &&
       partnerGrid.includes('"tournament"') &&
       partnerGrid.includes("flex flex-wrap gap-3") &&
-      partnerGrid.includes("max-w-[17.5rem]"),
+      (partnerGrid.includes("max-w-[17.5rem]") ||
+        partnerGrid.includes("w-[min(100%,15.75rem)]")),
     "tournament Partner layout is compact (not homepage full-width cards)",
   );
 
   // Visual polish (tournament-scoped only)
   assert(
     section.includes('tone="secondary"') &&
-      section.includes('className="mt-6"') &&
+      (section.includes('className="mt-6"') ||
+        section.includes('className="mt-8 sm:mt-10"') ||
+        section.includes('className="mt-7 sm:mt-8"')) &&
       partnerGrid.includes('tone?: "default" | "secondary"') &&
       partnerGrid.includes('tone = "default"'),
     "Partner heading uses secondary tone; shared header default unchanged",
@@ -196,15 +199,16 @@ export function runTournamentPartnersPublicChecks() {
     "homepage and /partner Partner typography/hover defaults unchanged",
   );
 
-  // Facts compact + Freie Plätze presentation-only emphasis
+  // Facts + Freie Plätze presentation-only emphasis (V2-A InfoGrid)
+  const infoGrid = read("src/components/tournaments/TournamentInfoGrid.tsx");
   assert(
     tournamentDetail.includes('label: "Freie Plätze"') &&
       tournamentDetail.includes("getDisplayCapacity(tournament)") &&
-      tournamentDetail.includes('fact.label === "Freie Plätze"') &&
-      tournamentDetail.includes("bg-brand-yellow/25") &&
-      tournamentDetail.includes("px-3.5 py-2.5") &&
-      tournamentDetail.includes("gap-2.5 sm:grid-cols-2 xl:grid-cols-3"),
-    "facts grid more compact; Freie Plätze yellow accent is presentation-only",
+      infoGrid.includes('fact.label === "Freie Plätze"') &&
+      (infoGrid.includes("bg-brand-yellow/25") ||
+        infoGrid.includes("bg-brand-yellow/30")) &&
+      tournamentDetail.includes("<TournamentInfoGrid"),
+    "facts retained via TournamentInfoGrid; Freie Plätze yellow accent is presentation-only",
   );
   assert(
     !tournamentDetail.includes("availableSlots +") &&

@@ -9,9 +9,10 @@ type TournamentPartnersSectionProps = {
 };
 
 /**
- * Public tournament detail Partner section (Phase 2C).
+ * Public tournament detail Partner section (Phase 2C / V2-A strip).
  * Renders nothing when no active assigned Partners exist.
  * Compact horizontal tiles — does not use homepage max-3 layout.
+ * No global /partner link — this strip is tournament-assigned only.
  */
 export function TournamentPartnersSection({
   partners,
@@ -21,13 +22,13 @@ export function TournamentPartnersSection({
   }
 
   return (
-    <section className="mt-6">
+    <section className="mt-7 sm:mt-8">
       <PartnerSectionHeader
         title="Partner & Sponsoren"
         compact
         tone="secondary"
       />
-      <div className="mt-2.5">
+      <div className="mt-2">
         <PartnerLogoGrid partners={partners} size="tournament" />
       </div>
     </section>

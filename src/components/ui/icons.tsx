@@ -74,6 +74,16 @@ export function IconCalendar(props: IconProps) {
   );
 }
 
+/** Outline clock — matches existing IconBase stroke style (no new icon dependency). */
+export function IconClock(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="7.5" {...stroke} />
+      <path d="M12 8.5V12l2.5 1.8" {...stroke} />
+    </IconBase>
+  );
+}
+
 export function IconPin(props: IconProps) {
   return (
     <IconBase {...props}>

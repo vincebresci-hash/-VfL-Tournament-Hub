@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { TournamentImageFrame } from "@/components/brand/TournamentImageFrame";
 import { Footer } from "@/components/layout/Footer";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { Container } from "@/components/layout/Container";
-import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { TournamentPublicStage } from "@/components/tournaments/TournamentPublicStage";
 import { TournamentPartnersSection } from "@/components/tournaments/TournamentPartnersSection";
+import { TournamentHero } from "@/components/tournaments/TournamentHero";
+import { TournamentInfoGrid } from "@/components/tournaments/TournamentInfoGrid";
+import { TournamentDescription } from "@/components/tournaments/TournamentDescription";
+import { TournamentExtraInfo } from "@/components/tournaments/TournamentExtraInfo";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { formatDateDe, formatDateTimeDe, formatTimeDe } from "@/lib/format";
 import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
@@ -29,7 +31,6 @@ import {
 import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import { listPublicActivePartnersForTournament } from "@/lib/partners/queries";
 import { publicTeamLabel } from "@/lib/schedule/names";
-import { tournamentImageObjectPosition } from "@/data/tournaments";
 import { getSiteUrl, withCanonical } from "@/lib/site";
 
 type TournamentDetailPageProps = {
@@ -113,9 +114,11 @@ export default async function TournamentDetailPage({
   const meinTurnierplanHybrid = isHybridLiveDataSource(tournament);
   const showTopMeinTurnierplanButton =
     showMeinTurnierplan && !showLiveTab;
+  // Hero availability: presentation-only when capacity exists and apply path is active.
+  const showHeroAvailability =
+    capacity != null &&
+    (applicationState === "open" || applicationState === "waitlist");
   const facts = [
-    tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
-    tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
     { label: "Datum", value: formatDateDe(tournament.date) },
     startTime ? { label: "Startzeit", value: startTime } : null,
     endTime ? { label: "Geplantes Ende", value: endTime } : null,
@@ -123,17 +126,19 @@ export default async function TournamentDetailPage({
       ? { label: "Veranstaltungsort", value: tournament.location }
       : null,
     nonempty(tournament.address) ? { label: "Adresse", value: tournament.address } : null,
+    tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
+    tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
+    capacity ? { label: "Max. Teams", value: String(capacity.maxTeams) } : null,
+    tournament.confirmedTeams > 0 || capacity
+      ? { label: "Bestätigte Teams", value: String(tournament.confirmedTeams) }
+      : null,
+    capacity ? { label: "Freie Plätze", value: String(capacity.availableSlots) } : null,
     tournament.applicationStart
       ? { label: "Bewerbungsstart", value: formatDateTimeDe(tournament.applicationStart) }
       : null,
     tournament.applicationDeadline
       ? { label: "Bewerbungsfrist", value: formatDateTimeDe(tournament.applicationDeadline) }
       : null,
-    capacity ? { label: "Max. Teams", value: String(capacity.maxTeams) } : null,
-    tournament.confirmedTeams > 0 || capacity
-      ? { label: "Bestätigte Teams", value: String(tournament.confirmedTeams) }
-      : null,
-    capacity ? { label: "Freie Plätze", value: String(capacity.availableSlots) } : null,
     tournament.waitlistEnabled || applicationState === "waitlist"
       ? {
           label: "Warteliste",
@@ -151,76 +156,62 @@ export default async function TournamentDetailPage({
     <div className="flex min-h-full flex-col">
       <SiteHeader variant="solid" />
       <main id="inhalt" className="flex-1 bg-background">
-        <Container className="py-12 sm:py-16 lg:py-20">
-          <Link
-            href="/turniere"
-            className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
-          >
-            ← Alle Turniere
-          </Link>
-
-          <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:items-start">
-            <TournamentImageFrame
-              src={tournament.image}
-              alt={tournament.name}
-              variant="hero"
-              className="w-full"
-              aspectClassName="aspect-[16/9]"
-              sizes="(min-width: 1024px) 55vw, 100vw"
-              objectPosition={tournamentImageObjectPosition(tournament.ageGroup)}
-            />
-
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex bg-brand-yellow px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
-                  {tournament.ageGroup}
-                </span>
-                <span
-                  className={`inline-flex px-1.5 py-0.5 text-[10px] font-semibold tracking-[0.08em] uppercase ${applicationStatusDisplay.className}`}
-                >
-                  {applicationStatusDisplay.label}
-                </span>
-              </div>
-
-              <h1 className="mt-4 font-display text-4xl font-bold tracking-wide text-ink uppercase sm:text-5xl">
-                {tournament.name}
-              </h1>
-
-              <p className="mt-4 inline-flex items-center gap-1.5 text-[15px] text-muted">
-                <IconCalendar className="h-4 w-4 text-brand-yellow" />
-                <time dateTime={tournament.date}>{formatDateDe(tournament.date)}</time>
-                {startTime ? ` · ${startTime}` : ""}
-              </p>
-              {nonempty(tournament.location) ? (
-                <p className="mt-2 inline-flex items-center gap-1.5 text-[15px] text-muted">
-                  <IconPin className="h-4 w-4 text-brand-yellow" />
-                  {tournament.location}
-                  {nonempty(tournament.address) ? ` · ${tournament.address}` : ""}
-                </p>
-              ) : null}
-
-              {shortDescription ? (
-                <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
-                  {shortDescription}
-                </p>
-              ) : null}
-
-              <div className="mt-8">
-                {applicationState === "coming-soon" ? (
-                  <span className="inline-flex h-11 items-center px-4 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
-                    Demnächst bewerben
-                  </span>
-                ) : canApply ? (
+        <Container className="py-8 sm:py-12 lg:py-14">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Link
+              href="/turniere"
+              className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase transition-colors hover:text-brand-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-yellow"
+            >
+              ← Alle Turniere
+            </Link>
+            <nav
+              aria-label="Brotkrumen"
+              className="hidden text-[12px] tracking-[0.02em] text-muted sm:block"
+            >
+              <ol className="flex flex-wrap items-center gap-1.5">
+                <li>
                   <Link
-                    href={`/turniere/${tournament.slug}/bewerben`}
-                    className="inline-flex h-11 items-center bg-brand-yellow px-4 text-[12px] font-semibold tracking-[0.08em] text-navy uppercase hover:bg-[#ffe066] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                    href="/"
+                    className="transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
                   >
-                    {ctaLabel}
+                    Startseite
                   </Link>
-                ) : null}
-              </div>
-            </div>
+                </li>
+                <li aria-hidden="true">›</li>
+                <li>
+                  <Link
+                    href="/turniere"
+                    className="transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow"
+                  >
+                    Turniere
+                  </Link>
+                </li>
+                <li aria-hidden="true">›</li>
+                <li className="max-w-[14rem] truncate font-medium text-ink">
+                  {tournament.name}
+                </li>
+              </ol>
+            </nav>
           </div>
+
+          <TournamentHero
+            name={tournament.name}
+            slug={tournament.slug}
+            image={tournament.image}
+            ageGroup={tournament.ageGroup}
+            dateIso={tournament.date}
+            dateLabel={formatDateDe(tournament.date)}
+            startTimeLabel={startTime}
+            location={nonempty(tournament.location)}
+            address={nonempty(tournament.address)}
+            shortDescription={shortDescription}
+            applicationState={applicationState}
+            applicationStatusDisplay={applicationStatusDisplay}
+            canApply={canApply}
+            ctaLabel={ctaLabel}
+            availableSlots={capacity?.availableSlots ?? null}
+            showAvailability={showHeroAvailability}
+          />
 
           {showTopMeinTurnierplanButton ? (
             <MeinTurnierplanPublicButton
@@ -234,58 +225,13 @@ export default async function TournamentDetailPage({
 
           <TournamentPartnersSection partners={tournamentPartners} />
 
-          {facts.length > 0 ? (
-            <dl className="mt-8 grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-              {facts.map((fact) => {
-                const isFreeSlots = fact.label === "Freie Plätze";
-                return (
-                  <div
-                    key={fact.label}
-                    className="border border-line bg-white px-3.5 py-2.5"
-                  >
-                    <dt className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
-                      {fact.label}
-                    </dt>
-                    <dd className="mt-0.5 text-[15px] leading-snug text-ink">
-                      {isFreeSlots ? (
-                        <span className="inline-flex items-center rounded-sm bg-brand-yellow/25 px-1.5 py-0.5 font-semibold text-navy tabular-nums">
-                          {fact.value}
-                        </span>
-                      ) : (
-                        fact.value
-                      )}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
-          ) : null}
+          <TournamentInfoGrid facts={facts} />
 
           {longDescription && longDescription !== shortDescription ? (
-            <section className="mt-10 max-w-3xl">
-              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
-                Beschreibung
-              </h2>
-              <p className="mt-4 whitespace-pre-line text-base leading-7 text-muted">
-                {longDescription}
-              </p>
-            </section>
+            <TournamentDescription description={longDescription} />
           ) : null}
 
-          {extraInfo.length > 0 ? (
-            <section className="mt-10 grid gap-4 md:grid-cols-2">
-              {extraInfo.map((item) => (
-                <article key={item.key} className="border border-line bg-white p-5">
-                  <h2 className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                    {item.label}
-                  </h2>
-                  <p className="mt-3 whitespace-pre-line text-[15px] leading-7 text-muted">
-                    {item.value}
-                  </p>
-                </article>
-              ))}
-            </section>
-          ) : null}
+          <TournamentExtraInfo items={extraInfo} />
 
           <TournamentPublicStage
             slug={tournament.slug}
