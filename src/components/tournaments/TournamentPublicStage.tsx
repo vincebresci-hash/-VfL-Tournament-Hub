@@ -18,6 +18,7 @@ import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnie
 import { MeinTurnierplanSourceHint } from "@/components/tournaments/MeinTurnierplanSourceHint";
 import { TournamentParticipantCards } from "@/components/tournaments/TournamentParticipantCards";
 import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCards";
+import { TournamentScheduleCards } from "@/components/tournaments/TournamentScheduleCards";
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import {
   resolveGruppenTab,
@@ -315,76 +316,83 @@ export function TournamentPublicStage({
 
       {current === "spielplan" ? (
         <section className="mt-8">
-          <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
-            Spielplan
-          </h2>
-          {publicScheduleNote ? (
-            <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-              {publicScheduleNote}
-            </p>
-          ) : null}
           {spielplanTab.source === "mein-turnierplan" && mtp.matchesWidgetUrl ? (
-            <div className={`${publicScheduleNote ? "mt-5" : "mt-4"} w-full`}>
-              <MeinTurnierplanWidget
-                url={mtp.matchesWidgetUrl}
-                title="MeinTurnierplan Spielplan"
-                iframeId="widgetMatches"
-              />
-              {spielplanTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
-            </div>
-          ) : spielplanTab.source === "unavailable" ? (
-            <div className="mt-4">
-              {livePresentation?.presentationUrl ? (
-                <MeinTurnierplanPublicButton
-                  tournamentName={livePresentation.tournamentName}
-                  tournamentDate={livePresentation.tournamentDate}
-                  tournamentStatus={livePresentation.tournamentStatus}
-                  url={livePresentation.presentationUrl}
-                  customLabel={livePresentation.customLabel}
-                />
-              ) : (
-                <p className="text-[15px] text-muted">
-                  Der Spielplan ist aktuell nicht verfügbar. Bitte prüfen Sie später erneut
-                  oder nutzen Sie den MeinTurnierplan-Link, falls hinterlegt.
+            <>
+              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
+                Spielplan
+              </h2>
+              {publicScheduleNote ? (
+                <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+                  {publicScheduleNote}
                 </p>
-              )}
-            </div>
+              ) : null}
+              <div className={`${publicScheduleNote ? "mt-5" : "mt-4"} w-full`}>
+                <MeinTurnierplanWidget
+                  url={mtp.matchesWidgetUrl}
+                  title="MeinTurnierplan Spielplan"
+                  iframeId="widgetMatches"
+                />
+                {spielplanTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
+              </div>
+            </>
+          ) : spielplanTab.source === "unavailable" ? (
+            <>
+              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
+                Spielplan
+              </h2>
+              {publicScheduleNote ? (
+                <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+                  {publicScheduleNote}
+                </p>
+              ) : null}
+              <div className="mt-4">
+                {livePresentation?.presentationUrl ? (
+                  <MeinTurnierplanPublicButton
+                    tournamentName={livePresentation.tournamentName}
+                    tournamentDate={livePresentation.tournamentDate}
+                    tournamentStatus={livePresentation.tournamentStatus}
+                    url={livePresentation.presentationUrl}
+                    customLabel={livePresentation.customLabel}
+                  />
+                ) : (
+                  <p className="text-[15px] text-muted">
+                    Der Spielplan ist aktuell nicht verfügbar. Bitte prüfen Sie später erneut
+                    oder nutzen Sie den MeinTurnierplan-Link, falls hinterlegt.
+                  </p>
+                )}
+              </div>
+            </>
           ) : stage.matches.length === 0 ? (
-            <p className="mt-4 text-[15px] text-muted">Der Spielplan wird noch veröffentlicht.</p>
+            <>
+              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
+                Spielplan
+              </h2>
+              {publicScheduleNote ? (
+                <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+                  {publicScheduleNote}
+                </p>
+              ) : null}
+              <p className="mt-4 text-[15px] text-muted">Der Spielplan wird noch veröffentlicht.</p>
+            </>
           ) : (
-            <ul className="mt-4 grid gap-3">
-              {stage.matches.map((match) => (
-                <li key={match.id} className="border border-line bg-white px-4 py-3">
-                  <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-                    {match.phase === "knockout" && match.round
-                      ? knockoutRoundLabel[match.round]
-                      : groupName(match.groupId)}{" "}
-                    · {fieldName(match.fieldId)} · {formatBerlinClock(match.scheduledAt)}
-                  </p>
-                  <p className="mt-1 text-[15px] text-ink">
-                    {teamLabel(
-                      teamLabels,
-                      matchTeamId(match.homeApplicationId, match.homeExternalTeamId),
-                    )}{" "}
-                    vs{" "}
-                    {teamLabel(
-                      teamLabels,
-                      matchTeamId(match.awayApplicationId, match.awayExternalTeamId),
-                    )}
-                  </p>
-                  {match.status === "completed" && match.homeScore != null && match.awayScore != null ? (
-                    <p className="mt-1 font-display text-lg font-bold text-ink">
-                      {match.homeScore} : {match.awayScore}
-                      {match.decidedBy === "penalties"
-                        ? ` n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
-                        : ""}
-                    </p>
-                  ) : (
-                    <p className="mt-1 text-[13px] text-muted">Ergebnis folgt</p>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <>
+              {publicScheduleNote ? (
+                <p className="mb-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+                  {publicScheduleNote}
+                </p>
+              ) : null}
+              <TournamentScheduleCards
+                matches={stage.matches}
+                teamLabels={teamLabels}
+                matchTeamId={matchTeamId}
+                phaseOrGroupLabel={(match) =>
+                  match.phase === "knockout" && match.round
+                    ? knockoutRoundLabel[match.round]
+                    : groupName(match.groupId)
+                }
+                fieldLabel={fieldName}
+              />
+            </>
           )}
         </section>
       ) : null}
