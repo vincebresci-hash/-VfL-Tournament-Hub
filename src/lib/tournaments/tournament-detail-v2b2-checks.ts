@@ -20,6 +20,9 @@ export function runTournamentDetailV2B2Checks() {
   const cards = read(
     "src/components/tournaments/TournamentParticipantCards.tsx",
   );
+  const cardsGroup = read(
+    "src/components/tournaments/TournamentGroupCards.tsx",
+  );
   const page = read("src/app/turniere/[slug]/page.tsx");
   const resolvers = read("src/lib/mein-turnierplan-public-source.ts");
   const standings = read("src/components/tournaments/StandingsTable.tsx");
@@ -158,7 +161,8 @@ export function runTournamentDetailV2B2Checks() {
   // 17–21 other tabs unchanged
   assert(
     stage.includes("resolveGruppenTab") &&
-      stage.includes("Noch keine Teams zugeordnet.") &&
+      (stage.includes("Noch keine Teams zugeordnet.") ||
+        cardsGroup.includes("Noch keine Teams zugeordnet.")) &&
       stage.includes("Der Spielplan wird noch veröffentlicht.") &&
       stage.includes("<StandingsTable") &&
       stage.includes("PublicRoundCard") &&
