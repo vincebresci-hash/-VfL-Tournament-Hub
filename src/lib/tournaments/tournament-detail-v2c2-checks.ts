@@ -201,7 +201,7 @@ export function runTournamentDetailV2C2Checks() {
     stage.includes('current === "tabelle"') &&
       stage.includes("<TournamentStandingsSection") &&
       stage.includes("computeGroupStandings") &&
-      stage.includes("PublicRoundCard") &&
+      stage.includes("TournamentKnockoutRounds") &&
       stage.includes("<MeinTurnierplanLiveSection") &&
       standings.includes("export function StandingsTable"),
     "other tabs / StandingsTable / Live / KO paths retained",

@@ -177,7 +177,7 @@ export function runTournamentDetailV2C1Checks() {
     stage.includes("<TournamentParticipantCards roster={stage.roster} />") &&
       stage.includes('current === "spielplan"') &&
       stage.includes("<TournamentStandingsSection") &&
-      stage.includes("PublicRoundCard") &&
+      stage.includes("TournamentKnockoutRounds") &&
       stage.includes("<MeinTurnierplanLiveSection") &&
       standings.includes("export function StandingsTable"),
     "Teilnehmer/Spielplan/Tabelle/KO/Live paths retained",

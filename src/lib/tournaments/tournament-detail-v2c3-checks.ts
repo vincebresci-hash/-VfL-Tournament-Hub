@@ -276,7 +276,7 @@ export function runTournamentDetailV2C3Checks() {
       stage.includes("<TournamentParticipantCards") &&
       hero.includes("export function TournamentHero") &&
       stage.includes("Turnier-Center") &&
-      stage.includes("PublicRoundCard") &&
+      stage.includes("TournamentKnockoutRounds") &&
       stage.includes("<MeinTurnierplanLiveSection"),
     "V2-A/B1/B2/C1/C2 and other tabs not redesigned here",
   );

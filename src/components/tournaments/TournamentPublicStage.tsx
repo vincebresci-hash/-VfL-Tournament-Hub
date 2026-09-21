@@ -10,7 +10,7 @@ import {
 } from "@/lib/schedule/knockout";
 import { computeGroupStandings } from "@/lib/schedule/standings";
 import type { PublicTournamentStage } from "@/lib/db/schedule-queries";
-import type { KnockoutRound, TournamentMatchRecord } from "@/types/schedule";
+import type { KnockoutRound } from "@/types/schedule";
 import { MeinTurnierplanLiveSection } from "@/components/tournaments/MeinTurnierplanLiveSection";
 import { MeinTurnierplanWidget } from "@/components/tournaments/MeinTurnierplanWidget";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
@@ -19,6 +19,7 @@ import { TournamentParticipantCards } from "@/components/tournaments/TournamentP
 import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCards";
 import { TournamentScheduleCards } from "@/components/tournaments/TournamentScheduleCards";
 import { TournamentStandingsSection } from "@/components/tournaments/TournamentStandingsSection";
+import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKnockoutRounds";
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import {
   resolveGruppenTab,
@@ -170,6 +171,45 @@ export function TournamentPublicStage({
     ["final", "third-place"],
   ];
   const publicPlacements: KnockoutRound[] = ["placement-5", "placement-7"];
+  const knockoutTeamSide = (applicationId: string | null) => {
+    const mark = applicationId ? teamMarks[applicationId] : undefined;
+    return {
+      label: teamLabel(teamLabels, applicationId),
+      logoUrl: mark?.logoUrl ?? null,
+      clubName: mark ? mark.clubName : null,
+    };
+  };
+  const knockoutRoundViews = [...publicRounds.flat(), ...publicPlacements].flatMap((round) => {
+    const roundMatches = knockoutMatches.filter((match) => match.round === round);
+    if (roundMatches.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        id: round,
+        title: knockoutRoundLabel[round],
+        matches: roundMatches.map((match) => {
+          const outcome = resolveKnockoutOutcome(match);
+          return {
+            id: match.id,
+            meta: `${fieldName(match.fieldId)} · ${formatBerlinClock(match.scheduledAt)}`,
+            home: knockoutTeamSide(match.homeApplicationId),
+            away: knockoutTeamSide(match.awayApplicationId),
+            resultText: knockoutResultText(match),
+            winnerLabel: outcome.winnerId
+              ? `Gewinner ${teamLabel(teamLabels, outcome.winnerId)}`
+              : null,
+          };
+        }),
+      },
+    ];
+  });
+  const knockoutPlacementViews = placements.map((row) => ({
+    id: `${row.place}-${row.applicationId}`,
+    place: row.place,
+    label: teamLabel(teamLabels, row.applicationId),
+  }));
 
   return (
     <div>
@@ -463,64 +503,10 @@ export function TournamentPublicStage({
       ) : null}
 
       {current === "ko-runde" ? (
-        <section className="mt-8 grid gap-5">
-          <div className="grid gap-5 lg:grid-cols-3">
-            {publicRounds.map((rounds) => {
-              const columnHasMatches = rounds.some((round) =>
-                knockoutMatches.some((match) => match.round === round),
-              );
-              if (!columnHasMatches) {
-                return null;
-              }
-
-              return (
-                <div key={rounds.join("-")} className="grid gap-5">
-                  {rounds.map((round) => {
-                    const roundMatches = knockoutMatches.filter((match) => match.round === round);
-                    if (roundMatches.length === 0) {
-                      return null;
-                    }
-
-                    return (
-                      <PublicRoundCard
-                        key={round}
-                        round={round}
-                        matches={roundMatches}
-                        teamLabels={teamLabels}
-                        fieldName={fieldName}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-          {publicPlacements.some((round) =>
-            knockoutMatches.some((match) => match.round === round),
-          ) ? (
-            <div className="grid gap-5 lg:grid-cols-2">
-              {publicPlacements.map((round) => {
-                const roundMatches = knockoutMatches.filter((match) => match.round === round);
-                if (roundMatches.length === 0) {
-                  return null;
-                }
-
-                return (
-                  <PublicRoundCard
-                    key={round}
-                    round={round}
-                    matches={roundMatches}
-                    teamLabels={teamLabels}
-                    fieldName={fieldName}
-                  />
-                );
-              })}
-            </div>
-          ) : null}
-          {placements.length > 0 ? (
-            <PublicPlacements placements={placements} teamLabels={teamLabels} />
-          ) : null}
-        </section>
+        <TournamentKnockoutRounds
+          rounds={knockoutRoundViews}
+          placements={knockoutPlacementViews}
+        />
       ) : null}
       {current === "live" && showLiveTab && livePresentation ? (
         <MeinTurnierplanLiveSection
@@ -539,57 +525,27 @@ export function TournamentPublicStage({
   );
 }
 
-function PublicRoundCard({
-  round,
-  matches,
-  teamLabels,
-  fieldName,
-}: {
-  round: KnockoutRound;
-  matches: TournamentMatchRecord[];
-  teamLabels: Record<string, string>;
-  fieldName: (id: string | null) => string;
+function knockoutResultText(match: {
+  status: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  decidedBy: string | null;
+  homePenalties: number | null;
+  awayPenalties: number | null;
 }) {
-  return (
-    <article className="border border-line bg-white p-5">
-      <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-        {knockoutRoundLabel[round]}
-      </h2>
-      <ul className="mt-4 grid gap-3">
-        {matches.map((match) => {
-          const outcome = resolveKnockoutOutcome(match);
-          return (
-            <li key={match.id} className="border border-line px-4 py-3">
-              <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-                {fieldName(match.fieldId)} · {formatBerlinClock(match.scheduledAt)}
-              </p>
-              <p className="mt-1 text-[15px] text-ink">
-                {teamLabel(teamLabels, match.homeApplicationId)} vs{" "}
-                {teamLabel(teamLabels, match.awayApplicationId)}
-              </p>
-              {match.status === "completed" &&
-              match.homeScore != null &&
-              match.awayScore != null ? (
-                <p className="mt-1 font-display text-lg font-bold text-ink">
-                  {match.homeScore}:{match.awayScore}
-                  {match.decidedBy === "penalties"
-                    ? ` n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
-                    : ""}
-                </p>
-              ) : (
-                <p className="mt-1 text-[13px] text-muted">Ergebnis folgt</p>
-              )}
-              {outcome.winnerId ? (
-                <p className="mt-1 text-[13px] text-muted">
-                  Gewinner {teamLabel(teamLabels, outcome.winnerId)}
-                </p>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
-    </article>
-  );
+  if (
+    match.status === "completed" &&
+    match.homeScore != null &&
+    match.awayScore != null
+  ) {
+    return `${match.homeScore}:${match.awayScore}${
+      match.decidedBy === "penalties"
+        ? ` n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
+        : ""
+    }`;
+  }
+
+  return "Ergebnis folgt";
 }
 
 function PublicPlacements({

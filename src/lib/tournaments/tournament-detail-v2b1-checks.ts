@@ -154,7 +154,7 @@ export function runTournamentDetailV2B1Checks() {
     "standings rendering path retained",
   );
   assert(
-    stage.includes("PublicRoundCard") &&
+    stage.includes("TournamentKnockoutRounds") &&
       stage.includes("computeKnockoutPlacements"),
     "KO content path retained",
   );
