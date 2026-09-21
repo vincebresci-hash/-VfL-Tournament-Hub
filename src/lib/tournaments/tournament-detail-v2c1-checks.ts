@@ -176,7 +176,7 @@ export function runTournamentDetailV2C1Checks() {
   assert(
     stage.includes("<TournamentParticipantCards roster={stage.roster} />") &&
       stage.includes('current === "spielplan"') &&
-      stage.includes("<StandingsTable") &&
+      stage.includes("<TournamentStandingsSection") &&
       stage.includes("PublicRoundCard") &&
       stage.includes("<MeinTurnierplanLiveSection") &&
       standings.includes("export function StandingsTable"),

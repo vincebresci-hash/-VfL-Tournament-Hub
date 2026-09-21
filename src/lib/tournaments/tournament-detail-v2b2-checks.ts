@@ -164,7 +164,7 @@ export function runTournamentDetailV2B2Checks() {
       (stage.includes("Noch keine Teams zugeordnet.") ||
         cardsGroup.includes("Noch keine Teams zugeordnet.")) &&
       stage.includes("Der Spielplan wird noch veröffentlicht.") &&
-      stage.includes("<StandingsTable") &&
+      stage.includes("<TournamentStandingsSection") &&
       stage.includes("PublicRoundCard") &&
       stage.includes("<MeinTurnierplanLiveSection") &&
       stage.includes('current === "gruppen"') &&

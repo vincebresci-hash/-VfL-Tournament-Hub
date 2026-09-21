@@ -12,6 +12,7 @@ import { runTournamentDetailV2B1Checks } from "@/lib/tournaments/tournament-deta
 import { runTournamentDetailV2B2Checks } from "@/lib/tournaments/tournament-detail-v2b2-checks";
 import { runTournamentDetailV2C1Checks } from "@/lib/tournaments/tournament-detail-v2c1-checks";
 import { runTournamentDetailV2C2Checks } from "@/lib/tournaments/tournament-detail-v2c2-checks";
+import { runTournamentDetailV2C3Checks } from "@/lib/tournaments/tournament-detail-v2c3-checks";
 import { runScheduleSelfChecks } from "./run-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
@@ -171,6 +172,7 @@ try {
   const tournamentDetailV2B2Checks = runTournamentDetailV2B2Checks();
   const tournamentDetailV2C1Checks = runTournamentDetailV2C1Checks();
   const tournamentDetailV2C2Checks = runTournamentDetailV2C2Checks();
+  const tournamentDetailV2C3Checks = runTournamentDetailV2C3Checks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
@@ -261,6 +263,7 @@ try {
   console.log(`tournament-detail-v2b2-checks: ${tournamentDetailV2B2Checks}`);
   console.log(`tournament-detail-v2c1-checks: ${tournamentDetailV2C1Checks}`);
   console.log(`tournament-detail-v2c2-checks: ${tournamentDetailV2C2Checks}`);
+  console.log(`tournament-detail-v2c3-checks: ${tournamentDetailV2C3Checks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
