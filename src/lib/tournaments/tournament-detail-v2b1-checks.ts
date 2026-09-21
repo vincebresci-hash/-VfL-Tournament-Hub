@@ -133,7 +133,11 @@ export function runTournamentDetailV2B1Checks() {
     "participant rendering path retained (hub cards + logo + team label)",
   );
   assert(
-    stage.includes("Noch keine Teams zugeordnet.") &&
+    stage.includes("TournamentGroupCards") &&
+      (stage.includes("Noch keine Teams zugeordnet.") ||
+        read("src/components/tournaments/TournamentGroupCards.tsx").includes(
+          "Noch keine Teams zugeordnet.",
+        )) &&
       stage.includes("resolveGruppenTab"),
     "group rendering path retained",
   );

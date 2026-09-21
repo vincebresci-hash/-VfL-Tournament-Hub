@@ -17,6 +17,7 @@ import { MeinTurnierplanWidget } from "@/components/tournaments/MeinTurnierplanW
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import { MeinTurnierplanSourceHint } from "@/components/tournaments/MeinTurnierplanSourceHint";
 import { TournamentParticipantCards } from "@/components/tournaments/TournamentParticipantCards";
+import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCards";
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import {
   resolveGruppenTab,
@@ -282,27 +283,17 @@ export function TournamentPublicStage({
       ) : null}
 
       {current === "gruppen" ? (
-        <section className="mt-8 grid gap-5">
+        <section className="mt-8">
           {gruppenTab.source === "mein-turnierplan" ? (
             <>
-              {mtp.groups.map((group) => (
-                <article key={group.id} className="border border-line bg-white p-5">
-                  <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                    {group.name}
-                  </h2>
-                  {group.teams.length === 0 ? (
-                    <p className="mt-3 text-[14px] text-muted">Noch keine Teams zugeordnet.</p>
-                  ) : (
-                    <ul className="mt-3 grid gap-2">
-                      {group.teams.map((team) => (
-                        <li key={team.id} className="text-[15px] text-ink">
-                          {team.name}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </article>
-              ))}
+              <TournamentGroupCards
+                source="mtp"
+                groups={mtp.groups.map((group) => ({
+                  id: group.id,
+                  name: group.name,
+                  teams: group.teams,
+                }))}
+              />
               {gruppenTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
             </>
           ) : gruppenTab.source === "unavailable" ? (
@@ -310,27 +301,14 @@ export function TournamentPublicStage({
               Gruppen konnten aktuell nicht von MeinTurnierplan geladen werden.
             </p>
           ) : (
-            stage.groups.map((group) => {
-              const members = stage.roster.filter((entry) => entry.groupId === group.id);
-              return (
-                <article key={group.id} className="border border-line bg-white p-5">
-                  <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                    {group.name}
-                  </h2>
-                  {members.length === 0 ? (
-                    <p className="mt-3 text-[14px] text-muted">Noch keine Teams zugeordnet.</p>
-                  ) : (
-                    <ul className="mt-3 grid gap-2">
-                      {members.map((entry) => (
-                        <li key={entry.applicationId} className="text-[15px] text-ink">
-                          {publicTeamLabel(entry.clubName, entry.teamName)}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </article>
-              );
-            })
+            <TournamentGroupCards
+              source="hub"
+              groups={stage.groups.map((group) => ({
+                id: group.id,
+                name: group.name,
+                members: stage.roster.filter((entry) => entry.groupId === group.id),
+              }))}
+            />
           )}
         </section>
       ) : null}
