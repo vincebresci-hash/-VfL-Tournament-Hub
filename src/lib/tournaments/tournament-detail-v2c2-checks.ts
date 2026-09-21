@@ -199,7 +199,8 @@ export function runTournamentDetailV2C2Checks() {
 
   assert(
     stage.includes('current === "tabelle"') &&
-      stage.includes("<StandingsTable") &&
+      stage.includes("<TournamentStandingsSection") &&
+      stage.includes("computeGroupStandings") &&
       stage.includes("PublicRoundCard") &&
       stage.includes("<MeinTurnierplanLiveSection") &&
       standings.includes("export function StandingsTable"),

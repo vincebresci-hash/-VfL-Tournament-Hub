@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { StandingsTable } from "@/components/tournaments/StandingsTable";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
 import { publicTeamLabel, teamLabel } from "@/lib/schedule/names";
 import {
@@ -19,6 +18,7 @@ import { MeinTurnierplanSourceHint } from "@/components/tournaments/MeinTurnierp
 import { TournamentParticipantCards } from "@/components/tournaments/TournamentParticipantCards";
 import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCards";
 import { TournamentScheduleCards } from "@/components/tournaments/TournamentScheduleCards";
+import { TournamentStandingsSection } from "@/components/tournaments/TournamentStandingsSection";
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import {
   resolveGruppenTab,
@@ -146,9 +146,15 @@ export function TournamentPublicStage({
       publicTeamLabel(entry.clubName, entry.teamName),
     ]),
   );
+  const teamMarks: Record<string, { logoUrl: string | null; clubName: string }> = {};
   for (const entry of stage.roster) {
     if (entry.externalTeamId) {
       teamLabels[entry.externalTeamId] = publicTeamLabel(entry.clubName, entry.teamName);
+    }
+    const mark = { logoUrl: entry.logoUrl ?? null, clubName: entry.clubName };
+    teamMarks[entry.applicationId] = mark;
+    if (entry.externalTeamId) {
+      teamMarks[entry.externalTeamId] = mark;
     }
   }
   const matchTeamId = (applicationId: string | null, externalTeamId?: string | null) =>
@@ -435,28 +441,23 @@ export function TournamentPublicStage({
               </div>
             </>
           ) : (
-            <div className="grid gap-5">
-              {stage.groups.map((group) => {
+            <TournamentStandingsSection
+              groups={stage.groups.map((group) => {
                 const memberIds = stage.roster
                   .filter((entry) => entry.groupId === group.id)
                   .map((entry) => entry.externalTeamId ?? entry.applicationId);
-                const standings = computeGroupStandings(
-                  memberIds,
-                  groupMatches.filter((match) => match.groupId === group.id),
-                );
-
-                return (
-                  <article key={group.id} className="border border-line bg-white p-5">
-                    <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-                      Tabelle {group.name}
-                    </h2>
-                    <div className="mt-4">
-                      <StandingsTable standings={standings} teamLabels={teamLabels} />
-                    </div>
-                  </article>
-                );
+                return {
+                  id: group.id,
+                  name: group.name,
+                  standings: computeGroupStandings(
+                    memberIds,
+                    groupMatches.filter((match) => match.groupId === group.id),
+                  ),
+                };
               })}
-            </div>
+              teamLabels={teamLabels}
+              teamMarks={teamMarks}
+            />
           )}
         </section>
       ) : null}

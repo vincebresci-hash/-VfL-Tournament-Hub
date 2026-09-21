@@ -148,7 +148,7 @@ export function runTournamentDetailV2B1Checks() {
     "schedule rendering path retained",
   );
   assert(
-    stage.includes("<StandingsTable") &&
+    stage.includes("<TournamentStandingsSection") &&
       stage.includes("computeGroupStandings") &&
       stage.includes('iframeId="widgetTable"'),
     "standings rendering path retained",
