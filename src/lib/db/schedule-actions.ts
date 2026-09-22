@@ -7,6 +7,7 @@ import { toUserFacingDbError } from "@/lib/db/errors";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import {
+  matchSideDbColumns,
   resolveScheduleParticipantRef,
   scheduleParticipantId,
 } from "@/lib/schedule/admin";
@@ -101,23 +102,6 @@ function constraintMessage(error: { message?: string; code?: string } | null, fa
 
 async function loadConfirmedScheduleParticipants(tournamentId: string) {
   return getTournamentParticipants(tournamentId);
-}
-
-function matchSideColumns(
-  side: "home" | "away",
-  ref: { applicationId: string | null; externalTeamId: string | null },
-) {
-  if (side === "home") {
-    return {
-      home_application_id: ref.applicationId,
-      home_external_team_id: ref.externalTeamId,
-    };
-  }
-
-  return {
-    away_application_id: ref.applicationId,
-    away_external_team_id: ref.externalTeamId,
-  };
 }
 
 export async function createTournamentGroupAction(
@@ -632,8 +616,8 @@ export async function generateTournamentScheduleAction(
       tournament_id: tournamentId,
       group_id: match.groupId,
       field_id: match.fieldId,
-      ...matchSideColumns("home", homeRef),
-      ...matchSideColumns("away", awayRef),
+      ...matchSideDbColumns("home", homeRef),
+      ...matchSideDbColumns("away", awayRef),
       scheduled_at: match.scheduledAt.toISOString(),
       duration_minutes: match.durationMinutes,
       status: "scheduled" as const,
@@ -715,8 +699,8 @@ export async function saveTournamentMatchAction(
     tournament_id: tournamentId,
     group_id: input.groupId,
     field_id: input.fieldId || null,
-    ...matchSideColumns("home", homeRef),
-    ...matchSideColumns("away", awayRef),
+    ...matchSideDbColumns("home", homeRef),
+    ...matchSideDbColumns("away", awayRef),
     scheduled_at: scheduledAt,
     duration_minutes: loaded.tournament.match_duration_minutes ?? 12,
     status: input.status,

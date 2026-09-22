@@ -15,6 +15,7 @@ import { runTournamentDetailV2C2Checks } from "@/lib/tournaments/tournament-deta
 import { runTournamentDetailV2C3Checks } from "@/lib/tournaments/tournament-detail-v2c3-checks";
 import { runTournamentDetailV2C4Checks } from "@/lib/tournaments/tournament-detail-v2c4-checks";
 import { runScheduleSelfChecks } from "./run-checks";
+import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
 import { runMeinTurnierplanImportSelfChecks } from "@/lib/mein-turnierplan-import";
@@ -90,6 +91,7 @@ import {
 
 try {
   const schedule = runScheduleSelfChecks();
+  const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
   const applicationWindow = runApplicationWindowSelfChecks();
   const meinTurnierplan = runMeinTurnierplanSelfChecks();
   const meinTurnierplanImport = runMeinTurnierplanImportSelfChecks();
@@ -176,6 +178,7 @@ try {
   const tournamentDetailV2C3Checks = runTournamentDetailV2C3Checks();
   const tournamentDetailV2C4Checks = runTournamentDetailV2C4Checks();
   console.log(`schedule-checks: ${schedule}`);
+  console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
   console.log(`mein-turnierplan-import-checks: ${meinTurnierplanImport}`);

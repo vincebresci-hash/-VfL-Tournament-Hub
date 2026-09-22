@@ -6,9 +6,9 @@ import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
-import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
-import { acceptedParticipants, stageStatusFor, teamLabelsFromApplications } from "@/lib/schedule/admin";
+import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import { stageStatusFor, teamLabelsFromParticipants } from "@/lib/schedule/admin";
 
 type KnockoutPageProps = {
   params: Promise<{ id: string }>;
@@ -31,17 +31,16 @@ export async function generateMetadata({ params }: KnockoutPageProps): Promise<M
 
 export default async function AdminTournamentKnockoutPage({ params }: KnockoutPageProps) {
   const { id } = await params;
-  const [tournament, applicationsResult] = await Promise.all([
-    loadTournament(id),
-    listAdminApplications(),
-  ]);
+  const tournament = await loadTournament(id);
 
   if (!tournament) {
     notFound();
   }
 
-  const stage = await getAdminTournamentStage(tournament.id);
-  const participants = acceptedParticipants(applicationsResult.applications, tournament);
+  const [stage, participants] = await Promise.all([
+    getAdminTournamentStage(tournament.id),
+    getTournamentParticipants(tournament.id),
+  ]);
 
   return (
     <TournamentAdminChrome
@@ -62,7 +61,7 @@ export default async function AdminTournamentKnockoutPage({ params }: KnockoutPa
           matches={stage.matches}
           memberIdsByGroupId={stage.memberIdsByGroupId}
           participants={participants}
-          teamLabels={teamLabelsFromApplications(participants)}
+          teamLabels={teamLabelsFromParticipants(participants)}
         />
       )}
     </TournamentAdminChrome>

@@ -186,8 +186,14 @@ export function runAdminScheduleParticipantChecks() {
   assert(groupsBoard.includes("participantSourceLabel"), "G: source labels shown");
 
   const scheduleActions = readSource("src/lib/db/schedule-actions.ts");
+  const scheduleAdmin = readSource("src/lib/schedule/admin.ts");
   assert(scheduleActions.includes("getTournamentParticipants"), "actions load unified participants");
-  assert(scheduleActions.includes("home_external_team_id"), "actions write external match columns");
+  assert(
+    scheduleActions.includes("matchSideDbColumns") &&
+      scheduleAdmin.includes("home_external_team_id") &&
+      scheduleAdmin.includes("away_external_team_id"),
+    "actions write external match columns",
+  );
   assert(scheduleActions.includes("external_team_id"), "actions write external group members");
 
   const scheduleBoard = readSource("src/components/admin/TournamentScheduleBoard.tsx");
