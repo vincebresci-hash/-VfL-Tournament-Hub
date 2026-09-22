@@ -25,7 +25,11 @@ import {
   type KnockoutFormat,
 } from "@/lib/schedule/knockout";
 import { teamLabel } from "@/lib/schedule/names";
-import type { AdminApplication } from "@/types/application";
+import {
+  matchSideParticipantId,
+  scheduleParticipantId,
+} from "@/lib/schedule/admin";
+import type { TournamentParticipant } from "@/lib/tournament-participants";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type {
   DecidedBy,
@@ -41,7 +45,7 @@ type TournamentKnockoutBoardProps = {
   fields: TournamentFieldRecord[];
   matches: TournamentMatchRecord[];
   memberIdsByGroupId: Record<string, string[]>;
-  participants: AdminApplication[];
+  participants: TournamentParticipant[];
   teamLabels: Record<string, string>;
 };
 
@@ -381,7 +385,7 @@ function KnockoutMatchCard({
 }: {
   match: TournamentMatchRecord;
   fields: TournamentFieldRecord[];
-  participants: AdminApplication[];
+  participants: TournamentParticipant[];
   teamLabels: Record<string, string>;
   pending: boolean;
   onSaveMatch: (
@@ -402,8 +406,8 @@ function KnockoutMatchCard({
     awayPenalties: string;
   }) => Promise<boolean>;
 }) {
-  const [homeId, setHomeId] = useState(match.homeApplicationId ?? "");
-  const [awayId, setAwayId] = useState(match.awayApplicationId ?? "");
+  const [homeId, setHomeId] = useState(matchSideParticipantId(match, "home") ?? "");
+  const [awayId, setAwayId] = useState(matchSideParticipantId(match, "away") ?? "");
   const [fieldId, setFieldId] = useState(match.fieldId ?? fields[0]?.id ?? "");
   const [scheduledAt, setScheduledAt] = useState(isoToDatetimeLocal(match.scheduledAt));
   const [duration, setDuration] = useState(String(match.durationMinutes));
@@ -419,6 +423,18 @@ function KnockoutMatchCard({
   const [confirmChange, setConfirmChange] = useState(false);
   const outcome = resolveKnockoutOutcome(match);
   const hasResult = match.status === "completed" || match.homeScore != null;
+  const homeLabel = teamLabel(teamLabels, matchSideParticipantId(match, "home"));
+  const awayLabel = teamLabel(teamLabels, matchSideParticipantId(match, "away"));
+  const winnerLabel = outcome.winnerId
+    ? teamLabel(teamLabels, outcome.winnerId)
+    : null;
+  const selectableParticipants = participants.flatMap((participant) => {
+    const id = scheduleParticipantId(participant);
+    if (!id) {
+      return [];
+    }
+    return [{ id, label: teamLabels[id] ?? participant.displayName }];
+  });
 
   return (
     <article className="border border-line p-4">
@@ -426,7 +442,7 @@ function KnockoutMatchCard({
         {fields.find((field) => field.id === match.fieldId)?.name ?? "Feld"} · {formatBerlinClock(match.scheduledAt)}
       </p>
       <p className="mt-2 font-display text-lg font-bold tracking-wide text-ink uppercase">
-        {teamLabel(teamLabels, match.homeApplicationId)} vs {teamLabel(teamLabels, match.awayApplicationId)}
+        {homeLabel} vs {awayLabel}
       </p>
       {match.status === "completed" && match.homeScore != null && match.awayScore != null ? (
         <p className="mt-1 text-[15px] text-ink">
@@ -434,7 +450,7 @@ function KnockoutMatchCard({
           {match.decidedBy === "penalties"
             ? ` · n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
             : ""}
-          {outcome.winnerId ? ` · Sieger ${teamLabel(teamLabels, outcome.winnerId)}` : ""}
+          {winnerLabel ? ` · Sieger ${winnerLabel}` : ""}
         </p>
       ) : (
         <p className="mt-1 text-[13px] text-muted">Ergebnis folgt</p>
@@ -462,17 +478,17 @@ function KnockoutMatchCard({
       >
         <SelectInput value={homeId} onChange={(event) => setHomeId(event.target.value)} aria-label="Heimteam">
           <option value="">steht noch nicht fest</option>
-          {participants.map((application) => (
-            <option key={application.id} value={application.id}>
-              {teamLabels[application.id] ?? application.teamName}
+          {selectableParticipants.map((participant) => (
+            <option key={participant.id} value={participant.id}>
+              {participant.label}
             </option>
           ))}
         </SelectInput>
         <SelectInput value={awayId} onChange={(event) => setAwayId(event.target.value)} aria-label="Auswärtsteam">
           <option value="">steht noch nicht fest</option>
-          {participants.map((application) => (
-            <option key={application.id} value={application.id}>
-              {teamLabels[application.id] ?? application.teamName}
+          {selectableParticipants.map((participant) => (
+            <option key={participant.id} value={participant.id}>
+              {participant.label}
             </option>
           ))}
         </SelectInput>

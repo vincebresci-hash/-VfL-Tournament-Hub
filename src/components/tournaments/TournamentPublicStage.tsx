@@ -171,10 +171,10 @@ export function TournamentPublicStage({
     ["final", "third-place"],
   ];
   const publicPlacements: KnockoutRound[] = ["placement-5", "placement-7"];
-  const knockoutTeamSide = (applicationId: string | null) => {
-    const mark = applicationId ? teamMarks[applicationId] : undefined;
+  const knockoutTeamSide = (participantId: string | null) => {
+    const mark = participantId ? teamMarks[participantId] : undefined;
     return {
-      label: teamLabel(teamLabels, applicationId),
+      label: teamLabel(teamLabels, participantId),
       logoUrl: mark?.logoUrl ?? null,
       clubName: mark ? mark.clubName : null,
     };
@@ -194,8 +194,12 @@ export function TournamentPublicStage({
           return {
             id: match.id,
             meta: `${fieldName(match.fieldId)} · ${formatBerlinClock(match.scheduledAt)}`,
-            home: knockoutTeamSide(match.homeApplicationId),
-            away: knockoutTeamSide(match.awayApplicationId),
+            home: knockoutTeamSide(
+              matchTeamId(match.homeApplicationId, match.homeExternalTeamId),
+            ),
+            away: knockoutTeamSide(
+              matchTeamId(match.awayApplicationId, match.awayExternalTeamId),
+            ),
             resultText: knockoutResultText(match),
             winnerLabel: outcome.winnerId
               ? `Gewinner ${teamLabel(teamLabels, outcome.winnerId)}`

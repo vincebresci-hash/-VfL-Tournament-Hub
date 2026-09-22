@@ -352,6 +352,57 @@ export function runScheduleSelfChecks() {
   );
   assert(qualified.map((team) => team.seedLabel).join(",") === "A1,A2,B1,B2", "Qualifikation Top 2");
 
+  // Dual-identity smoke (full matrix lives in knockout-dual-identity-checks.ts)
+  const externalWin = resolveKnockoutOutcome(
+    koMatch({
+      homeApplicationId: null,
+      homeExternalTeamId: "ext-home",
+      awayApplicationId: "app-away",
+      awayExternalTeamId: null,
+      homeScore: 2,
+      awayScore: 1,
+      status: "completed",
+      round: "semifinal",
+      nextMatchId: "final-dual",
+      nextMatchSlot: "home",
+      loserNextMatchId: "third-dual",
+      loserNextMatchSlot: "home",
+    }),
+  );
+  assert(
+    externalWin.winner?.externalTeamId === "ext-home" &&
+      externalWin.winner?.applicationId === null &&
+      externalWin.loser?.applicationId === "app-away" &&
+      externalWin.loser?.externalTeamId === null,
+    "KO dual-identity outcome preserves typed winner/loser",
+  );
+  const dualLive = propagateKnockoutTeams([
+    koMatch({
+      id: "sf-dual",
+      homeApplicationId: null,
+      homeExternalTeamId: "ext-home",
+      awayApplicationId: "app-away",
+      awayExternalTeamId: null,
+      homeScore: 2,
+      awayScore: 1,
+      status: "completed",
+      round: "semifinal",
+      nextMatchId: "final-dual",
+      nextMatchSlot: "home",
+      loserNextMatchId: "third-dual",
+      loserNextMatchSlot: "home",
+    }),
+    koMatch({ id: "final-dual", round: "final" }),
+    koMatch({ id: "third-dual", round: "third-place" }),
+  ]);
+  assert(
+    dualLive.find((match) => match.id === "final-dual")?.homeExternalTeamId === "ext-home" &&
+      dualLive.find((match) => match.id === "final-dual")?.homeApplicationId === null &&
+      dualLive.find((match) => match.id === "third-dual")?.homeApplicationId === "app-away" &&
+      dualLive.find((match) => match.id === "third-dual")?.homeExternalTeamId === null,
+    "KO dual-identity propagation writes typed identity columns",
+  );
+
   return "ok";
 }
 

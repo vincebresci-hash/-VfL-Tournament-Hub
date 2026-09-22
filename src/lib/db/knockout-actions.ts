@@ -5,12 +5,20 @@ import { createClient } from "@/lib/supabase/server";
 import { requireResultsManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import {
+  emptyScheduleParticipantRef,
+  matchSideDbColumns,
+  resolveScheduleParticipantRef,
+  type ScheduleParticipantRef,
+} from "@/lib/schedule/admin";
 import { addMinutes, datetimeLocalToIso } from "@/lib/schedule/datetime";
 import {
   buildKnockoutPlan,
   hasDuplicateTeamInRound,
   isGroupStageComplete,
   KNOCKOUT_SCHEDULE_WAVES,
+  knockoutSideRef,
   propagateKnockoutTeams,
   qualifyTopTwo,
   resolveKnockoutOutcome,
@@ -63,6 +71,16 @@ function parseScore(value: string) {
   }
 
   return Number(trimmed);
+}
+
+function participantRefFromStage(
+  participantId: string | null,
+  refs: Record<string, ScheduleParticipantRef>,
+): ScheduleParticipantRef | null {
+  if (!participantId) {
+    return emptyScheduleParticipantRef();
+  }
+  return refs[participantId] ?? null;
 }
 
 export async function generateKnockoutAction(
@@ -125,17 +143,44 @@ export async function generateKnockoutAction(
     return { error: plan.error, notice: null };
   }
 
-  if (hasDuplicateTeamInRound(plan.matches.map((match) => ({
-    round: match.round,
-    homeApplicationId: match.homeId,
-    awayApplicationId: match.awayId,
-  })))) {
-    return { error: "Ein Team würde in derselben KO-Runde doppelt spielen.", notice: null };
-  }
-
   const fields = stage.fields;
   if (fields.length === 0) {
     return { error: "Bitte zuerst mindestens ein Spielfeld anlegen.", notice: null };
+  }
+
+  const seededSides: Array<{ key: string; home: ScheduleParticipantRef; away: ScheduleParticipantRef }> = [];
+  for (const match of plan.matches) {
+    const home = participantRefFromStage(match.homeId, stage.participantRefById);
+    const away = participantRefFromStage(match.awayId, stage.participantRefById);
+    if ((match.homeId && !home) || (match.awayId && !away)) {
+      return {
+        error: "Ein qualifiziertes Team konnte keinem gültigen Teilnehmer zugeordnet werden.",
+        notice: null,
+      };
+    }
+    seededSides.push({
+      key: match.key,
+      home: home ?? emptyScheduleParticipantRef(),
+      away: away ?? emptyScheduleParticipantRef(),
+    });
+  }
+  const sideByKey = Object.fromEntries(seededSides.map((entry) => [entry.key, entry]));
+
+  if (
+    hasDuplicateTeamInRound(
+      plan.matches.map((match) => {
+        const sides = sideByKey[match.key];
+        return {
+          round: match.round,
+          homeApplicationId: sides?.home.applicationId ?? null,
+          awayApplicationId: sides?.away.applicationId ?? null,
+          homeExternalTeamId: sides?.home.externalTeamId ?? null,
+          awayExternalTeamId: sides?.away.externalTeamId ?? null,
+        };
+      }),
+    )
+  ) {
+    return { error: "Ein Team würde in derselben KO-Runde doppelt spielen.", notice: null };
   }
 
   const ids = Object.fromEntries(plan.matches.map((match) => [match.key, crypto.randomUUID()]));
@@ -205,13 +250,16 @@ export async function generateKnockoutAction(
 
   const rows = plan.matches.map((match) => {
     const time = scheduled.get(match.key);
+    const sides = sideByKey[match.key];
+    const home = sides?.home ?? emptyScheduleParticipantRef();
+    const away = sides?.away ?? emptyScheduleParticipantRef();
     return {
       id: ids[match.key],
       tournament_id: tournamentId,
       group_id: null,
       field_id: time?.fieldId ?? fields[0]?.id ?? null,
-      home_application_id: match.homeId,
-      away_application_id: match.awayId,
+      ...matchSideDbColumns("home", home),
+      ...matchSideDbColumns("away", away),
       scheduled_at: time?.scheduledAt.toISOString() ?? null,
       duration_minutes: duration,
       status: "scheduled" as const,
@@ -292,10 +340,9 @@ export async function saveKnockoutMatchAction(
     return { error: loaded.error };
   }
 
-  if (!input.homeApplicationId || !input.awayApplicationId) {
-    return { error: "Bitte Heim- und Auswärtsteam wählen." };
-  }
-  if (input.homeApplicationId === input.awayApplicationId) {
+  const homeParticipantId = input.homeApplicationId.trim();
+  const awayParticipantId = input.awayApplicationId.trim();
+  if (homeParticipantId && awayParticipantId && homeParticipantId === awayParticipantId) {
     return { error: "Ein Team kann nicht gegen sich selbst spielen." };
   }
 
@@ -310,6 +357,19 @@ export async function saveKnockoutMatchAction(
     return { error: "Das KO-Spiel wurde nicht gefunden." };
   }
 
+  const participants = await getTournamentParticipants(tournamentId);
+  const homeRef = homeParticipantId
+    ? resolveScheduleParticipantRef(homeParticipantId, participants)
+    : emptyScheduleParticipantRef();
+  const awayRef = awayParticipantId
+    ? resolveScheduleParticipantRef(awayParticipantId, participants)
+    : emptyScheduleParticipantRef();
+  if ((homeParticipantId && !homeRef) || (awayParticipantId && !awayRef)) {
+    return { error: "Nur bestätigte Teilnehmer können einem KO-Spiel zugeordnet werden." };
+  }
+  const home = homeRef ?? emptyScheduleParticipantRef();
+  const away = awayRef ?? emptyScheduleParticipantRef();
+
   const hasResult = current.status === "completed" || current.homeScore != null;
   if (hasResult && !input.confirmCompletedChange) {
     return {
@@ -321,8 +381,10 @@ export async function saveKnockoutMatchAction(
     match.id === input.matchId
       ? {
           ...match,
-          homeApplicationId: input.homeApplicationId,
-          awayApplicationId: input.awayApplicationId,
+          homeApplicationId: home.applicationId,
+          awayApplicationId: away.applicationId,
+          homeExternalTeamId: home.externalTeamId,
+          awayExternalTeamId: away.externalTeamId,
         }
       : match,
   );
@@ -334,8 +396,8 @@ export async function saveKnockoutMatchAction(
   const { error } = await supabase
     .from("tournament_matches")
     .update({
-      home_application_id: input.homeApplicationId,
-      away_application_id: input.awayApplicationId,
+      ...matchSideDbColumns("home", home),
+      ...matchSideDbColumns("away", away),
       field_id: input.fieldId || null,
       scheduled_at: datetimeLocalToIso(input.scheduledAt),
       duration_minutes: durationMinutes,
@@ -503,9 +565,15 @@ async function persistPropagatedMatches(
     if (!before) {
       continue;
     }
-    const changed =
+    const homeChanged =
       before.homeApplicationId !== match.homeApplicationId ||
+      (before.homeExternalTeamId ?? null) !== (match.homeExternalTeamId ?? null);
+    const awayChanged =
       before.awayApplicationId !== match.awayApplicationId ||
+      (before.awayExternalTeamId ?? null) !== (match.awayExternalTeamId ?? null);
+    const changed =
+      homeChanged ||
+      awayChanged ||
       before.status !== match.status ||
       before.homeScore !== match.homeScore ||
       before.awayScore !== match.awayScore ||
@@ -519,8 +587,14 @@ async function persistPropagatedMatches(
     const { error } = await supabase
       .from("tournament_matches")
       .update({
-        home_application_id: match.homeApplicationId,
-        away_application_id: match.awayApplicationId,
+        ...matchSideDbColumns(
+          "home",
+          knockoutSideRef(match.homeApplicationId, match.homeExternalTeamId),
+        ),
+        ...matchSideDbColumns(
+          "away",
+          knockoutSideRef(match.awayApplicationId, match.awayExternalTeamId),
+        ),
         status: match.status,
         home_score: match.homeScore,
         away_score: match.awayScore,

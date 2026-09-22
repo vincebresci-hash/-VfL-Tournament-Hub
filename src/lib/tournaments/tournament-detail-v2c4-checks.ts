@@ -97,14 +97,23 @@ export function runTournamentDetailV2C4Checks() {
 
   assert(
     names.includes('fallback = "steht noch nicht fest"') &&
-      sideFn.includes("teamLabel(teamLabels, applicationId)") &&
-      sideFn.includes("applicationId ? teamMarks[applicationId]") &&
-      !sideFn.includes("externalTeamId") &&
-      roundFn.includes("knockoutTeamSide(match.homeApplicationId)") &&
-      roundFn.includes("knockoutTeamSide(match.awayApplicationId)") &&
-      !roundFn.includes("homeExternalTeamId") &&
-      !roundFn.includes("awayExternalTeamId"),
-    "team labels stay on application ids with steht noch nicht fest",
+      sideFn.includes("teamLabel(teamLabels, participantId)") &&
+      sideFn.includes("participantId ? teamMarks[participantId]") &&
+      roundFn.includes(
+        "matchTeamId(match.homeApplicationId, match.homeExternalTeamId)",
+      ) &&
+      roundFn.includes(
+        "matchTeamId(match.awayApplicationId, match.awayExternalTeamId)",
+      ) &&
+      stage.includes(
+        "const matchTeamId = (applicationId: string | null, externalTeamId?: string | null) =>",
+      ) &&
+      stage.includes("applicationId ?? externalTeamId ?? null") &&
+      stage.includes("teamLabels[entry.externalTeamId]") &&
+      stage.includes("teamMarks[entry.externalTeamId]") &&
+      roundFn.includes("`Gewinner ${teamLabel(teamLabels, outcome.winnerId)}`") &&
+      placementFn.includes("teamLabel(teamLabels, row.applicationId)"),
+    "KO sides resolve via matchTeamId for application/external labels, logos, winner, placements",
   );
 
   assert(

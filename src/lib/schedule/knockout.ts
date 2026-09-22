@@ -35,10 +35,17 @@ export type QualifiedTeam = {
   seedLabel: string;
 };
 
+export type KnockoutSideRef = {
+  applicationId: string | null;
+  externalTeamId: string | null;
+};
+
 export type KnockoutMatchLike = {
   id?: string;
   homeApplicationId: string | null;
   awayApplicationId: string | null;
+  homeExternalTeamId?: string | null;
+  awayExternalTeamId?: string | null;
   homeScore: number | null;
   awayScore: number | null;
   status: MatchStatus;
@@ -344,28 +351,87 @@ export function buildKnockoutPlan(
   return { matches, error: null };
 }
 
+export function emptyKnockoutSideRef(): KnockoutSideRef {
+  return { applicationId: null, externalTeamId: null };
+}
+
+export function knockoutSideRef(
+  applicationId: string | null | undefined,
+  externalTeamId?: string | null,
+): KnockoutSideRef {
+  if (applicationId) {
+    return { applicationId, externalTeamId: null };
+  }
+  if (externalTeamId) {
+    return { applicationId: null, externalTeamId };
+  }
+  return emptyKnockoutSideRef();
+}
+
+export function knockoutSideParticipantId(side: KnockoutSideRef): string | null {
+  return side.applicationId ?? side.externalTeamId ?? null;
+}
+
+export function matchHomeSide(match: KnockoutMatchLike): KnockoutSideRef {
+  return knockoutSideRef(match.homeApplicationId, match.homeExternalTeamId);
+}
+
+export function matchAwaySide(match: KnockoutMatchLike): KnockoutSideRef {
+  return knockoutSideRef(match.awayApplicationId, match.awayExternalTeamId);
+}
+
+export function sameKnockoutSide(a: KnockoutSideRef, b: KnockoutSideRef): boolean {
+  return (
+    (a.applicationId ?? null) === (b.applicationId ?? null) &&
+    (a.externalTeamId ?? null) === (b.externalTeamId ?? null)
+  );
+}
+
 export function resolveKnockoutOutcome(match: KnockoutMatchLike): {
   winnerId: string | null;
   loserId: string | null;
+  winner: KnockoutSideRef | null;
+  loser: KnockoutSideRef | null;
   error: string | null;
 } {
-  if (!match.homeApplicationId || !match.awayApplicationId) {
-    return { winnerId: null, loserId: null, error: "Beide Teams müssen gesetzt sein." };
+  const home = matchHomeSide(match);
+  const away = matchAwaySide(match);
+  const homeId = knockoutSideParticipantId(home);
+  const awayId = knockoutSideParticipantId(away);
+
+  if (!homeId || !awayId) {
+    return {
+      winnerId: null,
+      loserId: null,
+      winner: null,
+      loser: null,
+      error: "Beide Teams müssen gesetzt sein.",
+    };
   }
 
-  if (match.homeApplicationId === match.awayApplicationId) {
-    return { winnerId: null, loserId: null, error: "Ein Team kann nicht gegen sich selbst spielen." };
+  if (sameKnockoutSide(home, away) || homeId === awayId) {
+    return {
+      winnerId: null,
+      loserId: null,
+      winner: null,
+      loser: null,
+      error: "Ein Team kann nicht gegen sich selbst spielen.",
+    };
   }
 
   if (match.status !== "completed" || match.homeScore == null || match.awayScore == null) {
-    return { winnerId: null, loserId: null, error: null };
+    return { winnerId: null, loserId: null, winner: null, loser: null, error: null };
   }
 
   if (match.homeScore !== match.awayScore) {
     const homeWins = match.homeScore > match.awayScore;
+    const winner = homeWins ? home : away;
+    const loser = homeWins ? away : home;
     return {
-      winnerId: homeWins ? match.homeApplicationId : match.awayApplicationId,
-      loserId: homeWins ? match.awayApplicationId : match.homeApplicationId,
+      winnerId: knockoutSideParticipantId(winner),
+      loserId: knockoutSideParticipantId(loser),
+      winner,
+      loser,
       error: null,
     };
   }
@@ -377,9 +443,13 @@ export function resolveKnockoutOutcome(match: KnockoutMatchLike): {
     match.homePenalties !== match.awayPenalties
   ) {
     const homeWins = match.homePenalties > match.awayPenalties;
+    const winner = homeWins ? home : away;
+    const loser = homeWins ? away : home;
     return {
-      winnerId: homeWins ? match.homeApplicationId : match.awayApplicationId,
-      loserId: homeWins ? match.awayApplicationId : match.homeApplicationId,
+      winnerId: knockoutSideParticipantId(winner),
+      loserId: knockoutSideParticipantId(loser),
+      winner,
+      loser,
       error: null,
     };
   }
@@ -387,12 +457,20 @@ export function resolveKnockoutOutcome(match: KnockoutMatchLike): {
   return {
     winnerId: null,
     loserId: null,
+    winner: null,
+    loser: null,
     error: "KO-Spiele dürfen nicht unentschieden enden. Bitte Elfmeterschießen eintragen.",
   };
 }
 
 export function hasDuplicateTeamInRound(
-  matches: Array<{ round?: KnockoutRound | null; homeApplicationId: string | null; awayApplicationId: string | null }>,
+  matches: Array<{
+    round?: KnockoutRound | null;
+    homeApplicationId: string | null;
+    awayApplicationId: string | null;
+    homeExternalTeamId?: string | null;
+    awayExternalTeamId?: string | null;
+  }>,
 ) {
   const seen = new Map<string, Set<string>>();
 
@@ -401,7 +479,14 @@ export function hasDuplicateTeamInRound(
       continue;
     }
     const roundTeams = seen.get(match.round) ?? new Set<string>();
-    for (const teamId of [match.homeApplicationId, match.awayApplicationId]) {
+    for (const teamId of [
+      knockoutSideParticipantId(
+        knockoutSideRef(match.homeApplicationId, match.homeExternalTeamId),
+      ),
+      knockoutSideParticipantId(
+        knockoutSideRef(match.awayApplicationId, match.awayExternalTeamId),
+      ),
+    ]) {
       if (!teamId) {
         continue;
       }
@@ -451,15 +536,18 @@ export const KNOCKOUT_SCHEDULE_WAVES: KnockoutRound[][] = [
   ["third-place", "final"],
 ];
 
-function assignSlot<T extends { homeApplicationId: string | null; awayApplicationId: string | null }>(
+function assignSlot<T extends KnockoutMatchLike>(
   match: T,
   slot: KnockoutSlot,
-  teamId: string | null,
+  side: KnockoutSideRef | null,
 ) {
+  const next = side ?? emptyKnockoutSideRef();
   if (slot === "home") {
-    match.homeApplicationId = teamId;
+    match.homeApplicationId = next.applicationId;
+    match.homeExternalTeamId = next.externalTeamId;
   } else {
-    match.awayApplicationId = teamId;
+    match.awayApplicationId = next.applicationId;
+    match.awayExternalTeamId = next.externalTeamId;
   }
 }
 
@@ -482,7 +570,16 @@ function resetKnockoutResult<
 }
 
 export function propagateKnockoutTeams<T extends KnockoutMatchLike & { id: string }>(matches: T[]): T[] {
-  const byId = new Map(matches.map((match) => [match.id, { ...match }]));
+  const byId = new Map(
+    matches.map((match) => [
+      match.id,
+      {
+        ...match,
+        homeExternalTeamId: match.homeExternalTeamId ?? null,
+        awayExternalTeamId: match.awayExternalTeamId ?? null,
+      },
+    ]),
+  );
 
   function setForward(sourceId: string, visited: Set<string>) {
     if (visited.has(sourceId)) {
@@ -495,10 +592,14 @@ export function propagateKnockoutTeams<T extends KnockoutMatchLike & { id: strin
     }
 
     const outcome = resolveKnockoutOutcome(source);
-    const winnerId = outcome.error ? null : outcome.winnerId;
-    const loserId = outcome.error ? null : outcome.loserId;
+    const winner = outcome.error ? null : outcome.winner;
+    const loser = outcome.error ? null : outcome.loser;
 
-    function place(targetId: string | null | undefined, slot: KnockoutSlot | null | undefined, teamId: string | null) {
+    function place(
+      targetId: string | null | undefined,
+      slot: KnockoutSlot | null | undefined,
+      side: KnockoutSideRef | null,
+    ) {
       if (!targetId || !slot) {
         return;
       }
@@ -506,19 +607,20 @@ export function propagateKnockoutTeams<T extends KnockoutMatchLike & { id: strin
       if (!target) {
         return;
       }
-      const previous = slot === "home" ? target.homeApplicationId : target.awayApplicationId;
-      if (previous === teamId) {
+      const previous = slot === "home" ? matchHomeSide(target) : matchAwaySide(target);
+      const next = side ?? emptyKnockoutSideRef();
+      if (sameKnockoutSide(previous, next)) {
         return;
       }
-      assignSlot(target, slot, teamId);
+      assignSlot(target, slot, next);
       if (target.status === "completed") {
         resetKnockoutResult(target);
         setForward(target.id, visited);
       }
     }
 
-    place(source.nextMatchId, source.nextMatchSlot, winnerId);
-    place(source.loserNextMatchId, source.loserNextMatchSlot, loserId);
+    place(source.nextMatchId, source.nextMatchSlot, winner);
+    place(source.loserNextMatchId, source.loserNextMatchSlot, loser);
   }
 
   for (const match of matches) {

@@ -69,6 +69,10 @@ export type ScheduleParticipantRef = {
   externalTeamId: string | null;
 };
 
+export function emptyScheduleParticipantRef(): ScheduleParticipantRef {
+  return { applicationId: null, externalTeamId: null };
+}
+
 export function resolveScheduleParticipantRef(
   participantId: string,
   participants: Array<Pick<TournamentParticipant, "applicationId" | "externalTeamId">>,
@@ -89,6 +93,24 @@ export function resolveScheduleParticipantRef(
   }
 
   return null;
+}
+
+/** Persist a typed match side into tournament_matches identity columns. */
+export function matchSideDbColumns(
+  side: "home" | "away",
+  ref: ScheduleParticipantRef,
+) {
+  if (side === "home") {
+    return {
+      home_application_id: ref.applicationId,
+      home_external_team_id: ref.externalTeamId,
+    };
+  }
+
+  return {
+    away_application_id: ref.applicationId,
+    away_external_team_id: ref.externalTeamId,
+  };
 }
 
 export function stageStatusFor(

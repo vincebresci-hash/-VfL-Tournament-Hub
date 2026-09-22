@@ -24,6 +24,8 @@ export type AdminTournamentStage = {
   ready: boolean;
   groups: TournamentGroupRecord[];
   memberIdsByGroupId: Record<string, string[]>;
+  /** Opaque participant id → typed application/external ref from group membership. */
+  participantRefById: Record<string, { applicationId: string | null; externalTeamId: string | null }>;
   groupIdByApplicationId: Record<string, string>;
   fields: TournamentFieldRecord[];
   matches: TournamentMatchRecord[];
@@ -138,6 +140,7 @@ function emptyStage(ready: boolean): AdminTournamentStage {
     ready,
     groups: [],
     memberIdsByGroupId: {},
+    participantRefById: {},
     groupIdByApplicationId: {},
     fields: [],
     matches: [],
@@ -193,6 +196,10 @@ export async function getAdminTournamentStage(
 
   const members = (membersResult.data ?? []) as TournamentGroupMemberRow[];
   const memberIdsByGroupId: Record<string, string[]> = {};
+  const participantRefById: Record<
+    string,
+    { applicationId: string | null; externalTeamId: string | null }
+  > = {};
   const groupIdByApplicationId: Record<string, string> = {};
 
   for (const group of groups) {
@@ -200,7 +207,9 @@ export async function getAdminTournamentStage(
   }
 
   for (const member of members) {
-    const participantId = member.application_id ?? member.external_team_id;
+    const applicationId = member.application_id ?? null;
+    const externalTeamId = member.external_team_id ?? null;
+    const participantId = applicationId ?? externalTeamId;
     if (!participantId) {
       continue;
     }
@@ -209,6 +218,10 @@ export async function getAdminTournamentStage(
       ...(memberIdsByGroupId[member.group_id] ?? []),
       participantId,
     ];
+    participantRefById[participantId] = {
+      applicationId: applicationId ? applicationId : null,
+      externalTeamId: applicationId ? null : externalTeamId,
+    };
     groupIdByApplicationId[participantId] = member.group_id;
   }
 
@@ -216,6 +229,7 @@ export async function getAdminTournamentStage(
     ready: true,
     groups,
     memberIdsByGroupId,
+    participantRefById,
     groupIdByApplicationId,
     fields: ((fieldsResult.data ?? []) as TournamentFieldRow[]).map(mapField),
     matches: ((matchesResult.data ?? []) as TournamentMatchRow[]).map(mapMatch),
