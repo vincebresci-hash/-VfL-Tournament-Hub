@@ -42,50 +42,77 @@ export function MeinTurnierplanLiveSection({
   const hasWidgets = Boolean(resolvedMatchesWidgetUrl || resolvedTableWidgetUrl);
 
   return (
-    <section className="mt-8 w-full" data-live-section="combined">
-      {publicLiveNote ? (
-        <p className="max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-          {publicLiveNote}
-        </p>
-      ) : null}
-
-      {resolvedMatchesWidgetUrl ? (
-        <div className={`${publicLiveNote ? "mt-5" : ""} w-full`} data-widget-url-present="matches">
-          <MeinTurnierplanWidget
-            url={resolvedMatchesWidgetUrl}
-            title="MeinTurnierplan Spielplan"
-            iframeId="widgetMatches"
-          />
+    <section
+      className="mt-8 min-w-0 w-full max-w-full"
+      data-live-section="combined"
+      aria-labelledby="live-mtp-heading"
+    >
+      <div className="min-w-0 max-w-full rounded-[10px] border border-line bg-white px-3.5 py-3.5 shadow-[0_1px_2px_rgba(16,20,28,0.04)]">
+        <div className="border-b border-line/80 pb-2.5">
+          <h2
+            id="live-mtp-heading"
+            className="font-display text-2xl font-bold tracking-wide text-ink uppercase"
+          >
+            Live / MeinTurnierplan
+          </h2>
+          <p className="mt-1.5 max-w-3xl text-[14px] leading-6 text-muted">
+            Aktuelle Spielinformationen werden über MeinTurnierplan bereitgestellt.
+          </p>
+          <p className="mt-1 text-[12px] font-medium tracking-wide text-muted">
+            Bereitgestellt über MeinTurnierplan
+          </p>
         </div>
-      ) : null}
 
-      {resolvedTableWidgetUrl ? (
-        <div className={`${hasWidgets ? "mt-8" : publicLiveNote ? "mt-5" : ""} w-full`} data-widget-url-present="table">
-          <MeinTurnierplanWidget
-            url={resolvedTableWidgetUrl}
-            title={`MeinTurnierplan Tabelle für ${tournamentName}`}
-            iframeId="widgetTable"
-          />
-        </div>
-      ) : null}
+        {publicLiveNote ? (
+          <p className="mt-3.5 rounded-[8px] border border-line bg-[#fafbfc] px-3.5 py-2.5 text-[14px] leading-6 text-muted">
+            {publicLiveNote}
+          </p>
+        ) : null}
 
-      {!hasWidgets && presentationUrl ? (
-        <div className={publicLiveNote ? "mt-5" : ""}>
-          <MeinTurnierplanPublicButton
-            tournamentName={tournamentName}
-            tournamentDate={tournamentDate}
-            tournamentStatus={tournamentStatus}
-            url={presentationUrl}
-            customLabel={customLabel}
-          />
-        </div>
-      ) : null}
+        {resolvedMatchesWidgetUrl ? (
+          <div
+            className="mt-3.5 min-w-0 w-full max-w-full"
+            data-widget-url-present="matches"
+          >
+            <MeinTurnierplanWidget
+              url={resolvedMatchesWidgetUrl}
+              title="MeinTurnierplan Spielplan"
+              iframeId="widgetMatches"
+            />
+          </div>
+        ) : null}
 
-      {!hasWidgets && !presentationUrl ? (
-        <p className={`${publicLiveNote ? "mt-5" : ""} border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted`}>
-          Für diesen Bereich ist noch keine MeinTurnierplan-Widget-URL hinterlegt.
-        </p>
-      ) : null}
+        {resolvedTableWidgetUrl ? (
+          <div
+            className={`${resolvedMatchesWidgetUrl ? "mt-5" : "mt-3.5"} min-w-0 w-full max-w-full`}
+            data-widget-url-present="table"
+          >
+            <MeinTurnierplanWidget
+              url={resolvedTableWidgetUrl}
+              title={`MeinTurnierplan Tabelle für ${tournamentName}`}
+              iframeId="widgetTable"
+            />
+          </div>
+        ) : null}
+
+        {!hasWidgets && presentationUrl ? (
+          <div className="mt-3.5">
+            <MeinTurnierplanPublicButton
+              tournamentName={tournamentName}
+              tournamentDate={tournamentDate}
+              tournamentStatus={tournamentStatus}
+              url={presentationUrl}
+              customLabel={customLabel}
+            />
+          </div>
+        ) : null}
+
+        {!hasWidgets && !presentationUrl ? (
+          <p className="mt-3.5 rounded-[8px] border border-line bg-[#fafbfc] px-3.5 py-2.5 text-[14px] leading-6 text-muted">
+            Für diesen Bereich ist noch keine MeinTurnierplan-Widget-URL hinterlegt.
+          </p>
+        ) : null}
+      </div>
     </section>
   );
 }
