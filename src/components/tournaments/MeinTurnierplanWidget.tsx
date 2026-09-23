@@ -16,7 +16,11 @@ export function MeinTurnierplanWidget({
   const iframeSrc = meinTurnierplanIframeSrc(url);
 
   return (
-    <div className="w-full" data-mtp-widget-state="iframe" data-mtp-widget-src={iframeSrc}>
+    <div
+      className="min-w-0 w-full max-w-full overflow-hidden rounded-[8px] border border-line bg-[#fafbfc]"
+      data-mtp-widget-state="iframe"
+      data-mtp-widget-src={iframeSrc}
+    >
       <iframe
         id={iframeId}
         src={iframeSrc}
@@ -29,6 +33,7 @@ export function MeinTurnierplanWidget({
           overflow: "hidden",
           border: 0,
           width: "100%",
+          maxWidth: "100%",
           minHeight: `${height}px`,
           display: "block",
         }}
