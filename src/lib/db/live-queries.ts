@@ -4,22 +4,22 @@ import {
   type PublicTournamentStage,
 } from "@/lib/db/schedule-queries";
 import {
-  getPublicMeinTurnierplanData,
-  type PublicMeinTurnierplanData,
-} from "@/lib/mein-turnierplan-public-data";
-import {
-  isMeinTurnierplanPublic,
   showsMeinTurnierplanLiveTab,
 } from "@/lib/mein-turnierplan";
 import { getDisplayCapacity } from "@/lib/public-tournament";
 import { computeGroupStandings } from "@/lib/schedule/standings";
 import { publicTeamLabel } from "@/lib/schedule/names";
+import { buildLiveKnockoutViews } from "@/lib/live/build-live-knockout-views";
 import { selectLiveMatchHighlights } from "@/lib/live/live-matches";
 import {
   hasActiveLiveTournamentToday,
   selectLivePageTournaments,
   type LiveTournamentSelection,
 } from "@/lib/live/select-live-tournament";
+import type {
+  KnockoutPlacementView,
+  KnockoutRoundView,
+} from "@/components/tournaments/TournamentKnockoutRounds";
 import type { PublicTournament } from "@/types/tournament";
 import type { PublicRosterEntry, TournamentMatchRecord } from "@/types/schedule";
 
@@ -55,11 +55,12 @@ export type LivePageData = {
   highlightMatches: ReturnType<typeof selectLiveMatchHighlights>;
   recentResults: TournamentMatchRecord[];
   groups: LiveGroupSummary[];
+  knockoutRounds: KnockoutRoundView[];
+  knockoutPlacements: KnockoutPlacementView[];
   participants: LiveTeamRef[];
   capacity: ReturnType<typeof getDisplayCapacity>;
-  meinTurnierplanActive: boolean;
+  /** Optional external presentation link only – /live itself is Hub-native. */
   showLiveSpielplanCta: boolean;
-  meinTurnierplanPublic: PublicMeinTurnierplanData | null;
 };
 
 export function rosterTeamMap(roster: PublicRosterEntry[]) {
@@ -114,7 +115,8 @@ function buildGroupSummaries(
     const groupMatches = stage.matches.filter(
       (match) => match.phase === "group" && match.groupId === group.id,
     );
-    const standings = computeGroupStandings(memberIds, groupMatches).slice(0, 4);
+    // Full Hub standings – no truncation; same computeGroupStandings as tournament detail.
+    const standings = computeGroupStandings(memberIds, groupMatches);
 
     return {
       id: group.id,
@@ -154,14 +156,18 @@ function emptyLivePageData(
     highlightMatches: [],
     recentResults: [],
     groups: [],
+    knockoutRounds: [],
+    knockoutPlacements: [],
     participants: [],
     capacity: null,
-    meinTurnierplanActive: false,
     showLiveSpielplanCta: false,
-    meinTurnierplanPublic: null,
   };
 }
 
+/**
+ * Hub-native /live data loader.
+ * Reads public Hub tournament + stage only. Does not call MTP sync or import MTP match data.
+ */
 export async function getLivePageData(now = new Date()): Promise<LivePageData> {
   const tournaments = await listPublicTournaments();
   const selection = selectLivePageTournaments(tournaments, { now });
@@ -184,12 +190,15 @@ export async function getLivePageData(now = new Date()): Promise<LivePageData> {
     return emptyLivePageData(selection, todayAlso, upcoming, past);
   }
 
-  const [stage, meinTurnierplanPublic] = await Promise.all([
-    getPublicTournamentStage(primary.slug, primary.id),
-    getPublicMeinTurnierplanData(primary),
-  ]);
+  const stage = await getPublicTournamentStage(primary.slug, primary.id);
 
   const teamMap = rosterTeamMap(stage.roster);
+  const fieldNameById = new Map(stage.fields.map((field) => [field.id, field.name]));
+  const knockout = buildLiveKnockoutViews({
+    matches: stage.matches,
+    teamMap,
+    fieldNameById,
+  });
   const participants = stage.roster
     .map((entry) => ({
       id: entry.externalTeamId ?? entry.applicationId,
@@ -214,11 +223,11 @@ export async function getLivePageData(now = new Date()): Promise<LivePageData> {
       .sort((a, b) => (b.scheduledAt ?? "").localeCompare(a.scheduledAt ?? ""))
       .slice(0, 5),
     groups: buildGroupSummaries(stage, teamMap),
+    knockoutRounds: knockout.rounds,
+    knockoutPlacements: knockout.placements,
     participants,
     capacity: getDisplayCapacity(primary),
-    meinTurnierplanActive: isMeinTurnierplanPublic(primary),
     showLiveSpielplanCta: showsMeinTurnierplanLiveTab(primary),
-    meinTurnierplanPublic,
   };
 }
 
