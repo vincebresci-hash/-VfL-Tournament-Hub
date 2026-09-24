@@ -1,8 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
+import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKnockoutRounds";
 import { IconCalendar, IconPin } from "@/components/ui/icons";
 import { Container } from "@/components/layout/Container";
+import { LiveAutoRefresh } from "@/components/live/LiveAutoRefresh";
 import { LiveMatchCard } from "@/components/live/LiveMatchCard";
 import { LiveShareActions } from "@/components/live/LiveShareActions";
 import {
@@ -11,7 +13,6 @@ import {
   type LiveTeamRef,
 } from "@/lib/db/live-queries";
 import {
-  formatUpdatedAgo,
   LIVE_TYPO,
   mapsSearchUrl,
   nextMatchForParticipant,
@@ -145,9 +146,10 @@ export function LivePageView({ data }: LivePageViewProps) {
     stage,
     teamMap,
     groups,
+    knockoutRounds,
+    knockoutPlacements,
     participants,
     capacity,
-    meinTurnierplanActive,
     showLiveSpielplanCta,
   } = data;
 
@@ -165,11 +167,17 @@ export function LivePageView({ data }: LivePageViewProps) {
   const tournamentDayFinished = !hasLiveMatch && !hasScheduledMatch && hasCompletedMatch;
   const hasLivePrimary = primaryMoment.kind === "live";
   const heroCompact = !hasLivePrimary;
-  const syncLabel = formatUpdatedAgo(primary?.meinTurnierplanLastSyncedAt);
+  const hasKnockout =
+    knockoutRounds.length > 0 || knockoutPlacements.length > 0;
   const routeUrl = primary ? mapsSearchUrl(primary.location, primary.address) : null;
   const liveUrl = `${getSiteUrl()}/live`;
   const fieldCount = stage?.fields.length ?? 0;
   const matchCount = matches.filter((match) => match.status !== "cancelled").length;
+  const liveDayStatus = tournamentDayFinished
+    ? "Beendet"
+    : hasLiveMatch
+      ? "LIVE"
+      : "Turniertag";
   const emptyPrimary = primaryMomentEmptyCopy({
     hasLive: hasLiveMatch,
     hasScheduled: hasScheduledMatch,
@@ -199,16 +207,23 @@ export function LivePageView({ data }: LivePageViewProps) {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   {tournamentDayFinished ? (
-                    <span className={cn(LIVE_TYPO.badge, "bg-white/10 text-white")}>Beendet</span>
+                    <span className={cn(LIVE_TYPO.badge, "bg-white/10 text-white")}>
+                      {liveDayStatus}
+                    </span>
                   ) : (
                     <span className={cn(LIVE_TYPO.badge, "bg-brand-yellow text-navy")}>
-                      <span
-                        className="h-2 w-2 animate-pulse rounded-full bg-brand-red"
-                        aria-hidden
-                      />
-                      LIVE
+                      {hasLiveMatch ? (
+                        <span
+                          className="h-2 w-2 animate-pulse rounded-full bg-brand-red"
+                          aria-hidden
+                        />
+                      ) : null}
+                      {liveDayStatus}
                     </span>
                   )}
+                  <span className={cn(LIVE_TYPO.badge, "bg-white/10 text-white")}>
+                    {primary.ageGroup}
+                  </span>
                 </div>
 
                 <h1
@@ -228,7 +243,6 @@ export function LivePageView({ data }: LivePageViewProps) {
                   )}
                 >
                   {[
-                    primary.ageGroup,
                     primary.birthYear ? `Jahrgang ${primary.birthYear}` : null,
                     formatDateDe(primary.date),
                     primary.location,
@@ -255,15 +269,6 @@ export function LivePageView({ data }: LivePageViewProps) {
                   {formatTimeDe(primary.endTime) ? (
                     <span>Ende {formatTimeDe(primary.endTime)}</span>
                   ) : null}
-                </div>
-                <div
-                  className={cn(
-                    "flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-white/55 sm:text-[12px]",
-                    heroCompact ? "mt-2" : "mt-3",
-                  )}
-                >
-                  {syncLabel ? <span>{syncLabel}</span> : null}
-                  {meinTurnierplanActive ? <span>Live-Daten via MeinTurnierplan</span> : null}
                 </div>
               </div>
 
@@ -324,6 +329,13 @@ export function LivePageView({ data }: LivePageViewProps) {
 
             {primary ? (
               <>
+                <div className="flex flex-col gap-3 border-b border-line pb-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <p className="text-[13px] text-muted">
+                    Hub-Live · Ergebnisse und Tabellen aus dem Tournament Hub
+                  </p>
+                  <LiveAutoRefresh enabled />
+                </div>
+
                 {/* PRIMARY MOMENT */}
                 <section aria-label="Hauptspiel">
                   {primaryMoment.match ? (
@@ -533,6 +545,13 @@ export function LivePageView({ data }: LivePageViewProps) {
                       ))}
                     </div>
                   </section>
+                ) : null}
+
+                {hasKnockout ? (
+                  <TournamentKnockoutRounds
+                    rounds={knockoutRounds}
+                    placements={knockoutPlacements}
+                  />
                 ) : null}
 
                 {participants.length > 0 ? (

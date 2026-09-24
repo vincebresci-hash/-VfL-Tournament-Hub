@@ -345,7 +345,6 @@ export function runTournamentDetailV2C4Checks() {
     knockout,
     knockoutActions,
     standings,
-    livePage,
     adminKo,
     adminResults,
     liveSection,
@@ -359,6 +358,12 @@ export function runTournamentDetailV2C4Checks() {
   ]) {
     assert(!file.includes("TournamentKnockoutRounds"), "frozen files do not mount the KO presenter");
   }
+
+  // C5B: LivePageView intentionally reuses TournamentKnockoutRounds for Hub-native /live.
+  assert(
+    livePage.includes("TournamentKnockoutRounds"),
+    "LivePageView mounts Hub KO presenter (C5B)",
+  );
 
   assert(
     migrationFiles.filter((name) => /partner/i.test(name)).length === 3,

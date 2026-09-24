@@ -146,10 +146,13 @@ export function runMatchCenterDesignChecks() {
   assert(view.includes("Letzte Ergebnisse"), "results section");
   assert(view.includes("Gruppen"), "groups section");
   assert(!view.includes("MeinTurnierplanBadge"), "no duplicate LIVE MTP badge");
-  assert(view.includes("Live-Daten via MeinTurnierplan"), "MTP source line kept");
+  assert(view.includes("LiveAutoRefresh"), "Hub-native auto refresh");
+  assert(view.includes("TournamentKnockoutRounds"), "KO reuses Hub presenter");
+  assert(view.includes("Hub-Live"), "Hub-native source line");
+  assert(!view.includes("Live-Daten via MeinTurnierplan"), "no MTP-as-source claim on /live");
   assert(view.includes("heroCompact"), "compact hero when no live primary");
   assert(view.includes("Letzte Synchronisierung") === false, "sync wording lives in helper");
-  assert(view.includes("formatUpdatedAgo"), "uses sync helper");
+  assert(!view.includes("formatUpdatedAgo"), "MTP sync ago not required on Hub /live");
   assert(view.includes("primaryMomentEmptyCopy"), "uses empty copy helper");
 
   const card = readFileSync(join(process.cwd(), "src/components/live/LiveMatchCard.tsx"), "utf8");
