@@ -517,6 +517,41 @@ export async function saveKnockoutResultAction(
   return { error: null };
 }
 
+/**
+ * Hard-delete all KO matches for a tournament (phase = knockout).
+ * Idempotent when no KO exists. Does not touch tournament.status,
+ * group-stage matches, applications, or external teams.
+ */
+export async function deleteTournamentKnockoutAction(
+  tournamentId: string,
+): Promise<{ error: string | null }> {
+  const access = await requireResultsManage();
+  if (access.error) {
+    return { error: access.error };
+  }
+
+  const loaded = await loadTournament(tournamentId);
+  if (!loaded.tournament) {
+    return { error: loaded.error };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournament_matches")
+    .delete()
+    .eq("tournament_id", tournamentId)
+    .eq("phase", "knockout");
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Das KO-System konnte nicht gelöscht werden.", error),
+    };
+  }
+
+  revalidateStage(loaded.tournament);
+  return { error: null };
+}
+
 export async function completeTournamentAction(
   tournamentId: string,
 ): Promise<{ error: string | null }> {
