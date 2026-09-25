@@ -26,6 +26,7 @@ import { runMeinTurnierplanNormalizeSelfChecks } from "@/lib/mein-turnierplan-no
 import { runMeinTurnierplanLiveRenderSelfChecks } from "@/lib/mein-turnierplan-live-render";
 import { runMeinTurnierplanPublicSourceSelfChecks } from "@/lib/mein-turnierplan-public-source";
 import { runMeinTurnierplanSyncSelfChecks } from "@/lib/mein-turnierplan-sync";
+import { runMeinTurnierplanB1ADisableSyncChecks } from "@/lib/mein-turnierplan-b1a-disable-sync-checks";
 import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan-participants-checks";
 import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
 import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-participant-logos-checks";
@@ -103,6 +104,7 @@ try {
   const meinTurnierplanLiveRender = runMeinTurnierplanLiveRenderSelfChecks();
   const meinTurnierplanPublicSource = runMeinTurnierplanPublicSourceSelfChecks();
   const meinTurnierplanSync = runMeinTurnierplanSyncSelfChecks();
+  const meinTurnierplanB1ADisableSyncChecks = runMeinTurnierplanB1ADisableSyncChecks();
   const meinTurnierplanSyncRpc = runMeinTurnierplanSyncRpcSelfChecks();
   const transactionRollbackCheck = runMeinTurnierplanTransactionRollbackCheck();
   const idempotencyCheck = runMeinTurnierplanIdempotencyCheck();
@@ -193,6 +195,7 @@ try {
   console.log(`mein-turnierplan-live-render-checks: ${meinTurnierplanLiveRender}`);
   console.log(`mein-turnierplan-public-source-checks: ${meinTurnierplanPublicSource}`);
   console.log(`mein-turnierplan-sync-checks: ${meinTurnierplanSync}`);
+  console.log(`mein-turnierplan-b1a-disable-sync-checks: ${meinTurnierplanB1ADisableSyncChecks}`);
   console.log(`mein-turnierplan-sync-rpc-checks: ${meinTurnierplanSyncRpc}`);
   console.log(`transaction-rollback-check: ${transactionRollbackCheck}`);
   console.log(`idempotency-check: ${idempotencyCheck}`);

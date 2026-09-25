@@ -1,37 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   AdminCard,
   AdminInfo,
   adminCardShellClass,
-  adminFilterControlClass,
-  adminMobileCardClass,
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
-  adminSectionTitleClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
-import {
-  checkMeinTurnierplanConnectionAction,
-} from "@/lib/db/mein-turnierplan-actions";
-import {
-  confirmMeinTurnierplanSyncAction,
-  previewMeinTurnierplanSyncAction,
-} from "@/lib/db/mein-turnierplan-sync-actions";
-import { confirmAllDetectedExternalTeamsAction } from "@/lib/db/mein-turnierplan-participants-actions";
+import { checkMeinTurnierplanConnectionAction } from "@/lib/db/mein-turnierplan-actions";
 import { isNumericMeinTurnierplanTournamentId } from "@/lib/mein-turnierplan";
-import { hubTeamLabel } from "@/lib/mein-turnierplan-import";
-import type { MeinTurnierplanSyncPreview, SyncOverridePolicy, SyncTeamMapping } from "@/lib/mein-turnierplan-sync";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication } from "@/types/application";
-
-type AcceptedTeamOption = {
-  applicationId: string;
-  label: string;
-};
 
 type TournamentSyncAdminPanelProps = {
   tournament: AdminTournamentRecord;
@@ -55,21 +37,17 @@ function formatSyncedAt(value: string | null | undefined) {
   }
 }
 
+/**
+ * B1-A: Presentation / connection status only.
+ * Competition sync (Preview + Confirm → RPC) is disabled.
+ */
 export function TournamentSyncAdminPanel({
   tournament,
-  applications = [],
-  detectedExternalTeamCount = 0,
 }: TournamentSyncAdminPanelProps) {
-  const router = useRouter();
   const [checking, setChecking] = useState(false);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [connectionOk, setConnectionOk] = useState<boolean | null>(null);
-  const [preview, setPreview] = useState<MeinTurnierplanSyncPreview | null>(null);
-  const [mappings, setMappings] = useState<SyncTeamMapping[]>([]);
-  const [overridePolicy, setOverridePolicy] = useState<SyncOverridePolicy>("keep-manual");
 
   const trimmedId = tournament.meinTurnierplanTournamentId?.trim() ?? "";
   const hasNumericId = isNumericMeinTurnierplanTournamentId(trimmedId);
@@ -78,31 +56,6 @@ export function TournamentSyncAdminPanel({
       tournament.meinTurnierplanTableWidgetUrl?.trim(),
   );
   const canQuery = hasNumericId || hasWidgetUrl;
-
-  const acceptedTeams: AcceptedTeamOption[] = useMemo(
-    () =>
-      applications
-        .filter(
-          (application) =>
-            (application.tournamentId === tournament.id ||
-              application.tournamentId === tournament.slug) &&
-            application.applicationStatus === "accepted",
-        )
-        .map((application) => ({
-          applicationId: application.id,
-          label: hubTeamLabel({
-            applicationId: application.id,
-            clubName: application.clubName,
-            teamName: application.teamName,
-          }),
-        })),
-    [applications, tournament.id, tournament.slug],
-  );
-
-  const syncMeta = tournament.meinTurnierplanSyncMeta as
-    | { counts?: Record<string, number>; queryId?: string }
-    | null
-    | undefined;
 
   async function handleCheckConnection() {
     if (!canQuery) {
@@ -127,123 +80,52 @@ export function TournamentSyncAdminPanel({
     setNotice("Verbindung zu MeinTurnierplan erfolgreich geprüft.");
   }
 
-  async function handleLoadPreview() {
-    if (!canQuery) {
-      setError("Bitte Widget-URL oder Turnier-ID hinterlegen.");
-      return;
-    }
-
-    setLoadingPreview(true);
-    setError(null);
-    setNotice(null);
-    const result = await previewMeinTurnierplanSyncAction(tournament.id, {
-      overridePolicy,
-    });
-    setLoadingPreview(false);
-
-    if (result.error || !result.preview) {
-      setError(result.error ?? "Vorschau fehlgeschlagen.");
-      setPreview(null);
-      return;
-    }
-
-    setPreview(result.preview);
-    setMappings(result.preview.mappings);
-    setNotice("Synchronisations-Vorschau geladen. Es wurde noch nichts gespeichert.");
-  }
-
-  async function handleConfirmSync() {
-    setSyncing(true);
-    setError(null);
-    setNotice(null);
-    const result = await confirmMeinTurnierplanSyncAction({
-      tournamentId: tournament.id,
-      mappings,
-      overridePolicy,
-    });
-    setSyncing(false);
-
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-
-    setNotice(result.notice);
-    setPreview(null);
-    router.refresh();
-  }
-
-  function updateMapping(externalId: string, applicationId: string | null) {
-    setMappings((current) =>
-      current.map((mapping) =>
-        mapping.externalId === externalId
-          ? { ...mapping, applicationId, createExternal: true }
-          : mapping,
-      ),
-    );
-  }
-
   return (
-    <AdminCard title="Turnierdaten & Synchronisation">
+    <AdminCard title="MeinTurnierPlan">
       <p className="text-[14px] leading-6 text-muted">
-        Manuelle Bearbeitung bleibt über die bestehenden Admin-Bereiche möglich.
-        MeinTurnierplan kann nach Vorschau und Bestätigung in den Hub übernommen
-        werden – ohne Fake-Bewerbungen und ohne HTML-Scraping.
+        MeinTurnierPlan wird für die öffentliche Anzeige und externe
+        Turnierinformationen verwendet.
+      </p>
+      <p className="mt-2 text-[14px] leading-6 text-muted">
+        Die Turnierdaten werden im VfL Tournament Hub verwaltet.
       </p>
 
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">
         <AdminInfo
-          label="MeinTurnierplan"
-          value={connectionOk === true ? "Verbunden" : canQuery ? "Konfiguriert" : "Nicht bereit"}
+          label="MeinTurnierPlan"
+          value={
+            connectionOk === true
+              ? "Verbunden"
+              : canQuery
+                ? "Konfiguriert"
+                : "Nicht bereit"
+          }
         />
         <AdminInfo
-          label="Letzte Synchronisierung"
+          label="Verwendung"
+          value="Öffentliche Anzeige · externer Spielplan-Link"
+        />
+        <AdminInfo
+          label="Turnierdaten"
+          value="Hub (Teilnehmer, Gruppen, Spielplan, Ergebnisse, KO)"
+        />
+        <AdminInfo
+          label="Letzte Synchronisierung (historisch)"
           value={formatSyncedAt(tournament.meinTurnierplanLastSyncedAt)}
         />
         <AdminInfo
-          label="Quelle"
-          value={displayValue(
-            (syncMeta?.queryId as string | undefined) ??
-              tournament.meinTurnierplanTournamentId ??
-              null,
-          )}
+          label="Quelle / Turnier-ID"
+          value={displayValue(tournament.meinTurnierplanTournamentId)}
         />
         <AdminInfo
-          label="Letzter Stand"
-          value={
-            syncMeta?.counts
-              ? `Teilnehmer ${syncMeta.counts.teamsFound ?? "—"} · Gruppen ${syncMeta.counts.groupsFound ?? "—"} · Spiele ${syncMeta.counts.matchesFound ?? "—"} · Ergebnisse ${syncMeta.counts.resultsPresent ?? "—"}`
-              : "—"
-          }
+          label="Spielplan-Widget"
+          value={displayValue(tournament.meinTurnierplanMatchesWidgetUrl)}
+        />
+        <AdminInfo
+          label="Tabellen-Widget"
+          value={displayValue(tournament.meinTurnierplanTableWidgetUrl)}
         />
       </dl>
-
-      <div className="mt-5 flex flex-wrap gap-3">
-        <Link
-          href={`/admin/turniere/${tournament.id}/gruppen`}
-          className={adminSecondaryButtonClass}
-        >
-          Manuell: Gruppen
-        </Link>
-        <Link
-          href={`/admin/turniere/${tournament.id}/spielplan`}
-          className={adminSecondaryButtonClass}
-        >
-          Manuell: Spielplan
-        </Link>
-        <Link
-          href={`/admin/turniere/${tournament.id}/ergebnisse`}
-          className={adminSecondaryButtonClass}
-        >
-          Manuell: Ergebnisse
-        </Link>
-        <Link
-          href={`/admin/turniere/${tournament.id}/ko-runde`}
-          className={adminSecondaryButtonClass}
-        >
-          Manuell: KO
-        </Link>
-      </div>
 
       <div className="mt-5 flex flex-wrap gap-3">
         <button
@@ -254,66 +136,47 @@ export function TournamentSyncAdminPanel({
         >
           {checking ? "Prüfe…" : "Verbindung prüfen"}
         </button>
-        <button
-          type="button"
-          disabled={loadingPreview}
-          onClick={handleLoadPreview}
-          className={adminSecondaryButtonClass}
-        >
-          {loadingPreview ? "Lade…" : "Vorschau laden"}
-        </button>
-        <button
-          type="button"
-          disabled={loadingPreview}
-          onClick={handleLoadPreview}
+        <Link
+          href={`/admin/turniere/${tournament.id}/bearbeiten`}
           className={adminPrimaryButtonClass}
         >
-          Jetzt synchronisieren
-        </button>
+          MTP-Konfiguration bearbeiten
+        </Link>
       </div>
 
-      {detectedExternalTeamCount > 0 ? (
-        <div className={`mt-5 ${adminCardShellClass} px-4 py-4`}>
-          <p className="text-[14px] text-ink">
-            {detectedExternalTeamCount} Teams erkannt · {detectedExternalTeamCount} noch nicht
-            als Teilnehmer bestätigt
-          </p>
-          <button
-            type="button"
-            disabled={syncing}
-            onClick={async () => {
-              setSyncing(true);
-              setError(null);
-              setNotice(null);
-              const result = await confirmAllDetectedExternalTeamsAction(tournament.id);
-              setSyncing(false);
-              if (result.error) {
-                setError(result.error);
-                return;
-              }
-              setNotice(result.notice);
-              router.refresh();
-            }}
-            className={`mt-3 ${adminPrimaryButtonClass}`}
-          >
-            Alle als Teilnehmer bestätigen
-          </button>
-        </div>
-      ) : null}
+      <div className="mt-5 flex flex-wrap gap-3">
+        <Link
+          href={`/admin/turniere/${tournament.id}/gruppen`}
+          className={adminSecondaryButtonClass}
+        >
+          Hub: Gruppen
+        </Link>
+        <Link
+          href={`/admin/turniere/${tournament.id}/spielplan`}
+          className={adminSecondaryButtonClass}
+        >
+          Hub: Spielplan
+        </Link>
+        <Link
+          href={`/admin/turniere/${tournament.id}/ergebnisse`}
+          className={adminSecondaryButtonClass}
+        >
+          Hub: Ergebnisse
+        </Link>
+        <Link
+          href={`/admin/turniere/${tournament.id}/ko-runde`}
+          className={adminSecondaryButtonClass}
+        >
+          Hub: KO
+        </Link>
+      </div>
 
       <div className={`mt-5 ${adminCardShellClass} border-dashed px-4 py-3`}>
-        <p className={adminSectionTitleClass}>PDF importieren</p>
-        <p className="mt-2 text-[13px] leading-6 text-muted">
-          Als separate Importfunktion vorbereitet (Upload → Extraktion → Vorschau → Mapping →
-          Bestätigung). Noch nicht aktiv – wird nicht mit MeinTurnierplan-Sync vermischt.
+        <p className="text-[13px] leading-6 text-muted">
+          Die Übernahme von Teilnehmer-, Gruppen-, Spielplan-, Ergebnis- und
+          KO-Daten aus MeinTurnierPlan in den Hub ist deaktiviert. Competition
+          Data wird ausschließlich im Hub gepflegt.
         </p>
-        <button
-          type="button"
-          disabled
-          className={`mt-3 ${adminSecondaryButtonClass}`}
-        >
-          PDF importieren
-        </button>
       </div>
 
       {error ? (
@@ -324,128 +187,9 @@ export function TournamentSyncAdminPanel({
         </p>
       ) : null}
       {notice ? (
-        <p className={`mt-5 ${adminCardShellClass} px-4 py-3 text-[14px] text-ink`}>{notice}</p>
-      ) : null}
-
-      {preview ? (
-        <section className={`mt-6 ${adminCardShellClass} p-4 sm:p-5`}>
-          <h3 className={adminSectionTitleClass}>Synchronisations-Vorschau</h3>
-          <p className="mt-2 text-[14px] text-ink">
-            {preview.tournamentName ?? "MeinTurnierplan"} · Quelle {preview.queryId}
-          </p>
-          <ul className="mt-4 grid gap-2 text-[14px] text-ink">
-            <li>
-              Teilnehmer: {preview.counts.teamsFound} gefunden · +{preview.counts.teamsNew} neu · ~
-              {preview.counts.teamsUnchanged} unverändert · {preview.counts.teamsUnmapped} ohne
-              Hub-Zuordnung
-            </li>
-            <li>
-              Gruppen: {preview.counts.groupsFound} gefunden · +{preview.counts.groupsNew} neu
-              {preview.counts.groupsLinked > 0
-                ? ` · ~${preview.counts.groupsLinked} wird verknüpft`
-                : ""}
-              {preview.counts.groupsUpdated > 0
-                ? ` · ~${preview.counts.groupsUpdated} aktualisiert`
-                : ""}
-            </li>
-            <li>
-              Felder: {preview.counts.courtsFound} gefunden · +{preview.counts.courtsNew} neu
-              {preview.counts.courtsLinked > 0
-                ? ` · ~${preview.counts.courtsLinked} wird verknüpft`
-                : ""}
-            </li>
-            <li>
-              Spiele: {preview.counts.matchesFound} gefunden · +{preview.counts.matchesNew} neu · ~
-              {preview.counts.matchesUpdated} aktualisiert
-            </li>
-            <li>
-              Ergebnisse: {preview.counts.resultsPresent} vorhanden · {preview.counts.resultsOpen}{" "}
-              noch offen
-            </li>
-            {preview.counts.manualOverridesProtected > 0 ? (
-              <li>
-                {preview.counts.manualOverridesProtected} manuell bearbeitete Datensätze würden
-                geändert.
-              </li>
-            ) : null}
-          </ul>
-
-          {preview.counts.manualOverridesProtected > 0 ? (
-            <fieldset className="mt-5 grid gap-2">
-              <legend className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-                Manuelle Änderungen
-              </legend>
-              <label className="flex items-center gap-2 text-[14px] text-ink">
-                <input
-                  type="radio"
-                  checked={overridePolicy === "keep-manual"}
-                  onChange={() => setOverridePolicy("keep-manual")}
-                />
-                Manuelle Änderungen behalten (Standard)
-              </label>
-              <label className="flex items-center gap-2 text-[14px] text-ink">
-                <input
-                  type="radio"
-                  checked={overridePolicy === "overwrite-manual"}
-                  onChange={() => setOverridePolicy("overwrite-manual")}
-                />
-                Mit MeinTurnierplan überschreiben
-              </label>
-            </fieldset>
-          ) : null}
-
-          <div className="mt-6 grid gap-3">
-            <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
-              Team-Zuordnung
-            </p>
-            {mappings.map((mapping) => (
-              <div
-                key={mapping.externalId}
-                className={`grid gap-2 ${adminMobileCardClass} sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] sm:items-center`}
-              >
-                <div>
-                  <p className="text-[14px] text-ink">{mapping.externalName}</p>
-                  <p className="mt-1 text-[12px] text-muted">
-                    Quelle: MeinTurnierplan · {mapping.applicationId ? "Zuordnung gewählt" : "extern führen"}
-                  </p>
-                </div>
-                <select
-                  value={mapping.applicationId ?? ""}
-                  onChange={(event) =>
-                    updateMapping(mapping.externalId, event.target.value || null)
-                  }
-                  className={adminFilterControlClass}
-                >
-                  <option value="">Als externes Turnierteam führen</option>
-                  {acceptedTeams.map((team) => (
-                    <option key={team.applicationId} value={team.applicationId}>
-                      {team.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button
-              type="button"
-              disabled={syncing}
-              onClick={handleConfirmSync}
-              className={adminPrimaryButtonClass}
-            >
-              {syncing ? "Synchronisiere…" : "Synchronisation bestätigen"}
-            </button>
-            <button
-              type="button"
-              disabled={syncing}
-              onClick={() => setPreview(null)}
-              className={adminSecondaryButtonClass}
-            >
-              Abbrechen
-            </button>
-          </div>
-        </section>
+        <p className={`mt-5 ${adminCardShellClass} px-4 py-3 text-[14px] text-ink`}>
+          {notice}
+        </p>
       ) : null}
     </AdminCard>
   );

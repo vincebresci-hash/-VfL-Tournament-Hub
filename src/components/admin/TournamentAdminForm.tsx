@@ -626,7 +626,7 @@ export function TournamentAdminForm({
           <Field
             id="tournament-mtp-tournament-id"
             label="MeinTurnierplan Turnier-ID"
-            hint="Numerische Turnier-ID aus dem eingeloggten MeinTurnierplan-Administrationsbereich. Sie wird für Verbindung prüfen sowie Gruppen & Teams laden verwendet."
+            hint="Numerische Turnier-ID aus MeinTurnierPlan. Sie wird für die Verbindung und optionale öffentliche Darstellung verwendet."
           >
             <TextInput
               id="tournament-mtp-tournament-id"

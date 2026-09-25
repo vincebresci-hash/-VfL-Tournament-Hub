@@ -1,14 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireScheduleManage,
   requireTournamentsView,
 } from "@/lib/rbac/action-access";
 import { listAdminApplications } from "@/lib/db/queries";
-import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
-import { createTournamentGroupAction, assignTeamToGroupAction } from "@/lib/db/schedule-actions";
 import {
   fetchMeinTurnierplanJson,
   meinTurnierplanConnectionMessage,
@@ -72,12 +69,6 @@ function resolveJsonQueryId(input: {
     queryId: resolved.queryId,
     source: resolved.source,
   };
-}
-
-function revalidateTournament(slug: string) {
-  revalidatePath("/admin/turniere");
-  revalidatePath(`/admin/turniere/${slug}`);
-  revalidatePath(`/turniere/${slug}`);
 }
 
 async function acceptedTeamsForTournament(tournament: Pick<AdminTournamentRecord, "id" | "slug">) {
@@ -229,6 +220,14 @@ export async function loadMeinTurnierplanPreviewForTournamentAction(
   };
 }
 
+/**
+ * B1-A: Hub is authoritative for competition structure.
+ * MeinTurnierplan Gruppen/Teams import into Hub is disabled for normal use.
+ * Presentation, widgets, and connection check remain available separately.
+ */
+const MEIN_TURNIERPLAN_COMPETITION_IMPORT_DISABLED_MESSAGE =
+  "Der MeinTurnierplan-Import von Gruppen und Teams ist deaktiviert. Teilnehmer, Gruppen und Zuordnungen werden im VfL Tournament Hub verwaltet. MeinTurnierplan dient nur der öffentlichen Anzeige und externen Live-Darstellung.";
+
 export async function importMeinTurnierplanGroupsAction(
   tournamentId: string,
   groups: MeinTurnierplanImportGroup[],
@@ -238,88 +237,12 @@ export async function importMeinTurnierplanGroupsAction(
     return { error: access.error, notice: null };
   }
 
-  const loaded = await loadTournament(tournamentId);
-  if (!loaded.tournament) {
-    return { error: loaded.error, notice: null };
-  }
-
-  const stage = await getAdminTournamentStage(tournamentId);
-  if (stage.matches.length > 0) {
-    return {
-      error:
-        "Import nicht möglich, solange ein Spielplan existiert. Bitte zuerst den Spielplan entfernen.",
-      notice: null,
-    };
-  }
-
-  const acceptedTeams = await acceptedTeamsForTournament(loaded.tournament);
-  const acceptedIds = new Set(acceptedTeams.map((team) => team.applicationId));
-  const usedApplicationIds = new Set<string>();
-
-  let assignedCount = 0;
-  let skippedCount = 0;
-
-  for (const group of groups) {
-    const trimmedName = group.name.trim();
-    if (!trimmedName) {
-      continue;
-    }
-
-    const existing = stage.groups.find(
-      (entry) => entry.name.trim().toLowerCase() === trimmedName.toLowerCase(),
-    );
-    let groupId = existing?.id ?? null;
-
-    if (!groupId) {
-      const created = await createTournamentGroupAction(tournamentId, trimmedName);
-      if (created.error) {
-        return { error: created.error, notice: null };
-      }
-
-      const refreshed = await getAdminTournamentStage(tournamentId);
-      groupId =
-        refreshed.groups.find(
-          (entry) => entry.name.trim().toLowerCase() === trimmedName.toLowerCase(),
-        )?.id ?? null;
-    }
-
-    if (!groupId) {
-      return { error: "Die Gruppe konnte nach dem Import nicht gefunden werden.", notice: null };
-    }
-
-    for (const assignment of group.assignments) {
-      const applicationId = assignment.applicationId?.trim() ?? "";
-      if (!applicationId) {
-        skippedCount += 1;
-        continue;
-      }
-
-      if (!acceptedIds.has(applicationId) || usedApplicationIds.has(applicationId)) {
-        skippedCount += 1;
-        continue;
-      }
-
-      const assignResult = await assignTeamToGroupAction(
-        tournamentId,
-        applicationId,
-        groupId,
-      );
-      if (assignResult.error) {
-        return { error: assignResult.error, notice: null };
-      }
-
-      usedApplicationIds.add(applicationId);
-      assignedCount += 1;
-    }
-  }
-
-  revalidateTournament(loaded.tournament.slug);
-
+  // B1-A hard block: never mutate Hub groups/memberships via MeinTurnierplan import.
+  // Keep signature for call-site compatibility; intentional unused input.
+  void tournamentId;
+  void groups;
   return {
-    error: null,
-    notice:
-      assignedCount > 0
-        ? `${assignedCount} Team(s) in Gruppen übernommen.${skippedCount > 0 ? ` ${skippedCount} ohne Zuordnung übersprungen.` : ""}`
-        : "Es wurden keine Teams übernommen. Bitte Zuordnungen prüfen.",
+    error: MEIN_TURNIERPLAN_COMPETITION_IMPORT_DISABLED_MESSAGE,
+    notice: null,
   };
 }
