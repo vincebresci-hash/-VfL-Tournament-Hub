@@ -7,11 +7,13 @@ import {
   AdminCard,
   AdminEmpty,
   adminCardShellClass,
+  adminDestructiveButtonClass,
   adminSectionTitleClass,
 } from "@/components/admin/AdminPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import {
   completeTournamentAction,
+  deleteTournamentKnockoutAction,
   generateKnockoutAction,
   saveKnockoutMatchAction,
   saveKnockoutResultAction,
@@ -88,6 +90,8 @@ export function TournamentKnockoutBoard({
   const [forceOpen, setForceOpen] = useState(false);
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [completeOpen, setCompleteOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearPending, setClearPending] = useState(false);
 
   const placements = computeKnockoutPlacements(knockout);
   const finalMatch = knockout.find((match) => match.round === "final");
@@ -215,6 +219,16 @@ export function TournamentKnockoutBoard({
 
       {knockout.length > 0 ? (
         <div className="grid gap-5">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setClearOpen(true)}
+              className={adminDestructiveButtonClass}
+            >
+              {clearPending ? "Wird gelöscht…" : "KO-System löschen"}
+            </button>
+          </div>
           <div className="grid gap-5 lg:grid-cols-3">
             {bracketColumns.map((rounds) => {
               const columnMatches = rounds.flatMap((round) => matchesByRound.get(round) ?? []);
@@ -370,6 +384,30 @@ export function TournamentKnockoutBoard({
           void run(() => completeTournamentAction(tournament.id));
         }}
       />
+      <ConfirmModal
+        open={clearOpen}
+        title="KO-System vollständig löschen?"
+        confirmLabel="KO-System löschen"
+        cancelLabel="Abbrechen"
+        onCancel={() => setClearOpen(false)}
+        onConfirm={() => {
+          setClearOpen(false);
+          void (async () => {
+            setClearPending(true);
+            await run(() => deleteTournamentKnockoutAction(tournament.id));
+            setClearPending(false);
+          })();
+        }}
+      >
+        <div className="grid gap-3 text-[14px] leading-6 text-muted">
+          <p>
+            Das gesamte KO-System dieses Turniers wird gelöscht. Dabei werden alle
+            KO-Spiele, Ergebnisse und Platzierungen entfernt.
+          </p>
+          <p>Die Gruppenphase und der normale Spielplan bleiben unverändert.</p>
+          <p>Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
+        </div>
+      </ConfirmModal>
     </div>
   );
 }
