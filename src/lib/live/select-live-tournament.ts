@@ -123,15 +123,14 @@ export function selectLivePageTournaments(
 
   const visible = tournaments.filter((tournament) => !tournament.archivedAt);
 
-  const todayActive = visible
-    .filter(
-      (tournament) =>
-        tournament.status === "active" && tournament.date.slice(0, 10) === todayBerlin,
-    )
+  // Tournament-day eligibility is date-driven (Europe/Berlin), not application lifecycle.
+  // All lifecycle statuses are eligible when date === todayBerlin.
+  const todayEligible = visible
+    .filter((tournament) => tournament.date.slice(0, 10) === todayBerlin)
     .sort(compareByStartThenName);
 
-  const primary = pickPrimaryLiveTournament(todayActive, now);
-  const todayAlso = todayActive.filter((tournament) => tournament.id !== primary?.id);
+  const primary = pickPrimaryLiveTournament(todayEligible, now);
+  const todayAlso = todayEligible.filter((tournament) => tournament.id !== primary?.id);
 
   const upcoming = visible
     .filter((tournament) => {
@@ -142,7 +141,8 @@ export function selectLivePageTournaments(
       if (todayAlso.some((entry) => entry.id === tournament.id)) {
         return false;
       }
-      return date > todayBerlin || tournament.status === "coming-soon";
+      // Future by tournament date only — today's tournament must not appear here.
+      return date > todayBerlin;
     })
     .sort((a, b) => {
       const dateCmp = a.date.localeCompare(b.date);
@@ -159,6 +159,10 @@ export function selectLivePageTournaments(
       if (primary && tournament.id === primary.id) {
         return false;
       }
+      if (todayAlso.some((entry) => entry.id === tournament.id)) {
+        return false;
+      }
+      // Today's tournament (including completed) stays live-day eligible, not past.
       return tournament.status === "completed" || date < todayBerlin;
     })
     .sort((a, b) => {
