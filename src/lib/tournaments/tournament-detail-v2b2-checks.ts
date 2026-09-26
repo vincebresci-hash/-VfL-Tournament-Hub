@@ -43,17 +43,17 @@ export function runTournamentDetailV2B2Checks() {
     .filter((name) => name.endsWith(".sql"))
     .sort();
 
-  // 1 participant source / resolver unchanged
+  // 1 participant source is Hub-only (B1-B1)
   assert(
-    stage.includes("resolveTeilnehmerTab({") &&
-      stage.includes("hubRosterCount: stage.roster.length") &&
-      stage.includes("preferSyncedHub: preferSyncedHubData") &&
+    stage.includes("<TournamentParticipantCards roster={stage.roster} />") &&
+      !stage.includes("resolveTeilnehmerTab") &&
+      !stage.includes("preferSyncedHubData") &&
+      !stage.includes("mtp.participants") &&
       resolvers.includes("export function resolveTeilnehmerTab") &&
-      /if \(input\.preferSyncedHub && input\.hubRosterCount > 0\)/.test(resolvers) &&
-      /source: "mein-turnierplan"/.test(resolvers) &&
-      /source: "unavailable"/.test(resolvers) &&
-      /source: "hub"/.test(resolvers),
-    "participant source/resolver wiring unchanged",
+      resolvers.includes("HUB_ONLY_TAB") &&
+      !/if \(input\.preferSyncedHub/.test(resolvers) &&
+      !/source: "mein-turnierplan"/.test(resolvers),
+    "participant source is Hub-only (B1-B1)",
   );
 
   // 2 ordering unchanged — hub still maps stage.roster in order; cards map roster as received
@@ -125,27 +125,27 @@ export function runTournamentDetailV2B2Checks() {
     "no new participant query/search/filter/pagination",
   );
 
-  // 14 empty-state semantics unchanged
+  // 14 empty-state is Hub-only (no MTP unavailable path on Teilnehmer)
   assert(
     stage.includes("Noch keine bestätigten Teams.") &&
-      stage.includes('teilnehmerTab.source === "unavailable"') &&
-      stage.includes(
+      !stage.includes('teilnehmerTab.source === "unavailable"') &&
+      !stage.includes(
         "Teilnehmer konnten aktuell nicht von MeinTurnierplan geladen werden.",
       ) &&
       /stage\.roster\.length === 0 \? \(/.test(stage),
-    "empty-state semantics unchanged",
+    "Teilnehmer empty-state is Hub-only",
   );
 
-  // 15 MTP resolver/source behavior unchanged
+  // 15 MTP JSON participant path removed from competition tab; cards hub-only
   assert(
     resolvers.includes("export function resolveGruppenTab") &&
       resolvers.includes("export function resolveSpielplanTab") &&
       resolvers.includes("export function resolveTabelleTab") &&
-      stage.includes('teilnehmerTab.source === "mein-turnierplan"') &&
-      stage.includes("mtp.participants.map") &&
+      !stage.includes('teilnehmerTab.source === "mein-turnierplan"') &&
+      !stage.includes("mtp.participants.map") &&
       !cards.includes("mein-turnierplan") &&
       !cards.includes("resolveTeilnehmerTab"),
-    "MTP participant path / resolvers unchanged; cards are hub-only",
+    "no MTP participant path on competition tab; cards remain hub-only",
   );
 
   // 16 Übersicht semantics unchanged (page overview list untouched)
@@ -158,9 +158,9 @@ export function runTournamentDetailV2B2Checks() {
     "Übersicht participant preview semantics unchanged",
   );
 
-  // 17–21 other tabs unchanged
+  // 17–21 other tabs retained (Hub competition + MTP Live)
   assert(
-    stage.includes("resolveGruppenTab") &&
+    stage.includes("TournamentGroupCards") &&
       (stage.includes("Noch keine Teams zugeordnet.") ||
         cardsGroup.includes("Noch keine Teams zugeordnet.")) &&
       stage.includes("Der Spielplan wird noch veröffentlicht.") &&
@@ -203,7 +203,7 @@ export function runTournamentDetailV2B2Checks() {
 
   // optional count uses rendered roster length only
   assert(
-    stage.includes('teilnehmerTab.source === "hub" && stage.roster.length > 0') &&
+    stage.includes("stage.roster.length > 0") &&
       stage.includes("{stage.roster.length}") &&
       !stage.includes("maxTeams") &&
       !stage.includes("confirmedTeams"),

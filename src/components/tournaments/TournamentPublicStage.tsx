@@ -12,21 +12,11 @@ import { computeGroupStandings } from "@/lib/schedule/standings";
 import type { PublicTournamentStage } from "@/lib/db/schedule-queries";
 import type { KnockoutRound } from "@/types/schedule";
 import { MeinTurnierplanLiveSection } from "@/components/tournaments/MeinTurnierplanLiveSection";
-import { MeinTurnierplanWidget } from "@/components/tournaments/MeinTurnierplanWidget";
-import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
-import { MeinTurnierplanSourceHint } from "@/components/tournaments/MeinTurnierplanSourceHint";
 import { TournamentParticipantCards } from "@/components/tournaments/TournamentParticipantCards";
 import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCards";
 import { TournamentScheduleCards } from "@/components/tournaments/TournamentScheduleCards";
 import { TournamentStandingsSection } from "@/components/tournaments/TournamentStandingsSection";
 import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKnockoutRounds";
-import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
-import {
-  resolveGruppenTab,
-  resolveSpielplanTab,
-  resolveTabelleTab,
-  resolveTeilnehmerTab,
-} from "@/lib/mein-turnierplan-public-source";
 
 import type { TournamentStatus } from "@/types/tournament";
 
@@ -52,11 +42,7 @@ type TournamentPublicStageProps = {
   tournamentStatus?: TournamentStatus;
   meinTurnierplanActive?: boolean;
   showLiveTab?: boolean;
-  meinTurnierplanPrimary?: boolean;
-  meinTurnierplanHybrid?: boolean;
   publicScheduleNote?: string | null;
-  meinTurnierplanPublic?: PublicMeinTurnierplanData;
-  preferSyncedHubData?: boolean;
   livePresentation?: {
     tournamentName: string;
     tournamentDate: string;
@@ -78,6 +64,11 @@ function asTab(value: string | undefined, tabs: Array<{ id: string }>): PublicTa
   return "uebersicht";
 }
 
+/**
+ * B1-B1: Normal competition tabs always render Hub stage data.
+ * MTP widgets/presentation remain on the dedicated Live tab only.
+ * Historical MTP-imported rows inside Hub tables are a known residual (not filtered here).
+ */
 export function TournamentPublicStage({
   slug,
   stage,
@@ -86,61 +77,18 @@ export function TournamentPublicStage({
   tournamentStatus,
   meinTurnierplanActive = false,
   showLiveTab = false,
-  meinTurnierplanPrimary = false,
-  meinTurnierplanHybrid = false,
   publicScheduleNote,
-  meinTurnierplanPublic,
-  preferSyncedHubData = false,
   livePresentation = null,
 }: TournamentPublicStageProps) {
-  const mtp =
-    meinTurnierplanPublic ??
-    ({
-      usesPublicSource: false,
-      isHybrid: false,
-      isMeinTurnierplanOnly: false,
-      available: false,
-      error: null,
-      tournamentName: null,
-      participants: [],
-      groups: [],
-      matchesWidgetUrl: null,
-      tableWidgetUrl: null,
-    } satisfies PublicMeinTurnierplanData);
   const knockoutMatches = stage.matches.filter((match) => match.phase === "knockout");
   const groupMatches = stage.matches.filter((match) => match.phase !== "knockout");
   const showTabs =
-    stage.groups.length > 0 ||
-    stage.matches.length > 0 ||
-    showLiveTab ||
-    (mtp.usesPublicSource &&
-      (mtp.available || Boolean(mtp.matchesWidgetUrl) || Boolean(mtp.tableWidgetUrl)));
+    stage.groups.length > 0 || stage.matches.length > 0 || showLiveTab;
   const tabs = showLiveTab ? [...baseTabs, liveTab] : [...baseTabs];
   const visibleTabs = tabs.filter((item) => item.id !== "ko-runde" || knockoutMatches.length > 0);
   const requested = showTabs ? asTab(tab, visibleTabs) : "uebersicht";
   const current =
     requested === "ko-runde" && knockoutMatches.length === 0 ? "uebersicht" : requested;
-  const teilnehmerTab = resolveTeilnehmerTab({
-    mtp,
-    hubRosterCount: stage.roster.length,
-    preferSyncedHub: preferSyncedHubData,
-  });
-  const gruppenTab = resolveGruppenTab({
-    mtp,
-    hubGroupCount: stage.groups.length,
-    preferSyncedHub: preferSyncedHubData,
-  });
-  const spielplanTab = resolveSpielplanTab({
-    mtp,
-    hubMatchCount: stage.matches.length,
-    preferSyncedHub: preferSyncedHubData,
-  });
-  const tabelleTab = resolveTabelleTab({
-    mtp,
-    hubGroupCount: stage.groups.length,
-    hubMatchCount: stage.matches.length,
-    preferSyncedHub: preferSyncedHubData,
-  });
   const teamLabels = Object.fromEntries(
     stage.roster.map((entry) => [
       entry.applicationId,
@@ -217,20 +165,15 @@ export function TournamentPublicStage({
 
   return (
     <div>
-      {meinTurnierplanPrimary ? (
+      {showLiveTab ? (
         <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-          Teilnehmer, Gruppen, Spielplan und Tabelle werden primär über MeinTurnierplan
-          bereitgestellt.
-        </p>
-      ) : meinTurnierplanHybrid ? (
-        <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-          MeinTurnierplan stellt Live-Spielplan, Tabellen sowie – wenn verfügbar –
-          Teilnehmer und Gruppen bereit. Fehlen MeinTurnierplan-Daten, werden die im
-          Hub hinterlegten Informationen als Fallback angezeigt.
+          Teilnehmer, Gruppen, Spielplan, Tabelle und KO stammen aus dem VfL Tournament
+          Hub. Aktuelle Live-Informationen können zusätzlich über MeinTurnierPlan
+          bereitgestellt werden.
         </p>
       ) : meinTurnierplanActive ? (
         <p className="mt-10 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-          Für den Live-Spieltag ist MeinTurnierplan als externer Link verfügbar.
+          Für den Live-Spieltag ist MeinTurnierPlan als externer Link verfügbar.
           Die Bereiche unten zeigen die im Tournament Hub hinterlegten Gruppen,
           den internen Spielplan und Ergebnisse.
         </p>
@@ -298,34 +241,14 @@ export function TournamentPublicStage({
             <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
               Teilnehmer
             </h2>
-            {teilnehmerTab.source === "hub" && stage.roster.length > 0 ? (
+            {stage.roster.length > 0 ? (
               <p className="text-[13px] font-medium tracking-wide text-muted">
                 {stage.roster.length}{" "}
                 {stage.roster.length === 1 ? "Team" : "Teams"}
               </p>
             ) : null}
           </div>
-          {teilnehmerTab.source === "mein-turnierplan" ? (
-            <>
-              <ul className="mt-4 grid gap-3">
-                {mtp.participants.map((entry) => (
-                  <li key={entry.id} className="border border-line bg-white px-4 py-3">
-                    <p className="font-display text-lg font-bold tracking-wide text-ink uppercase">
-                      {entry.name}
-                    </p>
-                    {entry.groupName ? (
-                      <p className="mt-2 text-[13px] text-muted">{entry.groupName}</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-              {teilnehmerTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
-            </>
-          ) : teilnehmerTab.source === "unavailable" ? (
-            <p className="mt-4 text-[15px] text-muted">
-              Teilnehmer konnten aktuell nicht von MeinTurnierplan geladen werden.
-            </p>
-          ) : stage.roster.length === 0 ? (
+          {stage.roster.length === 0 ? (
             <p className="mt-4 text-[15px] text-muted">Noch keine bestätigten Teams.</p>
           ) : (
             <TournamentParticipantCards roster={stage.roster} />
@@ -335,22 +258,8 @@ export function TournamentPublicStage({
 
       {current === "gruppen" ? (
         <section className="mt-8">
-          {gruppenTab.source === "mein-turnierplan" ? (
-            <>
-              <TournamentGroupCards
-                source="mtp"
-                groups={mtp.groups.map((group) => ({
-                  id: group.id,
-                  name: group.name,
-                  teams: group.teams,
-                }))}
-              />
-              {gruppenTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
-            </>
-          ) : gruppenTab.source === "unavailable" ? (
-            <p className="text-[15px] text-muted">
-              Gruppen konnten aktuell nicht von MeinTurnierplan geladen werden.
-            </p>
+          {stage.groups.length === 0 ? (
+            <p className="text-[15px] text-muted">Noch keine Gruppen veröffentlicht.</p>
           ) : (
             <TournamentGroupCards
               source="hub"
@@ -366,123 +275,42 @@ export function TournamentPublicStage({
 
       {current === "spielplan" ? (
         <section className="mt-8">
-          {spielplanTab.source === "mein-turnierplan" && mtp.matchesWidgetUrl ? (
+          {publicScheduleNote ? (
+            <p className="mb-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+              {publicScheduleNote}
+            </p>
+          ) : null}
+          {stage.matches.length === 0 ? (
             <>
               <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
                 Spielplan
               </h2>
-              {publicScheduleNote ? (
-                <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-                  {publicScheduleNote}
-                </p>
-              ) : null}
-              <div className={`${publicScheduleNote ? "mt-5" : "mt-4"} w-full`}>
-                <MeinTurnierplanWidget
-                  url={mtp.matchesWidgetUrl}
-                  title="MeinTurnierplan Spielplan"
-                  iframeId="widgetMatches"
-                />
-                {spielplanTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
-              </div>
-            </>
-          ) : spielplanTab.source === "unavailable" ? (
-            <>
-              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
-                Spielplan
-              </h2>
-              {publicScheduleNote ? (
-                <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-                  {publicScheduleNote}
-                </p>
-              ) : null}
-              <div className="mt-4">
-                {livePresentation?.presentationUrl ? (
-                  <MeinTurnierplanPublicButton
-                    tournamentName={livePresentation.tournamentName}
-                    tournamentDate={livePresentation.tournamentDate}
-                    tournamentStatus={livePresentation.tournamentStatus}
-                    url={livePresentation.presentationUrl}
-                    customLabel={livePresentation.customLabel}
-                  />
-                ) : (
-                  <p className="text-[15px] text-muted">
-                    Der Spielplan ist aktuell nicht verfügbar. Bitte prüfen Sie später erneut
-                    oder nutzen Sie den MeinTurnierplan-Link, falls hinterlegt.
-                  </p>
-                )}
-              </div>
-            </>
-          ) : stage.matches.length === 0 ? (
-            <>
-              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
-                Spielplan
-              </h2>
-              {publicScheduleNote ? (
-                <p className="mt-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-                  {publicScheduleNote}
-                </p>
-              ) : null}
               <p className="mt-4 text-[15px] text-muted">Der Spielplan wird noch veröffentlicht.</p>
             </>
           ) : (
-            <>
-              {publicScheduleNote ? (
-                <p className="mb-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
-                  {publicScheduleNote}
-                </p>
-              ) : null}
-              <TournamentScheduleCards
-                matches={stage.matches}
-                teamLabels={teamLabels}
-                matchTeamId={matchTeamId}
-                phaseOrGroupLabel={(match) =>
-                  match.phase === "knockout" && match.round
-                    ? knockoutRoundLabel[match.round]
-                    : groupName(match.groupId)
-                }
-                fieldLabel={fieldName}
-              />
-            </>
+            <TournamentScheduleCards
+              matches={stage.matches}
+              teamLabels={teamLabels}
+              matchTeamId={matchTeamId}
+              phaseOrGroupLabel={(match) =>
+                match.phase === "knockout" && match.round
+                  ? knockoutRoundLabel[match.round]
+                  : groupName(match.groupId)
+              }
+              fieldLabel={fieldName}
+            />
           )}
         </section>
       ) : null}
 
       {current === "tabelle" ? (
         <section className="mt-8">
-          {tabelleTab.source === "mein-turnierplan" && mtp.tableWidgetUrl ? (
-            <div className="w-full">
-              <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
-                Tabelle
-              </h2>
-              <div className="mt-4 w-full">
-                <MeinTurnierplanWidget
-                  url={mtp.tableWidgetUrl}
-                  title="MeinTurnierplan Tabelle"
-                  iframeId="widgetTable"
-                />
-              </div>
-              {tabelleTab.showMeinTurnierplanHint ? <MeinTurnierplanSourceHint /> : null}
-            </div>
-          ) : tabelleTab.source === "unavailable" ? (
+          {stage.groups.length === 0 ? (
             <>
               <h2 className="font-display text-2xl font-bold tracking-wide text-ink uppercase">
                 Tabelle
               </h2>
-              <div className="mt-4">
-                {livePresentation?.presentationUrl ? (
-                  <MeinTurnierplanPublicButton
-                    tournamentName={livePresentation.tournamentName}
-                    tournamentDate={livePresentation.tournamentDate}
-                    tournamentStatus={livePresentation.tournamentStatus}
-                    url={livePresentation.presentationUrl}
-                    customLabel={livePresentation.customLabel}
-                  />
-                ) : (
-                  <p className="text-[15px] text-muted">
-                    Die Tabelle ist aktuell nicht verfügbar.
-                  </p>
-                )}
-              </div>
+              <p className="mt-4 text-[15px] text-muted">Die Tabelle ist aktuell nicht verfügbar.</p>
             </>
           ) : (
             <TournamentStandingsSection

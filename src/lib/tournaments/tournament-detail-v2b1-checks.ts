@@ -85,8 +85,8 @@ export function runTournamentDetailV2B1Checks() {
     stage.includes("stage.groups.length > 0") &&
       stage.includes("stage.matches.length > 0") &&
       stage.includes("showLiveTab") &&
-      stage.includes("mtp.usesPublicSource"),
-    "showTabs logic unchanged",
+      !stage.includes("mtp.usesPublicSource"),
+    "showTabs logic is Hub stage + Live (no MTP public-source gate)",
   );
 
   // 9–12 a11y + Links
@@ -138,20 +138,22 @@ export function runTournamentDetailV2B1Checks() {
         read("src/components/tournaments/TournamentGroupCards.tsx").includes(
           "Noch keine Teams zugeordnet.",
         )) &&
-      stage.includes("resolveGruppenTab"),
-    "group rendering path retained",
+      stage.includes('source="hub"'),
+    "group rendering path retained (Hub)",
   );
+  const liveSection = read("src/components/tournaments/MeinTurnierplanLiveSection.tsx");
   assert(
     stage.includes("Der Spielplan wird noch veröffentlicht.") &&
-      stage.includes("MeinTurnierplanWidget") &&
-      stage.includes('iframeId="widgetMatches"'),
-    "schedule rendering path retained",
+      stage.includes("<TournamentScheduleCards") &&
+      liveSection.includes("MeinTurnierplanWidget") &&
+      liveSection.includes('iframeId="widgetMatches"'),
+    "schedule Hub path retained; MTP Spielplan widget on Live only",
   );
   assert(
     stage.includes("<TournamentStandingsSection") &&
       stage.includes("computeGroupStandings") &&
-      stage.includes('iframeId="widgetTable"'),
-    "standings rendering path retained",
+      liveSection.includes('iframeId="widgetTable"'),
+    "standings Hub path retained; MTP Tabelle widget on Live only",
   );
   assert(
     stage.includes("TournamentKnockoutRounds") &&
@@ -164,15 +166,17 @@ export function runTournamentDetailV2B1Checks() {
     "Live content path retained",
   );
 
-  // 20–21 resolvers / MTP source unchanged (file still exports same functions; stage still imports)
+  // 20–21 resolvers remain Hub-only (B1-B1); stage no longer source-switches
   assert(
     resolvers.includes("export function resolveTeilnehmerTab") &&
       resolvers.includes("export function resolveGruppenTab") &&
       resolvers.includes("export function resolveSpielplanTab") &&
       resolvers.includes("export function resolveTabelleTab") &&
-      stage.includes("resolveTeilnehmerTab({") &&
-      stage.includes("preferSyncedHub: preferSyncedHubData"),
-    "resolver wiring unchanged",
+      resolvers.includes("HUB_ONLY_TAB") &&
+      !stage.includes("preferSyncedHubData") &&
+      !stage.includes("resolveTeilnehmerTab({") &&
+      !stage.includes("meinTurnierplanPublic"),
+    "resolvers Hub-only; stage competition tabs not source-switched",
   );
 
   // 22 V2-A untouched (page still wires V2-A; hero files still exist with expected markers)

@@ -73,23 +73,28 @@ export function runTournamentDetailV2C2Checks() {
   );
 
   assert(
-    stage.includes("resolveSpielplanTab({") &&
-      stage.includes("hubMatchCount: stage.matches.length") &&
-      stage.includes("preferSyncedHub: preferSyncedHubData") &&
+    !stage.includes("resolveSpielplanTab({") &&
+      !stage.includes("preferSyncedHubData") &&
       resolvers.includes("export function resolveSpielplanTab") &&
-      /if \(input\.preferSyncedHub && input\.hubMatchCount > 0\)/.test(resolvers) &&
-      /input\.mtp\.matchesWidgetUrl/.test(resolvers),
-    "resolveSpielplanTab + preferSyncedHubData semantics unchanged",
+      resolvers.includes("HUB_ONLY_TAB") &&
+      !/if \(input\.preferSyncedHub/.test(resolvers) &&
+      !/input\.mtp\.matchesWidgetUrl/.test(resolvers) &&
+      stage.includes("<TournamentScheduleCards") &&
+      stage.includes("matches={stage.matches}"),
+    "Spielplan tab is Hub-only (B1-B1)",
   );
 
+  const liveSection = read("src/components/tournaments/MeinTurnierplanLiveSection.tsx");
   assert(
-    stage.includes('iframeId="widgetMatches"') &&
-      stage.includes("<MeinTurnierplanWidget") &&
-      stage.includes('spielplanTab.source === "mein-turnierplan"') &&
+    !stage.includes('iframeId="widgetMatches"') &&
+      !stage.includes("<MeinTurnierplanWidget") &&
+      !stage.includes('spielplanTab.source === "mein-turnierplan"') &&
+      liveSection.includes('iframeId="widgetMatches"') &&
+      liveSection.includes("<MeinTurnierplanWidget") &&
       mtpWidget.includes("export function MeinTurnierplanWidget") &&
       !schedule.includes("MeinTurnierplanWidget") &&
       !schedule.includes("matchesWidgetUrl"),
-    "MTP widget path unchanged; schedule cards are Hub-only",
+    "MTP Spielplan widget on Live only; schedule cards are Hub-only",
   );
 
   assert(
@@ -142,12 +147,13 @@ export function runTournamentDetailV2C2Checks() {
 
   assert(
     stage.includes("Der Spielplan wird noch veröffentlicht.") &&
-      stage.includes(
+      !stage.includes(
         "Der Spielplan ist aktuell nicht verfügbar. Bitte prüfen Sie später erneut",
       ) &&
       stage.includes("publicScheduleNote") &&
-      stage.includes("<MeinTurnierplanPublicButton"),
-    "Hub empty, MTP unavailable, and publicScheduleNote semantics preserved",
+      !stage.includes("<MeinTurnierplanPublicButton") &&
+      liveSection.includes("<MeinTurnierplanPublicButton"),
+    "Hub Spielplan empty + publicScheduleNote retained; MTP CTA on Live only",
   );
 
   assert(

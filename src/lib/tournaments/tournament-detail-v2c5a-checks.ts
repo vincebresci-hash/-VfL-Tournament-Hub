@@ -93,15 +93,16 @@ export function runTournamentDetailV2C5AChecks() {
       liveRender.includes("export function meinTurnierplanIframeSrc") &&
       mtp.includes("export function showsMeinTurnierplanLiveTab") &&
       mtp.includes("export function usesMeinTurnierplanAsPrimaryLive") &&
-      page.includes("preferSyncedHubData={Boolean(") &&
-      page.includes("tournament.meinTurnierplanLastSyncedAt") &&
+      !page.includes("preferSyncedHubData") &&
+      !page.includes("tournament.meinTurnierplanLastSyncedAt") &&
       publicSource.includes("export function resolveSpielplanTab") &&
       publicSource.includes("export function resolveTabelleTab") &&
+      publicSource.includes("HUB_ONLY_TAB") &&
       stage.includes("<MeinTurnierplanLiveSection") &&
       stage.includes("matchesWidgetUrl={livePresentation.matchesWidgetUrl}") &&
       stage.includes("tableWidgetUrl={livePresentation.tableWidgetUrl}") &&
       stage.includes("publicLiveNote={livePresentation.publicLiveNote}"),
-    "MTP resolvers, Live visibility, and stage wiring untouched",
+    "Hub-only competition resolvers; Live presentation wiring retained",
   );
 
   assert(

@@ -23,12 +23,9 @@ import { getAppSettings } from "@/lib/settings";
 import { nonempty } from "@/lib/text";
 import { MeinTurnierplanPublicButton } from "@/components/tournaments/MeinTurnierplanPublicButton";
 import {
-  isHybridLiveDataSource,
   isMeinTurnierplanPublic,
   showsMeinTurnierplanLiveTab,
-  usesMeinTurnierplanAsPrimaryLive,
 } from "@/lib/mein-turnierplan";
-import { getPublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import { listPublicActivePartnersForTournament } from "@/lib/partners/queries";
 import { publicTeamLabel } from "@/lib/schedule/names";
 import { getSiteUrl, withCanonical } from "@/lib/site";
@@ -76,13 +73,11 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const [settings, stage, meinTurnierplanPublic, tournamentPartners] =
-    await Promise.all([
-      getAppSettings(),
-      getPublicTournamentStage(tournament.slug, tournament.id),
-      getPublicMeinTurnierplanData(tournament),
-      listPublicActivePartnersForTournament(tournament.id),
-    ]);
+  const [settings, stage, tournamentPartners] = await Promise.all([
+    getAppSettings(),
+    getPublicTournamentStage(tournament.slug, tournament.id),
+    listPublicActivePartnersForTournament(tournament.id),
+  ]);
   const applicationGate = {
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
@@ -110,8 +105,6 @@ export default async function TournamentDetailPage({
   const extraInfo = filledPublicInfo(tournament);
   const showMeinTurnierplan = isMeinTurnierplanPublic(tournament);
   const showLiveTab = showsMeinTurnierplanLiveTab(tournament);
-  const meinTurnierplanPrimary = usesMeinTurnierplanAsPrimaryLive(tournament);
-  const meinTurnierplanHybrid = isHybridLiveDataSource(tournament);
   const showTopMeinTurnierplanButton =
     showMeinTurnierplan && !showLiveTab;
   // Hero availability: presentation-only when capacity exists and apply path is active.
@@ -240,16 +233,7 @@ export default async function TournamentDetailPage({
             tournamentStatus={tournament.status}
             meinTurnierplanActive={showMeinTurnierplan}
             showLiveTab={showLiveTab}
-            meinTurnierplanPrimary={meinTurnierplanPrimary}
-            meinTurnierplanHybrid={meinTurnierplanHybrid}
             publicScheduleNote={tournament.publicScheduleNote}
-            meinTurnierplanPublic={meinTurnierplanPublic}
-            preferSyncedHubData={Boolean(
-              tournament.meinTurnierplanLastSyncedAt &&
-                (stage.matches.length > 0 ||
-                  stage.groups.length > 0 ||
-                  stage.roster.length > 0),
-            )}
             livePresentation={
               showLiveTab
                 ? {

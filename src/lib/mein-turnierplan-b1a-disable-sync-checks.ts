@@ -157,15 +157,16 @@ export function runMeinTurnierplanB1ADisableSyncChecks() {
     "H) Datenquelle/live_data_source UI and helpers unchanged",
   );
 
-  // I) public resolvers unchanged
+  // I) public resolvers remain exported; B1-B1 made them Hub-only (no preferSynced wiring)
   assert(
     publicSource.includes("export function resolveTeilnehmerTab") &&
       publicSource.includes("export function resolveGruppenTab") &&
       publicSource.includes("export function resolveSpielplanTab") &&
       publicSource.includes("export function resolveTabelleTab") &&
-      publicPage.includes("preferSyncedHubData={Boolean(") &&
-      publicPage.includes("tournament.meinTurnierplanLastSyncedAt"),
-    "I) public resolvers / preferSyncedHubData wiring unchanged",
+      publicSource.includes("HUB_ONLY_TAB") &&
+      !publicPage.includes("preferSyncedHubData") &&
+      !publicPage.includes("getPublicMeinTurnierplanData"),
+    "I) public resolvers remain; competition tabs no longer use preferSyncedHub/MTP JSON",
   );
 
   // J) MTP presentation functionality unchanged
