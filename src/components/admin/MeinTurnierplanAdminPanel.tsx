@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   AdminCard,
   AdminInfo,
@@ -9,10 +8,7 @@ import {
   adminSecondaryButtonClass,
   displayValue,
 } from "@/components/admin/AdminPanel";
-import {
-  acceptedTeamsFromApplications,
-  MeinTurnierplanAdminTools,
-} from "@/components/admin/MeinTurnierplanAdminTools";
+import { MeinTurnierplanAdminTools } from "@/components/admin/MeinTurnierplanAdminTools";
 import {
   asLiveDataSource,
   isSafeHttpUrl,
@@ -33,29 +29,28 @@ type MeinTurnierplanAdminPanelProps = {
 
 export function MeinTurnierplanAdminPanel({
   tournament,
-  applications = [],
 }: MeinTurnierplanAdminPanelProps) {
-  const router = useRouter();
   const active =
     tournament.meinTurnierplanEnabled &&
     isSafeHttpUrl(tournament.meinTurnierplanUrl ?? "");
   const url = tournament.meinTurnierplanUrl?.trim() ?? "";
   const liveDataSource = asLiveDataSource(tournament.liveDataSource);
-  const acceptedTeams = acceptedTeamsFromApplications(
-    applications.filter(
-      (application) =>
-        application.tournamentId === tournament.id ||
-        application.tournamentId === tournament.slug,
-    ),
-  );
 
   return (
     <AdminCard title="MeinTurnierplan">
       <dl className="grid gap-3 sm:grid-cols-2">
-        <AdminInfo label="Status" value={active ? "Aktiv" : "Inaktiv"} />
+        <AdminInfo label="Status" value={active ? "Verbunden" : "Inaktiv"} />
         <AdminInfo
           label="Datenquelle"
           value={liveDataSourceLabels[liveDataSource]}
+        />
+        <AdminInfo
+          label="Verwendung"
+          value="Öffentliche Anzeige · externe Turnierinformationen"
+        />
+        <AdminInfo
+          label="Turnierdaten"
+          value="VfL Tournament Hub"
         />
         <AdminInfo
           label="Turnier-ID"
@@ -76,8 +71,12 @@ export function MeinTurnierplanAdminPanel({
         />
       </dl>
 
+      <p className="mt-5 text-[14px] leading-6 text-muted">
+        MeinTurnierPlan wird für die öffentliche Anzeige und externe
+        Turnierinformationen verwendet. Die Turnierdaten werden im VfL
+        Tournament Hub verwaltet.
+      </p>
       <MeinTurnierplanAdminTools
-        tournamentId={tournament.id}
         tournamentIdValue={tournament.meinTurnierplanTournamentId ?? ""}
         matchesWidgetUrl={tournament.meinTurnierplanMatchesWidgetUrl}
         tableWidgetUrl={tournament.meinTurnierplanTableWidgetUrl}
@@ -85,8 +84,6 @@ export function MeinTurnierplanAdminPanel({
           tournament.meinTurnierplanMatchesWidgetUrl?.trim() ||
             tournament.meinTurnierplanTableWidgetUrl?.trim(),
         )}
-        acceptedTeams={acceptedTeams}
-        onImportComplete={() => router.refresh()}
       />
 
       <div className="mt-5 flex flex-wrap gap-3">

@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireTournamentsManage,
@@ -17,15 +16,19 @@ import {
   type SyncTeamMapping,
 } from "@/lib/mein-turnierplan-sync";
 import {
-  buildMeinTurnierplanSyncRpcPayload,
-  type MeinTurnierplanSyncRpcResult,
-} from "@/lib/mein-turnierplan-sync-rpc-payload";
-import {
   resolvePublicMeinTurnierplanJsonQueryId,
   validateMeinTurnierplanTournamentId,
 } from "@/lib/mein-turnierplan";
 import { applicationBelongsToTournament } from "@/lib/tournaments";
 import { shouldSkipMeinTurnierplanLogoSync } from "@/lib/tournament-participant-logos";
+
+/**
+ * B1-A: Hub is authoritative for competition data.
+ * MeinTurnierplan competition sync (RPC) is disabled for normal use.
+ * Presentation/widgets/links remain available separately.
+ */
+export const MEIN_TURNIERPLAN_COMPETITION_SYNC_DISABLED_MESSAGE =
+  "Die MeinTurnierplan-Synchronisation von Turnierdaten ist deaktiviert. Teilnehmer, Gruppen, Spielplan, Ergebnisse und KO werden im VfL Tournament Hub verwaltet. MeinTurnierplan dient nur der öffentlichen Anzeige und externen Turnierinformationen.";
 
 async function loadTournamentForSync(tournamentId: string) {
   const supabase = await createClient();
@@ -134,31 +137,12 @@ async function loadHubSyncSnapshot(tournamentId: string, slug: string): Promise<
   };
 }
 
-function revalidateTournament(slug: string, tournamentId: string) {
-  revalidatePath("/admin/turniere");
-  revalidatePath(`/admin/turniere/${tournamentId}`);
-  revalidatePath(`/admin/turniere/${tournamentId}/gruppen`);
-  revalidatePath(`/admin/turniere/${tournamentId}/spielplan`);
-  revalidatePath(`/admin/turniere/${tournamentId}/ko-runde`);
-  revalidatePath(`/admin/turniere/${tournamentId}/ergebnisse`);
-  revalidatePath(`/turniere/${slug}`);
-}
-
-function formatSyncNotice(
-  preview: MeinTurnierplanSyncPreview,
-  result: MeinTurnierplanSyncRpcResult,
-) {
-  const protectedPart =
-    result.protectedOverrides > 0
-      ? ` (${result.protectedOverrides} manuelle Anpassungen geschützt)`
-      : "";
-
-  return `Synchronisation abgeschlossen: ${preview.counts.teamsFound} Teams, ${preview.counts.groupsFound} Gruppen, ${preview.counts.matchesFound} Spiele (${preview.counts.resultsPresent} Ergebnisse). Neu: ${result.matchesInserted}, aktualisiert: ${result.matchesUpdated}${protectedPart}.`;
-}
-
 /**
  * Persist MeinTurnierplan logo URLs onto external teams without touching
  * rows that have logo_manual_override = true.
+ *
+ * B1-A: retained for infrastructure compatibility, but no longer reachable
+ * from confirmMeinTurnierplanSyncAction (competition sync disabled).
  */
 export async function applyMeinTurnierplanTeamLogosAfterSync(input: {
   tournamentId: string;
@@ -262,60 +246,12 @@ export async function confirmMeinTurnierplanSyncAction(input: {
     return { error: access.error, notice: null };
   }
 
-  const loaded = await loadTournamentForSync(input.tournamentId);
-  if (!loaded.tournament) {
-    return { error: loaded.error, notice: null };
-  }
-
-  const previewResult = await previewMeinTurnierplanSyncAction(input.tournamentId, {
-    mappings: input.mappings,
-    overridePolicy: input.overridePolicy,
-  });
-  if (previewResult.error || !previewResult.preview) {
-    return { error: previewResult.error ?? "Vorschau fehlgeschlagen.", notice: null };
-  }
-
-  const preview = previewResult.preview;
-  const supabase = await createClient();
-  const rpcPayload = buildMeinTurnierplanSyncRpcPayload({
-    queryId: preview.queryId,
-    payload: preview.payload,
-    mappings: preview.mappings,
-  });
-
-  const { data, error } = await supabase.rpc("sync_mein_turnierplan_tournament", {
-    p_tournament_id: loaded.tournament.id,
-    p_payload: rpcPayload,
-    p_overwrite_manual: input.overridePolicy === "overwrite-manual",
-  });
-
-  if (error) {
-    return {
-      error: error.message || "Die Synchronisation ist fehlgeschlagen.",
-      notice: null,
-    };
-  }
-
-  const result = data as MeinTurnierplanSyncRpcResult | null;
-  if (!result?.success) {
-    return {
-      error: "Die Synchronisation ist fehlgeschlagen.",
-      notice: null,
-    };
-  }
-
-  // Apply MTP logos after RPC. The sync RPC does not write logo_url, so manual
-  // logos (logo_manual_override=true) are never overwritten by the RPC itself.
-  await applyMeinTurnierplanTeamLogosAfterSync({
-    tournamentId: loaded.tournament.id,
-    teams: rpcPayload.teams,
-  });
-
-  revalidateTournament(loaded.tournament.slug, loaded.tournament.id);
-
+  // B1-A hard block: never call sync_mein_turnierplan_tournament or post-RPC writes.
+  // Keep signature for call-site compatibility; intentional unused input.
+  void input;
   return {
-    error: null,
-    notice: formatSyncNotice(preview, result),
+    error: MEIN_TURNIERPLAN_COMPETITION_SYNC_DISABLED_MESSAGE,
+    notice: null,
   };
 }
 
