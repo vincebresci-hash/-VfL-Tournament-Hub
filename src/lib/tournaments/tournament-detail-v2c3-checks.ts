@@ -244,27 +244,32 @@ export function runTournamentDetailV2C3Checks() {
 
   assert(
     resolvers.includes("export function resolveTabelleTab") &&
-      resolvers.includes("input.mtp.tableWidgetUrl") &&
-      resolvers.includes(
-        "if (input.preferSyncedHub && (input.hubGroupCount > 0 || (input.hubMatchCount ?? 0) > 0))",
-      ) &&
-      stage.includes("resolveTabelleTab({") &&
-      stage.includes("preferSyncedHub: preferSyncedHubData") &&
-      page.includes("preferSyncedHubData={Boolean(") &&
-      page.includes("tournament.meinTurnierplanLastSyncedAt"),
-    "resolveTabelleTab and preferSyncedHubData unchanged",
+      resolvers.includes("HUB_ONLY_TAB") &&
+      !resolvers.includes("input.mtp.tableWidgetUrl") &&
+      !/if \(input\.preferSyncedHub/.test(resolvers) &&
+      !stage.includes("resolveTabelleTab({") &&
+      !stage.includes("preferSyncedHubData") &&
+      !page.includes("preferSyncedHubData") &&
+      !page.includes("tournament.meinTurnierplanLastSyncedAt") &&
+      stage.includes("<TournamentStandingsSection") &&
+      stage.includes("computeGroupStandings"),
+    "Tabelle tab is Hub-only (B1-B1)",
   );
 
+  const liveSection = read("src/components/tournaments/MeinTurnierplanLiveSection.tsx");
   assert(
-    stage.includes('iframeId="widgetTable"') &&
-      stage.includes('title="MeinTurnierplan Tabelle"') &&
-      stage.includes("<MeinTurnierplanWidget") &&
-      stage.includes("<MeinTurnierplanSourceHint />") &&
-      stage.includes("<MeinTurnierplanPublicButton") &&
+    !stage.includes('iframeId="widgetTable"') &&
+      !stage.includes("MeinTurnierplan Tabelle") &&
+      !stage.includes("<MeinTurnierplanWidget") &&
+      !stage.includes("<MeinTurnierplanSourceHint />") &&
+      liveSection.includes('iframeId="widgetTable"') &&
+      liveSection.includes("MeinTurnierplan Tabelle") &&
+      liveSection.includes("<MeinTurnierplanWidget") &&
+      liveSection.includes("<MeinTurnierplanPublicButton") &&
       stage.includes("Die Tabelle ist aktuell nicht verfügbar.") &&
       widget.includes("<iframe") &&
       widget.includes("meinTurnierplanIframeSrc"),
-    "MTP Tabelle iframe and unavailable copy unchanged",
+    "MTP Tabelle widget on Live only; Hub Tabelle empty copy retained",
   );
 
   assert(

@@ -70,14 +70,15 @@ export function runTournamentDetailV2C1Checks() {
     "Hub group/member order not sorted; filter semantics retained in Stage",
   );
 
-  // MTP order preserved
+  // Gruppen tab no longer mounts MTP JSON groups (B1-B1); card mtp path may remain unused
   assert(
-    stage.includes('source="mtp"') &&
-      stage.includes("mtp.groups.map((group)") &&
+    stage.includes('source="hub"') &&
+      !stage.includes('source="mtp"') &&
+      !stage.includes("mtp.groups.map((group)") &&
       groupCards.includes("group.teams.map") &&
       !groupCards.includes("teams.sort") &&
       !groupCards.includes("groups.sort"),
-    "MTP group/team order not sorted",
+    "Gruppen tab mounts Hub only; GroupCards remains unsorted",
   );
 
   // Hub publicTeamLabel preserved
@@ -117,14 +118,15 @@ export function runTournamentDetailV2C1Checks() {
     "TournamentParticipantCards source unchanged / not generalized",
   );
 
-  // empty + unavailable semantics
+  // empty group semantics (Hub-only; MTP unavailable path removed in B1-B1)
   assert(
     groupCards.includes("Noch keine Teams zugeordnet.") &&
-      stage.includes(
+      stage.includes("Noch keine Gruppen veröffentlicht.") &&
+      !stage.includes(
         "Gruppen konnten aktuell nicht von MeinTurnierplan geladen werden.",
       ) &&
-      stage.includes('gruppenTab.source === "unavailable"'),
-    "empty group and MTP unavailable semantics preserved",
+      !stage.includes('gruppenTab.source === "unavailable"'),
+    "empty group semantics are Hub-only",
   );
 
   // no new queries in presentation
@@ -138,14 +140,15 @@ export function runTournamentDetailV2C1Checks() {
     "no new participant/group query in group cards",
   );
 
-  // resolveGruppenTab / preferSyncedHub unchanged
+  // resolveGruppenTab is Hub-only; stage does not source-switch Gruppen
   assert(
     resolvers.includes("export function resolveGruppenTab") &&
-      /if \(input\.preferSyncedHub && input\.hubGroupCount > 0\)/.test(resolvers) &&
-      stage.includes("resolveGruppenTab({") &&
-      stage.includes("hubGroupCount: stage.groups.length") &&
-      stage.includes("preferSyncedHub: preferSyncedHubData"),
-    "resolveGruppenTab + preferSyncedHubData wiring unchanged",
+      resolvers.includes("HUB_ONLY_TAB") &&
+      !/if \(input\.preferSyncedHub/.test(resolvers) &&
+      !stage.includes("resolveGruppenTab({") &&
+      !stage.includes("preferSyncedHubData") &&
+      stage.includes('source="hub"'),
+    "Gruppen tab is Hub-only (B1-B1)",
   );
 
   // counts from rendered arrays only

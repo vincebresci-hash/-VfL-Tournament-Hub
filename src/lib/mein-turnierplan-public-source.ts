@@ -6,115 +6,44 @@ import {
 import type { PublicMeinTurnierplanData } from "@/lib/mein-turnierplan-public-data";
 import type { PublicTournamentStage } from "@/lib/db/schedule-queries";
 
-export type PublicTabContentSource = "mein-turnierplan" | "hub" | "unavailable";
+export type PublicTabContentSource = "hub";
 
 export type PublicTabResolution = {
   source: PublicTabContentSource;
   showMeinTurnierplanHint: boolean;
 };
 
-export function resolveTeilnehmerTab(input: {
-  mtp: PublicMeinTurnierplanData;
-  hubRosterCount: number;
-  preferSyncedHub?: boolean;
-}): PublicTabResolution {
-  if (input.preferSyncedHub && input.hubRosterCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
+/**
+ * B1-B1: Normal competition tabs are always Hub-authoritative.
+ * MTP JSON/widgets/live_data_source/preferSyncedHub must not switch these tabs.
+ * Historical pollution inside Hub tables is unresolved by design (B1-B3).
+ */
+const HUB_ONLY_TAB: PublicTabResolution = {
+  source: "hub",
+  showMeinTurnierplanHint: false,
+};
 
-  if (input.mtp.available && input.mtp.participants.length > 0) {
-    return { source: "mein-turnierplan", showMeinTurnierplanHint: true };
-  }
-
-  if (input.mtp.isHybrid && input.hubRosterCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.isMeinTurnierplanOnly) {
-    return { source: "unavailable", showMeinTurnierplanHint: false };
-  }
-
-  return { source: "hub", showMeinTurnierplanHint: false };
+export function resolveTeilnehmerTab(): PublicTabResolution {
+  return HUB_ONLY_TAB;
 }
 
-export function resolveGruppenTab(input: {
-  mtp: PublicMeinTurnierplanData;
-  hubGroupCount: number;
-  preferSyncedHub?: boolean;
-}): PublicTabResolution {
-  if (input.preferSyncedHub && input.hubGroupCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.available && input.mtp.groups.length > 0) {
-    return { source: "mein-turnierplan", showMeinTurnierplanHint: true };
-  }
-
-  if (input.mtp.isHybrid && input.hubGroupCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.isMeinTurnierplanOnly) {
-    return { source: "unavailable", showMeinTurnierplanHint: false };
-  }
-
-  return { source: "hub", showMeinTurnierplanHint: false };
+export function resolveGruppenTab(): PublicTabResolution {
+  return HUB_ONLY_TAB;
 }
 
-export function resolveSpielplanTab(input: {
-  mtp: PublicMeinTurnierplanData;
-  hubMatchCount: number;
-  preferSyncedHub?: boolean;
-}): PublicTabResolution {
-  if (input.preferSyncedHub && input.hubMatchCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.matchesWidgetUrl) {
-    return { source: "mein-turnierplan", showMeinTurnierplanHint: true };
-  }
-
-  if (input.mtp.isHybrid && input.hubMatchCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.isMeinTurnierplanOnly) {
-    return { source: "unavailable", showMeinTurnierplanHint: false };
-  }
-
-  return { source: "hub", showMeinTurnierplanHint: false };
+export function resolveSpielplanTab(): PublicTabResolution {
+  return HUB_ONLY_TAB;
 }
 
-export function resolveTabelleTab(input: {
-  mtp: PublicMeinTurnierplanData;
-  hubGroupCount: number;
-  hubMatchCount?: number;
-  preferSyncedHub?: boolean;
-}): PublicTabResolution {
-  if (input.preferSyncedHub && (input.hubGroupCount > 0 || (input.hubMatchCount ?? 0) > 0)) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.tableWidgetUrl) {
-    return { source: "mein-turnierplan", showMeinTurnierplanHint: true };
-  }
-
-  if (input.mtp.isHybrid && input.hubGroupCount > 0) {
-    return { source: "hub", showMeinTurnierplanHint: false };
-  }
-
-  if (input.mtp.isMeinTurnierplanOnly) {
-    return { source: "unavailable", showMeinTurnierplanHint: false };
-  }
-
-  return { source: "hub", showMeinTurnierplanHint: false };
+export function resolveTabelleTab(): PublicTabResolution {
+  return HUB_ONLY_TAB;
 }
 
 export function publicStageHasHubSchedule(stage: Pick<PublicTournamentStage, "matches" | "groups">) {
   return stage.matches.length > 0 || stage.groups.length > 0;
 }
 
-function assert(condition: unknown, message: string) {
+function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
@@ -155,27 +84,21 @@ export function runMeinTurnierplanPublicSourceSelfChecks() {
     tableWidgetUrl: null,
   };
 
-  const teilnehmer = resolveTeilnehmerTab({ mtp: realMtpData, hubRosterCount: 0 });
-  assert(teilnehmer.source === "mein-turnierplan", "Teilnehmer aus MeinTurnierplan");
-  assert(teilnehmer.showMeinTurnierplanHint, "Teilnehmer-Hinweis bei MTP");
+  // Force-reference fixture so authority cases stay explicit even without resolver inputs.
+  assert(realMtpData.available && realMtpData.participants.length > 0, "MTP fixture available");
 
-  const gruppen = resolveGruppenTab({ mtp: realMtpData, hubGroupCount: 0 });
-  assert(gruppen.source === "mein-turnierplan", "Gruppen aus MeinTurnierplan");
+  // B1-B1: resolvers ignore MTP availability / preferSynced / empty hub — always Hub
+  const cases = [
+    resolveTeilnehmerTab(),
+    resolveGruppenTab(),
+    resolveSpielplanTab(),
+    resolveTabelleTab(),
+  ];
 
-  const spielplan = resolveSpielplanTab({ mtp: realMtpData, hubMatchCount: 0 });
-  assert(spielplan.source === "mein-turnierplan", "Spielplan-Widget aus MeinTurnierplan");
-
-  const hybridFallback = resolveTeilnehmerTab({
-    mtp: { ...realMtpData, available: false, isHybrid: true, isMeinTurnierplanOnly: false },
-    hubRosterCount: 3,
-  });
-  assert(hybridFallback.source === "hub", "Hybrid fällt auf Hub-Teilnehmer zurück");
-
-  const mtpOnlyUnavailable = resolveTeilnehmerTab({
-    mtp: { ...realMtpData, available: false },
-    hubRosterCount: 0,
-  });
-  assert(mtpOnlyUnavailable.source === "unavailable", "MTP-only ohne Daten ist unavailable");
+  for (const resolution of cases) {
+    assert(resolution.source === "hub", "B1-B1 competition tabs always resolve to hub");
+    assert(!resolution.showMeinTurnierplanHint, "B1-B1 no MTP source hint on competition tabs");
+  }
 
   const suggested = suggestTableWidgetUrlFromMatches(MEIN_TURNIERPLAN_REAL_MATCHES_WIDGET_URL);
   assert(Boolean(suggested?.toLowerCase().includes("displaytable.php")), "Tabellen-Widget-Vorschlag muss displayTable.php sein");

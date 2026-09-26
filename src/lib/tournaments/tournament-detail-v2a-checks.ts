@@ -182,15 +182,16 @@ export function runTournamentDetailV2AChecks() {
       !hero.includes("tab=spielplan"),
     "TournamentPublicStage still wired; Spielplan CTA omitted in V2-A",
   );
-  // Stage file must not be modified for V2-A — assert key invariants still present
+  // Stage still hosts Turnier-Center tabs; B1-B1 made competition tabs Hub-only
   assert(
     stage.includes('id: "uebersicht"') &&
       stage.includes('id: "teilnehmer"') &&
-      stage.includes("resolveSpielplanTab") &&
-      stage.includes("resolveTeilnehmerTab") &&
+      stage.includes("<TournamentScheduleCards") &&
+      stage.includes("<TournamentParticipantCards") &&
+      stage.includes("<MeinTurnierplanLiveSection") &&
       !stage.includes("TournamentHero") &&
       !stage.includes("TournamentInfoGrid"),
-    "TournamentPublicStage implementation/functionality unchanged for V2-A",
+    "TournamentPublicStage tab shell retained for V2-A (Hub competition + MTP Live)",
   );
 
   // 18–20 homepage / partner / admin
