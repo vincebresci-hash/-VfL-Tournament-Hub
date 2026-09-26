@@ -595,7 +595,11 @@ export function TournamentAdminForm({
               className="h-4 w-4 accent-brand-yellow"
             />
           </label>
-          <Field id="tournament-mtp-source" label="Datenquelle">
+          <Field
+            id="tournament-mtp-source"
+            label="Live-Darstellung"
+            hint="Turnierdaten wie Teilnehmer, Gruppen, Spielplan, Ergebnisse und KO werden im VfL Tournament Hub verwaltet. Diese Auswahl steuert nur die optionale Live-Darstellung über MeinTurnierplan."
+          >
             <SelectInput
               id="tournament-mtp-source"
               value={values.liveDataSource}
@@ -606,9 +610,9 @@ export function TournamentAdminForm({
                 )
               }
             >
-              <option value="hub">Eigener Hub</option>
-              <option value="mein-turnierplan">MeinTurnierplan</option>
-              <option value="hybrid">Hybrid</option>
+              <option value="hub">Nur Hub</option>
+              <option value="mein-turnierplan">MeinTurnierplan Live</option>
+              <option value="hybrid">Hub + MeinTurnierplan Live</option>
             </SelectInput>
           </Field>
           <Field

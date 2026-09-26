@@ -28,6 +28,7 @@ import { runMeinTurnierplanPublicSourceSelfChecks } from "@/lib/mein-turnierplan
 import { runMeinTurnierplanSyncSelfChecks } from "@/lib/mein-turnierplan-sync";
 import { runMeinTurnierplanB1ADisableSyncChecks } from "@/lib/mein-turnierplan-b1a-disable-sync-checks";
 import { runMeinTurnierplanB1B1HubPublicTabsChecks } from "@/lib/mein-turnierplan-b1b1-hub-public-tabs-checks";
+import { runMeinTurnierplanB1B2LivePresentationChecks } from "@/lib/mein-turnierplan-b1b2-live-presentation-checks";
 import { runMeinTurnierplanParticipantCountChecks } from "@/lib/mein-turnierplan-participants-checks";
 import { runTournamentParticipantsListChecks } from "@/lib/tournament-participants-checks";
 import { runTournamentParticipantLogoManagementChecks } from "@/lib/tournament-participant-logos-checks";
@@ -107,6 +108,8 @@ try {
   const meinTurnierplanSync = runMeinTurnierplanSyncSelfChecks();
   const meinTurnierplanB1ADisableSyncChecks = runMeinTurnierplanB1ADisableSyncChecks();
   const meinTurnierplanB1B1HubPublicTabsChecks = runMeinTurnierplanB1B1HubPublicTabsChecks();
+  const meinTurnierplanB1B2LivePresentationChecks =
+    runMeinTurnierplanB1B2LivePresentationChecks();
   const meinTurnierplanSyncRpc = runMeinTurnierplanSyncRpcSelfChecks();
   const transactionRollbackCheck = runMeinTurnierplanTransactionRollbackCheck();
   const idempotencyCheck = runMeinTurnierplanIdempotencyCheck();
@@ -199,6 +202,7 @@ try {
   console.log(`mein-turnierplan-sync-checks: ${meinTurnierplanSync}`);
   console.log(`mein-turnierplan-b1a-disable-sync-checks: ${meinTurnierplanB1ADisableSyncChecks}`);
   console.log(`mein-turnierplan-b1b1-hub-public-tabs-checks: ${meinTurnierplanB1B1HubPublicTabsChecks}`);
+  console.log(`mein-turnierplan-b1b2-live-presentation-checks: ${meinTurnierplanB1B2LivePresentationChecks}`);
   console.log(`mein-turnierplan-sync-rpc-checks: ${meinTurnierplanSyncRpc}`);
   console.log(`transaction-rollback-check: ${transactionRollbackCheck}`);
   console.log(`idempotency-check: ${idempotencyCheck}`);

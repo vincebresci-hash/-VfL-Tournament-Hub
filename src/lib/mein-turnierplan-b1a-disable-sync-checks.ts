@@ -142,19 +142,25 @@ export function runMeinTurnierplanB1ADisableSyncChecks() {
     "G) previewMeinTurnierplanSyncAction remains read-only",
   );
 
-  // H) Datenquelle / live_data_source behavior unchanged
+  // H) Live-Darstellung / live_data_source wiring unchanged (B1-B2 Admin copy)
   assert(
-    adminForm.includes('label="Datenquelle"') &&
-      adminForm.includes('<option value="hub">Eigener Hub</option>') &&
-      adminForm.includes('<option value="mein-turnierplan">MeinTurnierplan</option>') &&
-      adminForm.includes('<option value="hybrid">Hybrid</option>') &&
+    adminForm.includes('label="Live-Darstellung"') &&
+      adminForm.includes('<option value="hub">Nur Hub</option>') &&
+      adminForm.includes(
+        '<option value="mein-turnierplan">MeinTurnierplan Live</option>',
+      ) &&
+      adminForm.includes(
+        '<option value="hybrid">Hub + MeinTurnierplan Live</option>',
+      ) &&
       adminForm.includes("liveDataSource") &&
-      mtpPanel.includes('label="Datenquelle"') &&
+      !adminForm.includes('label="Datenquelle"') &&
+      mtpPanel.includes('label="Live-Darstellung"') &&
+      !mtpPanel.includes('label="Datenquelle"') &&
       mtpLib.includes("showsMeinTurnierplanLiveTab") &&
       mtpLib.includes("usesMeinTurnierplanAsPrimaryLive") &&
       mtpLib.includes("isHybridLiveDataSource") &&
       publicData.includes("usesMeinTurnierplanPublicTabs"),
-    "H) Datenquelle/live_data_source UI and helpers unchanged",
+    "H) Live-Darstellung/live_data_source UI and helpers unchanged",
   );
 
   // I) public resolvers remain exported; B1-B1 made them Hub-only (no preferSynced wiring)
