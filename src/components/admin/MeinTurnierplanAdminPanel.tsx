@@ -17,9 +17,9 @@ import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication } from "@/types/application";
 
 const liveDataSourceLabels = {
-  hub: "Eigener Hub",
-  "mein-turnierplan": "MeinTurnierplan",
-  hybrid: "Hybrid",
+  hub: "Nur Hub",
+  "mein-turnierplan": "MeinTurnierplan Live",
+  hybrid: "Hub + MeinTurnierplan Live",
 } as const;
 
 type MeinTurnierplanAdminPanelProps = {
@@ -41,7 +41,7 @@ export function MeinTurnierplanAdminPanel({
       <dl className="grid gap-3 sm:grid-cols-2">
         <AdminInfo label="Status" value={active ? "Verbunden" : "Inaktiv"} />
         <AdminInfo
-          label="Datenquelle"
+          label="Live-Darstellung"
           value={liveDataSourceLabels[liveDataSource]}
         />
         <AdminInfo
@@ -72,9 +72,8 @@ export function MeinTurnierplanAdminPanel({
       </dl>
 
       <p className="mt-5 text-[14px] leading-6 text-muted">
-        MeinTurnierPlan wird für die öffentliche Anzeige und externe
-        Turnierinformationen verwendet. Die Turnierdaten werden im VfL
-        Tournament Hub verwaltet.
+        Die Turnierdaten werden im VfL Tournament Hub verwaltet.
+        MeinTurnierplan steuert nur die optionale Live-Darstellung.
       </p>
       <MeinTurnierplanAdminTools
         tournamentIdValue={tournament.meinTurnierplanTournamentId ?? ""}

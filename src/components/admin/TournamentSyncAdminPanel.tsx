@@ -114,7 +114,7 @@ export function TournamentSyncAdminPanel({
           value={formatSyncedAt(tournament.meinTurnierplanLastSyncedAt)}
         />
         <AdminInfo
-          label="Quelle / Turnier-ID"
+          label="Turnier-ID"
           value={displayValue(tournament.meinTurnierplanTournamentId)}
         />
         <AdminInfo
