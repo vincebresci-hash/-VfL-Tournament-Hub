@@ -17,6 +17,7 @@ import { runTournamentDetailV2C4Checks } from "@/lib/tournaments/tournament-deta
 import { runTournamentDetailV2C5AChecks } from "@/lib/tournaments/tournament-detail-v2c5a-checks";
 import { runLiveHubNativeC5BChecks } from "@/lib/live/live-hub-native-c5b-checks";
 import { runScheduleSelfChecks } from "./run-checks";
+import { runPlanPreviewChecks } from "./plan-preview-checks";
 import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
 import { runKnockoutDeleteChecks } from "./knockout-delete-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
@@ -97,6 +98,7 @@ import {
 
 try {
   const schedule = runScheduleSelfChecks();
+  const planPreviewChecks = runPlanPreviewChecks();
   const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
   const knockoutDeleteChecks = runKnockoutDeleteChecks();
   const applicationWindow = runApplicationWindowSelfChecks();
@@ -191,6 +193,7 @@ try {
   const tournamentDetailV2C5AChecks = runTournamentDetailV2C5AChecks();
   const liveHubNativeC5BChecks = runLiveHubNativeC5BChecks();
   console.log(`schedule-checks: ${schedule}`);
+  console.log(`plan-preview-checks: ${planPreviewChecks}`);
   console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
   console.log(`knockout-delete-checks: ${knockoutDeleteChecks}`);
   console.log(`application-window-checks: ${applicationWindow}`);
