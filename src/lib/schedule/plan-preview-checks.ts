@@ -352,7 +352,7 @@ function runRegenerationPolicyCases() {
   const groupsOnly = canRegenerateGroupSchedule({ groupCount: 2, matches: [] });
   assert(
     groupsOnly.state === "GROUPS_ONLY" && groupsOnly.decision === "allowed",
-    "A groups-only allowed",
+    "B groups-only allowed",
   );
 
   const scheduleNoResults = canRegenerateGroupSchedule({
@@ -362,14 +362,14 @@ function runRegenerationPolicyCases() {
   assert(
     scheduleNoResults.state === "SCHEDULE_NO_RESULTS" &&
       scheduleNoResults.decision === "allowedWithConfirmation",
-    "B schedule no results confirmation",
+    "C schedule no results confirmation",
   );
 
   const result10 = canRegenerateGroupSchedule({
     groupCount: 2,
     matches: [{ phase: "group", status: "completed", homeScore: 1, awayScore: 0 }],
   });
-  assert(result10.state === "RESULTS_EXIST" && result10.decision === "blocked", "C 1-0 blocked");
+  assert(result10.state === "RESULTS_EXIST" && result10.decision === "blocked", "D completed 1-0 blocked");
 
   const result00 = canRegenerateGroupSchedule({
     groupCount: 2,
@@ -377,14 +377,50 @@ function runRegenerationPolicyCases() {
   });
   assert(
     result00.state === "RESULTS_EXIST" && result00.decision === "blocked",
-    "D completed 0-0 blocked (status-based, not truthiness)",
+    "E completed 0-0 blocked (status + zero scores, not truthiness)",
   );
 
   const live = canRegenerateGroupSchedule({
     groupCount: 2,
     matches: [{ phase: "group", status: "live", homeScore: null, awayScore: null }],
   });
-  assert(live.state === "LIVE" && live.decision === "blocked", "E live blocked");
+  assert(live.state === "LIVE" && live.decision === "blocked", "F live blocked");
+
+  const scheduledScore10 = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "scheduled", homeScore: 1, awayScore: 0 }],
+  });
+  assert(
+    scheduledScore10.state === "RESULTS_EXIST" && scheduledScore10.decision === "blocked",
+    "G scheduled + 1-0 blocked",
+  );
+
+  const scheduledScore00 = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "scheduled", homeScore: 0, awayScore: 0 }],
+  });
+  assert(
+    scheduledScore00.state === "RESULTS_EXIST" && scheduledScore00.decision === "blocked",
+    "H scheduled + 0-0 blocked",
+  );
+
+  const scheduledHomeZero = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "scheduled", homeScore: 0, awayScore: null }],
+  });
+  assert(
+    scheduledHomeZero.state === "RESULTS_EXIST" && scheduledHomeZero.decision === "blocked",
+    "I scheduled + homeScore=0 / awayScore=null blocked",
+  );
+
+  const scheduledAwayZero = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "scheduled", homeScore: null, awayScore: 0 }],
+  });
+  assert(
+    scheduledAwayZero.state === "RESULTS_EXIST" && scheduledAwayZero.decision === "blocked",
+    "J scheduled + homeScore=null / awayScore=0 blocked",
+  );
 
   const koStarted = canRegenerateGroupSchedule({
     groupCount: 2,
@@ -393,7 +429,22 @@ function runRegenerationPolicyCases() {
       { phase: "knockout", status: "scheduled", homeScore: null, awayScore: null },
     ],
   });
-  assert(koStarted.state === "KO_STARTED" && koStarted.decision === "blocked", "F KO blocked");
+  assert(koStarted.state === "KO_STARTED" && koStarted.decision === "blocked", "K KO generated blocked");
+
+  const koLive = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "knockout", status: "live", homeScore: null, awayScore: null }],
+  });
+  assert(koLive.state === "KO_STARTED" && koLive.decision === "blocked", "L KO live blocked");
+
+  const koCompleted = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "knockout", status: "completed", homeScore: 2, awayScore: 1 }],
+  });
+  assert(
+    koCompleted.state === "KO_STARTED" && koCompleted.decision === "blocked",
+    "M KO completed blocked",
+  );
 
   const completed = canRegenerateGroupSchedule({
     tournamentStatus: "completed",
@@ -402,7 +453,7 @@ function runRegenerationPolicyCases() {
   });
   assert(
     completed.state === "COMPLETED" && completed.decision === "blocked",
-    "G completed tournament blocked",
+    "N completed tournament blocked",
   );
 
   const ambiguous = canRegenerateGroupSchedule({
@@ -411,7 +462,139 @@ function runRegenerationPolicyCases() {
   });
   assert(
     ambiguous.state === "AMBIGUOUS" && ambiguous.decision === "blocked",
-    "H ambiguous blocked",
+    "O ambiguous blocked",
+  );
+
+  const historicalKo = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [
+      { phase: "group", status: "scheduled", homeScore: null, awayScore: null },
+      // Historical/external-style KO row identified only by phase — no filtering.
+      { phase: "knockout", status: "scheduled", homeScore: null, awayScore: null },
+    ],
+  });
+  assert(
+    historicalKo.state === "KO_STARTED" && historicalKo.decision === "blocked",
+    "P historical/external-style KO row blocks by phase",
+  );
+
+  // Cancelled with no scores remains SCHEDULE_NO_RESULTS (existing-compatible; not a result).
+  const cancelledClean = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "cancelled", homeScore: null, awayScore: null }],
+  });
+  assert(
+    cancelledClean.state === "SCHEDULE_NO_RESULTS" &&
+      cancelledClean.decision === "allowedWithConfirmation",
+    "cancelled without scores => schedule/no-results confirmation",
+  );
+
+  const cancelledWithScore = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "cancelled", homeScore: 0, awayScore: 0 }],
+  });
+  assert(
+    cancelledWithScore.state === "RESULTS_EXIST" && cancelledWithScore.decision === "blocked",
+    "cancelled with residual 0-0 scores blocked",
+  );
+
+  const liveWithScore = canRegenerateGroupSchedule({
+    groupCount: 2,
+    matches: [{ phase: "group", status: "live", homeScore: 1, awayScore: 0 }],
+  });
+  assert(
+    liveWithScore.state === "LIVE" && liveWithScore.decision === "blocked",
+    "live + score keeps LIVE precedence",
+  );
+}
+
+function extractExportedFunctionSource(source: string, functionName: string) {
+  const marker = `export async function ${functionName}`;
+  const start = source.indexOf(marker);
+  assert(start >= 0, `missing exported function ${functionName}`);
+  // Skip parameter list, then optional Promise<{...}> return type, then body "{".
+  let index = source.indexOf("(", start + marker.length);
+  assert(index >= 0, `missing params for ${functionName}`);
+  let parenDepth = 0;
+  for (; index < source.length; index += 1) {
+    const char = source[index];
+    if (char === "(") {
+      parenDepth += 1;
+    } else if (char === ")") {
+      parenDepth -= 1;
+      if (parenDepth === 0) {
+        index += 1;
+        break;
+      }
+    }
+  }
+  while (index < source.length && /\s/.test(source[index] ?? "")) {
+    index += 1;
+  }
+  if (source[index] === ":") {
+    // Consume return type, tracking nested braces/angles until the body opens.
+    index += 1;
+    let angleDepth = 0;
+    let braceDepth = 0;
+    for (; index < source.length; index += 1) {
+      const char = source[index];
+      if (char === "<") {
+        angleDepth += 1;
+      } else if (char === ">") {
+        angleDepth -= 1;
+      } else if (char === "{") {
+        if (angleDepth === 0 && braceDepth === 0) {
+          break; // function body
+        }
+        braceDepth += 1;
+      } else if (char === "}") {
+        braceDepth -= 1;
+      }
+    }
+  }
+  while (index < source.length && /\s/.test(source[index] ?? "")) {
+    index += 1;
+  }
+  assert(source[index] === "{", `missing body for ${functionName}`);
+  const bodyStart = index;
+  let depth = 0;
+  index = bodyStart;
+  while (index < source.length) {
+    const char = source[index];
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(start, index + 1);
+      }
+    }
+    index += 1;
+  }
+  throw new Error(`plan-preview-checks: could not extract ${functionName}`);
+}
+
+function assertPolicyBeforeDelete(fnSource: string, functionName: string) {
+  const policyIdx = fnSource.indexOf("canRegenerateGroupSchedule");
+  const helperIdx = fnSource.indexOf("blockedGroupScheduleMutationError");
+  const deleteIdx = fnSource.indexOf(".delete()");
+  const guardIdx = policyIdx >= 0 ? policyIdx : helperIdx;
+  assert(guardIdx >= 0, `${functionName} must evaluate shared regeneration policy`);
+  assert(deleteIdx >= 0, `${functionName} must still contain destructive delete`);
+  assert(
+    guardIdx < deleteIdx,
+    `${functionName} must evaluate regeneration policy before .delete()`,
+  );
+  assert(
+    fnSource.includes("blockedGroupScheduleMutationError") ||
+      fnSource.includes("canRegenerateGroupSchedule"),
+    `${functionName} must call shared policy helper`,
+  );
+  // Blocked return must appear before delete in source order.
+  const blockedReturn = fnSource.indexOf("if (blocked");
+  assert(
+    blockedReturn >= 0 && blockedReturn < deleteIdx,
+    `${functionName} must return blocked error before delete`,
   );
 }
 
@@ -470,18 +653,64 @@ function runStructuralChecks() {
     );
   }
 
-  // Existing production actions unchanged by C6-A (no canRegenerateGroupSchedule wiring).
+  // C6-B: schedule actions consume shared canRegenerateGroupSchedule only.
   assert(
-    !scheduleActions.includes("canRegenerateGroupSchedule") &&
-      !scheduleActions.includes("buildTournamentPlanPreview") &&
-      !scheduleActions.includes("plan-preview"),
-    "schedule-actions not wired to C6-A yet",
+    scheduleActions.includes("canRegenerateGroupSchedule") &&
+      scheduleActions.includes('from "@/lib/schedule/plan-preview"'),
+    "schedule-actions imports shared canRegenerateGroupSchedule",
   );
+  assert(
+    !scheduleActions.includes("buildTournamentPlanPreview"),
+    "schedule-actions must not import/use buildTournamentPlanPreview (C6-C/D boundary)",
+  );
+  assert(
+    scheduleActions.includes("buildRegenerationStageSnapshot") &&
+      scheduleActions.includes("homeScore") &&
+      scheduleActions.includes("awayScore") &&
+      scheduleActions.includes("match.phase") &&
+      scheduleActions.includes("match.status") &&
+      scheduleActions.includes("stage.groups.length"),
+    "regeneration snapshot wires tournamentStatus, groupCount, phase, status, scores",
+  );
+  // Snapshot maps all stage.matches — must not filter KO before policy.
+  const snapshotStart = scheduleActions.indexOf("function buildRegenerationStageSnapshot");
+  assert(snapshotStart >= 0, "buildRegenerationStageSnapshot helper present");
+  const snapshotEnd = scheduleActions.indexOf("function blockedGroupScheduleMutationError");
+  assert(snapshotEnd > snapshotStart, "blocked helper follows snapshot helper");
+  const snapshotBody = scheduleActions.slice(snapshotStart, snapshotEnd);
+  assert(
+    snapshotBody.includes("stage.matches.map") &&
+      !snapshotBody.includes('phase !== "knockout"') &&
+      !snapshotBody.includes("external_source") &&
+      !snapshotBody.includes("externalSource"),
+    "snapshot maps all matches including KO; no MTP/external filter",
+  );
+
+  const generateFn = extractExportedFunctionSource(
+    scheduleActions,
+    "generateTournamentScheduleAction",
+  );
+  const deleteFn = extractExportedFunctionSource(
+    scheduleActions,
+    "deleteTournamentScheduleAction",
+  );
+  assertPolicyBeforeDelete(generateFn, "generateTournamentScheduleAction");
+  assertPolicyBeforeDelete(deleteFn, "deleteTournamentScheduleAction");
+  assert(
+    deleteFn.includes("getAdminTournamentStage"),
+    "deleteTournamentScheduleAction loads stage so KO rows are visible",
+  );
+  assert(
+    scheduleActions.includes('"id, slug, status, date, start_time') ||
+      scheduleActions.includes("id, slug, status, date, start_time"),
+    "loadTournament selects tournaments.status for COMPLETED policy",
+  );
+
   assert(
     !knockoutActions.includes("canRegenerateGroupSchedule") &&
       !knockoutActions.includes("buildTournamentPlanPreview") &&
       !knockoutActions.includes("plan-preview"),
-    "knockout-actions not wired to C6-A",
+    "knockout-actions remain unwired to plan-preview",
   );
 
   assert(
@@ -503,19 +732,27 @@ function runStructuralChecks() {
   assert(
     runChecksCli.includes("runPlanPreviewChecks") &&
       runChecksCli.includes("plan-preview-checks"),
-    "C6-A suite wired into run-checks-cli",
+    "C6-A/C6-B suite wired into run-checks-cli",
   );
 
-  // No migration in C6-A scope: preview module must not reference migrations paths as runtime deps.
   assert(
     !previewSource.includes("supabase/migrations"),
     "preview module does not reference migrations",
   );
+
+  // Score-present hardening uses explicit null checks, not truthiness.
+  assert(
+    previewSource.includes("homeScore != null") &&
+      previewSource.includes("awayScore != null") &&
+      !previewSource.includes("if (match.homeScore)") &&
+      !previewSource.includes("if (match.awayScore)"),
+    "score-present hardening uses explicit null checks",
+  );
 }
 
 /**
- * C6-A pure plan/preview foundation checks.
- * Unit coverage + structural freeze (no DB/UI/action wiring).
+ * C6-A plan/preview foundation + C6-B regeneration-safety checks.
+ * Unit policy coverage + structural control-flow freeze (no live DB).
  */
 export function runPlanPreviewChecks() {
   runRoundRobinCases();

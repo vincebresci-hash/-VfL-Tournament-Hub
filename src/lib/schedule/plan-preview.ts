@@ -619,14 +619,22 @@ function buildLogicalKoPlan(
   return { matches, error: null };
 }
 
-function hasCompletedResult(match: RegenerationStageSnapshot["matches"][number]) {
-  // Completion is status-based. 0–0 is a valid completed score.
-  return match.status === "completed";
+function hasScoreData(match: RegenerationStageSnapshot["matches"][number]) {
+  // Explicit null checks: 0 is a valid score and must count as result data.
+  return match.homeScore != null || match.awayScore != null;
+}
+
+function hasResultData(match: RegenerationStageSnapshot["matches"][number]) {
+  // Completed status blocks even when scores are missing.
+  // Any non-null score also blocks (scheduled/live/cancelled with residual scores).
+  return match.status === "completed" || hasScoreData(match);
 }
 
 /**
- * Pure regeneration policy for group-schedule regeneration.
+ * Pure regeneration policy for group-schedule regeneration / deletion.
  * Conservative: ambiguous/missing data → blocked.
+ * Residual TOCTOU (read then concurrent write then DELETE) is accepted for C6-B;
+ * this helper is action-level only and is not a transactional lock.
  */
 export function canRegenerateGroupSchedule(
   stage: RegenerationStageSnapshot,
@@ -678,11 +686,11 @@ export function canRegenerateGroupSchedule(
     };
   }
 
-  if (stage.matches.some((match) => hasCompletedResult(match))) {
+  if (stage.matches.some((match) => hasResultData(match))) {
     return {
       state: "RESULTS_EXIST",
       decision: "blocked",
-      reason: "Es existieren bereits abgeschlossene Ergebnisse (inkl. 0:0).",
+      reason: "Es existieren bereits Ergebnisse (inkl. 0:0).",
     };
   }
 

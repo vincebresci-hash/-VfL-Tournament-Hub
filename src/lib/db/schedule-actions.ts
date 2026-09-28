@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireScheduleManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
-import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { getAdminTournamentStage, type AdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import {
   matchSideDbColumns,
@@ -13,6 +13,10 @@ import {
 } from "@/lib/schedule/admin";
 import { distributeTeams } from "@/lib/schedule/distribute";
 import { fieldDisplayName, groupDisplayName } from "@/lib/schedule/names";
+import {
+  canRegenerateGroupSchedule,
+  type RegenerationStageSnapshot,
+} from "@/lib/schedule/plan-preview";
 import {
   expectedGroupMatchCount,
   hasSelfPlay,
@@ -43,7 +47,7 @@ async function loadTournament(tournamentId: string) {
   const { data, error } = await supabase
     .from("tournaments")
     .select(
-      "id, slug, date, start_time, match_duration_minutes, break_minutes, minimum_rest_minutes, lunch_break_start, lunch_break_end",
+      "id, slug, status, date, start_time, match_duration_minutes, break_minutes, minimum_rest_minutes, lunch_break_start, lunch_break_end",
     )
     .eq("id", tournamentId)
     .maybeSingle();
@@ -59,6 +63,35 @@ async function loadTournament(tournamentId: string) {
     tournament: data,
     error: null,
   };
+}
+
+function buildRegenerationStageSnapshot(
+  tournamentStatus: string | null | undefined,
+  stage: AdminTournamentStage,
+): RegenerationStageSnapshot {
+  return {
+    tournamentStatus: tournamentStatus ?? null,
+    groupCount: stage.groups.length,
+    matches: stage.matches.map((match) => ({
+      phase: match.phase,
+      status: match.status,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+    })),
+  };
+}
+
+function blockedGroupScheduleMutationError(
+  tournamentStatus: string | null | undefined,
+  stage: AdminTournamentStage,
+): string | null {
+  const policy = canRegenerateGroupSchedule(
+    buildRegenerationStageSnapshot(tournamentStatus, stage),
+  );
+  if (policy.decision === "blocked") {
+    return policy.reason;
+  }
+  return null;
 }
 
 function parseOptionalTime(value: string) {
@@ -590,6 +623,16 @@ export async function generateTournamentScheduleAction(
     };
   }
 
+  // C6-B: shared regeneration policy must run before destructive group DELETE.
+  // Residual TOCTOU (concurrent result/live write after this read) is accepted for C6-B.
+  const blockedGenerate = blockedGroupScheduleMutationError(
+    loaded.tournament.status,
+    stage,
+  );
+  if (blockedGenerate) {
+    return { error: blockedGenerate, notice: null };
+  }
+
   const { error: deleteError } = await supabase
     .from("tournament_matches")
     .delete()
@@ -762,6 +805,18 @@ export async function deleteTournamentScheduleAction(
   const loaded = await loadTournament(tournamentId);
   if (!loaded.tournament) {
     return { error: loaded.error };
+  }
+
+  const stage = await getAdminTournamentStage(tournamentId);
+
+  // C6-B: same shared policy as generate — KO/results/live/completed must hard-block.
+  // Residual TOCTOU (concurrent result/live write after this read) is accepted for C6-B.
+  const blockedDelete = blockedGroupScheduleMutationError(
+    loaded.tournament.status,
+    stage,
+  );
+  if (blockedDelete) {
+    return { error: blockedDelete };
   }
 
   const supabase = await createClient();
