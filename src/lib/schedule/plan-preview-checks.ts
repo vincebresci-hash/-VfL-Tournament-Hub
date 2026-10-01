@@ -607,10 +607,12 @@ function stripTsComments(source: string) {
 
 function runC6CAdminPreviewStructuralChecks() {
   const previewActions = read("src/lib/db/plan-preview-actions.ts");
+  const prepareSource = read("src/lib/db/plan-preview-prepare.ts");
   const scheduleActions = read("src/lib/db/schedule-actions.ts");
   const scheduleBoard = read("src/components/admin/TournamentScheduleBoard.tsx");
   const previewPanel = read("src/components/admin/TournamentPlanPreviewPanel.tsx");
-  const executable = stripTsComments(previewActions);
+  const executableActions = stripTsComments(previewActions);
+  const executablePrepare = stripTsComments(prepareSource);
 
   assert(
     previewActions.includes('"use server"') || previewActions.includes("'use server'"),
@@ -621,10 +623,15 @@ function runC6CAdminPreviewStructuralChecks() {
     "C6-C preview action requires schedule.manage via requireScheduleManage",
   );
   assert(
-    previewActions.includes("buildTournamentPlanPreview") &&
-      previewActions.includes("canRegenerateGroupSchedule") &&
-      previewActions.includes('from "@/lib/schedule/plan-preview"'),
-    "C6-C preview action imports shared buildTournamentPlanPreview + canRegenerateGroupSchedule",
+    previewActions.includes("prepareTournamentPlanFromDb") &&
+      previewActions.includes('from "@/lib/db/plan-preview-prepare"'),
+    "C6-C preview action uses shared server prepare helper",
+  );
+  assert(
+    prepareSource.includes("buildTournamentPlanPreview") &&
+      prepareSource.includes("canRegenerateGroupSchedule") &&
+      prepareSource.includes('from "@/lib/schedule/plan-preview"'),
+    "shared prepare imports buildTournamentPlanPreview + canRegenerateGroupSchedule",
   );
   assert(
     !scheduleActions.includes("buildTournamentPlanPreview"),
@@ -642,48 +649,50 @@ function runC6CAdminPreviewStructuralChecks() {
     "previewTournamentPlanAction calls requireScheduleManage",
   );
   assert(
-    previewFn.includes("getAdminTournamentStage") &&
-      previewFn.includes("buildTournamentPlanPreview") &&
-      previewFn.includes("canRegenerateGroupSchedule") &&
-      previewFn.includes("buildRegenerationStageSnapshot"),
-    "previewTournamentPlanAction loads stage and calls preview + policy helpers",
+    previewFn.includes("prepareTournamentPlanFromDb"),
+    "previewTournamentPlanAction loads stage via shared prepare helper",
   );
   assert(
-    previewActions.includes("function buildRegenerationStageSnapshot") &&
-      previewActions.includes("homeScore") &&
-      previewActions.includes("awayScore") &&
-      previewActions.includes("match.phase") &&
-      previewActions.includes("match.status") &&
-      previewActions.includes("stage.groups.length") &&
-      previewActions.includes("stage.matches.map"),
-    "preview action builds regeneration snapshot from server-loaded stage matches",
-  );
-  assert(
-    previewFn.includes("berlinWallTimeToIso") && previewFn.includes("wallTimeOnDate"),
-    "preview action reuses generator timing helpers",
+    prepareSource.includes("function buildRegenerationStageSnapshot") &&
+      prepareSource.includes("getAdminTournamentStage") &&
+      prepareSource.includes("homeScore") &&
+      prepareSource.includes("awayScore") &&
+      prepareSource.includes("match.phase") &&
+      prepareSource.includes("match.status") &&
+      prepareSource.includes("stage.groups.length") &&
+      prepareSource.includes("stage.matches.map") &&
+      prepareSource.includes("berlinWallTimeToIso") &&
+      prepareSource.includes("wallTimeOnDate"),
+    "shared prepare builds regeneration snapshot and timing from server-loaded stage",
   );
   assert(
     !previewFn.includes("generateTournamentScheduleAction") &&
       !previewFn.includes("deleteTournamentScheduleAction") &&
       !previewFn.includes("generateKnockoutAction") &&
-      !previewFn.includes("deleteKnockout"),
-    "preview action must not call generate/delete/KO mutation actions",
+      !previewFn.includes("deleteKnockout") &&
+      !previewFn.includes("applyTournamentPlanAction"),
+    "preview action must not call generate/delete/KO/apply mutation actions",
   );
 
   // Zero-mutation: inspect executable tokens, not comment prose.
-  assert(!/\.insert\s*\(/.test(previewFnExec), "preview action has no .insert(");
-  assert(!/\.update\s*\(/.test(previewFnExec), "preview action has no .update(");
-  assert(!/\.upsert\s*\(/.test(previewFnExec), "preview action has no .upsert(");
-  assert(!/\.delete\s*\(/.test(previewFnExec), "preview action has no .delete(");
-  assert(!/\.rpc\s*\(/.test(previewFnExec), "preview action has no .rpc(");
+  for (const [label, exec] of [
+    ["preview action", previewFnExec],
+    ["preview actions module", executableActions],
+    ["shared prepare module", executablePrepare],
+  ] as const) {
+    assert(!/\.insert\s*\(/.test(exec), `${label} has no .insert(`);
+    assert(!/\.update\s*\(/.test(exec), `${label} has no .update(`);
+    assert(!/\.upsert\s*\(/.test(exec), `${label} has no .upsert(`);
+    assert(!/\.delete\s*\(/.test(exec), `${label} has no .delete(`);
+    assert(!/\.rpc\s*\(/.test(exec), `${label} has no .rpc(`);
+    assert(!exec.includes("revalidatePath"), `${label} has no revalidatePath`);
+  }
   assert(
-    !previewFnExec.includes("revalidatePath"),
-    "preview action has no revalidatePath",
-  );
-  assert(
-    !executable.includes("generateTournamentScheduleAction") &&
-      !executable.includes("deleteTournamentScheduleAction"),
-    "preview action module executable code does not call schedule mutation actions",
+    !executableActions.includes("generateTournamentScheduleAction") &&
+      !executableActions.includes("deleteTournamentScheduleAction") &&
+      !executablePrepare.includes("generateTournamentScheduleAction") &&
+      !executablePrepare.includes("deleteTournamentScheduleAction"),
+    "preview/prepare executable code does not call schedule mutation actions",
   );
 
   // UI: preview opens without generate; no apply/persist control.
@@ -699,16 +708,19 @@ function runC6CAdminPreviewStructuralChecks() {
     "existing generate control remains on schedule board",
   );
   assert(
-    !scheduleBoard.includes("Spielplan übernehmen") &&
-      !previewPanel.includes("Spielplan übernehmen"),
-    "C6-C must not expose preview apply/persist control",
-  );
-  assert(
-    !previewPanel.includes("generateTournamentScheduleAction") &&
+    !previewPanel.includes("applyTournamentPlanAction") &&
+      !previewPanel.includes("plan-apply-actions") &&
+      !previewPanel.includes("generateTournamentScheduleAction") &&
       !previewPanel.includes("deleteTournamentScheduleAction") &&
       !previewPanel.includes("createClient") &&
       !previewPanel.includes("from(\"@/lib/supabase"),
-    "preview panel stays presentational (no DB / generate / delete)",
+    "preview panel stays presentational (no DB / generate / delete / apply action import)",
+  );
+  assert(
+    scheduleBoard.includes("applyTournamentPlanAction") &&
+      scheduleBoard.includes("handleApplyRequest") &&
+      previewPanel.includes("Spielplan übernehmen"),
+    "D2 board owns apply orchestration; panel exposes Spielplan übernehmen",
   );
   assert(
     previewPanel.includes("Vorschau schließen") &&
@@ -720,7 +732,9 @@ function runC6CAdminPreviewStructuralChecks() {
   );
   assert(
     previewPanel.includes("SCHEDULE_NO_RESULTS") &&
-      previewPanel.includes("Neugenerierung würde diesen Spielplan ersetzen"),
+      (previewPanel.includes("Neugenerierung würde diesen Spielplan ersetzen") ||
+        (previewPanel.includes("Übernahme würde") &&
+          previewPanel.includes("Gruppenspielplan ersetzen"))),
     "preview panel surfaces SCHEDULE_NO_RESULTS replacement warning",
   );
 }
@@ -858,8 +872,10 @@ function runStructuralChecks() {
 
   assert(
     runChecksCli.includes("runPlanPreviewChecks") &&
-      runChecksCli.includes("plan-preview-checks"),
-    "C6-A/C6-B suite wired into run-checks-cli",
+      runChecksCli.includes("plan-preview-checks") &&
+      runChecksCli.includes("runPlanApplyChecks") &&
+      runChecksCli.includes("plan-apply-checks"),
+    "C6-A/C6-B/C6-C/C6-D suites wired into run-checks-cli",
   );
 
   assert(

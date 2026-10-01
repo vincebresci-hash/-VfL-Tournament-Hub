@@ -3,6 +3,7 @@
 import {
   AdminCard,
   adminCardShellClass,
+  adminPrimaryButtonClass,
   adminSecondaryButtonClass,
   adminSectionTitleClass,
 } from "@/components/admin/AdminPanel";
@@ -18,6 +19,11 @@ type TournamentPlanPreviewPanelProps = {
   teamLabels: Record<string, string>;
   fieldLabels: Record<string, string>;
   onClose: () => void;
+  canApply: boolean;
+  applyPending: boolean;
+  applyLocked: boolean;
+  statusMessage: string | null;
+  onApply: () => void;
 };
 
 function participantLabel(
@@ -71,6 +77,11 @@ export function TournamentPlanPreviewPanel({
   teamLabels,
   fieldLabels,
   onClose,
+  canApply,
+  applyPending,
+  applyLocked,
+  statusMessage,
+  onApply,
 }: TournamentPlanPreviewPanelProps) {
   const summaryItems = [
     { label: "Teilnehmer", value: String(preview.summary.participantCount) },
@@ -88,12 +99,17 @@ export function TournamentPlanPreviewPanel({
     },
   ];
 
+  const showApply = canApply && !applyLocked;
+  const hasNoFieldsWarning = preview.warnings.some((warning) => warning.code === "NO_FIELDS");
+
   return (
     <AdminCard title="Spielplan-Vorschau">
       <div className="grid gap-5">
         <p className="text-[13px] text-muted">
-          Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen. Es
-          wird nichts gespeichert und kein bestehender Spielplan verändert.
+          Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
+          {showApply
+            ? " Eine Übernahme erfolgt erst nach „Spielplan übernehmen“."
+            : " Es wird nichts gespeichert und kein bestehender Spielplan verändert."}
         </p>
 
         <div
@@ -104,17 +120,28 @@ export function TournamentPlanPreviewPanel({
           <p className="mt-1.5 text-[13px] leading-relaxed">{policy.reason}</p>
           {policy.state === "SCHEDULE_NO_RESULTS" ? (
             <p className="mt-2 text-[13px] leading-relaxed">
-              Es besteht bereits ein Spielplan ohne Ergebnisse. Eine spätere
-              Neugenerierung würde diesen Spielplan ersetzen.
+              Es besteht bereits ein Spielplan ohne Ergebnisse. Eine Übernahme würde
+              diesen Gruppenspielplan ersetzen.
             </p>
           ) : null}
           {policy.decision === "blocked" ? (
             <p className="mt-2 text-[13px] leading-relaxed">
               Die Vorschau ist nur zur Information. Der bestehende Spielplan darf in
-              diesem Zustand nicht neu generiert werden.
+              diesem Zustand nicht übernommen werden.
             </p>
           ) : null}
         </div>
+
+        {statusMessage ? (
+          <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
+            {statusMessage}
+            {applyLocked ? (
+              <span className="mt-1.5 block text-[13px] leading-relaxed">
+                Bitte die Vorschau aktualisieren und den Spielplan erneut prüfen.
+              </span>
+            ) : null}
+          </p>
+        ) : null}
 
         <section aria-labelledby="preview-summary-heading">
           <h3 id="preview-summary-heading" className={adminSectionTitleClass}>
@@ -184,13 +211,20 @@ export function TournamentPlanPreviewPanel({
                     <span className="mt-1 block">
                       Ohne gespeichertes Spielfeld kann die Vorschau keinen normalen
                       Zeitplan erzeugen. Bitte zuerst unter Spielparameter ein Feld
-                      speichern.
+                      speichern und die Vorschau aktualisieren.
                     </span>
                   ) : null}
                 </li>
               ))}
             </ul>
           </section>
+        ) : null}
+
+        {!showApply && hasNoFieldsWarning ? (
+          <p className="text-[13px] text-muted">
+            „Spielplan übernehmen“ ist erst verfügbar, wenn mindestens ein Spielfeld
+            gespeichert ist und die Vorschau Spiele enthält.
+          </p>
         ) : null}
 
         <section aria-labelledby="preview-schedule-heading">
@@ -268,7 +302,23 @@ export function TournamentPlanPreviewPanel({
         </section>
 
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={onClose} className={adminSecondaryButtonClass}>
+          {showApply ? (
+            <button
+              type="button"
+              onClick={onApply}
+              disabled={applyPending}
+              className={adminPrimaryButtonClass}
+              aria-busy={applyPending}
+            >
+              {applyPending ? "Spielplan wird übernommen…" : "Spielplan übernehmen"}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={applyPending}
+            className={adminSecondaryButtonClass}
+          >
             Vorschau schließen
           </button>
         </div>
