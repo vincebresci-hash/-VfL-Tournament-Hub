@@ -598,6 +598,133 @@ function assertPolicyBeforeDelete(fnSource: string, functionName: string) {
   );
 }
 
+/** Strip comments so structural mutation checks ignore documentation prose. */
+function stripTsComments(source: string) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1");
+}
+
+function runC6CAdminPreviewStructuralChecks() {
+  const previewActions = read("src/lib/db/plan-preview-actions.ts");
+  const scheduleActions = read("src/lib/db/schedule-actions.ts");
+  const scheduleBoard = read("src/components/admin/TournamentScheduleBoard.tsx");
+  const previewPanel = read("src/components/admin/TournamentPlanPreviewPanel.tsx");
+  const executable = stripTsComments(previewActions);
+
+  assert(
+    previewActions.includes('"use server"') || previewActions.includes("'use server'"),
+    "C6-C preview action module is a server action module",
+  );
+  assert(
+    previewActions.includes("requireScheduleManage"),
+    "C6-C preview action requires schedule.manage via requireScheduleManage",
+  );
+  assert(
+    previewActions.includes("buildTournamentPlanPreview") &&
+      previewActions.includes("canRegenerateGroupSchedule") &&
+      previewActions.includes('from "@/lib/schedule/plan-preview"'),
+    "C6-C preview action imports shared buildTournamentPlanPreview + canRegenerateGroupSchedule",
+  );
+  assert(
+    !scheduleActions.includes("buildTournamentPlanPreview"),
+    "schedule-actions still must not import buildTournamentPlanPreview",
+  );
+
+  const previewFn = extractExportedFunctionSource(
+    previewActions,
+    "previewTournamentPlanAction",
+  );
+  const previewFnExec = stripTsComments(previewFn);
+
+  assert(
+    previewFn.includes("requireScheduleManage"),
+    "previewTournamentPlanAction calls requireScheduleManage",
+  );
+  assert(
+    previewFn.includes("getAdminTournamentStage") &&
+      previewFn.includes("buildTournamentPlanPreview") &&
+      previewFn.includes("canRegenerateGroupSchedule") &&
+      previewFn.includes("buildRegenerationStageSnapshot"),
+    "previewTournamentPlanAction loads stage and calls preview + policy helpers",
+  );
+  assert(
+    previewActions.includes("function buildRegenerationStageSnapshot") &&
+      previewActions.includes("homeScore") &&
+      previewActions.includes("awayScore") &&
+      previewActions.includes("match.phase") &&
+      previewActions.includes("match.status") &&
+      previewActions.includes("stage.groups.length") &&
+      previewActions.includes("stage.matches.map"),
+    "preview action builds regeneration snapshot from server-loaded stage matches",
+  );
+  assert(
+    previewFn.includes("berlinWallTimeToIso") && previewFn.includes("wallTimeOnDate"),
+    "preview action reuses generator timing helpers",
+  );
+  assert(
+    !previewFn.includes("generateTournamentScheduleAction") &&
+      !previewFn.includes("deleteTournamentScheduleAction") &&
+      !previewFn.includes("generateKnockoutAction") &&
+      !previewFn.includes("deleteKnockout"),
+    "preview action must not call generate/delete/KO mutation actions",
+  );
+
+  // Zero-mutation: inspect executable tokens, not comment prose.
+  assert(!/\.insert\s*\(/.test(previewFnExec), "preview action has no .insert(");
+  assert(!/\.update\s*\(/.test(previewFnExec), "preview action has no .update(");
+  assert(!/\.upsert\s*\(/.test(previewFnExec), "preview action has no .upsert(");
+  assert(!/\.delete\s*\(/.test(previewFnExec), "preview action has no .delete(");
+  assert(!/\.rpc\s*\(/.test(previewFnExec), "preview action has no .rpc(");
+  assert(
+    !previewFnExec.includes("revalidatePath"),
+    "preview action has no revalidatePath",
+  );
+  assert(
+    !executable.includes("generateTournamentScheduleAction") &&
+      !executable.includes("deleteTournamentScheduleAction"),
+    "preview action module executable code does not call schedule mutation actions",
+  );
+
+  // UI: preview opens without generate; no apply/persist control.
+  assert(
+    scheduleBoard.includes("previewTournamentPlanAction") &&
+      scheduleBoard.includes("Vorschau anzeigen") &&
+      scheduleBoard.includes("TournamentPlanPreviewPanel"),
+    "schedule board wires read-only preview entry point",
+  );
+  assert(
+    scheduleBoard.includes("generateTournamentScheduleAction") &&
+      scheduleBoard.includes("Spielplan generieren"),
+    "existing generate control remains on schedule board",
+  );
+  assert(
+    !scheduleBoard.includes("Spielplan übernehmen") &&
+      !previewPanel.includes("Spielplan übernehmen"),
+    "C6-C must not expose preview apply/persist control",
+  );
+  assert(
+    !previewPanel.includes("generateTournamentScheduleAction") &&
+      !previewPanel.includes("deleteTournamentScheduleAction") &&
+      !previewPanel.includes("createClient") &&
+      !previewPanel.includes("from(\"@/lib/supabase"),
+    "preview panel stays presentational (no DB / generate / delete)",
+  );
+  assert(
+    previewPanel.includes("Vorschau schließen") &&
+      previewPanel.includes("Zusammenfassung") &&
+      previewPanel.includes("Gruppen") &&
+      previewPanel.includes("Geplante Spiele") &&
+      previewPanel.includes("overflow-x-auto"),
+    "preview panel exposes summary/groups/schedule with mobile overflow",
+  );
+  assert(
+    previewPanel.includes("SCHEDULE_NO_RESULTS") &&
+      previewPanel.includes("Neugenerierung würde diesen Spielplan ersetzen"),
+    "preview panel surfaces SCHEDULE_NO_RESULTS replacement warning",
+  );
+}
+
 function runStructuralChecks() {
   const previewSource = read("src/lib/schedule/plan-preview.ts");
   const checksSource = read("src/lib/schedule/plan-preview-checks.ts");
@@ -748,10 +875,13 @@ function runStructuralChecks() {
       !previewSource.includes("if (match.awayScore)"),
     "score-present hardening uses explicit null checks",
   );
+
+  // C6-C Admin read-only preview boundary.
+  runC6CAdminPreviewStructuralChecks();
 }
 
 /**
- * C6-A plan/preview foundation + C6-B regeneration-safety checks.
+ * C6-A plan/preview foundation + C6-B regeneration-safety + C6-C Admin preview checks.
  * Unit policy coverage + structural control-flow freeze (no live DB).
  */
 export function runPlanPreviewChecks() {
