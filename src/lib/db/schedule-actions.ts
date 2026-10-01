@@ -15,16 +15,12 @@ import { distributeTeams } from "@/lib/schedule/distribute";
 import { fieldDisplayName, groupDisplayName } from "@/lib/schedule/names";
 import {
   canRegenerateGroupSchedule,
+  type RegenerationPolicyResult,
   type RegenerationStageSnapshot,
 } from "@/lib/schedule/plan-preview";
-import {
-  expectedGroupMatchCount,
-  hasSelfPlay,
-  interleaveGroupFixtures,
-  roundRobinFixtures,
-} from "@/lib/schedule/round-robin";
-import { buildTimetable } from "@/lib/schedule/timetable";
-import { berlinWallTimeToIso, datetimeLocalToIso, normalizeClock, wallTimeOnDate } from "@/lib/schedule/datetime";
+import { datetimeLocalToIso } from "@/lib/schedule/datetime";
+import { prepareTournamentPlanFromDb } from "@/lib/db/plan-preview-prepare";
+import { persistPreparedGroupSchedule } from "@/lib/db/plan-schedule-persist";
 import { MATCH_STATUSES, type MatchStatus } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -541,146 +537,87 @@ export async function saveScheduleSettingsAction(
   return { error: null };
 }
 
+export type GenerateTournamentScheduleStatus =
+  | "success"
+  | "confirmation_required"
+  | "blocked"
+  | "validation_error"
+  | "persistence_error";
+
+export type GenerateTournamentScheduleActionResult = {
+  status: GenerateTournamentScheduleStatus;
+  error: string | null;
+  notice: string | null;
+  policy: RegenerationPolicyResult | null;
+  fingerprint: string | null;
+};
+
+/**
+ * C6-E D1: Legacy generate routed through prepare + shared persist core.
+ * Client may send tournamentId + optional confirmReplace only.
+ * No fingerprint; no silent default-field creation.
+ */
 export async function generateTournamentScheduleAction(
   tournamentId: string,
-): Promise<{ error: string | null; notice: string | null }> {
+  confirmReplace?: boolean,
+): Promise<GenerateTournamentScheduleActionResult> {
   const access = await requireScheduleManage();
   if (access.error) {
-    return { error: access.error, notice: null };
-  }
-
-  const loaded = await loadTournament(tournamentId);
-  if (!loaded.tournament) {
-    return { error: loaded.error, notice: null };
-  }
-
-  let stage = await getAdminTournamentStage(tournamentId);
-  const populatedGroups = stage.groups.filter(
-    (group) => (stage.memberIdsByGroupId[group.id] ?? []).length >= 2,
-  );
-
-  if (populatedGroups.length === 0) {
     return {
-      error: "Bitte zuerst Gruppen mit mindestens zwei Teams anlegen.",
+      status: "validation_error",
+      error: access.error,
       notice: null,
+      policy: null,
+      fingerprint: null,
     };
   }
 
-  const supabase = await createClient();
-
-  if (stage.fields.length === 0) {
-    const { error } = await supabase.from("tournament_fields").insert({
-      tournament_id: tournamentId,
-      name: fieldDisplayName(0),
-      sort_order: 0,
-    });
-    if (error) {
-      return { error: constraintMessage(error, "Es konnte kein Spielfeld angelegt werden."), notice: null };
-    }
-    stage = await getAdminTournamentStage(tournamentId);
+  const id = tournamentId.trim();
+  if (!id) {
+    return {
+      status: "validation_error",
+      error: "Turnier-ID fehlt.",
+      notice: null,
+      policy: null,
+      fingerprint: null,
+    };
   }
 
-  const fixtures = interleaveGroupFixtures(
-    populatedGroups.map((group) => {
-      const teamIds = stage.memberIdsByGroupId[group.id] ?? [];
-      return roundRobinFixtures(teamIds).map((fixture) => ({
-        ...fixture,
-        groupId: group.id,
-      }));
-    }),
-  );
-
-  if (hasSelfPlay(fixtures)) {
-    return { error: "Der Spielplan enthielt eine ungültige Begegnung gegen sich selbst.", notice: null };
+  // Server-authoritative prepare (same planner as Preview/Apply; knockout:null).
+  const prepared = await prepareTournamentPlanFromDb(id);
+  if (
+    prepared.error ||
+    !prepared.tournament ||
+    !prepared.stage ||
+    !prepared.preview ||
+    !prepared.policy
+  ) {
+    return {
+      status: "validation_error",
+      error: prepared.error ?? "Der Spielplan konnte nicht vorbereitet werden.",
+      notice: null,
+      policy: prepared.policy,
+      fingerprint: prepared.preview?.inputFingerprint ?? null,
+    };
   }
 
-  const expected = populatedGroups.reduce(
-    (sum, group) => sum + expectedGroupMatchCount((stage.memberIdsByGroupId[group.id] ?? []).length),
-    0,
-  );
-  if (fixtures.length !== expected) {
-    return { error: "Die Anzahl der Gruppenspiele stimmt nicht mit der Round-Robin-Vorgabe überein.", notice: null };
-  }
-
-  const startTime = normalizeClock(loaded.tournament.start_time, "09:00");
-  const start = new Date(berlinWallTimeToIso(loaded.tournament.date, startTime));
-  const lunchStart = wallTimeOnDate(loaded.tournament.date, loaded.tournament.lunch_break_start);
-  const lunchEnd = wallTimeOnDate(loaded.tournament.date, loaded.tournament.lunch_break_end);
-
-  const timetable = buildTimetable(fixtures, stage.fields, {
-    start,
-    durationMinutes: loaded.tournament.match_duration_minutes ?? 12,
-    breakMinutes: loaded.tournament.break_minutes ?? 3,
-    minimumRestMinutes: loaded.tournament.minimum_rest_minutes ?? 15,
-    lunchStart,
-    lunchEnd,
+  const persisted = await persistPreparedGroupSchedule({
+    tournamentId: id,
+    tournament: prepared.tournament,
+    stage: prepared.stage,
+    preview: prepared.preview,
+    policy: prepared.policy,
+    confirmReplace,
+    successNotice: (count) => `${count} Gruppenspiele erzeugt.`,
   });
 
-  if (timetable.matches.length === 0) {
-    return {
-      error: timetable.warnings[0] ?? "Der Spielplan konnte nicht erzeugt werden.",
-      notice: null,
-    };
-  }
-
-  // C6-B: shared regeneration policy must run before destructive group DELETE.
-  // Residual TOCTOU (concurrent result/live write after this read) is accepted for C6-B.
-  const blockedGenerate = blockedGroupScheduleMutationError(
-    loaded.tournament.status,
-    stage,
-  );
-  if (blockedGenerate) {
-    return { error: blockedGenerate, notice: null };
-  }
-
-  const { error: deleteError } = await supabase
-    .from("tournament_matches")
-    .delete()
-    .eq("tournament_id", tournamentId)
-    .eq("phase", "group");
-
-  if (deleteError) {
-    return { error: constraintMessage(deleteError, "Der bestehende Spielplan konnte nicht ersetzt werden."), notice: null };
-  }
-
-  const participants = await loadConfirmedScheduleParticipants(tournamentId);
-  const rows = [];
-  for (const match of timetable.matches) {
-    const homeRef = resolveScheduleParticipantRef(match.homeId, participants);
-    const awayRef = resolveScheduleParticipantRef(match.awayId, participants);
-    if (!homeRef || !awayRef) {
-      return {
-        error: "Ein Spielplan-Team konnte keinem bestätigten Teilnehmer zugeordnet werden.",
-        notice: null,
-      };
-    }
-
-    rows.push({
-      tournament_id: tournamentId,
-      group_id: match.groupId,
-      field_id: match.fieldId,
-      ...matchSideDbColumns("home", homeRef),
-      ...matchSideDbColumns("away", awayRef),
-      scheduled_at: match.scheduledAt.toISOString(),
-      duration_minutes: match.durationMinutes,
-      status: "scheduled" as const,
-      phase: "group" as const,
-      sort_order: match.sortOrder,
-    });
-  }
-
-  const { error: insertError } = await supabase.from("tournament_matches").insert(rows);
-
-  if (insertError) {
-    return { error: constraintMessage(insertError, "Der Spielplan konnte nicht gespeichert werden."), notice: null };
-  }
-
-  revalidateStage(loaded.tournament);
-  const notice = [
-    `${timetable.matches.length} Gruppenspiele erzeugt.`,
-    ...timetable.warnings,
-  ].join(" ");
-  return { error: null, notice };
+  return {
+    status: persisted.status,
+    error: persisted.error,
+    notice: persisted.notice,
+    policy: persisted.policy,
+    fingerprint: persisted.fingerprint,
+  };
 }
 
 export async function saveTournamentMatchAction(
