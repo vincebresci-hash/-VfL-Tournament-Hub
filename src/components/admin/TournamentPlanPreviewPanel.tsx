@@ -106,10 +106,13 @@ export function TournamentPlanPreviewPanel({
     <AdminCard title="Spielplan-Vorschau">
       <div className="grid gap-5">
         <p className="text-[13px] text-muted">
-          Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
+          Die Vorschau ändert noch keinen gespeicherten Spielplan.
           {showApply
             ? " Eine Übernahme erfolgt erst nach „Spielplan übernehmen“."
-            : " Es wird nichts gespeichert und kein bestehender Spielplan verändert."}
+            : null}
+        </p>
+        <p className="text-[13px] text-muted">
+          Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
         </p>
 
         <div

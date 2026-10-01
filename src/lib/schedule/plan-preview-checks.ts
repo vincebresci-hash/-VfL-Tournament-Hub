@@ -698,14 +698,15 @@ function runC6CAdminPreviewStructuralChecks() {
   // UI: preview opens without generate; no apply/persist control.
   assert(
     scheduleBoard.includes("previewTournamentPlanAction") &&
-      scheduleBoard.includes("Vorschau anzeigen") &&
+      scheduleBoard.includes("Vorschau erstellen") &&
       scheduleBoard.includes("TournamentPlanPreviewPanel"),
     "schedule board wires read-only preview entry point",
   );
   assert(
     scheduleBoard.includes("generateTournamentScheduleAction") &&
-      scheduleBoard.includes("Spielplan generieren"),
-    "existing generate control remains on schedule board",
+      scheduleBoard.includes("Direkt generieren") &&
+      !scheduleBoard.includes("Spielplan generieren"),
+    "direct generate control remains on schedule board (demoted label)",
   );
   assert(
     !previewPanel.includes("applyTournamentPlanAction") &&
