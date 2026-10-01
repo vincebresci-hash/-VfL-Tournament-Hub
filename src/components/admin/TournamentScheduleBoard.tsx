@@ -11,6 +11,7 @@ import {
 } from "@/components/admin/AdminPanel";
 import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
+import { applyTournamentPlanAction } from "@/lib/db/plan-apply-actions";
 import { previewTournamentPlanAction } from "@/lib/db/plan-preview-actions";
 import {
   deleteTournamentMatchAction,
@@ -28,6 +29,19 @@ import type {
 } from "@/lib/schedule/plan-preview";
 import { MATCH_STATUSES, type MatchStatus, type TournamentFieldRecord, type TournamentGroupRecord, type TournamentMatchRecord } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
+
+function previewIsApplicable(preview: TournamentPlanPreview, policy: RegenerationPolicyResult) {
+  if (policy.decision !== "allowed" && policy.decision !== "allowedWithConfirmation") {
+    return false;
+  }
+  if (preview.summary.fieldCount <= 0 || preview.matches.length <= 0) {
+    return false;
+  }
+  if (preview.warnings.some((warning) => warning.code === "NO_FIELDS")) {
+    return false;
+  }
+  return true;
+}
 
 const statusLabel: Record<MatchStatus, string> = {
   scheduled: "Geplant",
@@ -67,6 +81,7 @@ export function TournamentScheduleBoard({
     fields.length > 0 ? fields.map((field) => field.name) : [fieldDisplayName(0)],
   );
   const [confirmGenerate, setConfirmGenerate] = useState(false);
+  const [confirmApplyReplace, setConfirmApplyReplace] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [deleteMatchId, setDeleteMatchId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -74,12 +89,38 @@ export function TournamentScheduleBoard({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [preview, setPreview] = useState<TournamentPlanPreview | null>(null);
   const [previewPolicy, setPreviewPolicy] = useState<RegenerationPolicyResult | null>(null);
+  const [previewApplyLocked, setPreviewApplyLocked] = useState(false);
+  const [previewStatusMessage, setPreviewStatusMessage] = useState<string | null>(null);
+
+  function clearPreviewState() {
+    setPreviewOpen(false);
+    setPreviewError(null);
+    setPreview(null);
+    setPreviewPolicy(null);
+    setPreviewApplyLocked(false);
+    setPreviewStatusMessage(null);
+    setConfirmApplyReplace(false);
+  }
+
+  function invalidateOpenPreview() {
+    // After generate/delete/other schedule mutations, an open preview must not remain applicable.
+    setPreview(null);
+    setPreviewPolicy(null);
+    setPreviewError(null);
+    setPreviewApplyLocked(false);
+    setPreviewStatusMessage(null);
+    setConfirmApplyReplace(false);
+    setPreviewOpen(false);
+  }
 
   async function handlePreview() {
     setPreviewLoading(true);
     setPreviewError(null);
     setError(null);
     setNotice(null);
+    setPreviewApplyLocked(false);
+    setPreviewStatusMessage(null);
+    setConfirmApplyReplace(false);
     const result = await previewTournamentPlanAction(tournament.id);
     setPreviewLoading(false);
     if (result.error) {
@@ -95,8 +136,10 @@ export function TournamentScheduleBoard({
   }
 
   function closePreview() {
-    setPreviewOpen(false);
-    setPreviewError(null);
+    if (pending) {
+      return;
+    }
+    clearPreviewState();
   }
 
   async function run(task: () => Promise<{ error: string | null; notice?: string | null }>) {
@@ -112,8 +155,89 @@ export function TournamentScheduleBoard({
     if (result.notice) {
       setNotice(result.notice);
     }
+    invalidateOpenPreview();
     router.refresh();
     return true;
+  }
+
+  async function executeApply(confirmReplace: boolean) {
+    if (!preview) {
+      return;
+    }
+    const fingerprint = preview.inputFingerprint;
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    setPreviewStatusMessage(null);
+    const result = await applyTournamentPlanAction(
+      tournament.id,
+      fingerprint,
+      confirmReplace,
+    );
+    setPending(false);
+
+    if (result.status === "success") {
+      setNotice("Der Spielplan wurde erfolgreich übernommen.");
+      clearPreviewState();
+      router.refresh();
+      return;
+    }
+
+    if (result.status === "stale_preview") {
+      const message =
+        result.error ??
+        "Die Turnierdaten haben sich seit der Vorschau geändert. Bitte aktualisiere die Vorschau und prüfe den Spielplan erneut.";
+      setPreviewApplyLocked(true);
+      setPreviewStatusMessage(message);
+      setError(message);
+      return;
+    }
+
+    if (result.status === "confirmation_required") {
+      setError(
+        result.error ??
+          "Es besteht bereits ein Spielplan ohne Ergebnisse. Bitte bestätige ausdrücklich, dass er ersetzt werden soll.",
+      );
+      return;
+    }
+
+    if (result.status === "blocked") {
+      const message = result.error ?? "Der Spielplan darf in diesem Zustand nicht übernommen werden.";
+      setPreviewApplyLocked(true);
+      setPreviewStatusMessage(message);
+      setError(message);
+      return;
+    }
+
+    if (result.status === "persistence_error") {
+      const message =
+        result.error ??
+        "Der Spielplan konnte nicht vollständig übernommen werden. Bitte lade den aktuellen Stand neu und prüfe den Spielplan.";
+      setError(message);
+      setPreviewApplyLocked(true);
+      setPreviewStatusMessage(message);
+      router.refresh();
+      return;
+    }
+
+    // validation_error and any unexpected status
+    setError(result.error ?? "Der Spielplan konnte nicht übernommen werden.");
+  }
+
+  function handleApplyRequest() {
+    if (!preview || !previewPolicy || previewApplyLocked || pending) {
+      return;
+    }
+    if (!previewIsApplicable(preview, previewPolicy)) {
+      return;
+    }
+    if (previewPolicy.decision === "allowedWithConfirmation") {
+      setConfirmApplyReplace(true);
+      return;
+    }
+    if (previewPolicy.decision === "allowed") {
+      void executeApply(false);
+    }
   }
 
   async function handleSettings(event: FormEvent<HTMLFormElement>) {
@@ -231,7 +355,11 @@ export function TournamentScheduleBoard({
             className={adminSecondaryButtonClass}
             aria-busy={previewLoading}
           >
-            {previewLoading ? "Vorschau wird geladen…" : "Vorschau anzeigen"}
+            {previewLoading
+              ? "Vorschau wird geladen…"
+              : previewOpen
+                ? "Vorschau aktualisieren"
+                : "Vorschau anzeigen"}
           </button>
           <button
             type="button"
@@ -267,6 +395,7 @@ export function TournamentScheduleBoard({
             <button
               type="button"
               onClick={closePreview}
+              disabled={pending}
               className={`${adminSecondaryButtonClass} mt-4`}
             >
               Vorschau schließen
@@ -279,6 +408,11 @@ export function TournamentScheduleBoard({
             teamLabels={teamLabels}
             fieldLabels={Object.fromEntries(fields.map((field) => [field.id, field.name]))}
             onClose={closePreview}
+            canApply={previewIsApplicable(preview, previewPolicy)}
+            applyPending={pending}
+            applyLocked={previewApplyLocked}
+            statusMessage={previewStatusMessage}
+            onApply={handleApplyRequest}
           />
         )
       ) : null}
@@ -326,6 +460,23 @@ export function TournamentScheduleBoard({
           void run(() => generateTournamentScheduleAction(tournament.id));
         }}
       />
+      <ConfirmModal
+        open={confirmApplyReplace}
+        title="Bestehenden Spielplan ersetzen?"
+        confirmLabel="Spielplan ersetzen"
+        cancelLabel="Abbrechen"
+        onCancel={() => setConfirmApplyReplace(false)}
+        onConfirm={() => {
+          setConfirmApplyReplace(false);
+          void executeApply(true);
+        }}
+      >
+        <p className="text-[14px] leading-relaxed text-muted">
+          Der vorhandene Spielplan enthält noch keine Ergebnisse. Wenn du fortfährst,
+          wird der bestehende Gruppenspielplan durch die aktuell geprüfte Vorschau
+          ersetzt.
+        </p>
+      </ConfirmModal>
       <ConfirmModal
         open={confirmClear}
         title="Gesamten Gruppenspielplan löschen?"
