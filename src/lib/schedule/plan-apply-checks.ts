@@ -172,6 +172,7 @@ function runApplyPolicyUnitChecks() {
 
 function runApplyStructuralChecks() {
   const applySource = read("src/lib/db/plan-apply-actions.ts");
+  const persistSource = read("src/lib/db/plan-schedule-persist.ts");
   const prepareSource = read("src/lib/db/plan-preview-prepare.ts");
   const previewActions = read("src/lib/db/plan-preview-actions.ts");
   const scheduleActions = read("src/lib/db/schedule-actions.ts");
@@ -189,26 +190,29 @@ function runApplyStructuralChecks() {
     applySource.includes("requireScheduleManage"),
     "apply requires schedule.manage",
   );
+  const persistModuleExec = stripTsComments(persistSource);
+  assert(
+    !/^\s*["']use server["']\s*;/m.test(persistModuleExec) &&
+      !persistModuleExec.includes('"use server"') &&
+      !persistModuleExec.includes("'use server'"),
+    "shared persist core is not a public use-server entrypoint",
+  );
 
   const applyFn = extractExportedFunctionSource(applySource, "applyTournamentPlanAction");
-  const applyExec = stripTsComments(applyFn);
   const applyModuleExec = stripTsComments(applySource);
+  const persistFn = extractExportedFunctionSource(persistSource, "persistPreparedGroupSchedule");
+  const persistExec = stripTsComments(persistFn);
+  const generateFn = extractExportedFunctionSource(
+    scheduleActions,
+    "generateTournamentScheduleAction",
+  );
+  const generateExec = stripTsComments(generateFn);
 
   assert(
     applyFn.includes("tournamentId") &&
       applyFn.includes("previewFingerprint") &&
       applyFn.includes("confirmReplace"),
     "apply signature is tournamentId + previewFingerprint + confirmReplace?",
-  );
-  assert(
-    !applyFn.includes("groups:") &&
-      !applyFn.includes("memberships") &&
-      !applyFn.includes("matches:") &&
-      !applyFn.includes("scheduleRows") &&
-      !applyFn.includes("homeScore") &&
-      !applyFn.includes("awayScore") &&
-      !applyFn.includes("policy:"),
-    "apply does not accept client schedule/policy payloads as parameters",
   );
   // Parameter list only — confirm by inspecting the function header before body.
   const header = applySource.slice(
@@ -230,41 +234,109 @@ function runApplyStructuralChecks() {
     "apply recomputes via shared server prepare",
   );
   assert(
+    applyFn.includes("persistPreparedGroupSchedule"),
+    "Apply calls persistPreparedGroupSchedule",
+  );
+  assert(
     applyFn.includes("inputFingerprint") &&
       applyFn.includes("stale_preview") &&
       applyFn.includes("currentFingerprint !== clientFingerprint"),
     "fingerprint mismatch returns stale_preview",
   );
 
-  // Gate order: fingerprint before blocked before confirmation before zero-field before delete.
+  // Apply: fingerprint before shared core call.
   const fpIdx = applyFn.indexOf("stale_preview");
-  const blockedIdx = applyFn.indexOf('policy.decision === "blocked"');
-  const confirmIdx = applyFn.indexOf("confirmation_required");
-  const zeroFieldIdx = applyFn.indexOf("stage.fields.length === 0");
-  const emptyMatchesIdx = applyFn.indexOf("preview.matches.length === 0");
-  const deleteIdx = applyExec.search(/\.delete\s*\(/);
-  assert(fpIdx >= 0 && blockedIdx > fpIdx, "fingerprint gate before blocked gate");
-  assert(confirmIdx > blockedIdx, "blocked gate before confirmation gate");
-  assert(zeroFieldIdx > confirmIdx, "confirmation gate before zero-field gate");
-  assert(emptyMatchesIdx > zeroFieldIdx, "zero-field gate before empty-timetable gate");
-  assert(deleteIdx > emptyMatchesIdx, "all validation gates before DELETE");
+  const persistCallIdx = applyFn.indexOf("persistPreparedGroupSchedule");
+  assert(fpIdx >= 0 && persistCallIdx > fpIdx, "Apply fingerprint comparison before persist core");
+
+  // Shared core gate order: blocked → confirmation → zero-field → empty matches → map → delete.
+  const blockedIdx = persistFn.indexOf('policy.decision === "blocked"');
+  const confirmIdx = persistFn.indexOf("confirmation_required");
+  const zeroFieldIdx = persistFn.indexOf("stage.fields.length === 0");
+  const emptyMatchesIdx = persistFn.indexOf("preview.matches.length === 0");
+  const participantsIdx = persistFn.indexOf("getTournamentParticipants");
+  const resolveIdx = persistFn.indexOf("resolveScheduleParticipantRef");
+  const deleteIdx = persistExec.search(/\.delete\s*\(/);
+  assert(blockedIdx >= 0 && confirmIdx > blockedIdx, "shared core: blocked before confirmation");
+  assert(zeroFieldIdx > confirmIdx, "shared core: confirmation before zero-field");
+  assert(emptyMatchesIdx > zeroFieldIdx, "shared core: zero-field before empty-timetable");
+  assert(participantsIdx > emptyMatchesIdx, "shared core: participants after empty-timetable gate");
+  assert(resolveIdx > participantsIdx, "shared core: resolve after participant load");
+  assert(deleteIdx > resolveIdx, "shared core: participant mapping before DELETE");
+  assert(deleteIdx > emptyMatchesIdx, "shared core: all validation gates before DELETE");
 
   assert(
-    applyFn.includes('allowedWithConfirmation') &&
-      applyFn.includes("confirmReplace !== true"),
-    "SCHEDULE_NO_RESULTS without confirmReplace is confirmation_required",
+    persistFn.includes('allowedWithConfirmation') &&
+      persistFn.includes("confirmReplace !== true"),
+    "shared core requires confirmation for allowedWithConfirmation",
   );
   assert(
-    applyFn.includes('status: "blocked"') || applyFn.includes('"blocked"'),
-    "blocked policy returns blocked",
+    persistFn.includes("stage.fields.length === 0") &&
+      persistFn.includes("validation_error") &&
+      persistFn.includes("Bitte zuerst mindestens ein Spielfeld anlegen und speichern.") &&
+      !persistFn.includes("fieldDisplayName") &&
+      !persistExec.includes("tournament_fields"),
+    "shared core zero fields → validation_error; no default field insert",
   );
   assert(
-    applyFn.includes("stage.fields.length === 0") &&
-      applyFn.includes("validation_error") &&
-      !applyFn.includes("fieldDisplayName") &&
-      !applyModuleExec.includes('name: fieldDisplayName'),
-    "zero fields → validation_error; apply does not auto-create field",
+    persistFn.includes("preview.matches") &&
+      persistFn.includes("previewParticipantKey") &&
+      persistFn.includes("resolveScheduleParticipantRef") &&
+      persistFn.includes('phase: "group"'),
+    "shared core persists server-recomputed preview.matches",
   );
+
+  const deleteSlice = persistExec.slice(deleteIdx, deleteIdx + 220);
+  assert(
+    deleteSlice.includes('eq("tournament_id"') &&
+      deleteSlice.includes('eq("phase", "group")'),
+    "DELETE scope is tournament + phase=group only",
+  );
+  assert(
+    !persistFn.includes("generateKnockoutAction") &&
+      !persistFn.includes("deleteKnockout") &&
+      !persistFn.includes("syncMeinTurnierplan") &&
+      !persistFn.includes("mein-turnierplan-sync") &&
+      !persistSource.includes("knockout-actions") &&
+      !persistSource.includes("mein-turnierplan"),
+    "shared core has no KO/MTP mutation imports",
+  );
+
+  // Generate routes through prepare + shared core.
+  assert(
+    generateFn.includes("prepareTournamentPlanFromDb"),
+    "Generate uses prepareTournamentPlanFromDb",
+  );
+  assert(
+    generateFn.includes("persistPreparedGroupSchedule"),
+    "Generate calls persistPreparedGroupSchedule",
+  );
+  assert(
+    generateFn.includes("confirmReplace"),
+    "Generate accepts confirmReplace",
+  );
+  assert(
+    !generateExec.includes("fieldDisplayName") &&
+      !generateExec.includes("tournament_fields") &&
+      !generateExec.includes("roundRobinFixtures") &&
+      !generateExec.includes("buildTimetable"),
+    "Generate no longer has default-field insert or inline planner",
+  );
+  assert(
+    !/\.delete\s*\(/.test(generateExec),
+    "Generate has no direct DELETE; persistence is in shared core",
+  );
+  assert(
+    !scheduleActions.includes("applyTournamentPlanAction"),
+    "schedule-actions does NOT call applyTournamentPlanAction",
+  );
+  // C6-E: schedule-actions may import prepare + persist core (obsolete freeze revised).
+  assert(
+    scheduleActions.includes("prepareTournamentPlanFromDb") &&
+      scheduleActions.includes("persistPreparedGroupSchedule"),
+    "schedule-actions may import prepare + persist core for Generate",
+  );
+
   assert(
     !applyFn.includes("generateTournamentScheduleAction") &&
       !applyModuleExec.includes("generateTournamentScheduleAction"),
@@ -272,31 +344,11 @@ function runApplyStructuralChecks() {
   );
 
   assert(
-    applyFn.includes("preview.matches") &&
-      applyFn.includes("resolveScheduleParticipantRef") &&
-      applyFn.includes('phase: "group"'),
-    "persistence source is server-recomputed preview.matches",
-  );
-
-  const deleteSlice = applyExec.slice(deleteIdx, deleteIdx + 220);
-  assert(
-    deleteSlice.includes('eq("tournament_id"') &&
-      deleteSlice.includes('eq("phase", "group")'),
-    "DELETE scope is tournament + phase=group only",
-  );
-  assert(
-    !applyFn.includes("generateKnockoutAction") &&
-      !applyFn.includes("deleteKnockout") &&
-      !applyFn.includes("syncMeinTurnierplan") &&
-      !applyFn.includes("mein-turnierplan-sync"),
-    "apply has no KO/MTP mutation calls",
-  );
-
-  assert(
     prepareSource.includes("prepareTournamentPlanFromDb") &&
       prepareSource.includes("buildTournamentPlanPreview") &&
-      prepareSource.includes("canRegenerateGroupSchedule"),
-    "shared prepare recomputes preview + C6-B policy",
+      prepareSource.includes("canRegenerateGroupSchedule") &&
+      prepareSource.includes("knockout: null"),
+    "shared prepare recomputes preview + C6-B policy with knockout:null",
   );
   const prepareExec = stripTsComments(prepareSource);
   assert(!/\.insert\s*\(/.test(prepareExec), "prepare has no insert");
@@ -312,38 +364,54 @@ function runApplyStructuralChecks() {
   assert(!/\.insert\s*\(/.test(previewExec), "C6-C preview remains zero mutation (no insert)");
   assert(!/\.delete\s*\(/.test(previewExec), "C6-C preview remains zero mutation (no delete)");
   runD2ApplyUiStructuralChecks(scheduleBoard, previewPanel);
+  runC6EGenerateBoardStructuralChecks(scheduleBoard);
 
-  // Existing generate remains C6-B protected; schedule-actions unchanged for apply extract.
   assert(
     scheduleActions.includes("canRegenerateGroupSchedule") &&
       scheduleActions.includes("blockedGroupScheduleMutationError"),
-    "existing generate/delete remain C6-B protected",
-  );
-  assert(
-    !scheduleActions.includes("applyTournamentPlanAction") &&
-      !scheduleActions.includes("prepareTournamentPlanFromDb"),
-    "schedule-actions not coupled to C6-D apply module",
+    "delete schedule path remains C6-B protected via blocked helper",
   );
   assert(
     !knockoutActions.includes("applyTournamentPlanAction") &&
-      !syncActions.includes("applyTournamentPlanAction"),
-    "KO/MTP modules unwired to apply",
+      !syncActions.includes("applyTournamentPlanAction") &&
+      !knockoutActions.includes("persistPreparedGroupSchedule") &&
+      !syncActions.includes("persistPreparedGroupSchedule"),
+    "KO/MTP modules unwired to apply/persist",
   );
 
   assert(
     runChecksCli.includes("runPlanApplyChecks") &&
       runChecksCli.includes("plan-apply-checks"),
-    "C6-D apply suite wired into run-checks-cli",
+    "C6-D/E apply suite wired into run-checks-cli",
   );
 
   assert(
     applySource.includes("stale_preview") &&
-      applySource.includes("confirmation_required") &&
-      applySource.includes("blocked") &&
-      applySource.includes("validation_error") &&
-      applySource.includes("persistence_error") &&
-      applySource.includes("success"),
-    "apply result statuses are discriminated",
+      persistSource.includes("confirmation_required") &&
+      persistSource.includes("blocked") &&
+      persistSource.includes("validation_error") &&
+      persistSource.includes("persistence_error") &&
+      persistSource.includes("success"),
+    "apply/persist result statuses are discriminated",
+  );
+}
+
+function runC6EGenerateBoardStructuralChecks(scheduleBoard: string) {
+  assert(
+    scheduleBoard.includes("executeGenerate") &&
+      scheduleBoard.includes("generateTournamentScheduleAction"),
+    "Board wires typed Generate executor",
+  );
+  assert(
+    scheduleBoard.includes("executeGenerate(true)") &&
+      scheduleBoard.includes("executeGenerate(false)"),
+    "Board confirmed Generate passes true; non-replace path passes false",
+  );
+  const generateCall = scheduleBoard.match(/generateTournamentScheduleAction\([\s\S]*?\);/);
+  assert(generateCall != null, "generateTournamentScheduleAction call present");
+  assert(
+    generateCall[0].includes("tournament.id") && generateCall[0].includes("confirmReplace"),
+    "generate call uses tournament id + confirmReplace",
   );
 }
 

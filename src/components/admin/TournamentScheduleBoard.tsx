@@ -224,6 +224,47 @@ export function TournamentScheduleBoard({
     setError(result.error ?? "Der Spielplan konnte nicht übernommen werden.");
   }
 
+  async function executeGenerate(confirmReplace: boolean) {
+    setPending(true);
+    setError(null);
+    setNotice(null);
+    const result = await generateTournamentScheduleAction(tournament.id, confirmReplace);
+    setPending(false);
+
+    if (result.status === "success") {
+      if (result.notice) {
+        setNotice(result.notice);
+      }
+      invalidateOpenPreview();
+      router.refresh();
+      return;
+    }
+
+    if (result.status === "confirmation_required") {
+      setError(
+        result.error ??
+          "Es besteht bereits ein Spielplan ohne Ergebnisse. Bitte bestätige ausdrücklich, dass er ersetzt werden soll.",
+      );
+      return;
+    }
+
+    if (result.status === "blocked") {
+      setError(result.error ?? "Der Spielplan darf in diesem Zustand nicht erzeugt werden.");
+      return;
+    }
+
+    if (result.status === "persistence_error") {
+      setError(
+        result.error ??
+          "Der Spielplan konnte nicht vollständig gespeichert werden. Bitte lade den aktuellen Stand neu und prüfe den Spielplan.",
+      );
+      router.refresh();
+      return;
+    }
+
+    setError(result.error ?? "Der Spielplan konnte nicht erzeugt werden.");
+  }
+
   function handleApplyRequest() {
     if (!preview || !previewPolicy || previewApplyLocked || pending) {
       return;
@@ -364,7 +405,11 @@ export function TournamentScheduleBoard({
           <button
             type="button"
             disabled={pending || previewLoading}
-            onClick={() => (groupMatches.length > 0 ? setConfirmGenerate(true) : void run(() => generateTournamentScheduleAction(tournament.id)))}
+            onClick={() =>
+              groupMatches.length > 0
+                ? setConfirmGenerate(true)
+                : void executeGenerate(false)
+            }
             className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase disabled:opacity-60"
           >
             Spielplan generieren
@@ -457,7 +502,7 @@ export function TournamentScheduleBoard({
         onCancel={() => setConfirmGenerate(false)}
         onConfirm={() => {
           setConfirmGenerate(false);
-          void run(() => generateTournamentScheduleAction(tournament.id));
+          void executeGenerate(true);
         }}
       />
       <ConfirmModal

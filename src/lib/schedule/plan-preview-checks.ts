@@ -835,7 +835,18 @@ function runStructuralChecks() {
     scheduleActions,
     "deleteTournamentScheduleAction",
   );
-  assertPolicyBeforeDelete(generateFn, "generateTournamentScheduleAction");
+  // C6-E D1: Generate routes through prepare + shared persist core (policy inside core).
+  assert(
+    generateFn.includes("prepareTournamentPlanFromDb") &&
+      generateFn.includes("persistPreparedGroupSchedule") &&
+      generateFn.includes("confirmReplace"),
+    "generateTournamentScheduleAction uses prepare + shared persist + confirmReplace",
+  );
+  assert(
+    !stripTsComments(generateFn).includes("fieldDisplayName") &&
+      !stripTsComments(generateFn).includes("tournament_fields"),
+    "generate no longer auto-creates tournament_fields",
+  );
   assertPolicyBeforeDelete(deleteFn, "deleteTournamentScheduleAction");
   assert(
     deleteFn.includes("getAdminTournamentStage"),
