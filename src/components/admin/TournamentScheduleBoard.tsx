@@ -9,7 +9,9 @@ import {
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
 } from "@/components/admin/AdminPanel";
+import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
+import { previewTournamentPlanAction } from "@/lib/db/plan-preview-actions";
 import {
   deleteTournamentMatchAction,
   deleteTournamentScheduleAction,
@@ -20,6 +22,10 @@ import {
 import { isoToDatetimeLocal } from "@/lib/schedule/datetime";
 import { fieldDisplayName } from "@/lib/schedule/names";
 import { matchSideParticipantId } from "@/lib/schedule/admin";
+import type {
+  RegenerationPolicyResult,
+  TournamentPlanPreview,
+} from "@/lib/schedule/plan-preview";
 import { MATCH_STATUSES, type MatchStatus, type TournamentFieldRecord, type TournamentGroupRecord, type TournamentMatchRecord } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -63,6 +69,35 @@ export function TournamentScheduleBoard({
   const [confirmGenerate, setConfirmGenerate] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [deleteMatchId, setDeleteMatchId] = useState<string | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<TournamentPlanPreview | null>(null);
+  const [previewPolicy, setPreviewPolicy] = useState<RegenerationPolicyResult | null>(null);
+
+  async function handlePreview() {
+    setPreviewLoading(true);
+    setPreviewError(null);
+    setError(null);
+    setNotice(null);
+    const result = await previewTournamentPlanAction(tournament.id);
+    setPreviewLoading(false);
+    if (result.error) {
+      setPreviewError(result.error);
+      setPreview(null);
+      setPreviewPolicy(null);
+      setPreviewOpen(true);
+      return;
+    }
+    setPreview(result.preview);
+    setPreviewPolicy(result.policy);
+    setPreviewOpen(true);
+  }
+
+  function closePreview() {
+    setPreviewOpen(false);
+    setPreviewError(null);
+  }
 
   async function run(task: () => Promise<{ error: string | null; notice?: string | null }>) {
     setPending(true);
@@ -191,7 +226,16 @@ export function TournamentScheduleBoard({
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
-            disabled={pending}
+            disabled={pending || previewLoading}
+            onClick={() => void handlePreview()}
+            className={adminSecondaryButtonClass}
+            aria-busy={previewLoading}
+          >
+            {previewLoading ? "Vorschau wird geladen…" : "Vorschau anzeigen"}
+          </button>
+          <button
+            type="button"
+            disabled={pending || previewLoading}
             onClick={() => (groupMatches.length > 0 ? setConfirmGenerate(true) : void run(() => generateTournamentScheduleAction(tournament.id)))}
             className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase disabled:opacity-60"
           >
@@ -200,7 +244,7 @@ export function TournamentScheduleBoard({
           {groupMatches.length > 0 ? (
             <button
               type="button"
-              disabled={pending}
+              disabled={pending || previewLoading}
               onClick={() => setConfirmClear(true)}
               className={adminSecondaryButtonClass}
             >
@@ -210,8 +254,34 @@ export function TournamentScheduleBoard({
         </div>
         <p className="mt-3 text-[13px] text-muted">
           Round-Robin innerhalb jeder Gruppe, ohne Hin- und Rückrunde. Uhrzeiten in deutscher Ortszeit.
+          Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
         </p>
       </AdminCard>
+
+      {previewOpen ? (
+        previewError || !preview || !previewPolicy ? (
+          <AdminCard title="Spielplan-Vorschau">
+            <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
+              {previewError ?? "Die Vorschau konnte nicht geladen werden."}
+            </p>
+            <button
+              type="button"
+              onClick={closePreview}
+              className={`${adminSecondaryButtonClass} mt-4`}
+            >
+              Vorschau schließen
+            </button>
+          </AdminCard>
+        ) : (
+          <TournamentPlanPreviewPanel
+            preview={preview}
+            policy={previewPolicy}
+            teamLabels={teamLabels}
+            fieldLabels={Object.fromEntries(fields.map((field) => [field.id, field.name]))}
+            onClose={closePreview}
+          />
+        )
+      ) : null}
 
       <AdminCard title="Spiele">
         {groupMatches.length === 0 ? (
