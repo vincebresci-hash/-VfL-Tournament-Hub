@@ -472,9 +472,11 @@ function runD2ApplyUiStructuralChecks(scheduleBoard: string, previewPanel: strin
   );
   assert(
     scheduleBoard.includes("confirmGenerate") &&
-      scheduleBoard.includes('confirmLabel="Generieren"') &&
-      scheduleBoard.includes("generateTournamentScheduleAction"),
-    "existing generate confirmation remains distinct",
+      scheduleBoard.includes('confirmLabel="Direkt generieren"') &&
+      scheduleBoard.includes('title="Spielplan direkt ersetzen?"') &&
+      scheduleBoard.includes("generateTournamentScheduleAction") &&
+      scheduleBoard.includes("confirmApplyReplace"),
+    "direct generate confirmation remains distinct from apply confirmation",
   );
   assert(
     !scheduleBoard.includes("executeApply(true)") ||
@@ -537,10 +539,51 @@ function runD2ApplyUiStructuralChecks(scheduleBoard: string, previewPanel: strin
     scheduleBoard.includes("previewTournamentPlanAction") &&
       scheduleBoard.includes("generateTournamentScheduleAction") &&
       scheduleBoard.includes("deleteTournamentScheduleAction") &&
-      scheduleBoard.includes("Vorschau anzeigen") &&
-      scheduleBoard.includes("Spielplan generieren") &&
+      scheduleBoard.includes("Vorschau erstellen") &&
+      scheduleBoard.includes("Direkt generieren") &&
       scheduleBoard.includes("Spielplan löschen"),
     "preview/generate/delete controls remain wired",
+  );
+  assert(
+    scheduleBoard.includes('title="Spielplan planen"') &&
+      scheduleBoard.includes("Vorschau wird erstellt…") &&
+      scheduleBoard.includes("Erstellt und speichert den Spielplan direkt ohne Vorschau."),
+    "D2 schedule card uses planning title, preview pending copy, and direct-generate support copy",
+  );
+
+  // D2 hierarchy freezes: assert className on the preview/generate button JSX nodes,
+  // not merely that the class identifier appears somewhere in the file/comments.
+  const previewButtonMatch = scheduleBoard.match(
+    /onClick=\{\(\) => void handlePreview\(\)\}[\s\S]{0,180}?className=\{([^}]+)\}/,
+  );
+  assert(
+    previewButtonMatch != null &&
+      previewButtonMatch[1].includes("adminPrimaryButtonClass") &&
+      !previewButtonMatch[1].includes("adminSecondaryButtonClass"),
+    "preview CTA uses adminPrimaryButtonClass in primary/refresh state",
+  );
+  const generateButtonMatch = scheduleBoard.match(
+    /setConfirmGenerate\(true\)[\s\S]{0,220}?className=\{([^}]+)\}/,
+  );
+  assert(
+    generateButtonMatch != null &&
+      generateButtonMatch[1].includes("adminSecondaryButtonClass") &&
+      !generateButtonMatch[1].includes("adminPrimaryButtonClass") &&
+      !scheduleBoard.includes("bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white"),
+    "direct generate CTA uses adminSecondaryButtonClass (no navy-solid primary treatment)",
+  );
+  assert(
+    previewPanel.includes("Die Vorschau ändert noch keinen gespeicherten Spielplan.") &&
+      previewPanel.includes("Eine Übernahme erfolgt erst nach „Spielplan übernehmen“.") &&
+      previewPanel.includes("Spielplan übernehmen"),
+    "preview panel leads with non-persistence copy and keeps Apply CTA",
+  );
+  assert(
+    !scheduleBoard.includes("plan-schedule-persist") &&
+      !previewPanel.includes("plan-schedule-persist") &&
+      !scheduleBoard.includes("persistPreparedGroupSchedule") &&
+      !previewPanel.includes("persistPreparedGroupSchedule"),
+    "D2 UI does not couple to D1 persist core module",
   );
   assert(
     !scheduleBoard.includes("generateKnockoutAction") &&

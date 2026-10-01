@@ -387,20 +387,20 @@ export function TournamentScheduleBoard({
         </form>
       </AdminCard>
 
-      <AdminCard title="Spielplan erzeugen">
+      <AdminCard title="Spielplan planen">
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
             disabled={pending || previewLoading}
             onClick={() => void handlePreview()}
-            className={adminSecondaryButtonClass}
+            className={adminPrimaryButtonClass}
             aria-busy={previewLoading}
           >
             {previewLoading
-              ? "Vorschau wird geladen…"
-              : previewOpen
+              ? "Vorschau wird erstellt…"
+              : previewOpen || previewApplyLocked
                 ? "Vorschau aktualisieren"
-                : "Vorschau anzeigen"}
+                : "Vorschau erstellen"}
           </button>
           <button
             type="button"
@@ -410,9 +410,9 @@ export function TournamentScheduleBoard({
                 ? setConfirmGenerate(true)
                 : void executeGenerate(false)
             }
-            className="inline-flex h-11 items-center bg-navy px-4 text-[12px] font-semibold tracking-[0.08em] text-white uppercase disabled:opacity-60"
+            className={adminSecondaryButtonClass}
           >
-            Spielplan generieren
+            Direkt generieren
           </button>
           {groupMatches.length > 0 ? (
             <button
@@ -428,6 +428,9 @@ export function TournamentScheduleBoard({
         <p className="mt-3 text-[13px] text-muted">
           Round-Robin innerhalb jeder Gruppe, ohne Hin- und Rückrunde. Uhrzeiten in deutscher Ortszeit.
           Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
+        </p>
+        <p className="mt-1.5 text-[13px] text-muted">
+          Erstellt und speichert den Spielplan direkt ohne Vorschau.
         </p>
       </AdminCard>
 
@@ -497,14 +500,20 @@ export function TournamentScheduleBoard({
 
       <ConfirmModal
         open={confirmGenerate}
-        title="Bestehenden Spielplan ersetzen?"
-        confirmLabel="Generieren"
+        title="Spielplan direkt ersetzen?"
+        confirmLabel="Direkt generieren"
+        cancelLabel="Abbrechen"
         onCancel={() => setConfirmGenerate(false)}
         onConfirm={() => {
           setConfirmGenerate(false);
           void executeGenerate(true);
         }}
-      />
+      >
+        <p className="text-[14px] leading-relaxed text-muted">
+          Du generierst und speicherst den Spielplan direkt ohne Vorschau. Der
+          bestehende Gruppenspielplan ohne Ergebnisse wird ersetzt.
+        </p>
+      </ConfirmModal>
       <ConfirmModal
         open={confirmApplyReplace}
         title="Bestehenden Spielplan ersetzen?"
