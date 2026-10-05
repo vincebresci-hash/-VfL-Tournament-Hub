@@ -11,6 +11,11 @@ import {
 import { TextInput } from "@/components/apply/FormControls";
 import { saveMatchResultAction } from "@/lib/db/schedule-actions";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
+import {
+  GROUP_RESULT_LOCKED_MESSAGE,
+  canMutateGroupResults,
+} from "@/lib/schedule/group-result-lock";
+import { GROUP_RESULT_LOCK_CORRECTION_MESSAGE } from "@/lib/schedule/group-result-lock-ux";
 import { computeGroupStandings } from "@/lib/schedule/standings";
 import { StandingsTable } from "@/components/tournaments/StandingsTable";
 import { teamLabel } from "@/lib/schedule/names";
@@ -37,6 +42,8 @@ export function TournamentResultsBoard({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const groupMatches = matches.filter((match) => match.phase !== "knockout");
+  // Informational UI lock from loaded stage matches (includes KO). D1 server guard remains authoritative.
+  const groupResultsLocked = !canMutateGroupResults(matches).allowed;
 
   return (
     <div className="grid gap-5">
@@ -44,6 +51,19 @@ export function TournamentResultsBoard({
         <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
           {error}
         </p>
+      ) : null}
+
+      {groupResultsLocked ? (
+        <div
+          className={`${adminCardShellClass} border-brand-yellow/50 bg-brand-yellow/10 px-4 py-3.5`}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-[14px] font-semibold text-ink">{GROUP_RESULT_LOCKED_MESSAGE}</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+            {GROUP_RESULT_LOCK_CORRECTION_MESSAGE}
+          </p>
+        </div>
       ) : null}
 
       <AdminCard title="Ergebnisse">
@@ -59,12 +79,14 @@ export function TournamentResultsBoard({
                 groupName={groups.find((group) => group.id === match.groupId)?.name ?? "Gruppe"}
                 teamLabels={teamLabels}
                 pending={pending}
+                locked={groupResultsLocked}
                 onSave={async (home, away) => {
                   setPending(true);
                   setError(null);
                   const result = await saveMatchResultAction(tournamentId, match.id, home, away);
                   setPending(false);
                   if (result.error) {
+                    // Surfaces D1 lock message (and other errors) for stale-UI races.
                     setError(result.error);
                     return;
                   }
@@ -102,6 +124,7 @@ function ResultRow({
   groupName,
   teamLabels,
   pending,
+  locked,
   onSave,
 }: {
   match: TournamentMatchRecord;
@@ -109,13 +132,18 @@ function ResultRow({
   groupName: string;
   teamLabels: Record<string, string>;
   pending: boolean;
+  locked: boolean;
   onSave: (home: string, away: string) => Promise<void>;
 }) {
   const [home, setHome] = useState(match.homeScore == null ? "" : String(match.homeScore));
   const [away, setAway] = useState(match.awayScore == null ? "" : String(match.awayScore));
+  const controlsDisabled = pending || locked;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (locked) {
+      return;
+    }
     await onSave(home, away);
   }
 
@@ -135,7 +163,9 @@ function ResultRow({
           value={home}
           onChange={(event) => setHome(event.target.value)}
           aria-label="Heimtore"
-          className="w-16"
+          disabled={controlsDisabled}
+          readOnly={locked}
+          className="w-16 disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
         />
         <span className="text-[15px] text-muted">:</span>
         <TextInput
@@ -143,11 +173,14 @@ function ResultRow({
           value={away}
           onChange={(event) => setAway(event.target.value)}
           aria-label="Gasttore"
-          className="w-16"
+          disabled={controlsDisabled}
+          readOnly={locked}
+          className="w-16 disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
         />
         <button
           type="submit"
-          disabled={pending}
+          disabled={controlsDisabled}
+          aria-disabled={controlsDisabled}
           className={adminPrimaryButtonClass}
         >
           Ergebnis speichern
