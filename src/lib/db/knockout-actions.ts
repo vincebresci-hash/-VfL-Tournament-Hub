@@ -14,18 +14,15 @@ import {
 } from "@/lib/schedule/admin";
 import { addMinutes, datetimeLocalToIso } from "@/lib/schedule/datetime";
 import {
-  buildKnockoutPlan,
   hasDuplicateTeamInRound,
-  isGroupStageComplete,
   KNOCKOUT_SCHEDULE_WAVES,
   knockoutSideRef,
   propagateKnockoutTeams,
-  qualifyTopTwo,
   resolveKnockoutOutcome,
   type KnockoutFormat,
   type KnockoutOptions,
 } from "@/lib/schedule/knockout";
-import { computeGroupStandings } from "@/lib/schedule/standings";
+import { buildKnockoutQualificationPreview } from "@/lib/schedule/knockout-preview";
 import { buildTimetable } from "@/lib/schedule/timetable";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { DecidedBy, TournamentMatchRecord } from "@/types/schedule";
@@ -113,7 +110,20 @@ export async function generateKnockoutAction(
     };
   }
 
-  const progress = isGroupStageComplete(stage.groups, stage.memberIdsByGroupId, stage.matches);
+  const options: KnockoutOptions = {
+    format: input.format,
+    includeThirdPlace: input.includeThirdPlace,
+    includePlacement5: input.format === 8 && input.includePlacement5,
+    includePlacement7: input.format === 8 && input.includePlacement7,
+  };
+  // C6-G D1: shared pure completeness → standings → qualify → plan composition.
+  const preview = buildKnockoutQualificationPreview({
+    groups: stage.groups,
+    memberIdsByGroupId: stage.memberIdsByGroupId,
+    matches: stage.matches,
+    options,
+  });
+  const progress = preview.progress;
   if (!progress.complete && !input.forceIncomplete) {
     return {
       error: "Die Gruppenphase ist noch nicht vollständig abgeschlossen.",
@@ -121,24 +131,7 @@ export async function generateKnockoutAction(
     };
   }
 
-  const standingsByGroupId = Object.fromEntries(
-    stage.groups.map((group) => [
-      group.id,
-      computeGroupStandings(
-        stage.memberIdsByGroupId[group.id] ?? [],
-        stage.matches.filter((match) => match.groupId === group.id && match.phase !== "knockout"),
-      ),
-    ]),
-  );
-
-  const qualified = qualifyTopTwo(stage.groups, standingsByGroupId);
-  const options: KnockoutOptions = {
-    format: input.format,
-    includeThirdPlace: input.includeThirdPlace,
-    includePlacement5: input.format === 8 && input.includePlacement5,
-    includePlacement7: input.format === 8 && input.includePlacement7,
-  };
-  const plan = buildKnockoutPlan(options, qualified);
+  const plan = preview.plan;
   if (plan.error) {
     return { error: plan.error, notice: null };
   }

@@ -225,9 +225,15 @@ export function runGroupResultLockChecks() {
 
   assert(
     knockoutActions.includes("forceIncomplete") &&
-      knockoutActions.includes("isGroupStageComplete") &&
-      knockoutActions.includes("generateKnockoutAction"),
-    "forceIncomplete remains wired unchanged in generateKnockoutAction",
+      knockoutActions.includes("buildKnockoutQualificationPreview") &&
+      knockoutActions.includes("generateKnockoutAction") &&
+      lockHelper.includes('phase === "knockout"'),
+    "forceIncomplete remains wired via shared KO preview helper in generateKnockoutAction",
+  );
+  assert(
+    read("src/lib/schedule/knockout-preview.ts").includes("isGroupStageComplete") &&
+      read("src/lib/schedule/knockout.ts").includes("export function isGroupStageComplete"),
+    "completeness policy remains isGroupStageComplete (via shared preview helper)",
   );
   assert(
     knockoutActions.includes("forceIncomplete") &&
