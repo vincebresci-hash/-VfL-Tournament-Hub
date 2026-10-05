@@ -10,9 +10,13 @@ export type ApplicationCapacityDisplayInput = {
 export type ApplicationCapacityDisplay = {
   heading: string;
   participantLine: string;
-  statusLine: string;
+  statusLine: string | null;
 };
 
+/**
+ * Public application capacity presentation.
+ * Shows configured maximum only — never confirmed count or free places.
+ */
 export function getApplicationCapacityDisplay(
   input: ApplicationCapacityDisplayInput,
 ): ApplicationCapacityDisplay | null {
@@ -25,7 +29,7 @@ export function getApplicationCapacityDisplay(
     return null;
   }
 
-  const participantLine = `${capacity.confirmedTeams} von ${capacity.maxTeams} Teams bestätigt`;
+  const participantLine = `Max. ${capacity.maxTeams} Teams`;
 
   if (input.applicationState === "waitlist") {
     return {
@@ -43,11 +47,9 @@ export function getApplicationCapacityDisplay(
     };
   }
 
-  const slotLabel = capacity.availableSlots === 1 ? "Platz" : "Plätze";
-
   return {
     heading: "Teilnehmer",
     participantLine,
-    statusLine: `Noch ${capacity.availableSlots} ${slotLabel} frei`,
+    statusLine: null,
   };
 }

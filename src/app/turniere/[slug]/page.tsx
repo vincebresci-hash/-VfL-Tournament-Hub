@@ -107,10 +107,8 @@ export default async function TournamentDetailPage({
   const showLiveTab = showsMeinTurnierplanLiveTab(tournament);
   const showTopMeinTurnierplanButton =
     showMeinTurnierplan && !showLiveTab;
-  // Hero availability: presentation-only when capacity exists and apply path is active.
-  const showHeroAvailability =
-    capacity != null &&
-    (applicationState === "open" || applicationState === "waitlist");
+  // Hero max-capacity chip: presentation-only when a configured maximum exists.
+  const showHeroMaxTeams = capacity != null;
   const facts = [
     { label: "Datum", value: formatDateDe(tournament.date) },
     startTime ? { label: "Startzeit", value: startTime } : null,
@@ -122,10 +120,6 @@ export default async function TournamentDetailPage({
     tournament.ageGroup ? { label: "Altersklasse", value: tournament.ageGroup } : null,
     tournament.birthYear ? { label: "Jahrgang", value: String(tournament.birthYear) } : null,
     capacity ? { label: "Max. Teams", value: String(capacity.maxTeams) } : null,
-    tournament.confirmedTeams > 0 || capacity
-      ? { label: "Bestätigte Teams", value: String(tournament.confirmedTeams) }
-      : null,
-    capacity ? { label: "Freie Plätze", value: String(capacity.availableSlots) } : null,
     tournament.applicationStart
       ? { label: "Bewerbungsstart", value: formatDateTimeDe(tournament.applicationStart) }
       : null,
@@ -202,8 +196,8 @@ export default async function TournamentDetailPage({
             applicationStatusDisplay={applicationStatusDisplay}
             canApply={canApply}
             ctaLabel={ctaLabel}
-            availableSlots={capacity?.availableSlots ?? null}
-            showAvailability={showHeroAvailability}
+            maxTeams={capacity?.maxTeams ?? null}
+            showMaxTeams={showHeroMaxTeams}
           />
 
           {showTopMeinTurnierplanButton ? (

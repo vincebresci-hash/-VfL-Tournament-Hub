@@ -32,8 +32,6 @@ const PRIMARY_LABELS = new Set<string>(PRIMARY_ORDER);
 /** Quieter secondary reading order. */
 const SECONDARY_ORDER = [
   "Max. Teams",
-  "Bestätigte Teams",
-  "Freie Plätze",
   "Bewerbungsstart",
   "Bewerbungsfrist",
   "Warteliste",
@@ -68,8 +66,6 @@ function iconForLabel(label: string): ReactNode {
     case "Jahrgang":
       return <IconShield className={className} />;
     case "Max. Teams":
-    case "Bestätigte Teams":
-    case "Freie Plätze":
     case "Warteliste":
       return <IconUsers className={className} />;
     default:
@@ -139,7 +135,7 @@ function InfoCard({
   fact: TournamentInfoFact;
   emphasis: "primary" | "secondary";
 }) {
-  const isFreeSlots = fact.label === "Freie Plätze";
+  const isMaxTeams = fact.label === "Max. Teams";
 
   return (
     <div
@@ -148,7 +144,7 @@ function InfoCard({
         emphasis === "primary"
           ? "border-line px-3.5 py-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)]"
           : "border-line/70 px-3 py-2.5",
-        isFreeSlots && "border-brand-yellow/45",
+        isMaxTeams && "border-brand-yellow/45",
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -167,7 +163,7 @@ function InfoCard({
                 : "text-[14px]",
             )}
           >
-            {isFreeSlots ? (
+            {isMaxTeams ? (
               <span className="inline-flex items-center rounded-sm bg-brand-yellow/30 px-1.5 py-0.5 font-bold text-navy tabular-nums">
                 {fact.value}
               </span>
