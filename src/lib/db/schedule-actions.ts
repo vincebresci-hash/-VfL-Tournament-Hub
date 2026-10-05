@@ -18,11 +18,22 @@ import {
   type RegenerationPolicyResult,
   type RegenerationStageSnapshot,
 } from "@/lib/schedule/plan-preview";
+import {
+  GROUP_RESULT_LOCKED_BY_KNOCKOUT,
+  GROUP_RESULT_LOCKED_MESSAGE,
+  canMutateGroupResults,
+} from "@/lib/schedule/group-result-lock";
 import { datetimeLocalToIso } from "@/lib/schedule/datetime";
 import { prepareTournamentPlanFromDb } from "@/lib/db/plan-preview-prepare";
 import { persistPreparedGroupSchedule } from "@/lib/db/plan-schedule-persist";
 import { MATCH_STATUSES, type MatchStatus } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
+
+export type GroupResultMutationActionResult = {
+  error: string | null;
+  /** Distinguishable lock code for D2; absent/null when unlocked or unrelated errors. */
+  code?: typeof GROUP_RESULT_LOCKED_BY_KNOCKOUT | null;
+};
 
 function revalidateStage(tournament: Pick<AdminTournamentRecord, "id" | "slug">) {
   revalidatePath("/admin");
@@ -88,6 +99,40 @@ function blockedGroupScheduleMutationError(
     return policy.reason;
   }
   return null;
+}
+
+/**
+ * Authoritative KO-presence read for C6-F D1 group-result freeze.
+ * Residual TOCTOU (concurrent KO insert after this read) is accepted / deferred —
+ * same class as C6-B action-level guards; not a transactional lock.
+ */
+async function tournamentHasKnockoutPhase(tournamentId: string): Promise<{
+  hasKnockout: boolean;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("tournament_matches")
+    .select("id")
+    .eq("tournament_id", tournamentId)
+    .eq("phase", "knockout")
+    .limit(1);
+
+  if (error) {
+    return {
+      hasKnockout: false,
+      error: toUserFacingDbError("Die K.-o.-Phase konnte nicht geprüft werden.", error),
+    };
+  }
+
+  return { hasKnockout: (data?.length ?? 0) > 0, error: null };
+}
+
+function groupResultLockedFailure(): GroupResultMutationActionResult {
+  return {
+    error: GROUP_RESULT_LOCKED_MESSAGE,
+    code: GROUP_RESULT_LOCKED_BY_KNOCKOUT,
+  };
 }
 
 function parseOptionalTime(value: string) {
@@ -631,7 +676,7 @@ export async function saveTournamentMatchAction(
     scheduledAt: string;
     status: MatchStatus;
   },
-): Promise<{ error: string | null }> {
+): Promise<GroupResultMutationActionResult> {
   const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
@@ -674,7 +719,43 @@ export async function saveTournamentMatchAction(
     return { error: "Nur bestätigte Teilnehmer können einem Spiel zugeordnet werden." };
   }
 
+  // This action always writes phase=group. C6-F D1: block group mutations once KO exists.
+  // Authoritative phase for an existing row is loaded from DB (not client input).
   const supabase = await createClient();
+  if (input.matchId) {
+    const { data: existing, error: existingError } = await supabase
+      .from("tournament_matches")
+      .select("id, phase")
+      .eq("id", input.matchId)
+      .eq("tournament_id", tournamentId)
+      .maybeSingle();
+
+    if (existingError) {
+      return {
+        error: toUserFacingDbError("Das Spiel konnte nicht geladen werden.", existingError),
+      };
+    }
+    if (!existing) {
+      return { error: "Das Spiel wurde nicht gefunden." };
+    }
+    if (existing.phase === "knockout") {
+      return {
+        error: "K.-o.-Spiele können hier nicht als Gruppenspiel bearbeitet werden.",
+      };
+    }
+  }
+
+  const knockoutPresence = await tournamentHasKnockoutPhase(tournamentId);
+  if (knockoutPresence.error) {
+    return { error: knockoutPresence.error };
+  }
+  const lock = canMutateGroupResults(
+    knockoutPresence.hasKnockout ? [{ phase: "knockout" }] : [],
+  );
+  if (!lock.allowed) {
+    return groupResultLockedFailure();
+  }
+
   const payload = {
     tournament_id: tournamentId,
     group_id: input.groupId,
@@ -705,7 +786,7 @@ export async function saveTournamentMatchAction(
 export async function deleteTournamentMatchAction(
   tournamentId: string,
   matchId: string,
-): Promise<{ error: string | null }> {
+): Promise<GroupResultMutationActionResult> {
   const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
@@ -717,6 +798,38 @@ export async function deleteTournamentMatchAction(
   }
 
   const supabase = await createClient();
+  const { data: target, error: targetError } = await supabase
+    .from("tournament_matches")
+    .select("id, phase")
+    .eq("id", matchId)
+    .eq("tournament_id", tournamentId)
+    .maybeSingle();
+
+  if (targetError) {
+    return {
+      error: toUserFacingDbError("Das Spiel konnte nicht geladen werden.", targetError),
+    };
+  }
+  if (!target) {
+    return { error: "Das Spiel wurde nicht gefunden." };
+  }
+
+  // Group (or legacy null-phase) deletes can change standings — freeze when KO exists.
+  // Knockout single-delete is not wrapped by the group-result freeze (KO bulk delete
+  // remains deleteTournamentKnockoutAction).
+  if (target.phase !== "knockout") {
+    const knockoutPresence = await tournamentHasKnockoutPhase(tournamentId);
+    if (knockoutPresence.error) {
+      return { error: knockoutPresence.error };
+    }
+    const lock = canMutateGroupResults(
+      knockoutPresence.hasKnockout ? [{ phase: "knockout" }] : [],
+    );
+    if (!lock.allowed) {
+      return groupResultLockedFailure();
+    }
+  }
+
   const { error } = await supabase
     .from("tournament_matches")
     .delete()
@@ -776,7 +889,7 @@ export async function saveMatchResultAction(
   matchId: string,
   homeScore: string,
   awayScore: string,
-): Promise<{ error: string | null }> {
+): Promise<GroupResultMutationActionResult> {
   const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
@@ -791,6 +904,19 @@ export async function saveMatchResultAction(
   const away = parseScore(awayScore);
   if (home == null || away == null) {
     return { error: "Bitte gültige Tore (0–999) eintragen." };
+  }
+
+  // C6-F D1: authoritative KO presence before any group result write.
+  // Residual TOCTOU vs concurrent KO generation is accepted / deferred.
+  const knockoutPresence = await tournamentHasKnockoutPhase(tournamentId);
+  if (knockoutPresence.error) {
+    return { error: knockoutPresence.error };
+  }
+  const lock = canMutateGroupResults(
+    knockoutPresence.hasKnockout ? [{ phase: "knockout" }] : [],
+  );
+  if (!lock.allowed) {
+    return groupResultLockedFailure();
   }
 
   const supabase = await createClient();
