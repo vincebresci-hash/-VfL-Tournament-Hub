@@ -77,24 +77,30 @@ export function runTournamentDetailV2AChecks() {
     "CTA labels derived on page; coming-soon presentation in Hero",
   );
 
-  // 5–6 capacity presentation only
+  // 5–6 capacity presentation: public max only (no free-place / confirmed facts)
   assert(
     page.includes("getDisplayCapacity(tournament)") &&
-      page.includes("capacity?.availableSlots") &&
-      hero.includes("availableSlots") &&
-      hero.includes("showAvailability") &&
-      !hero.includes("maxTeams -") &&
+      page.includes("capacity?.maxTeams") &&
+      page.includes("showHeroMaxTeams") &&
+      hero.includes("maxTeams") &&
+      hero.includes("showMaxTeams") &&
+      !hero.includes("availableSlots") &&
+      !hero.includes("freie Plätze") &&
       !hero.includes("confirmedTeams") &&
       publicTournament.includes(
         "availableSlots: Math.max(0, tournament.maxTeams - tournament.confirmedTeams)",
       ),
-    "Hero availability derives from existing display capacity only",
+    "Hero max-teams chip derives from existing display capacity only",
   );
   assert(
-    page.includes("String(capacity.availableSlots)") &&
+    page.includes('label: "Max. Teams"') &&
+      page.includes("String(capacity.maxTeams)") &&
+      !page.includes('label: "Bestätigte Teams"') &&
+      !page.includes('label: "Freie Plätze"') &&
+      !page.includes("String(capacity.availableSlots)") &&
       !page.includes("availableSlots +") &&
       !page.includes("availableSlots -"),
-    "no capacity recalculation on page",
+    "public detail exposes Max. Teams only (no occupancy facts / recalculation)",
   );
 
   // 7–10 Partner guarantees
@@ -134,8 +140,6 @@ export function runTournamentDetailV2AChecks() {
     "Bewerbungsstart",
     "Bewerbungsfrist",
     "Max. Teams",
-    "Bestätigte Teams",
-    "Freie Plätze",
     "Warteliste",
   ];
   for (const label of requiredFactLabels) {
@@ -145,10 +149,17 @@ export function runTournamentDetailV2AChecks() {
     );
   }
   assert(
+    !page.includes('label: "Bestätigte Teams"') &&
+      !page.includes('label: "Freie Plätze"'),
+    "occupancy fact labels removed from public detail",
+  );
+  assert(
     page.includes("<TournamentInfoGrid facts={facts} />") &&
       infoGrid.includes("Turnierinfos") &&
-      infoGrid.includes('fact.label === "Freie Plätze"'),
-    "Turnierinfos redesigned via TournamentInfoGrid",
+      infoGrid.includes('"Max. Teams"') &&
+      !infoGrid.includes('"Freie Plätze"') &&
+      !infoGrid.includes('"Bestätigte Teams"'),
+    "Turnierinfos via TournamentInfoGrid with max-teams capacity only",
   );
   assert(
     page.includes("filledPublicInfo(tournament)") &&

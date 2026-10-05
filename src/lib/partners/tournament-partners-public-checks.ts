@@ -199,22 +199,24 @@ export function runTournamentPartnersPublicChecks() {
     "homepage and /partner Partner typography/hover defaults unchanged",
   );
 
-  // Facts + Freie Plätze presentation-only emphasis (V2-A InfoGrid)
+  // Facts + Max. Teams presentation emphasis (public occupancy facts removed)
   const infoGrid = read("src/components/tournaments/TournamentInfoGrid.tsx");
   assert(
-    tournamentDetail.includes('label: "Freie Plätze"') &&
+    tournamentDetail.includes('label: "Max. Teams"') &&
       tournamentDetail.includes("getDisplayCapacity(tournament)") &&
-      infoGrid.includes('fact.label === "Freie Plätze"') &&
+      !tournamentDetail.includes('label: "Freie Plätze"') &&
+      !tournamentDetail.includes('label: "Bestätigte Teams"') &&
+      infoGrid.includes('fact.label === "Max. Teams"') &&
       (infoGrid.includes("bg-brand-yellow/25") ||
         infoGrid.includes("bg-brand-yellow/30")) &&
       tournamentDetail.includes("<TournamentInfoGrid"),
-    "facts retained via TournamentInfoGrid; Freie Plätze yellow accent is presentation-only",
+    "facts retained via TournamentInfoGrid; Max. Teams yellow accent is presentation-only",
   );
   assert(
     !tournamentDetail.includes("availableSlots +") &&
       !tournamentDetail.includes("availableSlots -") &&
-      tournamentDetail.includes("String(capacity.availableSlots)"),
-    "capacity value formatting unchanged (display String only)",
+      tournamentDetail.includes("String(capacity.maxTeams)"),
+    "capacity value formatting unchanged (display String of max only)",
   );
 
   // 15–19 homepage / partner / admin / V1 unchanged

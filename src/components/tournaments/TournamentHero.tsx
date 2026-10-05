@@ -21,10 +21,10 @@ type TournamentHeroProps = {
   applicationStatusDisplay: PublicApplicationStatusDisplay;
   canApply: boolean;
   ctaLabel: string;
-  /** Existing display-capacity availableSlots; presentation only. */
-  availableSlots?: number | null;
-  /** Show availability chip only when caller deems it appropriate. */
-  showAvailability: boolean;
+  /** Configured maximum team capacity; presentation only. */
+  maxTeams?: number | null;
+  /** Show max-teams chip only when caller deems it appropriate. */
+  showMaxTeams: boolean;
 };
 
 /**
@@ -46,8 +46,8 @@ export function TournamentHero({
   applicationStatusDisplay,
   canApply,
   ctaLabel,
-  availableSlots,
-  showAvailability,
+  maxTeams,
+  showMaxTeams,
 }: TournamentHeroProps) {
   const venueLine = [location, address].filter(Boolean).join(" · ");
 
@@ -125,13 +125,13 @@ export function TournamentHero({
             </Link>
           ) : null}
 
-          {showAvailability && availableSlots != null ? (
+          {showMaxTeams && maxTeams != null ? (
             <span
               className="inline-flex items-center gap-1.5 rounded-md border border-brand-yellow/40 bg-brand-yellow/15 px-2.5 py-1.5 text-[12px] font-semibold text-navy tabular-nums"
-              aria-label={`${availableSlots} freie Plätze`}
+              aria-label={`Max. ${maxTeams} Teams`}
             >
               <IconUsers className="h-3.5 w-3.5 shrink-0 text-navy/80" />
-              {availableSlots} freie Plätze
+              Max. {maxTeams} Teams
             </span>
           ) : null}
         </div>

@@ -56,11 +56,6 @@ export function TournamentCard({
   const applyLabel =
     applicationState === "waitlist" ? "Warteliste →" : "Bewerben →";
 
-  const capacityRatio =
-    capacity && capacity.maxTeams > 0
-      ? Math.min(1, capacity.confirmedTeams / capacity.maxTeams)
-      : null;
-
   return (
     <article
       className={cn(
@@ -141,26 +136,8 @@ export function TournamentCard({
         </div>
 
         {capacity ? (
-          <div className="mt-3">
-            <p className="text-[12px] font-medium tracking-[0.04em] text-ink">
-              {capacity.confirmedTeams} / {capacity.maxTeams} Teams
-            </p>
-            {capacityRatio != null ? (
-              <div
-                className="mt-1.5 h-1 w-full overflow-hidden bg-line"
-                role="presentation"
-                aria-hidden="true"
-              >
-                <div
-                  className="h-full bg-brand-yellow"
-                  style={{ width: `${Math.round(capacityRatio * 100)}%` }}
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : tournament.confirmedTeams > 0 ? (
-          <p className="mt-3 text-[12px] font-medium tracking-[0.04em] text-muted">
-            {tournament.confirmedTeams} bestätigte Teams
+          <p className="mt-3 text-[12px] font-medium tracking-[0.04em] text-ink">
+            Max. {capacity.maxTeams} Teams
           </p>
         ) : null}
 

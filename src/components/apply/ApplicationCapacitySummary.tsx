@@ -28,7 +28,9 @@ export function ApplicationCapacitySummary({
         {display.heading}
       </p>
       <p className="mt-2 text-[13px] font-medium text-ink">{display.participantLine}</p>
-      <p className="mt-1 text-[13px] text-muted">{display.statusLine}</p>
+      {display.statusLine ? (
+        <p className="mt-1 text-[13px] text-muted">{display.statusLine}</p>
+      ) : null}
     </div>
   );
 }
