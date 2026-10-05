@@ -21,6 +21,11 @@ import {
   saveTournamentMatchAction,
 } from "@/lib/db/schedule-actions";
 import { isoToDatetimeLocal } from "@/lib/schedule/datetime";
+import {
+  GROUP_RESULT_LOCKED_MESSAGE,
+  canMutateGroupResults,
+} from "@/lib/schedule/group-result-lock";
+import { GROUP_RESULT_LOCK_CORRECTION_MESSAGE } from "@/lib/schedule/group-result-lock-ux";
 import { fieldDisplayName } from "@/lib/schedule/names";
 import { matchSideParticipantId } from "@/lib/schedule/admin";
 import type {
@@ -69,6 +74,8 @@ export function TournamentScheduleBoard({
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
   const groupMatches = matches.filter((match) => match.phase !== "knockout");
+  // Informational UI lock from loaded stage matches (includes KO). D1 server guard remains authoritative.
+  const groupResultsLocked = !canMutateGroupResults(matches).allowed;
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -306,6 +313,19 @@ export function TournamentScheduleBoard({
         <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted`}>{notice}</p>
       ) : null}
 
+      {groupResultsLocked ? (
+        <div
+          className={`${adminCardShellClass} border-brand-yellow/50 bg-brand-yellow/10 px-4 py-3.5`}
+          role="status"
+          aria-live="polite"
+        >
+          <p className="text-[14px] font-semibold text-ink">{GROUP_RESULT_LOCKED_MESSAGE}</p>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-muted">
+            {GROUP_RESULT_LOCK_CORRECTION_MESSAGE}
+          </p>
+        </div>
+      ) : null}
+
       <AdminCard title="Spielparameter">
         <form onSubmit={handleSettings} className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -479,6 +499,7 @@ export function TournamentScheduleBoard({
                 memberIdsByGroupId={memberIdsByGroupId}
                 teamLabels={teamLabels}
                 pending={pending}
+                locked={groupResultsLocked}
                 onSave={(input) => run(() => saveTournamentMatchAction(tournament.id, input))}
                 onDelete={() => setDeleteMatchId(match.id)}
               />
@@ -495,6 +516,7 @@ export function TournamentScheduleBoard({
         memberIdsByGroupId={memberIdsByGroupId}
         teamLabels={teamLabels}
         pending={pending}
+        locked={groupResultsLocked}
         onSave={(input) => run(() => saveTournamentMatchAction(tournament.id, input))}
       />
 
@@ -565,6 +587,7 @@ function MatchEditor({
   memberIdsByGroupId,
   teamLabels,
   pending,
+  locked,
   onSave,
   onDelete,
 }: {
@@ -574,6 +597,7 @@ function MatchEditor({
   memberIdsByGroupId: Record<string, string[]>;
   teamLabels: Record<string, string>;
   pending: boolean;
+  locked: boolean;
   onSave: (input: {
     matchId?: string;
     groupId: string;
@@ -594,12 +618,16 @@ function MatchEditor({
   const teams = Array.from(
     new Set([...(memberIdsByGroupId[groupId] ?? []), homeId, awayId].filter(Boolean)),
   );
+  const controlsDisabled = pending || locked;
 
   return (
     <form
       className="grid gap-3 border border-line p-4"
       onSubmit={(event) => {
         event.preventDefault();
+        if (locked) {
+          return;
+        }
         void onSave({
           matchId: match.id,
           groupId,
@@ -612,14 +640,26 @@ function MatchEditor({
       }}
     >
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <SelectInput value={groupId} onChange={(event) => setGroupId(event.target.value)} aria-label="Gruppe">
+        <SelectInput
+          value={groupId}
+          onChange={(event) => setGroupId(event.target.value)}
+          aria-label="Gruppe"
+          disabled={controlsDisabled}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {groups.map((group) => (
             <option key={group.id} value={group.id}>
               {group.name}
             </option>
           ))}
         </SelectInput>
-        <SelectInput value={fieldId} onChange={(event) => setFieldId(event.target.value)} aria-label="Spielfeld">
+        <SelectInput
+          value={fieldId}
+          onChange={(event) => setFieldId(event.target.value)}
+          aria-label="Spielfeld"
+          disabled={controlsDisabled}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {fields.map((field) => (
             <option key={field.id} value={field.id}>
               {field.name}
@@ -631,15 +671,29 @@ function MatchEditor({
           value={scheduledAt}
           onChange={(event) => setScheduledAt(event.target.value)}
           aria-label="Uhrzeit"
+          disabled={controlsDisabled}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
         />
-        <SelectInput value={homeId} onChange={(event) => setHomeId(event.target.value)} aria-label="Heimteam">
+        <SelectInput
+          value={homeId}
+          onChange={(event) => setHomeId(event.target.value)}
+          aria-label="Heimteam"
+          disabled={controlsDisabled}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {teams.map((id) => (
             <option key={id} value={id}>
               {teamLabels[id] ?? id}
             </option>
           ))}
         </SelectInput>
-        <SelectInput value={awayId} onChange={(event) => setAwayId(event.target.value)} aria-label="Auswärtsteam">
+        <SelectInput
+          value={awayId}
+          onChange={(event) => setAwayId(event.target.value)}
+          aria-label="Auswärtsteam"
+          disabled={controlsDisabled}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {teams.map((id) => (
             <option key={id} value={id}>
               {teamLabels[id] ?? id}
@@ -650,6 +704,8 @@ function MatchEditor({
           value={status}
           onChange={(event) => setStatus(event.target.value as MatchStatus)}
           aria-label="Status"
+          disabled={controlsDisabled}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
         >
           {MATCH_STATUSES.map((item) => (
             <option key={item} value={item}>
@@ -661,16 +717,23 @@ function MatchEditor({
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
-          disabled={pending}
+          disabled={controlsDisabled}
+          aria-disabled={controlsDisabled}
           className={adminPrimaryButtonClass}
         >
           Spiel speichern
         </button>
         <button
           type="button"
-          disabled={pending}
-          onClick={onDelete}
-          className="inline-flex h-10 items-center text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
+          disabled={controlsDisabled}
+          aria-disabled={controlsDisabled}
+          onClick={() => {
+            if (locked) {
+              return;
+            }
+            onDelete();
+          }}
+          className="inline-flex h-10 items-center text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:cursor-not-allowed disabled:opacity-60"
         >
           Löschen
         </button>
@@ -687,6 +750,7 @@ function AddMatchForm({
   memberIdsByGroupId,
   teamLabels,
   pending,
+  locked,
   onSave,
 }: {
   tournamentDate: string;
@@ -696,6 +760,7 @@ function AddMatchForm({
   memberIdsByGroupId: Record<string, string[]>;
   teamLabels: Record<string, string>;
   pending: boolean;
+  locked: boolean;
   onSave: (input: {
     groupId: string;
     fieldId: string;
@@ -713,6 +778,7 @@ function AddMatchForm({
   const [awayId, setAwayId] = useState(teams[1] ?? "");
   const defaultTime = `${tournamentDate}T${(startTime ?? "09:00").slice(0, 5)}`;
   const [scheduledAt, setScheduledAt] = useState(defaultTime);
+  const controlsDisabled = pending || locked || teams.length < 2;
 
   if (groups.length === 0) {
     return null;
@@ -724,6 +790,9 @@ function AddMatchForm({
         className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         onSubmit={(event) => {
           event.preventDefault();
+          if (locked) {
+            return;
+          }
           void onSave({
             groupId,
             fieldId,
@@ -734,14 +803,24 @@ function AddMatchForm({
           });
         }}
       >
-        <SelectInput value={groupId} onChange={(event) => setGroupId(event.target.value)}>
+        <SelectInput
+          value={groupId}
+          onChange={(event) => setGroupId(event.target.value)}
+          disabled={pending || locked}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {groups.map((group) => (
             <option key={group.id} value={group.id}>
               {group.name}
             </option>
           ))}
         </SelectInput>
-        <SelectInput value={fieldId} onChange={(event) => setFieldId(event.target.value)}>
+        <SelectInput
+          value={fieldId}
+          onChange={(event) => setFieldId(event.target.value)}
+          disabled={pending || locked}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {fields.map((field) => (
             <option key={field.id} value={field.id}>
               {field.name}
@@ -752,15 +831,27 @@ function AddMatchForm({
           type="datetime-local"
           value={scheduledAt}
           onChange={(event) => setScheduledAt(event.target.value)}
+          disabled={pending || locked}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
         />
-        <SelectInput value={homeId} onChange={(event) => setHomeId(event.target.value)}>
+        <SelectInput
+          value={homeId}
+          onChange={(event) => setHomeId(event.target.value)}
+          disabled={pending || locked}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {teams.map((id) => (
             <option key={id} value={id}>
               {teamLabels[id] ?? id}
             </option>
           ))}
         </SelectInput>
-        <SelectInput value={awayId} onChange={(event) => setAwayId(event.target.value)}>
+        <SelectInput
+          value={awayId}
+          onChange={(event) => setAwayId(event.target.value)}
+          disabled={pending || locked}
+          className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+        >
           {teams.map((id) => (
             <option key={id} value={id}>
               {teamLabels[id] ?? id}
@@ -769,7 +860,8 @@ function AddMatchForm({
         </SelectInput>
         <button
           type="submit"
-          disabled={pending || teams.length < 2}
+          disabled={controlsDisabled}
+          aria-disabled={controlsDisabled}
           className={adminPrimaryButtonClass}
         >
           Spiel hinzufügen
