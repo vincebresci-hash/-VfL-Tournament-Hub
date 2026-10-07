@@ -24,6 +24,7 @@ import { runKnockoutDeleteChecks } from "./knockout-delete-checks";
 import { runGroupResultLockChecks } from "./group-result-lock-checks";
 import { runGroupResultLockUxChecks } from "./group-result-lock-ux-checks";
 import { runKnockoutPreviewChecks } from "./knockout-preview-checks";
+import { runKnockoutPreviewUxChecks } from "./knockout-preview-ux-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
 import { runMeinTurnierplanImportSelfChecks } from "@/lib/mein-turnierplan-import";
@@ -109,6 +110,7 @@ try {
   const groupResultLockChecks = runGroupResultLockChecks();
   const groupResultLockUxChecks = runGroupResultLockUxChecks();
   const knockoutPreviewChecks = runKnockoutPreviewChecks();
+  const knockoutPreviewUxChecks = runKnockoutPreviewUxChecks();
   const applicationWindow = runApplicationWindowSelfChecks();
   const meinTurnierplan = runMeinTurnierplanSelfChecks();
   const meinTurnierplanImport = runMeinTurnierplanImportSelfChecks();
@@ -208,6 +210,7 @@ try {
   console.log(`group-result-lock-checks: ${groupResultLockChecks}`);
   console.log(`group-result-lock-ux-checks: ${groupResultLockUxChecks}`);
   console.log(`knockout-preview-checks: ${knockoutPreviewChecks}`);
+  console.log(`knockout-preview-ux-checks: ${knockoutPreviewUxChecks}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
   console.log(`mein-turnierplan-import-checks: ${meinTurnierplanImport}`);

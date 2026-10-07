@@ -25,7 +25,10 @@ import {
   knockoutRoundLabel,
   resolveKnockoutOutcome,
   type KnockoutFormat,
+  type KnockoutOptions,
 } from "@/lib/schedule/knockout";
+import { buildKnockoutQualificationPreview } from "@/lib/schedule/knockout-preview";
+import { formatGoals } from "@/lib/schedule/standings";
 import { teamLabel } from "@/lib/schedule/names";
 import {
   matchSideParticipantId,
@@ -36,6 +39,7 @@ import type { AdminTournamentRecord } from "@/types/admin";
 import type {
   DecidedBy,
   KnockoutRound,
+  StandingRow,
   TournamentFieldRecord,
   TournamentGroupRecord,
   TournamentMatchRecord,
@@ -96,6 +100,26 @@ export function TournamentKnockoutBoard({
   const placements = computeKnockoutPlacements(knockout);
   const finalMatch = knockout.find((match) => match.round === "final");
   const finalReady = Boolean(finalMatch && resolveKnockoutOutcome(finalMatch).winnerId);
+
+  // C6-G D2: advisory read-only preview from D1 shared planning core (not authoritative).
+  const previewOptions: KnockoutOptions = {
+    format,
+    includeThirdPlace,
+    includePlacement5: format === 8 && includePlacement5,
+    includePlacement7: format === 8 && includePlacement7,
+  };
+  const qualificationPreview = buildKnockoutQualificationPreview({
+    groups,
+    memberIdsByGroupId,
+    matches,
+    options: previewOptions,
+  });
+  const seedLabelByParticipantId = Object.fromEntries(
+    qualificationPreview.qualifiers.map((qualifier) => [
+      qualifier.applicationId,
+      qualifier.seedLabel,
+    ]),
+  );
 
   async function run(task: () => Promise<{ error: string | null; notice?: string | null }>) {
     setPending(true);
@@ -207,6 +231,15 @@ export function TournamentKnockoutBoard({
               </label>
             </>
           ) : null}
+
+          <KnockoutQualificationPreviewPanel
+            groups={groups}
+            teamLabels={teamLabels}
+            knockoutExists={knockout.length > 0}
+            preview={qualificationPreview}
+            seedLabelByParticipantId={seedLabelByParticipantId}
+          />
+
           <button
             type="submit"
             disabled={pending}
@@ -408,6 +441,225 @@ export function TournamentKnockoutBoard({
           <p>Dieser Vorgang kann nicht rückgängig gemacht werden.</p>
         </div>
       </ConfirmModal>
+    </div>
+  );
+}
+
+function KnockoutQualificationPreviewPanel({
+  groups,
+  teamLabels,
+  knockoutExists,
+  preview,
+  seedLabelByParticipantId,
+}: {
+  groups: TournamentGroupRecord[];
+  teamLabels: Record<string, string>;
+  knockoutExists: boolean;
+  preview: ReturnType<typeof buildKnockoutQualificationPreview>;
+  seedLabelByParticipantId: Record<string, string>;
+}) {
+  const groupNameById = Object.fromEntries(groups.map((group) => [group.id, group.name]));
+
+  return (
+    <section
+      className="grid gap-4 border border-line bg-surface/40 px-4 py-4"
+      aria-labelledby="ko-qualification-preview-title"
+    >
+      <div className="grid gap-1.5">
+        <h3
+          id="ko-qualification-preview-title"
+          className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+        >
+          Qualifikationsvorschau
+        </h3>
+        <p className="text-[13px] leading-relaxed text-muted">
+          Unverbindliche Vorschau aus der aktuellen Gruppentabelle. Die Erzeugung der
+          K.-o.-Runde bleibt serverseitig maßgeblich.
+        </p>
+      </div>
+
+      {!preview.progress.complete ? (
+        <div
+          className="border border-brand-yellow/50 bg-brand-yellow/10 px-3.5 py-3"
+          role="status"
+        >
+          <p className="text-[13px] font-semibold text-ink">Vorläufige Vorschau</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
+            Die Gruppenphase ist noch nicht vollständig abgeschlossen. Platzierungen und
+            K.-o.-Paarungen können sich noch ändern.
+          </p>
+        </div>
+      ) : null}
+
+      {knockoutExists ? (
+        <div className="border border-line bg-white px-3.5 py-3" role="status">
+          <p className="text-[13px] leading-relaxed text-ink">
+            Eine K.-o.-Phase ist bereits vorhanden. Beim erneuten Erzeugen wird die bestehende
+            K.-o.-Phase ersetzt.
+          </p>
+        </div>
+      ) : null}
+
+      {groups.length === 0 ? (
+        <p className="text-[14px] text-muted">Noch keine Gruppen vorhanden.</p>
+      ) : (
+        <div className="grid gap-4">
+          <div className="grid gap-3">
+            <h4 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+              Aktuelle Gruppentabellen
+            </h4>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {groups.map((group) => {
+                const standings = preview.standingsByGroupId[group.id] ?? [];
+                return (
+                  <div key={group.id} className="border border-line bg-white p-3">
+                    <p className="text-[13px] font-semibold text-ink">{group.name}</p>
+                    {standings.length === 0 ? (
+                      <p className="mt-2 text-[13px] text-muted">Noch keine Teams in dieser Gruppe.</p>
+                    ) : (
+                      <PreviewStandingsTable standings={standings} teamLabels={teamLabels} />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            <h4 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+              Qualifizierte Teams
+            </h4>
+            {preview.qualifiers.length === 0 ? (
+              <p className="text-[14px] text-muted">Noch keine Qualifikationsplätze ableitbar.</p>
+            ) : (
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {preview.qualifiers.map((qualifier) => {
+                  const group = groups[qualifier.groupIndex];
+                  return (
+                    <li
+                      key={`${qualifier.seedLabel}-${qualifier.applicationId}`}
+                      className="border border-line bg-white px-3 py-2.5"
+                    >
+                      <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                        {qualifier.seedLabel} · Rang {qualifier.rank}
+                        {group ? ` · ${groupNameById[group.id] ?? group.name}` : ""}
+                      </p>
+                      <p className="mt-1 text-[14px] text-ink break-words">
+                        {teamLabel(teamLabels, qualifier.applicationId, "Team")}
+                      </p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+
+          <div className="grid gap-3">
+            <h4 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+              Erste K.-o.-Runde
+            </h4>
+            {preview.plan.error ? (
+              <p className="text-[14px] text-[#9a2b2b]" role="status">
+                {preview.plan.error}
+              </p>
+            ) : preview.firstRoundMatches.length === 0 ? (
+              <p className="text-[14px] text-muted">
+                Für die aktuelle Konfiguration liegen noch keine ersten K.-o.-Paarungen vor.
+              </p>
+            ) : (
+              <ul className="grid gap-2">
+                {preview.firstRoundMatches.map((match) => {
+                  const homeSeed = match.homeId
+                    ? seedLabelByParticipantId[match.homeId]
+                    : null;
+                  const awaySeed = match.awayId
+                    ? seedLabelByParticipantId[match.awayId]
+                    : null;
+                  return (
+                    <li
+                      key={match.key}
+                      className="grid gap-2 border border-line bg-white px-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:items-center"
+                    >
+                      <div>
+                        <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                          {homeSeed ?? "—"}
+                        </p>
+                        <p className="mt-1 text-[14px] text-ink break-words">
+                          {teamLabel(teamLabels, match.homeId, "steht noch nicht fest")}
+                        </p>
+                      </div>
+                      <p className="text-[12px] font-semibold tracking-[0.08em] text-muted uppercase sm:text-center">
+                        vs.
+                      </p>
+                      <div className="sm:text-right">
+                        <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                          {awaySeed ?? "—"}
+                        </p>
+                        <p className="mt-1 text-[14px] text-ink break-words">
+                          {teamLabel(teamLabels, match.awayId, "steht noch nicht fest")}
+                        </p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PreviewStandingsTable({
+  standings,
+  teamLabels,
+}: {
+  standings: StandingRow[];
+  teamLabels: Record<string, string>;
+}) {
+  return (
+    <div className="mt-2 overflow-x-auto">
+      <table className="min-w-full text-left text-[13px] text-ink">
+        <thead>
+          <tr className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+            <th className="pb-2 pr-3">Pl</th>
+            <th className="pb-2 pr-3">Team</th>
+            <th className="pb-2 pr-3">Sp</th>
+            <th className="pb-2 pr-3">Diff</th>
+            <th className="pb-2">Pkt</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((row) => {
+            const qualifying = row.rank === 1 || row.rank === 2;
+            return (
+              <tr
+                key={row.applicationId}
+                className={`border-t border-line ${qualifying ? "bg-brand-yellow/10" : ""}`}
+              >
+                <td className="py-2 pr-3">
+                  <span className="font-semibold">{row.rank}</span>
+                  {qualifying ? (
+                    <span className="ml-1 text-[10px] font-semibold tracking-[0.06em] text-muted uppercase">
+                      Q
+                    </span>
+                  ) : null}
+                </td>
+                <td className="py-2 pr-3 break-words">
+                  {teamLabel(teamLabels, row.applicationId, "Team")}
+                </td>
+                <td className="py-2 pr-3">{row.played}</td>
+                <td className="py-2 pr-3">
+                  {row.goalDiff > 0 ? `+${row.goalDiff}` : row.goalDiff}
+                  <span className="ml-1 text-muted">({formatGoals(row.goalsFor, row.goalsAgainst)})</span>
+                </td>
+                <td className="py-2 font-semibold">{row.points}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
