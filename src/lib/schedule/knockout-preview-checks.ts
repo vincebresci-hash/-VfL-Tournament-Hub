@@ -219,10 +219,13 @@ export function runKnockoutPreviewChecks() {
     "generateKnockoutAction does not retain duplicate standings→qualify→plan pipeline",
   );
 
+  // D1 contract: helper stays UI-independent. D2 may consume it from KnockoutBoard.
   assert(
-    !knockoutBoard.includes("buildKnockoutQualificationPreview") &&
-      !knockoutBoard.includes("knockout-preview"),
-    "D1 does not add preview UX to TournamentKnockoutBoard",
+    !helper.includes("from \"react\"") &&
+      !helper.includes("TournamentKnockoutBoard") &&
+      (!knockoutBoard.includes("buildKnockoutQualificationPreview") ||
+        knockoutBoard.includes('from "@/lib/schedule/knockout-preview"')),
+    "D1 helper remains UI-independent; board may only consume shared helper (D2)",
   );
 
   assert(
