@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AdminTournamentDetailView } from "@/components/admin/AdminTournamentDetailView";
 import {
+  hasPermissionInAuthorization,
+  requireAdminSession,
+} from "@/lib/auth/guards";
+import { canManageSystem } from "@/lib/auth/roles";
+import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
   listAdminClubs,
@@ -11,6 +16,9 @@ import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import { listExternalTeamsForTournamentAction } from "@/lib/db/mein-turnierplan-participants-actions";
+import { teamLabelsFromParticipants } from "@/lib/schedule/admin";
+import { buildTournamentMatchdayDashboardModel } from "@/lib/schedule/tournament-matchday-dashboard";
+import type { Permission } from "@/types/rbac";
 
 type TournamentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -24,6 +32,39 @@ async function loadTournament(idOrSlug: string) {
     (await getAdminTournamentById(idOrSlug)) ??
     (await getAdminTournamentBySlug(idOrSlug))
   );
+}
+
+async function matchdayPermissionFlags() {
+  const adminAccess = await requireAdminSession();
+  if ("error" in adminAccess && adminAccess.error) {
+    return {
+      canScheduleManage: false,
+      canResultsManage: false,
+      canTournamentsManage: false,
+    };
+  }
+  if (!adminAccess.session || !adminAccess.authorization) {
+    return {
+      canScheduleManage: false,
+      canResultsManage: false,
+      canTournamentsManage: false,
+    };
+  }
+
+  const system = canManageSystem(adminAccess.session.user.role);
+  const can = (permission: Permission) =>
+    system ||
+    hasPermissionInAuthorization(
+      adminAccess.authorization,
+      adminAccess.session,
+      permission,
+    );
+
+  return {
+    canScheduleManage: can("schedule.manage"),
+    canResultsManage: can("results.manage"),
+    canTournamentsManage: can("tournaments.manage"),
+  };
 }
 
 export async function generateMetadata({
@@ -53,14 +94,32 @@ export default async function AdminTournamentDetailPage({
     notFound();
   }
 
-  const [stage, externalTeamsResult, participantsResult, clubsResult, lifecycle] =
-    await Promise.all([
-      getAdminTournamentStage(tournament.id),
-      listExternalTeamsForTournamentAction(tournament.id),
-      getTournamentParticipants(tournament.id),
-      listAdminClubs(),
-      getAdminLifecyclePanelModel(tournament.id),
-    ]);
+  const [
+    stage,
+    externalTeamsResult,
+    participantsResult,
+    clubsResult,
+    lifecycle,
+    permissions,
+  ] = await Promise.all([
+    getAdminTournamentStage(tournament.id),
+    listExternalTeamsForTournamentAction(tournament.id),
+    getTournamentParticipants(tournament.id),
+    listAdminClubs(),
+    getAdminLifecyclePanelModel(tournament.id),
+    matchdayPermissionFlags(),
+  ]);
+
+  const matchday = lifecycle.model
+    ? buildTournamentMatchdayDashboardModel({
+        tournamentId: tournament.id,
+        effective: lifecycle.model.effective,
+        groups: stage.groups,
+        memberIdsByGroupId: stage.memberIdsByGroupId,
+        matches: stage.matches,
+        permissions,
+      })
+    : null;
 
   return (
     <AdminTournamentDetailView
@@ -69,12 +128,15 @@ export default async function AdminTournamentDetailPage({
       externalTeams={externalTeamsResult.teams}
       participants={participantsResult}
       groups={stage.groups.map((group) => ({ id: group.id, name: group.name }))}
+      fields={stage.fields}
+      teamLabels={teamLabelsFromParticipants(participantsResult)}
       clubs={clubsResult.clubs.map((club) => ({
         id: club.id,
         name: club.name,
         logoUrl: club.logoUrl,
       }))}
       lifecycle={lifecycle.model}
+      matchday={matchday}
       current={bereich === "teilnehmer" ? "participants" : "overview"}
     />
   );
