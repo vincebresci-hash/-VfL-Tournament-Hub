@@ -14,9 +14,9 @@ import { acceptedParticipants } from "@/lib/schedule/admin";
 import { getTournamentCapacityWithExternal } from "@/lib/mein-turnierplan-participants";
 import type { ExternalTeamAdminRow } from "@/lib/db/mein-turnierplan-participants-actions";
 import type { TournamentParticipant } from "@/lib/tournament-participants";
+import type { AdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication, ApplicationStatus } from "@/types/application";
-import type { TournamentStageStatus } from "@/types/schedule";
 
 type AdminTournamentDetailViewProps = {
   tournament: AdminTournamentRecord;
@@ -25,7 +25,7 @@ type AdminTournamentDetailViewProps = {
   participants: TournamentParticipant[];
   groups: Array<{ id: string; name: string }>;
   clubs: Array<{ id: string; name: string; logoUrl: string | null }>;
-  stageStatus: TournamentStageStatus;
+  lifecycle: AdminLifecyclePanelModel | null;
   current: "overview" | "participants";
 };
 
@@ -42,7 +42,7 @@ export function AdminTournamentDetailView({
   participants,
   groups,
   clubs,
-  stageStatus,
+  lifecycle,
   current,
 }: AdminTournamentDetailViewProps) {
   const related = applications.filter(
@@ -100,7 +100,7 @@ export function AdminTournamentDetailView({
   return (
     <TournamentAdminChrome
       tournament={tournament}
-      stageStatus={stageStatus}
+      lifecycle={lifecycle}
       current={current}
     >
       <section className={adminIdentityHeroClass}>

@@ -1,14 +1,14 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { StatusBadge } from "@/components/tournaments/StatusBadge";
+import { TournamentLifecyclePanel } from "@/components/admin/TournamentLifecyclePanel";
 import {
   adminCompactPrimaryButtonClass,
   adminIdentityHeroClass,
-  adminStatusBadgeClass,
   adminTextLinkClass,
 } from "@/components/admin/AdminPanel";
 import { formatDateDe } from "@/lib/format";
-import { tournamentStageStatusLabel, type TournamentStageStatus } from "@/types/schedule";
+import type { AdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import type { AdminTournamentRecord } from "@/types/admin";
 
 type NavKey =
@@ -22,7 +22,7 @@ type NavKey =
 
 type TournamentAdminChromeProps = {
   tournament: AdminTournamentRecord;
-  stageStatus: TournamentStageStatus;
+  lifecycle: AdminLifecyclePanelModel | null;
   current: NavKey;
   children?: ReactNode;
 };
@@ -46,7 +46,7 @@ function navClass(active: boolean) {
 
 export function TournamentAdminChrome({
   tournament,
-  stageStatus,
+  lifecycle,
   current,
   children,
 }: TournamentAdminChromeProps) {
@@ -106,17 +106,24 @@ export function TournamentAdminChrome({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <span
-              className={`${adminStatusBadgeClass} bg-brand-yellow text-navy`}
-            >
-              {tournamentStageStatusLabel[stageStatus]}
-            </span>
-            <StatusBadge status={tournament.status} />
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                Öffentlicher Status
+              </span>
+              <StatusBadge status={tournament.status} />
+            </div>
             <Link href={`${base}/bearbeiten`} className={adminCompactPrimaryButtonClass}>
               Bearbeiten
             </Link>
           </div>
         </div>
+
+        {lifecycle ? (
+          <TournamentLifecyclePanel
+            tournamentId={tournament.id}
+            model={lifecycle}
+          />
+        ) : null}
       </div>
 
       <nav
