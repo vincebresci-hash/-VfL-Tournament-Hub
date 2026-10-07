@@ -17,6 +17,7 @@ import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCa
 import { TournamentScheduleCards } from "@/components/tournaments/TournamentScheduleCards";
 import { TournamentStandingsSection } from "@/components/tournaments/TournamentStandingsSection";
 import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKnockoutRounds";
+import { TeamNameWithLogo } from "@/components/tournaments/TeamNameWithLogo";
 
 import type { TournamentStatus } from "@/types/tournament";
 
@@ -157,11 +158,16 @@ export function TournamentPublicStage({
       },
     ];
   });
-  const knockoutPlacementViews = placements.map((row) => ({
-    id: `${row.place}-${row.applicationId}`,
-    place: row.place,
-    label: teamLabel(teamLabels, row.applicationId),
-  }));
+  const knockoutPlacementViews = placements.map((row) => {
+    const mark = teamMarks[row.applicationId];
+    return {
+      id: `${row.place}-${row.applicationId}`,
+      place: row.place,
+      label: teamLabel(teamLabels, row.applicationId),
+      logoUrl: mark?.logoUrl ?? null,
+      clubName: mark?.clubName ?? null,
+    };
+  });
 
   return (
     <div>
@@ -231,7 +237,11 @@ export function TournamentPublicStage({
 
       {current === "uebersicht" && placements.length > 0 ? (
         <section className="mt-8">
-          <PublicPlacements placements={placements} teamLabels={teamLabels} />
+          <PublicPlacements
+            placements={placements}
+            teamLabels={teamLabels}
+            teamMarks={teamMarks}
+          />
         </section>
       ) : null}
 
@@ -291,6 +301,7 @@ export function TournamentPublicStage({
             <TournamentScheduleCards
               matches={stage.matches}
               teamLabels={teamLabels}
+              teamMarks={teamMarks}
               matchTeamId={matchTeamId}
               phaseOrGroupLabel={(match) =>
                 match.phase === "knockout" && match.round
@@ -383,9 +394,11 @@ function knockoutResultText(match: {
 function PublicPlacements({
   placements,
   teamLabels,
+  teamMarks,
 }: {
   placements: PlacementRow[];
   teamLabels: Record<string, string>;
+  teamMarks: Record<string, { logoUrl: string | null; clubName: string }>;
 }) {
   return (
     <article className="border border-line bg-white p-5">
@@ -393,11 +406,24 @@ function PublicPlacements({
         Abschlussplatzierung
       </h2>
       <ol className="mt-4 grid gap-2">
-        {placements.map((row) => (
-          <li key={`${row.place}-${row.applicationId}`} className="text-[15px] text-ink">
-            {row.place}. {teamLabel(teamLabels, row.applicationId)}
-          </li>
-        ))}
+        {placements.map((row) => {
+          const mark = teamMarks[row.applicationId];
+          return (
+            <li
+              key={`${row.place}-${row.applicationId}`}
+              className="flex min-w-0 items-center gap-2 text-[15px] text-ink"
+            >
+              <span className="shrink-0 tabular-nums font-semibold">{row.place}.</span>
+              <TeamNameWithLogo
+                label={teamLabel(teamLabels, row.applicationId)}
+                logoUrl={mark?.logoUrl ?? null}
+                clubName={mark?.clubName ?? null}
+                size="xs"
+                nameClassName="text-[15px]"
+              />
+            </li>
+          );
+        })}
       </ol>
     </article>
   );

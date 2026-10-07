@@ -15,6 +15,7 @@ import { runTournamentDetailV2C2Checks } from "@/lib/tournaments/tournament-deta
 import { runTournamentDetailV2C3Checks } from "@/lib/tournaments/tournament-detail-v2c3-checks";
 import { runTournamentDetailV2C4Checks } from "@/lib/tournaments/tournament-detail-v2c4-checks";
 import { runTournamentDetailV2C5AChecks } from "@/lib/tournaments/tournament-detail-v2c5a-checks";
+import { runTeamLogoDisplayChecks } from "@/lib/tournaments/team-logo-display-checks";
 import { runLiveHubNativeC5BChecks } from "@/lib/live/live-hub-native-c5b-checks";
 import { runScheduleSelfChecks } from "./run-checks";
 import { runPlanPreviewChecks } from "./plan-preview-checks";
@@ -211,6 +212,7 @@ try {
   const tournamentDetailV2C3Checks = runTournamentDetailV2C3Checks();
   const tournamentDetailV2C4Checks = runTournamentDetailV2C4Checks();
   const tournamentDetailV2C5AChecks = runTournamentDetailV2C5AChecks();
+  const teamLogoDisplayChecks = runTeamLogoDisplayChecks();
   const liveHubNativeC5BChecks = runLiveHubNativeC5BChecks();
   console.log(`schedule-checks: ${schedule}`);
   console.log(`plan-preview-checks: ${planPreviewChecks}`);
@@ -321,6 +323,7 @@ try {
   console.log(`tournament-detail-v2c3-checks: ${tournamentDetailV2C3Checks}`);
   console.log(`tournament-detail-v2c4-checks: ${tournamentDetailV2C4Checks}`);
   console.log(`tournament-detail-v2c5a-checks: ${tournamentDetailV2C5AChecks}`);
+  console.log(`team-logo-display-checks: ${teamLogoDisplayChecks}`);
   console.log(`live-hub-native-c5b-checks: ${liveHubNativeC5BChecks}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : error);

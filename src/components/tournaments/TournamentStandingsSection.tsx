@@ -101,7 +101,8 @@ export function TournamentStandingsSection({
                                 <ParticipantClubLogo
                                   logoUrl={mark.logoUrl}
                                   clubName={mark.clubName}
-                                  size="sm"
+                                  size="xs"
+                                  fallback="none"
                                 />
                               ) : null}
                               <span className="min-w-0 leading-snug font-medium break-words">

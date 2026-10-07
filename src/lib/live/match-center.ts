@@ -10,6 +10,8 @@ export const LIVE_TYPO = {
 } as const;
 
 export const LIVE_LOGO_SIZE = {
+  /** Compact table / Spielplan rows (~20–24px). */
+  xs: 24,
   sm: 32,
   md: 40,
   lg: 48,

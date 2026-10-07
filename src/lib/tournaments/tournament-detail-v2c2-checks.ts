@@ -166,10 +166,12 @@ export function runTournamentDetailV2C2Checks() {
   );
 
   assert(
-    !schedule.includes("ParticipantClubLogo") &&
-      !schedule.includes("logoUrl") &&
+    schedule.includes("TeamNameWithLogo") &&
+      schedule.includes("teamMarks") &&
+      !schedule.includes("resolveApplicationParticipantLogoUrl") &&
+      !schedule.includes("resolveParticipantLogoUrl") &&
       logo.includes("export function ParticipantClubLogo"),
-    "no new Spielplan logo behavior; ParticipantClubLogo untouched",
+    "Spielplan uses ID-keyed teamMarks + TeamNameWithLogo; no new logo resolver",
   );
 
   assert(
