@@ -26,6 +26,11 @@ import {
 import { datetimeLocalToIso } from "@/lib/schedule/datetime";
 import { prepareTournamentPlanFromDb } from "@/lib/db/plan-preview-prepare";
 import { persistPreparedGroupSchedule } from "@/lib/db/plan-schedule-persist";
+import {
+  loadTournamentLifecycleSnapshot,
+  syncLifecycleAfterGroupsChanged,
+} from "@/lib/db/tournament-lifecycle";
+import { lifecycleAllowsDestructiveGroupScheduleMutation } from "@/lib/schedule/tournament-lifecycle";
 import { MATCH_STATUSES, type MatchStatus } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -91,12 +96,23 @@ function buildRegenerationStageSnapshot(
 function blockedGroupScheduleMutationError(
   tournamentStatus: string | null | undefined,
   stage: AdminTournamentStage,
+  effectiveLifecycle?: "setup" | "group_stage" | "knockout_stage" | "completed" | null,
 ): string | null {
   const policy = canRegenerateGroupSchedule(
     buildRegenerationStageSnapshot(tournamentStatus, stage),
   );
   if (policy.decision === "blocked") {
     return policy.reason;
+  }
+  // C6-H D2: lifecycle may only tighten destructive group-schedule mutations.
+  if (
+    effectiveLifecycle &&
+    !lifecycleAllowsDestructiveGroupScheduleMutation({
+      effectiveLifecycle,
+      regenerationPolicy: policy,
+    })
+  ) {
+    return "Der Gruppenspielplan darf im aktuellen Turnier-Lebenszyklus nicht verändert werden.";
   }
   return null;
 }
@@ -215,6 +231,11 @@ export async function createTournamentGroupAction(
     return { error: constraintMessage(error, "Die Gruppe konnte nicht erstellt werden.") };
   }
 
+  const lifecycleSync = await syncLifecycleAfterGroupsChanged(tournamentId);
+  if (lifecycleSync.error) {
+    return { error: lifecycleSync.error };
+  }
+
   revalidateStage(loaded.tournament);
   return { error: null };
 }
@@ -282,6 +303,12 @@ export async function deleteTournamentGroupAction(
 
   if (error) {
     return { error: constraintMessage(error, "Die Gruppe konnte nicht gelöscht werden.") };
+  }
+
+  // C6-H D2: after last group deleted (no KO) → setup; otherwise group_stage.
+  const lifecycleSync = await syncLifecycleAfterGroupsChanged(tournamentId);
+  if (lifecycleSync.error) {
+    return { error: lifecycleSync.error };
   }
 
   revalidateStage(loaded.tournament);
@@ -472,6 +499,11 @@ export async function autoDistributeTeamsAction(
     if (error) {
       return { error: constraintMessage(error, "Die automatische Verteilung ist fehlgeschlagen."), notice: null };
     }
+  }
+
+  const lifecycleSync = await syncLifecycleAfterGroupsChanged(tournamentId);
+  if (lifecycleSync.error) {
+    return { error: lifecycleSync.error, notice: null };
   }
 
   revalidateStage(loaded.tournament);
@@ -858,15 +890,20 @@ export async function deleteTournamentScheduleAction(
   }
 
   const stage = await getAdminTournamentStage(tournamentId);
+  const lifecycle = await loadTournamentLifecycleSnapshot(tournamentId);
 
   // C6-B: same shared policy as generate — KO/results/live/completed must hard-block.
-  // Residual TOCTOU (concurrent result/live write after this read) is accepted for C6-B.
+  // C6-H D2: lifecycle may tighten further. Residual TOCTOU accepted/deferred.
   const blockedDelete = blockedGroupScheduleMutationError(
     loaded.tournament.status,
     stage,
+    lifecycle.snapshot?.effective ?? null,
   );
   if (blockedDelete) {
     return { error: blockedDelete };
+  }
+  if (lifecycle.error) {
+    return { error: lifecycle.error };
   }
 
   const supabase = await createClient();

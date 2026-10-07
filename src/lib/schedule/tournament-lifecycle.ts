@@ -12,6 +12,10 @@ import {
   canMutateGroupResults,
   type GroupResultLockPolicy,
 } from "@/lib/schedule/group-result-lock";
+import {
+  resolveKnockoutOutcome,
+  type KnockoutMatchLike,
+} from "@/lib/schedule/knockout";
 
 export const TOURNAMENT_LIFECYCLE_STATES = [
   "setup",
@@ -317,4 +321,42 @@ export function lifecycleGroupResultMutationPolicy(
   return canMutateGroupResults(
     facts.knockoutExists ? [{ phase: "knockout" }] : [],
   );
+}
+
+type CompletionEligibilityMatch = Partial<KnockoutMatchLike> & {
+  phase?: string | null;
+  homeApplicationId?: string | null;
+  awayApplicationId?: string | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  status?: KnockoutMatchLike["status"] | string | null;
+};
+
+/**
+ * Existing product completion eligibility: final has a resolvable winner.
+ * Reuses resolveKnockoutOutcome — no second KO-completion algorithm.
+ */
+export function isTournamentCompletionEligible(
+  matches: ReadonlyArray<CompletionEligibilityMatch>,
+): boolean {
+  const finalMatch = matches.find(
+    (match) => match.phase === "knockout" && match.round === "final",
+  );
+  if (!finalMatch) {
+    return false;
+  }
+  const normalized: KnockoutMatchLike = {
+    homeApplicationId: finalMatch.homeApplicationId ?? null,
+    awayApplicationId: finalMatch.awayApplicationId ?? null,
+    homeExternalTeamId: finalMatch.homeExternalTeamId ?? null,
+    awayExternalTeamId: finalMatch.awayExternalTeamId ?? null,
+    homeScore: finalMatch.homeScore ?? null,
+    awayScore: finalMatch.awayScore ?? null,
+    status: (finalMatch.status as KnockoutMatchLike["status"]) ?? "scheduled",
+    decidedBy: finalMatch.decidedBy ?? null,
+    homePenalties: finalMatch.homePenalties ?? null,
+    awayPenalties: finalMatch.awayPenalties ?? null,
+    round: finalMatch.round ?? null,
+  };
+  return Boolean(resolveKnockoutOutcome(normalized).winnerId);
 }

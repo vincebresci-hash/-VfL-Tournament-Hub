@@ -22,6 +22,8 @@ import {
   type RegenerationPolicyResult,
   type TournamentPlanPreview,
 } from "@/lib/schedule/plan-preview";
+import { loadTournamentLifecycleSnapshot } from "@/lib/db/tournament-lifecycle";
+import { lifecycleAllowsDestructiveGroupScheduleMutation } from "@/lib/schedule/tournament-lifecycle";
 
 export type PersistGroupScheduleStatus =
   | "success"
@@ -122,6 +124,28 @@ export async function persistPreparedGroupSchedule(
   // C6-B: blocked before confirmation; confirmReplace cannot bypass blocked.
   if (policy.decision === "blocked") {
     return result("blocked", policy.reason, { policy, fingerprint });
+  }
+
+  // C6-H D2: lifecycle may only tighten; never unlock a C6-B block.
+  const lifecycle = await loadTournamentLifecycleSnapshot(tournamentId);
+  if (lifecycle.error || !lifecycle.snapshot) {
+    return result(
+      "blocked",
+      lifecycle.error ?? "Der Turnier-Lebenszyklus konnte nicht geprüft werden.",
+      { policy, fingerprint },
+    );
+  }
+  if (
+    !lifecycleAllowsDestructiveGroupScheduleMutation({
+      effectiveLifecycle: lifecycle.snapshot.effective,
+      regenerationPolicy: policy,
+    })
+  ) {
+    return result(
+      "blocked",
+      "Der Gruppenspielplan darf im aktuellen Turnier-Lebenszyklus nicht verändert werden.",
+      { policy, fingerprint },
+    );
   }
 
   if (policy.decision === "allowedWithConfirmation" && input.confirmReplace !== true) {

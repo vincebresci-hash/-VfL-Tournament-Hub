@@ -401,10 +401,14 @@ export function runTournamentLifecycleChecks() {
       !lifecycle.includes("qualifyTopTwo") &&
       !lifecycle.includes("buildKnockoutPlan") &&
       !lifecycle.includes("buildKnockoutQualificationPreview") &&
-      !lifecycle.includes("resolveKnockoutOutcome") &&
       !lifecycle.includes("isKnockoutPhaseComplete") &&
       !lifecycle.includes("function isGroupStageComplete"),
     "no second standings/qualification/KO-completion/completeness algorithm",
+  );
+  assert(
+    lifecycle.includes("export function isTournamentCompletionEligible") &&
+      lifecycle.includes("resolveKnockoutOutcome"),
+    "completion eligibility reuses resolveKnockoutOutcome (no second algorithm)",
   );
   assert(
     lifecycle.includes('from "@/lib/schedule/group-result-lock"') &&

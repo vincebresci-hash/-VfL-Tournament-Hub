@@ -27,10 +27,12 @@ import type {
 import { EMAIL_TEMPLATE_TYPES, type AppSettings, type EmailTemplateInput, type AdminTournamentInput } from "@/types/admin";
 import { settingsToRows } from "@/lib/settings";
 import { sendApplicationStatusEmail } from "@/lib/email/status-mail";
-import { AGE_GROUPS, TOURNAMENT_STATUSES } from "@/types/tournament";
+import { AGE_GROUPS, TOURNAMENT_STATUSES, type TournamentStatus } from "@/types/tournament";
 import { slugifyTournamentName } from "@/lib/tournaments";
 import { validateMeinTurnierplanInput } from "@/lib/mein-turnierplan";
 import { canAcceptApplicationIntoCapacity } from "@/lib/mein-turnierplan-participants";
+import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { isTournamentCompletionEligible } from "@/lib/db/tournament-lifecycle";
 import {
   APPLICATION_HARD_DELETE_BLOCKED_MESSAGE,
   APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC,
@@ -847,6 +849,40 @@ export async function updateTournamentAction(
   }
 
   const supabase = await createClient();
+  const { data: existing, error: existingError } = await supabase
+    .from("tournaments")
+    .select("id, status")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (existingError || !existing) {
+    return {
+      error: toUserFacingDbError("Das Turnier wurde nicht gefunden.", existingError),
+    };
+  }
+
+  const previousStatus = existing.status as TournamentStatus;
+  const nextStatus = parsed.value.status;
+
+  // C6-H D2: completed demotion via settings is refused — use reopenTournamentAction.
+  if (previousStatus === "completed" && nextStatus !== "completed") {
+    return {
+      error:
+        "Ein abgeschlossenes Turnier kann nicht über die Einstellungen wiedereröffnet werden. Bitte die explizite Wiedereröffnung verwenden.",
+    };
+  }
+
+  // C6-H D2: entering completed requires the same final-winner eligibility as completeTournamentAction.
+  if (previousStatus !== "completed" && nextStatus === "completed") {
+    const stage = await getAdminTournamentStage(id);
+    if (!isTournamentCompletionEligible(stage.matches)) {
+      return {
+        error: "Das Finale muss zuerst mit einem eindeutigen Sieger abgeschlossen sein.",
+      };
+    }
+    Object.assign(parsed.value, { lifecycle_state: "completed" as const });
+  }
+
   const { data, error } = await supabase
     .from("tournaments")
     .update(parsed.value)
