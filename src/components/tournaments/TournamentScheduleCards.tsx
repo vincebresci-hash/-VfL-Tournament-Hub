@@ -1,3 +1,4 @@
+import { TeamNameWithLogo, type TeamMark } from "@/components/tournaments/TeamNameWithLogo";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
 import { teamLabel } from "@/lib/schedule/names";
 import type { TournamentMatchRecord } from "@/types/schedule";
@@ -5,6 +6,7 @@ import type { TournamentMatchRecord } from "@/types/schedule";
 type TournamentScheduleCardsProps = {
   matches: TournamentMatchRecord[];
   teamLabels: Record<string, string>;
+  teamMarks?: Record<string, TeamMark>;
   matchTeamId: (
     applicationId: string | null,
     externalTeamId?: string | null,
@@ -20,12 +22,24 @@ type TournamentScheduleCardsProps = {
 export function TournamentScheduleCards({
   matches,
   teamLabels,
+  teamMarks,
   matchTeamId,
   phaseOrGroupLabel,
   fieldLabel,
 }: TournamentScheduleCardsProps) {
   if (matches.length === 0) {
     return null;
+  }
+
+  function sideView(applicationId: string | null, externalTeamId?: string | null) {
+    const id = matchTeamId(applicationId, externalTeamId);
+    const label = teamLabel(teamLabels, id);
+    const mark = id ? teamMarks?.[id] : undefined;
+    return {
+      label,
+      logoUrl: mark?.logoUrl ?? null,
+      clubName: mark?.clubName ?? null,
+    };
   }
 
   return (
@@ -41,14 +55,8 @@ export function TournamentScheduleCards({
 
       <ul className="mt-4 grid grid-cols-1 gap-2.5">
         {matches.map((match) => {
-          const home = teamLabel(
-            teamLabels,
-            matchTeamId(match.homeApplicationId, match.homeExternalTeamId),
-          );
-          const away = teamLabel(
-            teamLabels,
-            matchTeamId(match.awayApplicationId, match.awayExternalTeamId),
-          );
+          const home = sideView(match.homeApplicationId, match.homeExternalTeamId);
+          const away = sideView(match.awayApplicationId, match.awayExternalTeamId);
           const showScore =
             match.status === "completed" &&
             match.homeScore != null &&
@@ -77,15 +85,25 @@ export function TournamentScheduleCards({
 
               <div className="mt-2.5 flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[14px] leading-snug font-medium text-ink">
-                    {home}
-                  </p>
+                  <TeamNameWithLogo
+                    label={home.label}
+                    logoUrl={home.logoUrl}
+                    clubName={home.clubName}
+                    size="xs"
+                    nameClassName="text-[14px]"
+                  />
                   <p className="mt-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
                     vs
                   </p>
-                  <p className="mt-0.5 text-[14px] leading-snug font-medium text-ink">
-                    {away}
-                  </p>
+                  <div className="mt-0.5">
+                    <TeamNameWithLogo
+                      label={away.label}
+                      logoUrl={away.logoUrl}
+                      clubName={away.clubName}
+                      size="xs"
+                      nameClassName="text-[14px]"
+                    />
+                  </div>
                 </div>
                 <div className="shrink-0 pt-0.5 text-right">
                   {showScore ? (

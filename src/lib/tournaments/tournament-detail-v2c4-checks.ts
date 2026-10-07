@@ -281,7 +281,8 @@ export function runTournamentDetailV2C4Checks() {
   assert(
     placementFn.includes("placements.map((row)") &&
       !placementFn.includes(".sort(") &&
-      presenter.includes("{row.place}. {row.label}") &&
+      presenter.includes("{row.place}.") &&
+      presenter.includes("<TeamNameWithLogo") &&
       presenter.includes("Abschlussplatzierung"),
     "presenter keeps prepared placement order",
   );
@@ -300,7 +301,7 @@ export function runTournamentDetailV2C4Checks() {
 
   assert(
     presenter.includes("export function TournamentKnockoutRounds") &&
-      presenter.includes("<ParticipantClubLogo") &&
+      presenter.includes("<TeamNameWithLogo") &&
       stage.includes("<TournamentKnockoutRounds") &&
       stage.includes("rounds={knockoutRoundViews}") &&
       stage.includes("placements={knockoutPlacementViews}") &&

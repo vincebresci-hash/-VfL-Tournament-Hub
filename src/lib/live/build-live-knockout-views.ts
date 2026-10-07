@@ -117,11 +117,16 @@ export function buildLiveKnockoutViews(input: {
     },
   );
 
-  const placementViews: KnockoutPlacementView[] = placements.map((row) => ({
-    id: `${row.place}-${row.applicationId}`,
-    place: row.place,
-    label: input.teamMap.get(row.applicationId)?.label ?? "steht noch nicht fest",
-  }));
+  const placementViews: KnockoutPlacementView[] = placements.map((row) => {
+    const team = input.teamMap.get(row.applicationId);
+    return {
+      id: `${row.place}-${row.applicationId}`,
+      place: row.place,
+      label: team?.label ?? "steht noch nicht fest",
+      logoUrl: team?.logoUrl ?? null,
+      clubName: team?.clubName ?? null,
+    };
+  });
 
   return { rounds, placements: placementViews };
 }

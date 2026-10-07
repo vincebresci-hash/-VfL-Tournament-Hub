@@ -1,4 +1,4 @@
-import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
+import { TeamNameWithLogo } from "@/components/tournaments/TeamNameWithLogo";
 
 export type KnockoutMatchSideView = {
   label: string;
@@ -25,6 +25,8 @@ export type KnockoutPlacementView = {
   id: string;
   place: number;
   label: string;
+  logoUrl?: string | null;
+  clubName?: string | null;
 };
 
 type TournamentKnockoutRoundsProps = {
@@ -135,8 +137,15 @@ export function TournamentKnockoutRounds({
           </h3>
           <ol className="mt-3 grid gap-1.5">
             {placements.map((row) => (
-              <li key={row.id} className="text-[14px] leading-snug break-words text-ink">
-                {row.place}. {row.label}
+              <li key={row.id} className="flex min-w-0 items-center gap-2 text-[14px] text-ink">
+                <span className="shrink-0 tabular-nums font-semibold">{row.place}.</span>
+                <TeamNameWithLogo
+                  label={row.label}
+                  logoUrl={row.logoUrl}
+                  clubName={row.clubName}
+                  size="xs"
+                  nameClassName="text-[14px]"
+                />
               </li>
             ))}
           </ol>
@@ -148,13 +157,13 @@ export function TournamentKnockoutRounds({
 
 function KnockoutTeamRow({ side }: { side: KnockoutMatchSideView }) {
   return (
-    <div className="flex min-w-0 items-center gap-2.5">
-      {side.clubName ? (
-        <ParticipantClubLogo logoUrl={side.logoUrl} clubName={side.clubName} size="sm" />
-      ) : null}
-      <p className="min-w-0 text-[14px] leading-snug font-medium break-words text-ink">
-        {side.label}
-      </p>
-    </div>
+    <TeamNameWithLogo
+      label={side.label}
+      logoUrl={side.logoUrl}
+      clubName={side.clubName}
+      size="sm"
+      className="gap-2.5"
+      nameClassName="text-[14px]"
+    />
   );
 }
