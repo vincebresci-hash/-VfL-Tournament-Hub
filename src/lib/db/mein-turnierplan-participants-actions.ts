@@ -11,6 +11,11 @@ import {
   countConfirmedParticipants,
   type ExternalTeamParticipationStatus,
 } from "@/lib/mein-turnierplan-participants";
+import {
+  assertParticipantMembershipMutationAllowed,
+  deleteTournamentOwnedGroupMembership,
+} from "@/lib/db/tournament-participant-membership";
+import { canProceedParticipantExitAfterMembershipCleanup } from "@/lib/tournament-participant-membership";
 
 async function loadTournamentMeta(tournamentId: string) {
   const supabase = await createClient();
@@ -59,6 +64,7 @@ function revalidateTournamentPaths(slug: string, tournamentId: string) {
   revalidatePath("/admin/turniere");
   revalidatePath(`/admin/turniere/${tournamentId}`);
   revalidatePath(`/admin/turniere/${tournamentId}/gruppen`);
+  revalidatePath(`/admin/turniere/${tournamentId}/spielplan`);
   revalidatePath(`/turniere/${slug}`);
   revalidatePath("/turniere");
 }
@@ -184,6 +190,36 @@ async function setParticipationStatus(input: {
 
     if (!gate.ok) {
       return { error: gate.error, notice: null };
+    }
+  }
+
+  // Leaving confirmed set: match gate + membership-first cleanup (prevents stale group rows).
+  const leavingConfirmed =
+    input.status === "rejected"
+      ? selected.filter(
+          (team) => team.participationStatus === "confirmed" && team.externalActive,
+        )
+      : [];
+
+  if (leavingConfirmed.length > 0) {
+    const mutationGate = await assertParticipantMembershipMutationAllowed(input.tournamentId);
+    if (!mutationGate.tournament) {
+      return { error: mutationGate.error, notice: null };
+    }
+
+    for (const team of leavingConfirmed) {
+      const membership = await deleteTournamentOwnedGroupMembership({
+        tournamentId: input.tournamentId,
+        externalTeamId: team.id,
+      });
+      if (!canProceedParticipantExitAfterMembershipCleanup(membership)) {
+        return {
+          error:
+            membership.error ??
+            "Die Gruppenzuordnung konnte nicht entfernt werden. Der Teilnehmerstatus wurde nicht geändert.",
+          notice: null,
+        };
+      }
     }
   }
 

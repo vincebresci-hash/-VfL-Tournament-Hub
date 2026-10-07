@@ -13,6 +13,11 @@ import {
   countConfirmedParticipants,
 } from "@/lib/mein-turnierplan-participants";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import {
+  assertParticipantMembershipMutationAllowed,
+  deleteTournamentOwnedGroupMembership,
+} from "@/lib/db/tournament-participant-membership";
+import { canProceedParticipantExitAfterMembershipCleanup } from "@/lib/tournament-participant-membership";
 import type { TournamentParticipant } from "@/lib/tournament-participants";
 import {
   buildApplyLogoUrlOnlyState,
@@ -49,6 +54,7 @@ function revalidateTournamentPaths(slug: string, tournamentId: string) {
   revalidatePath("/admin/turniere");
   revalidatePath(`/admin/turniere/${tournamentId}`);
   revalidatePath(`/admin/turniere/${tournamentId}/gruppen`);
+  revalidatePath(`/admin/turniere/${tournamentId}/spielplan`);
   revalidatePath(`/turniere/${slug}`);
   revalidatePath("/turniere");
   revalidatePath("/live");
@@ -360,6 +366,25 @@ export async function deactivateManualTournamentParticipantAction(input: {
 
   if (!existing || existing.external_source !== "manual") {
     return { error: "Nur manuelle Teilnehmer können hier deaktiviert werden.", notice: null };
+  }
+
+  // Leaving confirmed set: match gate + membership-first cleanup.
+  const mutationGate = await assertParticipantMembershipMutationAllowed(input.tournamentId);
+  if (!mutationGate.tournament) {
+    return { error: mutationGate.error, notice: null };
+  }
+
+  const membership = await deleteTournamentOwnedGroupMembership({
+    tournamentId: input.tournamentId,
+    externalTeamId: input.externalTeamId,
+  });
+  if (!canProceedParticipantExitAfterMembershipCleanup(membership)) {
+    return {
+      error:
+        membership.error ??
+        "Die Gruppenzuordnung konnte nicht entfernt werden. Der Teilnehmerstatus wurde nicht geändert.",
+      notice: null,
+    };
   }
 
   const { error } = await supabase
