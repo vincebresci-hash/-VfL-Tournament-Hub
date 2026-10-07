@@ -125,18 +125,19 @@ export function runTeamLogoDisplayChecks(): string {
 
   // 1 + 2: schedule wiring — logo when mark present; text always
   assert(schedule.includes("teamMarks"), "Spielplan accepts teamMarks");
-  assert(schedule.includes("<TeamNameWithLogo"), "Spielplan renders logo+name");
-  assert(schedule.includes("home.label"), "home textual name retained");
-  assert(schedule.includes("away.label"), "away textual name retained");
+  assert(schedule.includes("<MatchSidesScoreBlock"), "Spielplan renders shared match sides");
+  assert(schedule.includes("home={home}"), "home side passed to match block");
+  assert(schedule.includes("away={away}"), "away side passed to match block");
   assert(
-    schedule.includes("showScore") &&
-      schedule.includes('match.status === "completed"') &&
-      schedule.includes("Ergebnis folgt"),
-    "score/status presentation intact",
+    schedule.includes('match.status === "completed"') &&
+      schedule.includes("homeScore={match.homeScore}") &&
+      schedule.includes("awayScore={match.awayScore}"),
+    "score/status presentation intact via prepared match scores",
   );
+  const matchBlock = read("src/components/tournaments/MatchSidesScoreBlock.tsx");
   assert(
-    schedule.includes("shrink-0") && schedule.includes("min-w-0"),
-    "mobile flex guards on schedule rows",
+    matchBlock.includes("shrink-0") && matchBlock.includes("min-w-0"),
+    "mobile flex guards on match side rows",
   );
   assert(
     !schedule.includes("resolveApplicationParticipantLogoUrl") &&
@@ -201,10 +202,11 @@ export function runTeamLogoDisplayChecks(): string {
   );
 
   // KO presentation + identity
-  assert(knockout.includes("<TeamNameWithLogo"), "KO uses shared name+logo");
-  assert(knockout.includes("side.label"), "KO textual name retained");
-  assert(knockout.includes("placements.map"), "KO placements list retained");
-  assert(knockout.includes("{row.place}."), "placement rank numbering retained");
+  assert(knockout.includes("<MatchSidesScoreBlock"), "KO uses shared match sides");
+  assert(knockout.includes("match.home"), "KO textual home side retained");
+  assert(knockout.includes("<TournamentPlacementsList"), "KO placements list retained");
+  const placementsListSrc = read("src/components/tournaments/TournamentPlacementsList.tsx");
+  assert(placementsListSrc.includes("{row.place}."), "placement rank numbering retained");
   assert(
     !knockoutLogic.includes("TeamNameWithLogo") &&
       !knockoutLogic.includes("ParticipantClubLogo"),

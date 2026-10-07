@@ -59,6 +59,10 @@ export function TournamentStandingsSection({
                   id={headingId}
                   className="font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-base"
                 >
+                  <span
+                    className="mr-2 inline-block h-3 w-1 translate-y-px bg-brand-yellow align-middle"
+                    aria-hidden="true"
+                  />
                   {group.name}
                 </h3>
                 <p className="text-[12px] font-medium tracking-wide text-muted">
@@ -73,16 +77,16 @@ export function TournamentStandingsSection({
                 >
                   <caption className="sr-only">{group.name}</caption>
                   <thead>
-                    <tr className="text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
-                      <th scope="col" className="pb-2 pr-3 font-semibold">Pl</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">Team</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">Sp</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">S</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">U</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">N</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">Tore</th>
-                      <th scope="col" className="pb-2 pr-3 font-semibold">Diff</th>
-                      <th scope="col" className="border-b-2 border-brand-yellow pb-2 font-semibold">Pkt</th>
+                    <tr className="border-b border-line text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">Pl</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">Team</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">Sp</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">S</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">U</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">N</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">Tore</th>
+                      <th scope="col" className="pb-2.5 pr-3 font-semibold">Diff</th>
+                      <th scope="col" className="border-b-2 border-brand-yellow pb-2.5 font-semibold">Pkt</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -91,7 +95,10 @@ export function TournamentStandingsSection({
                       const label = teamLabels[row.applicationId] ?? "Team";
 
                       return (
-                        <tr key={row.applicationId} className="border-t border-line">
+                        <tr
+                          key={row.applicationId}
+                          className="border-t border-line odd:bg-surface/35"
+                        >
                           <td className="py-2 pr-3 font-semibold tabular-nums">
                             {row.rank}
                           </td>
