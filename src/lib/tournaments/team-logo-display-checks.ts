@@ -101,7 +101,27 @@ export function runTeamLogoDisplayChecks(): string {
   assert(withLogo.includes('fallback="none"'), "wrapper never shows letter tile");
   assert(withLogo.includes("{label}"), "textual name always rendered");
   assert(withLogo.includes("min-w-0"), "text container min-w-0");
-  assert(withLogo.includes("shrink-0") || logo.includes("shrink-0"), "logo shrink-0");
+  assert(withLogo.includes("shrink-0"), "logo slot shrink-0");
+  // Alignment hotfix: fixed invisible logo slot for logo and no-logo rows
+  assert(withLogo.includes("logoSlotClass"), "fixed logo slot helper");
+  assert(
+    withLogo.includes("inline-flex shrink-0 items-center justify-center") &&
+      withLogo.includes("h-5 w-5 sm:h-6 sm:w-6"),
+    "logo team and no-logo team reserve the same xs slot",
+  );
+  assert(withLogo.includes("aria-hidden"), "empty slot is not announced");
+  assert(
+    !withLogo.includes("Kein Logo") &&
+      !withLogo.includes("title=") &&
+      !withLogo.includes("slice(0, 1)"),
+    "no visible letter-tile placeholder markup in TeamNameWithLogo",
+  );
+  assert(
+    !withLogo.includes("resolveApplicationParticipantLogoUrl") &&
+      !withLogo.includes("resolveParticipantLogoUrl") &&
+      !withLogo.includes("teamMarks"),
+    "TeamNameWithLogo remains ID-agnostic presentation component",
+  );
 
   // 1 + 2: schedule wiring — logo when mark present; text always
   assert(schedule.includes("teamMarks"), "Spielplan accepts teamMarks");
@@ -127,10 +147,10 @@ export function runTeamLogoDisplayChecks(): string {
     "no name-based logo lookup in Spielplan",
   );
 
-  // Standings: fallback none, computation untouched
-  assert(standings.includes('fallback="none"'), "standings hide missing logos");
+  // Standings: shared aligned name+logo, computation untouched
+  assert(standings.includes("<TeamNameWithLogo"), "standings use shared aligned primitive");
   assert(standings.includes("teamMarks?.[row.applicationId]"), "ID-keyed standings marks");
-  assert(standings.includes("{label}"), "standings textual name retained");
+  assert(standings.includes("label={label}"), "standings textual name retained");
   assert(
     !standingsLogic.includes("logoUrl") && !standingsLogic.includes("ParticipantClubLogo"),
     "standings computation untouched by logos",

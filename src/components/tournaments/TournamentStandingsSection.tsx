@@ -1,4 +1,4 @@
-import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
+import { TeamNameWithLogo } from "@/components/tournaments/TeamNameWithLogo";
 import { formatGoals } from "@/lib/schedule/standings";
 import type { StandingRow } from "@/types/schedule";
 
@@ -96,19 +96,12 @@ export function TournamentStandingsSection({
                             {row.rank}
                           </td>
                           <td className="max-w-[14rem] py-2 pr-3 sm:max-w-[22rem]">
-                            <span className="flex min-w-0 items-center gap-2">
-                              {mark ? (
-                                <ParticipantClubLogo
-                                  logoUrl={mark.logoUrl}
-                                  clubName={mark.clubName}
-                                  size="xs"
-                                  fallback="none"
-                                />
-                              ) : null}
-                              <span className="min-w-0 leading-snug font-medium break-words">
-                                {label}
-                              </span>
-                            </span>
+                            <TeamNameWithLogo
+                              label={label}
+                              logoUrl={mark?.logoUrl}
+                              clubName={mark?.clubName}
+                              size="xs"
+                            />
                           </td>
                           <td className="py-2 pr-3 tabular-nums">{row.played}</td>
                           <td className="py-2 pr-3 tabular-nums">{row.won}</td>
