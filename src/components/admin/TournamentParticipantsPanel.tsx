@@ -10,14 +10,18 @@ import {
   adminMobileCardClass,
   adminPrimaryButtonClass,
 } from "@/components/admin/AdminPanel";
+import { ConfirmModal } from "@/components/admin/ConfirmModal";
 import { ApplicationParticipantLogoEditor } from "@/components/admin/ApplicationParticipantLogoEditor";
 import { ExternalTeamLogoEditor } from "@/components/admin/ExternalTeamLogoEditor";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
   addManualTournamentParticipantAction,
-  deactivateManualTournamentParticipantAction,
   updateManualTournamentParticipantAction,
 } from "@/lib/db/tournament-participants-actions";
+import {
+  removeParticipantFromGroupAction,
+  removeTournamentParticipantAction,
+} from "@/lib/db/tournament-participant-membership-actions";
 import {
   participantSourceBadge,
   participantSourceLabel,
@@ -62,6 +66,11 @@ export function TournamentParticipantsPanel({
   const [groupId, setGroupId] = useState("");
   const [clubId, setClubId] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [confirm, setConfirm] = useState<
+    | { kind: "remove-group"; participant: TournamentParticipant }
+    | { kind: "remove-participant"; participant: TournamentParticipant }
+    | null
+  >(null);
 
   const sortedParticipants = useMemo(
     () => [...participants].sort((a, b) => a.displayName.localeCompare(b.displayName, "de")),
@@ -363,32 +372,33 @@ export function TournamentParticipantsPanel({
                   </button>
                 ) : null}
                 {participant.source === "manual" && participant.externalTeamId ? (
-                  <>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => startEdit(participant)}
-                      className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
-                    >
-                      Bearbeiten
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() =>
-                        runAction(() =>
-                          deactivateManualTournamentParticipantAction({
-                            tournamentId,
-                            externalTeamId: participant.externalTeamId!,
-                          }),
-                        )
-                      }
-                      className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
-                    >
-                      Deaktivieren
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => startEdit(participant)}
+                    className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                  >
+                    Bearbeiten
+                  </button>
                 ) : null}
+                {participant.groupName ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => setConfirm({ kind: "remove-group", participant })}
+                    className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                  >
+                    Aus Gruppe entfernen
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => setConfirm({ kind: "remove-participant", participant })}
+                  className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
+                >
+                  Teilnehmer entfernen
+                </button>
               </div>
 
               {participant.source === "application" &&
@@ -417,6 +427,70 @@ export function TournamentParticipantsPanel({
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={confirm?.kind === "remove-group"}
+        title={
+          confirm?.kind === "remove-group"
+            ? `${confirm.participant.displayName} aus ${confirm.participant.groupName ?? "Gruppe"} entfernen?`
+            : ""
+        }
+        confirmLabel="Aus Gruppe entfernen"
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const participant = confirm?.kind === "remove-group" ? confirm.participant : null;
+          setConfirm(null);
+          if (!participant) {
+            return;
+          }
+          runAction(() =>
+            removeParticipantFromGroupAction({
+              tournamentId,
+              applicationId:
+                participant.source === "application" ? participant.applicationId : null,
+              externalTeamId:
+                participant.source === "application" ? null : participant.externalTeamId,
+            }),
+          );
+        }}
+      >
+        <p className="text-[14px] leading-6 text-muted">
+          Das Team bleibt Turnierteilnehmer und kann anschließend einer anderen Gruppe zugeordnet
+          werden.
+        </p>
+      </ConfirmModal>
+
+      <ConfirmModal
+        open={confirm?.kind === "remove-participant"}
+        title={
+          confirm?.kind === "remove-participant"
+            ? `${confirm.participant.displayName} als Teilnehmer entfernen?`
+            : ""
+        }
+        confirmLabel="Teilnehmer entfernen"
+        onCancel={() => setConfirm(null)}
+        onConfirm={() => {
+          const participant = confirm?.kind === "remove-participant" ? confirm.participant : null;
+          setConfirm(null);
+          if (!participant) {
+            return;
+          }
+          runAction(() =>
+            removeTournamentParticipantAction({
+              tournamentId,
+              applicationId:
+                participant.source === "application" ? participant.applicationId : null,
+              externalTeamId:
+                participant.source === "application" ? null : participant.externalTeamId,
+            }),
+          );
+        }}
+      >
+        <p className="text-[14px] leading-6 text-muted">
+          Das Team nimmt anschließend nicht mehr am Turnier teil und wird aus seiner Gruppe
+          entfernt.
+        </p>
+      </ConfirmModal>
     </AdminCard>
   );
 }

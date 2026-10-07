@@ -34,6 +34,11 @@ import { canAcceptApplicationIntoCapacity } from "@/lib/mein-turnierplan-partici
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { isTournamentCompletionEligible } from "@/lib/db/tournament-lifecycle";
 import {
+  assertParticipantMembershipMutationAllowed,
+  deleteTournamentOwnedGroupMembership,
+} from "@/lib/db/tournament-participant-membership";
+import { canProceedParticipantExitAfterMembershipCleanup } from "@/lib/tournament-participant-membership";
+import {
   APPLICATION_HARD_DELETE_BLOCKED_MESSAGE,
   APPLICATION_HARD_DELETE_DEPENDENCY_COUNTS_RPC,
   evaluateApplicationHardDeleteGuard,
@@ -137,6 +142,29 @@ export async function updateApplicationStatusAction(
   }
 
   if (statusChanged) {
+    // Leaving confirmed participant set: match gate + membership-first cleanup.
+    if (previousStatus === "accepted" && status !== "accepted") {
+      const mutationGate = await assertParticipantMembershipMutationAllowed(
+        String(current.tournament_id),
+      );
+      if (!mutationGate.tournament) {
+        return { error: mutationGate.error, notice: null };
+      }
+
+      const membership = await deleteTournamentOwnedGroupMembership({
+        tournamentId: String(current.tournament_id),
+        applicationId,
+      });
+      if (!canProceedParticipantExitAfterMembershipCleanup(membership)) {
+        return {
+          error:
+            membership.error ??
+            "Die Gruppenzuordnung konnte nicht entfernt werden. Der Teilnehmerstatus wurde nicht geändert.",
+          notice: null,
+        };
+      }
+    }
+
     const { error } = await supabase
       .from("applications")
       .update({ status })
@@ -158,6 +186,9 @@ export async function updateApplicationStatusAction(
   revalidatePath("/turniere");
   if (tournament?.slug) {
     revalidatePath(`/admin/turniere/${tournament.slug}`);
+    revalidatePath(`/admin/turniere/${tournament.id}`);
+    revalidatePath(`/admin/turniere/${tournament.id}/gruppen`);
+    revalidatePath(`/admin/turniere/${tournament.id}/spielplan`);
     revalidatePath(`/turniere/${tournament.slug}`);
   }
 
