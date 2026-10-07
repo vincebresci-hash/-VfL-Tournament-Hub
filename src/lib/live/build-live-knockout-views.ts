@@ -110,6 +110,12 @@ export function buildLiveKnockoutViews(input: {
               winnerLabel: winnerId
                 ? `Gewinner ${winnerTeam?.label ?? "steht noch nicht fest"}`
                 : null,
+              homeScore: match.homeScore,
+              awayScore: match.awayScore,
+              status: match.status,
+              decidedBy: match.decidedBy,
+              homePenalties: match.homePenalties,
+              awayPenalties: match.awayPenalties,
             };
           }),
         },

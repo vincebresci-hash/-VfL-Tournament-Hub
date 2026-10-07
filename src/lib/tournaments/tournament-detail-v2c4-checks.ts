@@ -234,10 +234,13 @@ export function runTournamentDetailV2C4Checks() {
     roundFn.includes("resolveKnockoutOutcome(match)") &&
       roundFn.includes("outcome.winnerId") &&
       roundFn.includes("`Gewinner ${teamLabel(teamLabels, outcome.winnerId)}`") &&
+      roundFn.includes("homeScore: match.homeScore") &&
+      roundFn.includes("awayScore: match.awayScore") &&
       !presenter.includes("resolveKnockoutOutcome") &&
-      !presenter.includes("homeScore") &&
-      !presenter.includes("winnerId"),
-    "presenter renders the prepared winner and does not infer one",
+      !presenter.includes("winnerId") &&
+      presenter.includes("match.winnerLabel") &&
+      presenter.includes("<MatchSidesScoreBlock"),
+    "presenter renders prepared winner/scores and does not infer outcomes",
   );
 
   const placed = computeKnockoutPlacements([
@@ -278,13 +281,16 @@ export function runTournamentDetailV2C4Checks() {
     placed.map((row) => row.place).join(",") === "1,2,3,4,5,6,7,8",
     "placement order preserved",
   );
+  const placementsList = read("src/components/tournaments/TournamentPlacementsList.tsx");
   assert(
     placementFn.includes("placements.map((row)") &&
       !placementFn.includes(".sort(") &&
-      presenter.includes("{row.place}.") &&
-      presenter.includes("<TeamNameWithLogo") &&
-      presenter.includes("Abschlussplatzierung"),
-    "presenter keeps prepared placement order",
+      presenter.includes("<TournamentPlacementsList") &&
+      placementsList.includes("{row.place}.") &&
+      placementsList.includes("<TeamNameWithLogo") &&
+      placementsList.includes("Abschlussplatzierung") &&
+      !placementsList.includes(".sort("),
+    "presenter keeps prepared placement order via TournamentPlacementsList",
   );
 
   assert(
@@ -301,7 +307,7 @@ export function runTournamentDetailV2C4Checks() {
 
   assert(
     presenter.includes("export function TournamentKnockoutRounds") &&
-      presenter.includes("<TeamNameWithLogo") &&
+      presenter.includes("<MatchSidesScoreBlock") &&
       stage.includes("<TournamentKnockoutRounds") &&
       stage.includes("rounds={knockoutRoundViews}") &&
       stage.includes("placements={knockoutPlacementViews}") &&

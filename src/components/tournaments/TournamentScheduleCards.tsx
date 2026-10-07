@@ -1,4 +1,5 @@
-import { TeamNameWithLogo, type TeamMark } from "@/components/tournaments/TeamNameWithLogo";
+import { MatchSidesScoreBlock } from "@/components/tournaments/MatchSidesScoreBlock";
+import { type TeamMark } from "@/components/tournaments/TeamNameWithLogo";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
 import { teamLabel } from "@/lib/schedule/names";
 import type { TournamentMatchRecord } from "@/types/schedule";
@@ -53,69 +54,49 @@ export function TournamentScheduleCards({
         </p>
       </div>
 
-      <ul className="mt-4 grid grid-cols-1 gap-2.5">
+      <ul className="mt-4 grid grid-cols-1 gap-2">
         {matches.map((match) => {
           const home = sideView(match.homeApplicationId, match.homeExternalTeamId);
           const away = sideView(match.awayApplicationId, match.awayExternalTeamId);
-          const showScore =
+          const completed =
             match.status === "completed" &&
             match.homeScore != null &&
             match.awayScore != null;
-          const scoreText = showScore
-            ? `${match.homeScore} : ${match.awayScore}${
-                match.decidedBy === "penalties"
-                  ? ` n.E. ${match.homePenalties ?? 0}:${match.awayPenalties ?? 0}`
-                  : ""
-              }`
-            : null;
+          const scoreNote =
+            completed &&
+            match.decidedBy === "penalties" &&
+            match.homePenalties != null &&
+            match.awayPenalties != null
+              ? `n.E. ${match.homePenalties}:${match.awayPenalties}`
+              : null;
 
           return (
             <li
               key={match.id}
-              className="rounded-[10px] border border-line bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)]"
+              className="min-w-0 rounded-[10px] border border-line bg-white px-3 py-2.5 shadow-[0_1px_2px_rgba(16,20,28,0.04)] sm:px-3.5"
             >
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <p className="font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-base">
+              <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                <span className="font-display text-[13px] font-bold tracking-wide text-ink sm:text-[14px]">
                   {formatBerlinClock(match.scheduledAt)}
-                </p>
-                <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                </span>
+                <span className="mx-1.5 text-line" aria-hidden>
+                  ·
+                </span>
+                <span>
                   {phaseOrGroupLabel(match)} · {fieldLabel(match.fieldId)}
-                </p>
-              </div>
+                </span>
+              </p>
 
-              <div className="mt-2.5 flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <TeamNameWithLogo
-                    label={home.label}
-                    logoUrl={home.logoUrl}
-                    clubName={home.clubName}
-                    size="xs"
-                    nameClassName="text-[14px]"
-                  />
-                  <p className="mt-0.5 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-                    vs
-                  </p>
-                  <div className="mt-0.5">
-                    <TeamNameWithLogo
-                      label={away.label}
-                      logoUrl={away.logoUrl}
-                      clubName={away.clubName}
-                      size="xs"
-                      nameClassName="text-[14px]"
-                    />
-                  </div>
-                </div>
-                <div className="shrink-0 pt-0.5 text-right">
-                  {showScore ? (
-                    <p className="font-display text-lg font-bold leading-none text-ink">
-                      {scoreText}
-                    </p>
-                  ) : (
-                    <p className="text-[12px] leading-snug text-muted">
-                      Ergebnis folgt
-                    </p>
-                  )}
-                </div>
+              <div className="mt-2">
+                <MatchSidesScoreBlock
+                  home={home}
+                  away={away}
+                  completed={completed}
+                  homeScore={match.homeScore}
+                  awayScore={match.awayScore}
+                  scoreNote={scoreNote}
+                  logoSize="xs"
+                />
               </div>
             </li>
           );

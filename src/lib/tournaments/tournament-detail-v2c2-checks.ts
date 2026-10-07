@@ -128,12 +128,14 @@ export function runTournamentDetailV2C2Checks() {
     schedule.includes('match.status === "completed"') &&
       schedule.includes("match.homeScore != null") &&
       schedule.includes("match.awayScore != null") &&
-      schedule.includes("Ergebnis folgt") &&
+      schedule.includes("<MatchSidesScoreBlock") &&
+      schedule.includes("homeScore={match.homeScore}") &&
+      schedule.includes("awayScore={match.awayScore}") &&
       schedule.includes('match.decidedBy === "penalties"') &&
       schedule.includes("n.E.") &&
       schedule.includes("homePenalties") &&
       schedule.includes("awayPenalties"),
-    "completed-score gate, Ergebnis folgt, and penalty semantics preserved",
+    "completed-score gate and per-side scores via MatchSidesScoreBlock; penalties preserved",
   );
 
   // 0:0 remains valid completed score (gate uses != null, not truthy)
@@ -166,12 +168,12 @@ export function runTournamentDetailV2C2Checks() {
   );
 
   assert(
-    schedule.includes("TeamNameWithLogo") &&
+    schedule.includes("MatchSidesScoreBlock") &&
       schedule.includes("teamMarks") &&
       !schedule.includes("resolveApplicationParticipantLogoUrl") &&
       !schedule.includes("resolveParticipantLogoUrl") &&
       logo.includes("export function ParticipantClubLogo"),
-    "Spielplan uses ID-keyed teamMarks + TeamNameWithLogo; no new logo resolver",
+    "Spielplan uses ID-keyed teamMarks + MatchSidesScoreBlock; no new logo resolver",
   );
 
   assert(

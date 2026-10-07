@@ -17,7 +17,7 @@ import { TournamentGroupCards } from "@/components/tournaments/TournamentGroupCa
 import { TournamentScheduleCards } from "@/components/tournaments/TournamentScheduleCards";
 import { TournamentStandingsSection } from "@/components/tournaments/TournamentStandingsSection";
 import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKnockoutRounds";
-import { TeamNameWithLogo } from "@/components/tournaments/TeamNameWithLogo";
+import { TournamentPlacementsList } from "@/components/tournaments/TournamentPlacementsList";
 
 import type { TournamentStatus } from "@/types/tournament";
 
@@ -153,6 +153,12 @@ export function TournamentPublicStage({
             winnerLabel: outcome.winnerId
               ? `Gewinner ${teamLabel(teamLabels, outcome.winnerId)}`
               : null,
+            homeScore: match.homeScore,
+            awayScore: match.awayScore,
+            status: match.status,
+            decidedBy: match.decidedBy,
+            homePenalties: match.homePenalties,
+            awayPenalties: match.awayPenalties,
           };
         }),
       },
@@ -401,30 +407,20 @@ function PublicPlacements({
   teamMarks: Record<string, { logoUrl: string | null; clubName: string }>;
 }) {
   return (
-    <article className="border border-line bg-white p-5">
-      <h2 className="font-display text-xl font-bold tracking-wide text-ink uppercase">
-        Abschlussplatzierung
-      </h2>
-      <ol className="mt-4 grid gap-2">
-        {placements.map((row) => {
-          const mark = teamMarks[row.applicationId];
-          return (
-            <li
-              key={`${row.place}-${row.applicationId}`}
-              className="flex min-w-0 items-center gap-2 text-[15px] text-ink"
-            >
-              <span className="shrink-0 tabular-nums font-semibold">{row.place}.</span>
-              <TeamNameWithLogo
-                label={teamLabel(teamLabels, row.applicationId)}
-                logoUrl={mark?.logoUrl ?? null}
-                clubName={mark?.clubName ?? null}
-                size="xs"
-                nameClassName="text-[15px]"
-              />
-            </li>
-          );
-        })}
-      </ol>
-    </article>
+    <TournamentPlacementsList
+      headingId="overview-placements-heading"
+      headingLevel={2}
+      density="comfortable"
+      placements={placements.map((row) => {
+        const mark = teamMarks[row.applicationId];
+        return {
+          id: `${row.place}-${row.applicationId}`,
+          place: row.place,
+          label: teamLabel(teamLabels, row.applicationId),
+          logoUrl: mark?.logoUrl ?? null,
+          clubName: mark?.clubName ?? null,
+        };
+      })}
+    />
   );
 }

@@ -1,4 +1,6 @@
-import { TeamNameWithLogo } from "@/components/tournaments/TeamNameWithLogo";
+import { MatchSidesScoreBlock } from "@/components/tournaments/MatchSidesScoreBlock";
+import { TournamentPlacementsList } from "@/components/tournaments/TournamentPlacementsList";
+import { cn } from "@/lib/cn";
 
 export type KnockoutMatchSideView = {
   label: string;
@@ -13,6 +15,13 @@ export type KnockoutMatchView = {
   away: KnockoutMatchSideView;
   resultText: string;
   winnerLabel: string | null;
+  /** Presentation wiring from prepared match fields only. */
+  homeScore?: number | null;
+  awayScore?: number | null;
+  status?: string | null;
+  decidedBy?: string | null;
+  homePenalties?: number | null;
+  awayPenalties?: number | null;
 };
 
 export type KnockoutRoundView = {
@@ -64,19 +73,26 @@ export function TournamentKnockoutRounds({
       </div>
 
       {rounds.length > 0 ? (
-        <div className="mt-4 grid gap-3.5">
+        <div className="mt-4 grid gap-3">
           {rounds.map((round) => {
             const headingId = `ko-round-${round.id}`;
+            const isFinal = round.id === "final";
             return (
               <section
                 key={round.id}
                 aria-labelledby={headingId}
-                className="min-w-0 rounded-[10px] border border-line bg-white px-3.5 py-3.5 shadow-[0_1px_2px_rgba(16,20,28,0.04)]"
+                className={cn(
+                  "min-w-0 rounded-[10px] border bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)]",
+                  isFinal ? "border-navy/35 ring-1 ring-inset ring-brand-yellow/50" : "border-line",
+                )}
               >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line/80 pb-2.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-b border-line/80 pb-2">
                   <h3
                     id={headingId}
-                    className="font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-base"
+                    className={cn(
+                      "font-display font-bold tracking-wide text-ink uppercase",
+                      isFinal ? "text-base sm:text-lg" : "text-[15px] sm:text-base",
+                    )}
                   >
                     <span
                       className="mr-2 inline-block h-3 w-1 translate-y-px bg-brand-yellow align-middle"
@@ -90,33 +106,49 @@ export function TournamentKnockoutRounds({
                   </p>
                 </div>
 
-                <ul className="mt-3 grid grid-cols-1 gap-2.5 md:grid-cols-2">
-                  {round.matches.map((match) => (
-                    <li
-                      key={match.id}
-                      className="min-w-0 rounded-[8px] border border-line bg-[#fafbfc] px-3 py-2.5"
-                    >
-                      <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-                        {match.meta}
-                      </p>
-                      <div className="mt-2.5 grid gap-2">
-                        <KnockoutTeamRow side={match.home} />
-                        <KnockoutTeamRow side={match.away} />
-                      </div>
-                      <p
-                        className={
-                          match.resultText === "Ergebnis folgt"
-                            ? "mt-2.5 text-[13px] text-muted"
-                            : "mt-2.5 font-display text-lg font-bold tracking-wide text-ink"
-                        }
+                <ul className="mt-2.5 grid grid-cols-1 gap-2 md:grid-cols-2">
+                  {round.matches.map((match) => {
+                    const completed =
+                      match.status === "completed" &&
+                      match.homeScore != null &&
+                      match.awayScore != null;
+                    const scoreNote =
+                      completed &&
+                      match.decidedBy === "penalties" &&
+                      match.homePenalties != null &&
+                      match.awayPenalties != null
+                        ? `n.E. ${match.homePenalties}:${match.awayPenalties}`
+                        : null;
+
+                    return (
+                      <li
+                        key={match.id}
+                        className="min-w-0 rounded-[8px] border border-line bg-surface px-3 py-2.5"
                       >
-                        {match.resultText}
-                      </p>
-                      {match.winnerLabel ? (
-                        <p className="mt-1 text-[13px] text-ink">{match.winnerLabel}</p>
-                      ) : null}
-                    </li>
-                  ))}
+                        <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                          {match.meta}
+                        </p>
+                        <div className="mt-2">
+                          <MatchSidesScoreBlock
+                            home={match.home}
+                            away={match.away}
+                            completed={completed}
+                            homeScore={match.homeScore}
+                            awayScore={match.awayScore}
+                            scoreNote={scoreNote}
+                            logoSize="xs"
+                          />
+                        </div>
+                        {match.winnerLabel ? (
+                          <p className="mt-2 text-[12px] font-medium tracking-wide text-muted">
+                            {match.winnerLabel}
+                          </p>
+                        ) : !completed && match.resultText === "Ergebnis folgt" ? (
+                          <p className="sr-only">{match.resultText}</p>
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
               </section>
             );
@@ -125,45 +157,12 @@ export function TournamentKnockoutRounds({
       ) : null}
 
       {placements.length > 0 ? (
-        <section
-          className="mt-3.5 min-w-0 rounded-[10px] border border-line bg-white px-3.5 py-3.5 shadow-[0_1px_2px_rgba(16,20,28,0.04)]"
-          aria-labelledby="ko-placements-heading"
-        >
-          <h3
-            id="ko-placements-heading"
-            className="font-display text-[15px] font-bold tracking-wide text-ink uppercase sm:text-base"
-          >
-            Abschlussplatzierung
-          </h3>
-          <ol className="mt-3 grid gap-1.5">
-            {placements.map((row) => (
-              <li key={row.id} className="flex min-w-0 items-center gap-2 text-[14px] text-ink">
-                <span className="shrink-0 tabular-nums font-semibold">{row.place}.</span>
-                <TeamNameWithLogo
-                  label={row.label}
-                  logoUrl={row.logoUrl}
-                  clubName={row.clubName}
-                  size="xs"
-                  nameClassName="text-[14px]"
-                />
-              </li>
-            ))}
-          </ol>
-        </section>
+        <TournamentPlacementsList
+          className="mt-3"
+          placements={placements}
+          density="compact"
+        />
       ) : null}
     </section>
-  );
-}
-
-function KnockoutTeamRow({ side }: { side: KnockoutMatchSideView }) {
-  return (
-    <TeamNameWithLogo
-      label={side.label}
-      logoUrl={side.logoUrl}
-      clubName={side.clubName}
-      size="sm"
-      className="gap-2.5"
-      nameClassName="text-[14px]"
-    />
   );
 }
