@@ -6,6 +6,7 @@ import { TournamentCapacityForm } from "@/components/admin/TournamentCapacityFor
 import { MeinTurnierplanAdminPanel } from "@/components/admin/MeinTurnierplanAdminPanel";
 import { TournamentSyncAdminPanel } from "@/components/admin/TournamentSyncAdminPanel";
 import { ExternalTeamsParticipationPanel } from "@/components/admin/ExternalTeamsParticipationPanel";
+import { TournamentMatchdayDashboard } from "@/components/admin/TournamentMatchdayDashboard";
 import { TournamentParticipantsPanel } from "@/components/admin/TournamentParticipantsPanel";
 import { TournamentStatusCapacityNotice } from "@/components/admin/TournamentStatusCapacityNotice";
 import { applicationStatusLabel } from "@/lib/admin";
@@ -15,8 +16,10 @@ import { getTournamentCapacityWithExternal } from "@/lib/mein-turnierplan-partic
 import type { ExternalTeamAdminRow } from "@/lib/db/mein-turnierplan-participants-actions";
 import type { TournamentParticipant } from "@/lib/tournament-participants";
 import type { AdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
+import type { TournamentMatchdayDashboardModel } from "@/lib/schedule/tournament-matchday-dashboard";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { AdminApplication, ApplicationStatus } from "@/types/application";
+import type { TournamentFieldRecord } from "@/types/schedule";
 
 type AdminTournamentDetailViewProps = {
   tournament: AdminTournamentRecord;
@@ -24,8 +27,11 @@ type AdminTournamentDetailViewProps = {
   externalTeams: ExternalTeamAdminRow[];
   participants: TournamentParticipant[];
   groups: Array<{ id: string; name: string }>;
+  fields: TournamentFieldRecord[];
+  teamLabels: Record<string, string>;
   clubs: Array<{ id: string; name: string; logoUrl: string | null }>;
   lifecycle: AdminLifecyclePanelModel | null;
+  matchday: TournamentMatchdayDashboardModel | null;
   current: "overview" | "participants";
 };
 
@@ -41,8 +47,11 @@ export function AdminTournamentDetailView({
   externalTeams,
   participants,
   groups,
+  fields,
+  teamLabels,
   clubs,
   lifecycle,
+  matchday,
   current,
 }: AdminTournamentDetailViewProps) {
   const related = applications.filter(
@@ -64,38 +73,6 @@ export function AdminTournamentDetailView({
   const maxLabel = tournament.maxTeams == null ? "—" : String(tournament.maxTeams);
 
   const base = `/admin/turniere/${tournament.id}`;
-  const orientationLinks = [
-    {
-      href: `/admin/bewerbungen?turnier=${tournament.slug}`,
-      label: "Bewerbungen",
-      hint: "Eingänge prüfen und entscheiden",
-    },
-    {
-      href: `${base}?bereich=teilnehmer`,
-      label: "Teilnehmer",
-      hint: "Bestätigtes Teilnehmerfeld",
-    },
-    {
-      href: `${base}/gruppen`,
-      label: "Gruppen",
-      hint: "Gruppen und Zuordnung",
-    },
-    {
-      href: `${base}/spielplan`,
-      label: "Spielplan",
-      hint: "Spiele und Zeiten",
-    },
-    {
-      href: `${base}/ergebnisse`,
-      label: "Ergebnisse",
-      hint: "Ergebnisse erfassen",
-    },
-    {
-      href: `${base}/ko-runde`,
-      label: "KO-Runde",
-      hint: "K.o.-Phase verwalten",
-    },
-  ] as const;
 
   return (
     <TournamentAdminChrome
@@ -103,16 +80,21 @@ export function AdminTournamentDetailView({
       lifecycle={lifecycle}
       current={current}
     >
-      <section className={adminIdentityHeroClass}>
+      {matchday ? (
+        <TournamentMatchdayDashboard
+          model={matchday}
+          fields={fields}
+          teamLabels={teamLabels}
+        />
+      ) : null}
+
+      <section className={`mt-6 ${adminIdentityHeroClass}`}>
         <p className="text-[11px] font-semibold tracking-[0.12em] text-muted uppercase">
-          Turnierübersicht
+          Kapazität & Teilnehmer
         </p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate font-display text-2xl font-bold tracking-wide text-ink uppercase">
-              {tournament.name}
-            </p>
-            <p className="mt-1 text-[14px] text-muted">
+            <p className="text-[14px] text-muted">
               {formatDateDe(tournament.date)} · {tournament.ageGroup}
               {tournament.location ? ` · ${tournament.location}` : ""}
             </p>
@@ -153,23 +135,29 @@ export function AdminTournamentDetailView({
       ) : null}
 
       <section className="mt-6">
-        <h2 className={adminSectionTitleClass}>Bereiche</h2>
+        <h2 className={adminSectionTitleClass}>Bewerbungen & Teilnehmer</h2>
         <p className="mt-1 text-[13px] text-muted">
-          Schnellzugriff auf die bestehenden Turnierbereiche.
+          Schnellzugriff auf Bewerbungen und das Teilnehmerfeld.
         </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {orientationLinks.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`${adminCardShellClass} px-4 py-3.5 transition-colors hover:border-navy/20`}
-            >
-              <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
-                {item.label}
-              </p>
-              <p className="mt-1 text-[13px] text-muted">{item.hint}</p>
-            </Link>
-          ))}
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <Link
+            href={`/admin/bewerbungen?turnier=${tournament.slug}`}
+            className={`${adminCardShellClass} px-4 py-3.5 transition-colors hover:border-navy/20`}
+          >
+            <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
+              Bewerbungen
+            </p>
+            <p className="mt-1 text-[13px] text-muted">Eingänge prüfen und entscheiden</p>
+          </Link>
+          <Link
+            href={`${base}?bereich=teilnehmer`}
+            className={`${adminCardShellClass} px-4 py-3.5 transition-colors hover:border-navy/20`}
+          >
+            <p className="font-display text-sm font-bold tracking-wide text-ink uppercase">
+              Teilnehmer
+            </p>
+            <p className="mt-1 text-[13px] text-muted">Bestätigtes Teilnehmerfeld</p>
+          </Link>
         </div>
       </section>
 
