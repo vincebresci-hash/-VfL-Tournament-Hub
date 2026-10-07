@@ -20,6 +20,13 @@ export type PaymentStatusRow =
   | "not_required"
   | "waived";
 export type TournamentStatusRow = "coming-soon" | "active" | "full" | "completed";
+
+/** Matchday lifecycle — mirrors D1 TournamentLifecycleState; separate from marketing status. */
+export type TournamentLifecycleStateRow =
+  | "setup"
+  | "group_stage"
+  | "knockout_stage"
+  | "completed";
 export type InternalCategoryRow = "S" | "A" | "B" | "C";
 export type ClubStatusRow = "active" | "inactive";
 export type EmailTemplateTypeRow =
@@ -124,6 +131,8 @@ export type TournamentRow = {
   image_url: string | null;
   max_teams: number | null;
   status: TournamentStatusRow;
+  /** Matchday lifecycle; optional on reads until migration applied; Insert may omit (DB default setup). */
+  lifecycle_state?: TournamentLifecycleStateRow;
   application_start: string | null;
   application_deadline: string | null;
   description: string | null;

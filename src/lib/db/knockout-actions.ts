@@ -24,6 +24,12 @@ import {
 } from "@/lib/schedule/knockout";
 import { buildKnockoutQualificationPreview } from "@/lib/schedule/knockout-preview";
 import { buildTimetable } from "@/lib/schedule/timetable";
+import {
+  isTournamentCompletionEligible,
+  planReopenTournamentLifecycle,
+  syncLifecycleAfterKnockoutPersisted,
+  syncLifecycleAfterKnockoutRemoved,
+} from "@/lib/db/tournament-lifecycle";
 import type { AdminTournamentRecord } from "@/types/admin";
 import type { DecidedBy, TournamentMatchRecord } from "@/types/schedule";
 
@@ -304,6 +310,12 @@ export async function generateKnockoutAction(
     }
   }
 
+  // C6-H D2: promote lifecycle only after authoritative KO persistence succeeded.
+  const lifecycleSync = await syncLifecycleAfterKnockoutPersisted(tournamentId);
+  if (lifecycleSync.error) {
+    return { error: lifecycleSync.error, notice: null };
+  }
+
   revalidateStage(loaded.tournament);
   const notice = progress.complete
     ? `${plan.matches.length} KO-Spiele erzeugt.`
@@ -541,6 +553,12 @@ export async function deleteTournamentKnockoutAction(
     };
   }
 
+  // C6-H D2: rewind lifecycle only after KO delete succeeded + authoritative reread.
+  const lifecycleSync = await syncLifecycleAfterKnockoutRemoved(tournamentId);
+  if (lifecycleSync.error) {
+    return { error: lifecycleSync.error };
+  }
+
   revalidateStage(loaded.tournament);
   return { error: null };
 }
@@ -559,20 +577,66 @@ export async function completeTournamentAction(
   }
 
   const stage = await getAdminTournamentStage(tournamentId);
-  const finalMatch = stage.matches.find((match) => match.phase === "knockout" && match.round === "final");
-  const outcome = finalMatch ? resolveKnockoutOutcome(finalMatch) : null;
-  if (!finalMatch || !outcome?.winnerId) {
+  if (!isTournamentCompletionEligible(stage.matches)) {
     return { error: "Das Finale muss zuerst mit einem eindeutigen Sieger abgeschlossen sein." };
   }
 
   const supabase = await createClient();
   const { error } = await supabase
     .from("tournaments")
-    .update({ status: "completed" })
+    .update({ status: "completed", lifecycle_state: "completed" })
     .eq("id", tournamentId);
 
   if (error) {
     return { error: toUserFacingDbError("Das Turnier konnte nicht abgeschlossen werden.", error) };
+  }
+
+  revalidateStage(loaded.tournament);
+  return { error: null };
+}
+
+/**
+ * C6-H D2: Explicit confirmed reopen. Server derives lifecycle destination.
+ * Sets marketing status to active + lifecycle_state in one update.
+ */
+export async function reopenTournamentAction(
+  tournamentId: string,
+  confirm: boolean,
+): Promise<{ error: string | null }> {
+  const access = await requireResultsManage();
+  if (access.error) {
+    return { error: access.error };
+  }
+
+  if (confirm !== true) {
+    return {
+      error: "Wiedereröffnung eines abgeschlossenen Turniers erfordert eine Bestätigung.",
+    };
+  }
+
+  const loaded = await loadTournament(tournamentId);
+  if (!loaded.tournament) {
+    return { error: loaded.error };
+  }
+
+  const planned = await planReopenTournamentLifecycle(tournamentId);
+  if (planned.error || !planned.destination) {
+    return { error: planned.error ?? "Wiedereröffnung ist nicht möglich." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("tournaments")
+    .update({
+      status: "active",
+      lifecycle_state: planned.destination,
+    })
+    .eq("id", tournamentId);
+
+  if (error) {
+    return {
+      error: toUserFacingDbError("Das Turnier konnte nicht wiedereröffnet werden.", error),
+    };
   }
 
   revalidateStage(loaded.tournament);
