@@ -7,8 +7,9 @@ import {
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
-import { stageStatusFor, teamLabelsFromParticipants } from "@/lib/schedule/admin";
+import { teamLabelsFromParticipants } from "@/lib/schedule/admin";
 
 type KnockoutPageProps = {
   params: Promise<{ id: string }>;
@@ -37,15 +38,16 @@ export default async function AdminTournamentKnockoutPage({ params }: KnockoutPa
     notFound();
   }
 
-  const [stage, participants] = await Promise.all([
+  const [stage, participants, lifecycle] = await Promise.all([
     getAdminTournamentStage(tournament.id),
     getTournamentParticipants(tournament.id),
+    getAdminLifecyclePanelModel(tournament.id),
   ]);
 
   return (
     <TournamentAdminChrome
       tournament={tournament}
-      stageStatus={stageStatusFor(tournament, stage.groups.length, stage.matches)}
+      lifecycle={lifecycle.model}
       current="knockout"
     >
       {!stage.ready ? (

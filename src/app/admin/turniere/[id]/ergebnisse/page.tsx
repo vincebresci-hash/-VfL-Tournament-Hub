@@ -8,7 +8,8 @@ import {
 } from "@/lib/db/admin-queries";
 import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
-import { acceptedParticipants, stageStatusFor, teamLabelsFromApplications } from "@/lib/schedule/admin";
+import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
+import { acceptedParticipants, teamLabelsFromApplications } from "@/lib/schedule/admin";
 
 type ResultsPageProps = {
   params: Promise<{ id: string }>;
@@ -40,13 +41,16 @@ export default async function AdminTournamentResultsPage({ params }: ResultsPage
     notFound();
   }
 
-  const stage = await getAdminTournamentStage(tournament.id);
+  const [stage, lifecycle] = await Promise.all([
+    getAdminTournamentStage(tournament.id),
+    getAdminLifecyclePanelModel(tournament.id),
+  ]);
   const participants = acceptedParticipants(applicationsResult.applications, tournament);
 
   return (
     <TournamentAdminChrome
       tournament={tournament}
-      stageStatus={stageStatusFor(tournament, stage.groups.length, stage.matches)}
+      lifecycle={lifecycle.model}
       current="results"
     >
       {!stage.ready ? (

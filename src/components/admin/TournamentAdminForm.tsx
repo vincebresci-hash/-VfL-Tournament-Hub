@@ -407,7 +407,7 @@ export function TournamentAdminForm({
               onChange={(event) => update("maxTeams", event.target.value)}
             />
           </Field>
-          <Field id="tournament-status" label="Turnierstatus">
+          <Field id="tournament-status" label="Öffentlicher Turnierstatus">
             <SelectInput
               id="tournament-status"
               value={values.status}
@@ -421,6 +421,10 @@ export function TournamentAdminForm({
                 </option>
               ))}
             </SelectInput>
+            <p className="mt-1.5 text-[12px] leading-5 text-muted">
+              Steuert die öffentliche Darstellung und Bewerbung. Die Matchday-Phase
+              wird separat aus dem Turnierablauf gesteuert.
+            </p>
           </Field>
           {statusCapacityWarning ? (
             <div className="sm:col-span-2 border border-[#d9b0b0] bg-[#fff5f5] px-4 py-3 text-[13px] leading-6 text-[#9a2b2b]">

@@ -27,6 +27,7 @@ import { runKnockoutPreviewChecks } from "./knockout-preview-checks";
 import { runKnockoutPreviewUxChecks } from "./knockout-preview-ux-checks";
 import { runTournamentLifecycleChecks } from "./tournament-lifecycle-checks";
 import { runTournamentLifecyclePersistChecks } from "./tournament-lifecycle-persist-checks";
+import { runTournamentLifecycleUxChecks } from "./tournament-lifecycle-ux-checks";
 import { runApplicationWindowSelfChecks } from "@/lib/public-application-state";
 import { runMeinTurnierplanSelfChecks } from "@/lib/mein-turnierplan";
 import { runMeinTurnierplanImportSelfChecks } from "@/lib/mein-turnierplan-import";
@@ -115,6 +116,7 @@ try {
   const knockoutPreviewUxChecks = runKnockoutPreviewUxChecks();
   const tournamentLifecycleChecks = runTournamentLifecycleChecks();
   const tournamentLifecyclePersistChecks = runTournamentLifecyclePersistChecks();
+  const tournamentLifecycleUxChecks = runTournamentLifecycleUxChecks();
   const applicationWindow = runApplicationWindowSelfChecks();
   const meinTurnierplan = runMeinTurnierplanSelfChecks();
   const meinTurnierplanImport = runMeinTurnierplanImportSelfChecks();
@@ -217,6 +219,7 @@ try {
   console.log(`knockout-preview-ux-checks: ${knockoutPreviewUxChecks}`);
   console.log(`tournament-lifecycle-checks: ${tournamentLifecycleChecks}`);
   console.log(`tournament-lifecycle-persist-checks: ${tournamentLifecyclePersistChecks}`);
+  console.log(`tournament-lifecycle-ux-checks: ${tournamentLifecycleUxChecks}`);
   console.log(`application-window-checks: ${applicationWindow}`);
   console.log(`mein-turnierplan-checks: ${meinTurnierplan}`);
   console.log(`mein-turnierplan-import-checks: ${meinTurnierplanImport}`);

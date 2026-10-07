@@ -8,9 +8,9 @@ import {
 } from "@/lib/db/admin-queries";
 import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import { listExternalTeamsForTournamentAction } from "@/lib/db/mein-turnierplan-participants-actions";
-import { stageStatusFor } from "@/lib/schedule/admin";
 
 type TournamentDetailPageProps = {
   params: Promise<{ id: string }>;
@@ -53,12 +53,14 @@ export default async function AdminTournamentDetailPage({
     notFound();
   }
 
-  const [stage, externalTeamsResult, participantsResult, clubsResult] = await Promise.all([
-    getAdminTournamentStage(tournament.id),
-    listExternalTeamsForTournamentAction(tournament.id),
-    getTournamentParticipants(tournament.id),
-    listAdminClubs(),
-  ]);
+  const [stage, externalTeamsResult, participantsResult, clubsResult, lifecycle] =
+    await Promise.all([
+      getAdminTournamentStage(tournament.id),
+      listExternalTeamsForTournamentAction(tournament.id),
+      getTournamentParticipants(tournament.id),
+      listAdminClubs(),
+      getAdminLifecyclePanelModel(tournament.id),
+    ]);
 
   return (
     <AdminTournamentDetailView
@@ -72,7 +74,7 @@ export default async function AdminTournamentDetailPage({
         name: club.name,
         logoUrl: club.logoUrl,
       }))}
-      stageStatus={stageStatusFor(tournament, stage.groups.length, stage.matches)}
+      lifecycle={lifecycle.model}
       current={bereich === "teilnehmer" ? "participants" : "overview"}
     />
   );
