@@ -127,12 +127,12 @@ export function runTournamentDetailV2C3Checks() {
   );
 
   assert(
-    section.includes("ParticipantClubLogo") &&
-      section.includes("logoUrl={mark.logoUrl}") &&
+    section.includes("TeamNameWithLogo") &&
+      section.includes("logoUrl={mark?.logoUrl}") &&
       section.includes("teamMarks?.[row.applicationId]") &&
       !section.includes("createClient") &&
       logo.includes("export function ParticipantClubLogo"),
-    "logos are an optional roster lookup, not a new query",
+    "logos are an optional roster lookup via TeamNameWithLogo, not a new query",
   );
 
   assert(
