@@ -31,6 +31,13 @@ import {
   syncLifecycleAfterGroupsChanged,
 } from "@/lib/db/tournament-lifecycle";
 import { lifecycleAllowsDestructiveGroupScheduleMutation } from "@/lib/schedule/tournament-lifecycle";
+import {
+  EMPTY_GROUP_DELETE_COMPLETED_MESSAGE,
+  EMPTY_GROUP_DELETE_HAS_MATCHES_MESSAGE,
+  EMPTY_GROUP_DELETE_HAS_MEMBERS_MESSAGE,
+  EMPTY_GROUP_DELETE_NOT_FOUND_MESSAGE,
+  emptyGroupDeletionBlockReason,
+} from "@/lib/schedule/empty-group-deletion";
 import { MATCH_STATUSES, type MatchStatus } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
@@ -275,6 +282,15 @@ export async function renameTournamentGroupAction(
   return { error: null };
 }
 
+/**
+ * Delete an empty group that has no match references.
+ *
+ * Residual TOCTOU (not transactional): a concurrent membership INSERT between the
+ * final membership SELECT and DELETE can still be removed by
+ * tournament_group_members.group_id ON DELETE CASCADE. Match INSERT is blocked by
+ * tournament_matches.group_id ON DELETE RESTRICT (DB error). Full atomic safety
+ * would require an approved RPC/transaction — not claimed here.
+ */
 export async function deleteTournamentGroupAction(
   tournamentId: string,
   groupId: string,
@@ -289,20 +305,85 @@ export async function deleteTournamentGroupAction(
     return { error: loaded.error };
   }
 
+  const lifecycle = await loadTournamentLifecycleSnapshot(tournamentId);
+  if (lifecycle.error || !lifecycle.snapshot) {
+    return {
+      error: lifecycle.error ?? "Der Turnier-Lebenszyklus konnte nicht geprüft werden.",
+    };
+  }
+  if (
+    lifecycle.snapshot.facts.marketingStatusCompleted ||
+    lifecycle.snapshot.effective === "completed"
+  ) {
+    return { error: EMPTY_GROUP_DELETE_COMPLETED_MESSAGE };
+  }
+
   const stage = await getAdminTournamentStage(tournamentId);
-  if (stage.matches.some((match) => match.groupId === groupId)) {
-    return { error: "Die Gruppe kann nicht gelöscht werden, solange Spiele davon abhängen." };
+  if (!stage.groups.some((group) => group.id === groupId)) {
+    return { error: EMPTY_GROUP_DELETE_NOT_FOUND_MESSAGE };
+  }
+
+  // Stage-level advisory (same shared messages); authoritative reads follow.
+  const stageBlock = emptyGroupDeletionBlockReason({
+    tournamentCompleted: false,
+    memberCount: (stage.memberIdsByGroupId[groupId] ?? []).length,
+    matchCountForGroup: stage.matches.filter((match) => match.groupId === groupId)
+      .length,
+  });
+  if (stageBlock) {
+    return { error: stageBlock };
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
+
+  // Authoritative membership + match presence immediately before DELETE.
+  const [membersResult, matchesResult] = await Promise.all([
+    supabase.from("tournament_group_members").select("id").eq("group_id", groupId),
+    supabase
+      .from("tournament_matches")
+      .select("id")
+      .eq("tournament_id", tournamentId)
+      .eq("group_id", groupId),
+  ]);
+
+  if (membersResult.error) {
+    return {
+      error: toUserFacingDbError(
+        "Die Gruppenmitglieder konnten nicht geprüft werden.",
+        membersResult.error,
+      ),
+    };
+  }
+  if (matchesResult.error) {
+    return {
+      error: toUserFacingDbError(
+        "Die Gruppenspiele konnten nicht geprüft werden.",
+        matchesResult.error,
+      ),
+    };
+  }
+
+  if ((membersResult.data ?? []).length > 0) {
+    return { error: EMPTY_GROUP_DELETE_HAS_MEMBERS_MESSAGE };
+  }
+  if ((matchesResult.data ?? []).length > 0) {
+    return { error: EMPTY_GROUP_DELETE_HAS_MATCHES_MESSAGE };
+  }
+
+  // Residual TOCTOU: concurrent membership insert may still CASCADE on DELETE.
+  // Match insert is DB-restricted (ON DELETE RESTRICT). Not a transactional lock.
+  const { data: deletedRows, error } = await supabase
     .from("tournament_groups")
     .delete()
     .eq("id", groupId)
-    .eq("tournament_id", tournamentId);
+    .eq("tournament_id", tournamentId)
+    .select("id");
 
   if (error) {
     return { error: constraintMessage(error, "Die Gruppe konnte nicht gelöscht werden.") };
+  }
+  if (!deletedRows || deletedRows.length === 0) {
+    return { error: "Die Gruppe konnte nicht gelöscht werden." };
   }
 
   // C6-H D2: after last group deleted (no KO) → setup; otherwise group_stage.

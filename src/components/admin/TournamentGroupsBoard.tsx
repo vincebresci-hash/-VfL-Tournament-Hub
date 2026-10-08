@@ -21,6 +21,10 @@ import {
 } from "@/lib/db/schedule-actions";
 import { scheduleParticipantId } from "@/lib/schedule/admin";
 import {
+  canAdviseEmptyGroupDeletion,
+  emptyGroupDeletionBlockReason,
+} from "@/lib/schedule/empty-group-deletion";
+import {
   participantSourceLabel,
   type TournamentParticipant,
 } from "@/lib/tournament-participants";
@@ -31,7 +35,12 @@ type TournamentGroupsBoardProps = {
   participants: TournamentParticipant[];
   groups: TournamentGroupRecord[];
   groupIdByParticipantId: Record<string, string>;
+  /** True when any tournament match exists — keeps assignment/distribution locked. */
   hasMatches: boolean;
+  /** Match counts keyed by group id (any status/phase). Advisory only. */
+  matchCountByGroupId: Record<string, number>;
+  /** Marketing status or effective lifecycle completed. Advisory only. */
+  tournamentCompleted: boolean;
 };
 
 export function TournamentGroupsBoard({
@@ -40,6 +49,8 @@ export function TournamentGroupsBoard({
   groups,
   groupIdByParticipantId,
   hasMatches,
+  matchCountByGroupId,
+  tournamentCompleted,
 }: TournamentGroupsBoardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +180,14 @@ export function TournamentGroupsBoard({
             const id = scheduleParticipantId(participant);
             return Boolean(id) && groupIdByParticipantId[id!] === group.id;
           });
+          const deleteFacts = {
+            tournamentCompleted,
+            memberCount: groupParticipants.length,
+            matchCountForGroup: matchCountByGroupId[group.id] ?? 0,
+          };
+          const deleteBlockReason = emptyGroupDeletionBlockReason(deleteFacts);
+          const deleteAdvised = canAdviseEmptyGroupDeletion(deleteFacts);
+          const deleteDisabled = pending || !deleteAdvised;
 
           return (
             <div key={group.id} className={`${adminCardShellClass} p-4 sm:p-5`}>
@@ -192,13 +211,17 @@ export function TournamentGroupsBoard({
                 </button>
                 <button
                   type="button"
-                  disabled={pending || hasMatches}
+                  disabled={deleteDisabled}
+                  title={deleteBlockReason ?? undefined}
                   onClick={() => setDeleteGroupId(group.id)}
-                  className="inline-flex h-11 items-center px-3 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
+                  className="inline-flex h-11 items-center px-3 text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:opacity-60"
                 >
                   Löschen
                 </button>
               </div>
+              {deleteBlockReason ? (
+                <p className="mt-2 text-[12px] text-muted">{deleteBlockReason}</p>
+              ) : null}
               <div className="mt-4">
                 <GroupColumn
                   title={`${group.name} · ${groupParticipants.length} Teams`}
