@@ -12,8 +12,15 @@ const paymentApplicationSelect = `
   payment_status,
   participation_fee,
   paid_at,
-  tournaments (name, date)
+  tournaments (id, name, date, age_group)
 `;
+
+type PaymentTournamentRow = {
+  id: string;
+  name: string;
+  date: string;
+  age_group: string;
+};
 
 type PaymentApplicationRow = {
   id: string;
@@ -23,12 +30,12 @@ type PaymentApplicationRow = {
   payment_status: AdminPaymentRecord["paymentStatus"];
   participation_fee: number | null;
   paid_at: string | null;
-  tournaments: { name: string; date: string } | { name: string; date: string }[] | null;
+  tournaments: PaymentTournamentRow | PaymentTournamentRow[] | null;
 };
 
 function unwrapTournament(
   value: PaymentApplicationRow["tournaments"],
-): { name: string; date: string } | null {
+): PaymentTournamentRow | null {
   if (Array.isArray(value)) {
     return value[0] ?? null;
   }
@@ -75,8 +82,10 @@ function toAdminPaymentRecord(
     applicationStatus: row.status,
     clubName: row.club_name,
     teamName: row.team_name,
+    tournamentId: tournament?.id ?? "",
     tournamentName: tournament?.name ?? "—",
     tournamentDate: tournament?.date ?? "",
+    ageGroup: tournament?.age_group ?? "",
     ...toApplicationPayment({
       payment_status: row.payment_status,
       participation_fee: row.participation_fee,

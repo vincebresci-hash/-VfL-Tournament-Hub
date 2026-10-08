@@ -21,6 +21,8 @@ export type AdminPaymentRecord = ApplicationPayment & {
   applicationStatus: ApplicationStatus;
   clubName: string;
   teamName: string;
+  tournamentId: string;
   tournamentName: string;
   tournamentDate: string;
+  ageGroup: string;
 };

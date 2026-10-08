@@ -6,6 +6,14 @@ import {
   parseParticipationFeeInput,
 } from "@/lib/payments/normalize";
 import { toApplicationPayment } from "@/lib/payments/mappers";
+import {
+  arePaymentFiltersActive,
+  emptyPaymentFilters,
+  filterPaymentRecords,
+  getPaymentAgeGroupFilterOptions,
+  getPaymentTournamentFilterOptions,
+} from "@/lib/payments/payment-filters";
+import type { AdminPaymentRecord } from "@/types/payment";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -22,6 +30,21 @@ function readMigration() {
 
 function readActions() {
   return readFileSync(join(process.cwd(), "src/lib/payments/actions.ts"), "utf8");
+}
+
+function readQueries() {
+  return readFileSync(join(process.cwd(), "src/lib/payments/queries.ts"), "utf8");
+}
+
+function readPaymentTypes() {
+  return readFileSync(join(process.cwd(), "src/types/payment.ts"), "utf8");
+}
+
+function readPaymentsBoard() {
+  return readFileSync(
+    join(process.cwd(), "src/components/admin/AdminPaymentsBoard.tsx"),
+    "utf8",
+  );
 }
 
 function readStatusMail() {
@@ -43,6 +66,25 @@ function readOccupancyMigration() {
     ),
     "utf8",
   );
+}
+
+function samplePaymentRecord(
+  overrides: Partial<AdminPaymentRecord> & Pick<AdminPaymentRecord, "applicationId">,
+): AdminPaymentRecord {
+  return {
+    applicationStatus: "accepted",
+    clubName: "TSV Jesingen",
+    teamName: "Jesingen U7",
+    tournamentId: "tourn-u7",
+    tournamentName: "G-Junioren Hallenturnier",
+    tournamentDate: "2026-03-01",
+    ageGroup: "U7",
+    paymentStatus: "pending",
+    participationFee: 80,
+    paidAt: null,
+    paymentNote: null,
+    ...overrides,
+  };
 }
 
 export function runPaymentStatusChecks() {
@@ -171,6 +213,200 @@ export function runPaymentStatusChecks() {
     payment_note: "ok",
   });
   assert(payment.participationFee === 120.5, "fee mapping");
+
+  const queries = readQueries();
+  const paymentTypes = readPaymentTypes();
+  const board = readPaymentsBoard();
+
+  assert(
+    queries.includes("tournaments (id, name, date, age_group)"),
+    "payment list select includes tournament id and age_group",
+  );
+  assert(paymentTypes.includes("tournamentId: string"), "AdminPaymentRecord.tournamentId");
+  assert(paymentTypes.includes("ageGroup: string"), "AdminPaymentRecord.ageGroup");
+  assert(queries.includes("tournamentId: tournament?.id ?? \"\""), "mapper tournamentId");
+  assert(
+    queries.includes("ageGroup: tournament?.age_group ?? \"\""),
+    "mapper uses authoritative tournament age_group",
+  );
+
+  const records: AdminPaymentRecord[] = [
+    samplePaymentRecord({ applicationId: "app-1" }),
+    samplePaymentRecord({
+      applicationId: "app-2",
+      clubName: "SV Kirchheim",
+      teamName: "Kirchheim Elite",
+      tournamentId: "tourn-u10",
+      tournamentName: "Kirchheim Cup",
+      tournamentDate: "2026-04-10",
+      ageGroup: "U10",
+      paymentStatus: "paid",
+      paidAt: "2026-02-01T00:00:00.000Z",
+    }),
+    samplePaymentRecord({
+      applicationId: "app-3",
+      clubName: "FC Muster",
+      teamName: "Muster U7",
+      tournamentId: "tourn-u7-b",
+      tournamentName: "G-Junioren Hallenturnier",
+      tournamentDate: "2026-05-01",
+      ageGroup: "U7",
+      paymentStatus: "waived",
+    }),
+    samplePaymentRecord({
+      applicationId: "app-4",
+      clubName: "SC Firma",
+      teamName: "Firma A",
+      tournamentId: "tourn-firma",
+      tournamentName: "Firmenturnier Cup",
+      tournamentDate: "2026-06-01",
+      ageGroup: "Firmenturnier",
+      paymentStatus: "not_required",
+      participationFee: null,
+    }),
+  ];
+
+  const clubHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    query: "jesingen",
+  });
+  assert(
+    clubHits.length === 1 && clubHits[0]?.applicationId === "app-1",
+    "club name search",
+  );
+
+  const teamHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    query: "Elite",
+  });
+  assert(
+    teamHits.length === 1 && teamHits[0]?.applicationId === "app-2",
+    "team name search",
+  );
+
+  const caseHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    query: "JESINGEN",
+  });
+  assert(caseHits.length === 1, "case-insensitive search");
+
+  const trimmedHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    query: "  jesingen  ",
+  });
+  assert(trimmedHits.length === 1, "trimmed search");
+
+  const tournamentHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    tournamentId: "tourn-u10",
+  });
+  assert(
+    tournamentHits.length === 1 && tournamentHits[0]?.applicationId === "app-2",
+    "tournament ID filter",
+  );
+
+  const ageHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    ageGroup: "U7",
+  });
+  assert(
+    ageHits.length === 2 &&
+      ageHits.every((record) => record.ageGroup === "U7"),
+    "age-group filter",
+  );
+
+  const statusHits = filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    paymentStatus: "pending",
+  });
+  assert(
+    statusHits.length === 1 && statusHits[0]?.applicationId === "app-1",
+    "payment status filter",
+  );
+
+  const combined = filterPaymentRecords(records, {
+    query: "Jesingen",
+    tournamentId: "tourn-u7",
+    ageGroup: "U7",
+    paymentStatus: "pending",
+  });
+  assert(
+    combined.length === 1 && combined[0]?.applicationId === "app-1",
+    "combined AND filtering",
+  );
+
+  const reset = filterPaymentRecords(records, emptyPaymentFilters);
+  assert(reset.length === records.length, "reset restores all records");
+  assert(!arePaymentFiltersActive(emptyPaymentFilters), "empty filters inactive");
+
+  const emptyFiltered = filterPaymentRecords(records, {
+    query: "Jesingen",
+    tournamentId: "tourn-u10",
+    ageGroup: "U7",
+    paymentStatus: "pending",
+  });
+  assert(emptyFiltered.length === 0, "empty filtered result");
+
+  assert(
+    reset.map((record) => record.applicationId).join(",") ===
+      "app-1,app-2,app-3,app-4",
+    "original ordering preserved",
+  );
+
+  const frozenIds = records.map((record) => record.applicationId).join(",");
+  filterPaymentRecords(records, {
+    ...emptyPaymentFilters,
+    query: "Kirchheim",
+  });
+  assert(
+    records.map((record) => record.applicationId).join(",") === frozenIds,
+    "original input not mutated",
+  );
+
+  const tournamentOptions = getPaymentTournamentFilterOptions(records);
+  assert(
+    tournamentOptions.some((option) => option.id === "tourn-u7") &&
+      tournamentOptions.some((option) => option.id === "tourn-u7-b"),
+    "tournament options derived from records",
+  );
+  assert(
+    tournamentOptions.some((option) =>
+      option.label.includes("G-Junioren Hallenturnier") &&
+      option.label.includes("("),
+    ),
+    "duplicate tournament names remain distinguishable",
+  );
+
+  const ageOptions = getPaymentAgeGroupFilterOptions(records);
+  assert(
+    ageOptions.join(",") === "U7,U10,Firmenturnier",
+    "canonical age-group ordering",
+  );
+
+  assert(actions.includes("requirePaymentsView"), "authorization view unchanged");
+  assert(actions.includes("requirePaymentsManage"), "authorization manage unchanged");
+  assert(
+    actions.includes("updateApplicationPaymentAction") &&
+      actions.includes("normalizePaymentUpdate"),
+    "payment mutation behavior unchanged",
+  );
+  assert(
+    !board.includes("loadAdminPaymentRecordsAction") &&
+      !board.includes("createClient") &&
+      !board.includes('from("applications")') &&
+      board.includes("filterPaymentRecords") &&
+      board.includes('"use client"'),
+    "no per-keystroke database requests",
+  );
+  assert(board.includes("Filter zurücksetzen"), "reset control present");
+  assert(
+    board.includes("Keine passenden Zahlungseinträge gefunden."),
+    "filtered empty state present",
+  );
+  assert(
+    board.includes("von ${records.length} Zahlungseinträgen"),
+    "filtered result count present",
+  );
 
   return "ok";
 }
