@@ -25,6 +25,13 @@ REVOKE ALL ON TABLE public.admin_nav_seen_state FROM PUBLIC, anon;
 -- so clients cannot regress cursors with arbitrary UPDATEs.
 GRANT SELECT ON TABLE public.admin_nav_seen_state TO authenticated;
 
+-- Defense in depth: default privileges may have granted write/TRUNCATE to
+-- authenticated. RLS blocks INSERT/UPDATE/DELETE without policies, but TRUNCATE
+-- is not governed by RLS — revoke all direct table mutations explicitly.
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE
+  ON TABLE public.admin_nav_seen_state
+  FROM authenticated;
+
 DROP POLICY IF EXISTS admin_nav_seen_state_select_own ON public.admin_nav_seen_state;
 CREATE POLICY admin_nav_seen_state_select_own
   ON public.admin_nav_seen_state

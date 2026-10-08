@@ -52,8 +52,13 @@ export function runAdminNavBadgesChecks() {
     migration.includes("GRANT SELECT ON TABLE public.admin_nav_seen_state TO authenticated") &&
       !migration.includes("GRANT UPDATE ON TABLE public.admin_nav_seen_state") &&
       !migration.includes("GRANT INSERT ON TABLE public.admin_nav_seen_state") &&
-      !migration.includes("GRANT DELETE ON TABLE public.admin_nav_seen_state"),
-    "no direct write grants; RPC-only writes",
+      !migration.includes("GRANT DELETE ON TABLE public.admin_nav_seen_state") &&
+      migration.includes(
+        "REVOKE INSERT, UPDATE, DELETE, TRUNCATE",
+      ) &&
+      migration.includes("ON TABLE public.admin_nav_seen_state") &&
+      migration.includes("FROM authenticated"),
+    "no direct write grants; explicit revoke of INSERT/UPDATE/DELETE/TRUNCATE",
   );
   assert(
     migration.includes("advance_admin_nav_seen_state") &&
