@@ -6,6 +6,12 @@ import { Logo } from "@/components/brand/Logo";
 import { cn } from "@/lib/cn";
 import { CLUB_NAME, HUB_NAME } from "@/lib/constants";
 import { adminNavigationGroups } from "@/lib/admin-navigation";
+import {
+  adminNavBadgeAriaLabel,
+  emptyAdminNavBadgeCounts,
+  formatAdminNavBadgeCount,
+  type AdminNavBadgeCounts,
+} from "@/lib/admin/nav-badges";
 import { canSeeAdminNavItem } from "@/lib/rbac/admin-access";
 import type { Permission } from "@/types/rbac";
 
@@ -13,6 +19,7 @@ type AdminSidebarProps = {
   onNavigate?: () => void;
   effectivePermissions: Permission[];
   isSuperAdmin: boolean;
+  badgeCounts?: AdminNavBadgeCounts;
 };
 
 function isNavItemActive(pathname: string, href: string, exact?: boolean) {
@@ -27,6 +34,7 @@ export function AdminSidebar({
   onNavigate,
   effectivePermissions,
   isSuperAdmin,
+  badgeCounts = emptyAdminNavBadgeCounts,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const permissionSet = new Set(effectivePermissions);
@@ -72,6 +80,8 @@ export function AdminSidebar({
                 {group.items.map((item) => {
                   const active = isNavItemActive(pathname, item.href, item.exact);
                   const Icon = item.icon;
+                  const count = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
+                  const badge = formatAdminNavBadgeCount(count);
 
                   return (
                     <li key={item.href}>
@@ -87,7 +97,22 @@ export function AdminSidebar({
                         aria-current={active ? "page" : undefined}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span className="min-w-0 break-words leading-snug">{item.label}</span>
+                        <span className="min-w-0 flex-1 break-words leading-snug">
+                          {item.label}
+                        </span>
+                        {badge ? (
+                          <span
+                            className={cn(
+                              "shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-normal tabular-nums",
+                              active
+                                ? "bg-navy text-brand-yellow"
+                                : "bg-brand-yellow text-navy",
+                            )}
+                            aria-label={adminNavBadgeAriaLabel(item.label, count)}
+                          >
+                            {badge}
+                          </span>
+                        ) : null}
                       </Link>
                     </li>
                   );

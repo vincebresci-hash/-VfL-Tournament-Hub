@@ -402,6 +402,14 @@ export type AppSettingRow = {
   updated_by: string | null;
 };
 
+export type AdminNavSeenStateRow = {
+  user_id: string;
+  nav_key: "applications" | "cancellations";
+  seen_until: string;
+  seen_id: string;
+  updated_at: string;
+};
+
 export type EmailLogStatusRow = "sent" | "failed" | "skipped";
 
 export type EmailLogRow = {
@@ -833,6 +841,16 @@ export type Database = {
         AppSettingRow,
         Partial<AppSettingRow> & { key: string },
         Partial<AppSettingRow>
+      >;
+      admin_nav_seen_state: Table<
+        AdminNavSeenStateRow,
+        Partial<AdminNavSeenStateRow> & {
+          user_id: string;
+          nav_key: AdminNavSeenStateRow["nav_key"];
+          seen_until: string;
+          seen_id: string;
+        },
+        Partial<AdminNavSeenStateRow>
       >;
       email_logs: Table<
         EmailLogRow,
@@ -1332,6 +1350,18 @@ export type Database = {
           p_admin_note?: string | null;
         };
         Returns: undefined;
+      };
+      get_admin_nav_badge_counts: {
+        Args: Record<string, never>;
+        Returns: Array<{ nav_key: string; unread_count: number }>;
+      };
+      advance_admin_nav_seen_state: {
+        Args: {
+          p_nav_key: string;
+          p_seen_until: string;
+          p_seen_id: string;
+        };
+        Returns: boolean;
       };
       reserve_cancellation_email_send: {
         Args: {

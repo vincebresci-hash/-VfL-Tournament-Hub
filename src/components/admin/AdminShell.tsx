@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { cn } from "@/lib/cn";
+import type { AdminNavBadgeCounts } from "@/lib/admin/nav-badges";
+import { emptyAdminNavBadgeCounts } from "@/lib/admin/nav-badges";
 import { ADMIN_HOME } from "@/lib/auth/roles";
 import { getAdminRoutePermissions, hasEffectivePermission } from "@/lib/rbac/admin-access";
 import type { Permission } from "@/types/rbac";
@@ -13,12 +15,14 @@ type AdminShellProps = {
   children: ReactNode;
   effectivePermissions: Permission[];
   isSuperAdmin: boolean;
+  badgeCounts?: AdminNavBadgeCounts;
 };
 
 export function AdminShell({
   children,
   effectivePermissions,
   isSuperAdmin,
+  badgeCounts = emptyAdminNavBadgeCounts,
 }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -79,6 +83,7 @@ export function AdminShell({
           <AdminSidebar
             effectivePermissions={effectivePermissions}
             isSuperAdmin={isSuperAdmin}
+            badgeCounts={badgeCounts}
           />
         </div>
       </aside>
@@ -102,6 +107,7 @@ export function AdminShell({
           onNavigate={() => setOpen(false)}
           effectivePermissions={effectivePermissions}
           isSuperAdmin={isSuperAdmin}
+          badgeCounts={badgeCounts}
         />
       </div>
 

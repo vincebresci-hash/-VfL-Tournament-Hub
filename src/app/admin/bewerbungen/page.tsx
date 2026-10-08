@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import { AdminApplicationsNavSeen } from "@/components/admin/AdminApplicationsNavSeen";
 import { ApplicationsBoard } from "@/components/admin/ApplicationsBoard";
 import { listAdminTournamentRecords } from "@/lib/db/admin-queries";
 
@@ -12,6 +13,7 @@ export default async function AdminApplicationsPage() {
 
   return (
     <Suspense fallback={<p className="text-[15px] text-muted">Bewerbungen werden geladen.</p>}>
+      <AdminApplicationsNavSeen />
       <ApplicationsBoard tournaments={tournaments} />
     </Suspense>
   );

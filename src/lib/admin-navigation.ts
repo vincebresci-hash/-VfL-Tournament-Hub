@@ -1,4 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
+import type { AdminNavBadgeKey } from "@/lib/admin/nav-badges";
 import {
   IconCancel,
   IconCheckCircle,
@@ -19,11 +20,14 @@ import {
 
 type IconComponent = ComponentType<SVGProps<SVGSVGElement>>;
 
+export type { AdminNavBadgeKey };
+
 export type AdminNavItem = {
   href: string;
   label: string;
   icon: IconComponent;
   exact?: boolean;
+  badgeKey?: AdminNavBadgeKey;
 };
 
 export type AdminNavGroup = {
@@ -49,8 +53,18 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     label: "Turnierbetrieb",
     items: [
       { href: "/admin/turniere", label: "Turniere", icon: IconTrophy },
-      { href: "/admin/bewerbungen", label: "Bewerbungen", icon: IconClipboard },
-      { href: "/admin/absagen", label: "Absagen", icon: IconCancel },
+      {
+        href: "/admin/bewerbungen",
+        label: "Bewerbungen",
+        icon: IconClipboard,
+        badgeKey: "applications",
+      },
+      {
+        href: "/admin/absagen",
+        label: "Absagen",
+        icon: IconCancel,
+        badgeKey: "cancellations",
+      },
       { href: "/admin/zahlungen", label: "Zahlungen", icon: IconCheckCircle },
     ],
   },
