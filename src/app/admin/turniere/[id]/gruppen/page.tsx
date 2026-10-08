@@ -61,6 +61,15 @@ export default async function AdminTournamentGroupsPage({ params }: GroupsPagePr
           groups={stage.groups}
           groupIdByParticipantId={stage.groupIdByApplicationId}
           hasMatches={stage.matches.length > 0}
+          matchCountByGroupId={Object.fromEntries(
+            stage.groups.map((group) => [
+              group.id,
+              stage.matches.filter((match) => match.groupId === group.id).length,
+            ]),
+          )}
+          tournamentCompleted={
+            tournament.status === "completed" || lifecycle.model?.effective === "completed"
+          }
         />
       )}
     </TournamentAdminChrome>

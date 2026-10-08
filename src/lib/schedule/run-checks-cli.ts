@@ -25,6 +25,7 @@ import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
 import { runKnockoutDeleteChecks } from "./knockout-delete-checks";
 import { runGroupResultLockChecks } from "./group-result-lock-checks";
 import { runGroupResultLockUxChecks } from "./group-result-lock-ux-checks";
+import { runEmptyGroupDeletionChecks } from "./empty-group-deletion-checks";
 import { runKnockoutPreviewChecks } from "./knockout-preview-checks";
 import { runKnockoutPreviewUxChecks } from "./knockout-preview-ux-checks";
 import { runTournamentLifecycleChecks } from "./tournament-lifecycle-checks";
@@ -116,6 +117,7 @@ try {
   const knockoutDeleteChecks = runKnockoutDeleteChecks();
   const groupResultLockChecks = runGroupResultLockChecks();
   const groupResultLockUxChecks = runGroupResultLockUxChecks();
+  const emptyGroupDeletionChecks = runEmptyGroupDeletionChecks();
   const knockoutPreviewChecks = runKnockoutPreviewChecks();
   const knockoutPreviewUxChecks = runKnockoutPreviewUxChecks();
   const tournamentLifecycleChecks = runTournamentLifecycleChecks();
@@ -223,6 +225,7 @@ try {
   console.log(`knockout-delete-checks: ${knockoutDeleteChecks}`);
   console.log(`group-result-lock-checks: ${groupResultLockChecks}`);
   console.log(`group-result-lock-ux-checks: ${groupResultLockUxChecks}`);
+  console.log(`empty-group-deletion-checks: ${emptyGroupDeletionChecks}`);
   console.log(`knockout-preview-checks: ${knockoutPreviewChecks}`);
   console.log(`knockout-preview-ux-checks: ${knockoutPreviewUxChecks}`);
   console.log(`tournament-lifecycle-checks: ${tournamentLifecycleChecks}`);
