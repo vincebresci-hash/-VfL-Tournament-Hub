@@ -106,7 +106,13 @@ export function TournamentKnockoutRounds({
                   </p>
                 </div>
 
-                <ul className="mt-2.5 grid grid-cols-1 gap-2 md:grid-cols-2">
+                <ul
+                  className={
+                    round.matches.length === 1
+                      ? "mt-2.5 grid grid-cols-1 gap-2"
+                      : "mt-2.5 grid grid-cols-1 gap-2 md:grid-cols-2"
+                  }
+                >
                   {round.matches.map((match) => {
                     const completed =
                       match.status === "completed" &&

@@ -183,6 +183,24 @@ export function runMatchdayUiPolishChecks(): string {
     "Finale hierarchy is CSS/presentation only",
   );
 
+  // Single-match KO rounds span full round width on desktop (no half-empty grid)
+  assert(
+    knockout.includes("round.matches.length === 1") &&
+      knockout.includes('"mt-2.5 grid grid-cols-1 gap-2"') &&
+      knockout.includes("md:grid-cols-2"),
+    "single-match KO round uses one-column layout; multi-match keeps md:grid-cols-2",
+  );
+  assert(
+    !/ul className="mt-2\.5 grid grid-cols-1 gap-2 md:grid-cols-2"/.test(knockout),
+    "single-match KO round does not retain always-on desktop half-width grid",
+  );
+  assert(
+    knockout.includes("grid-cols-1") &&
+      !knockout.includes("resolveKnockoutOutcome") &&
+      !knockout.includes("winnerId"),
+    "mobile remains single-column; no KO business logic introduced for layout",
+  );
+
   // Placements
   assert(placements.includes("{row.place}."), "placement ranks retained");
   assert(placements.includes("<TeamNameWithLogo"), "placements keep TeamNameWithLogo");
