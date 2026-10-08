@@ -16,7 +16,7 @@ export default async function AdminCancellationRequestsPage() {
     <div>
       <AdminPageHeader
         title="Absagen"
-        description="Absageanfragen prüfen und über die Teilnahme entscheiden."
+        description="Offene Absageanfragen prüfen und abgeschlossene Anfragen im Archiv einsehen."
       />
       {!ready ? (
         <AdminNotice>Absageanfragen konnten nicht geladen werden.</AdminNotice>

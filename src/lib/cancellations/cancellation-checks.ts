@@ -1,6 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  cancellationRequestStatusLabel,
+  isArchivedCancellationStatus,
+  partitionCancellationRequests,
+  selectCancellationRequestsForTab,
+} from "@/lib/cancellations/cancellation-archive";
+import {
   isLateCancellationRequest,
   requiresCancellationReason,
 } from "@/lib/cancellations/deadline";
@@ -10,6 +16,7 @@ import {
   isValidSecureAccessTokenFormat,
 } from "@/lib/cancellations/tokens";
 import { countApplicationsByStatus } from "@/lib/tournament-capacity";
+import type { CancellationRequestListItem } from "@/types/cancellation";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -158,6 +165,212 @@ export function runCancellationRequestsChecks() {
 
   // R club cannot decide
   assert(actions.includes("requireCancellationsManage"), "R: admin guard on decide");
+
+  const board = readFileSync(
+    join(process.cwd(), "src/components/admin/CancellationRequestsBoard.tsx"),
+    "utf8",
+  );
+  const queries = readFileSync(
+    join(process.cwd(), "src/lib/cancellations/queries.ts"),
+    "utf8",
+  );
+  const absagenPage = readFileSync(
+    join(process.cwd(), "src/app/admin/absagen/page.tsx"),
+    "utf8",
+  );
+  const absagenLayout = readFileSync(
+    join(process.cwd(), "src/app/admin/absagen/layout.tsx"),
+    "utf8",
+  );
+
+  const sampleRequests: CancellationRequestListItem[] = [
+    {
+      id: "req-pending",
+      applicationId: "app-1",
+      requestedByType: "club",
+      reason: "Verletzung im Kader",
+      isLateRequest: false,
+      status: "pending",
+      requestedAt: "2026-09-01T10:00:00.000Z",
+      decidedAt: null,
+      decidedBy: null,
+      adminNote: null,
+      createdAt: "2026-09-01T10:00:00.000Z",
+      updatedAt: "2026-09-01T10:00:00.000Z",
+      tournamentName: "G-Junioren Hallenturnier",
+      tournamentSlug: "g-junioren",
+      tournamentDate: "2026-12-01",
+      clubName: "TSV Jesingen",
+      teamName: "Jesingen U7",
+      contactFirstName: "Max",
+      contactLastName: "Mustermann",
+      contactEmail: "max@example.com",
+      applicationStatus: "accepted",
+      daysUntilTournament: 20,
+    },
+    {
+      id: "req-confirmed",
+      applicationId: "app-2",
+      requestedByType: "external",
+      reason: "Terminüberschneidung",
+      isLateRequest: true,
+      status: "confirmed",
+      requestedAt: "2026-08-01T10:00:00.000Z",
+      decidedAt: "2026-08-02T12:00:00.000Z",
+      decidedBy: "admin-1",
+      adminNote: "Platz freigegeben",
+      createdAt: "2026-08-01T10:00:00.000Z",
+      updatedAt: "2026-08-02T12:00:00.000Z",
+      tournamentName: "U10 Soccer Cup",
+      tournamentSlug: "u10-soccer-cup",
+      tournamentDate: "2026-11-01",
+      clubName: "SV Kirchheim",
+      teamName: "Kirchheim U10",
+      contactFirstName: "Erika",
+      contactLastName: "Muster",
+      contactEmail: "erika@example.com",
+      applicationStatus: "cancelled",
+      daysUntilTournament: null,
+    },
+    {
+      id: "req-rejected",
+      applicationId: "app-3",
+      requestedByType: "club",
+      reason: "Zu kurzfristig ohne Begründung",
+      isLateRequest: true,
+      status: "rejected",
+      requestedAt: "2026-07-01T10:00:00.000Z",
+      decidedAt: "2026-07-02T09:00:00.000Z",
+      decidedBy: "admin-2",
+      adminNote: null,
+      createdAt: "2026-07-01T10:00:00.000Z",
+      updatedAt: "2026-07-02T09:00:00.000Z",
+      tournamentName: "U12 Master Cup",
+      tournamentSlug: "u12-master-cup",
+      tournamentDate: "2026-10-01",
+      clubName: "FC Muster",
+      teamName: "Muster U12",
+      contactFirstName: "Tom",
+      contactLastName: "Test",
+      contactEmail: "tom@example.com",
+      applicationStatus: "accepted",
+      daysUntilTournament: null,
+    },
+  ];
+
+  const { active, archived } = partitionCancellationRequests(sampleRequests);
+  assert(
+    active.length === 1 && active[0]?.id === "req-pending",
+    "pending requests in active tab",
+  );
+  assert(
+    archived.some((request) => request.id === "req-confirmed"),
+    "confirmed requests in archive",
+  );
+  assert(
+    archived.some((request) => request.id === "req-rejected"),
+    "rejected requests in archive",
+  );
+  assert(
+    selectCancellationRequestsForTab(sampleRequests, "archive").length === 2,
+    "previously processed requests visible",
+  );
+  assert(active.length === 1 && archived.length === 2, "correct tab counts");
+
+  const confirmed = archived.find((request) => request.id === "req-confirmed");
+  assert(
+    confirmed?.reason === "Terminüberschneidung",
+    "original cancellation reason preserved",
+  );
+  assert(
+    confirmed?.decidedAt === "2026-08-02T12:00:00.000Z",
+    "decision timestamps displayed",
+  );
+  assert(
+    confirmed?.adminNote === "Platz freigegeben",
+    "admin note displayed when available",
+  );
+  assert(
+    cancellationRequestStatusLabel.confirmed === "Bestätigt" &&
+      cancellationRequestStatusLabel.rejected === "Abgelehnt" &&
+      cancellationRequestStatusLabel.pending === "Offen",
+    "clear German status labels",
+  );
+  assert(isArchivedCancellationStatus("confirmed"), "confirmed is archived");
+  assert(isArchivedCancellationStatus("rejected"), "rejected is archived");
+  assert(!isArchivedCancellationStatus("pending"), "pending is not archived");
+
+  assert(board.includes("Offene Absagen"), "active tab label");
+  assert(board.includes("Archiv"), "archive tab label");
+  assert(
+    board.includes('useState<CancellationArchiveTab>("active")'),
+    "default tab is active",
+  );
+  assert(
+    board.includes("Keine archivierten Absageanfragen."),
+    "empty archive state",
+  );
+  assert(
+    board.includes("Keine offenen Absageanfragen."),
+    "empty active state",
+  );
+  assert(
+    board.includes("Absage bestätigen") && board.includes("Absage ablehnen"),
+    "pending decision actions unchanged",
+  );
+  // Archive list must not call decision setters — only active actions do.
+  const archiveSectionStart = board.indexOf("function ArchiveRequestsList");
+  assert(archiveSectionStart >= 0, "archive list component exists");
+  const archiveSection = board.slice(archiveSectionStart);
+  assert(
+    !archiveSection.includes("setPendingDecision") &&
+      !archiveSection.includes("decideCancellationRequestAction") &&
+      !archiveSection.includes("Absage bestätigen") &&
+      !archiveSection.includes("Absage ablehnen") &&
+      !archiveSection.includes(".delete("),
+    "archive is read-only",
+  );
+  assert(
+    !board.includes("archived_at") && !queries.includes("archived_at"),
+    "no archived_at column introduced",
+  );
+  const listFnStart = queries.indexOf("export async function listCancellationRequests");
+  const listFnEnd = queries.indexOf(
+    "export async function getPendingCancellationForApplication",
+  );
+  assert(listFnStart >= 0 && listFnEnd > listFnStart, "listCancellationRequests present");
+  const listFn = queries.slice(listFnStart, listFnEnd);
+  assert(
+    !listFn.includes('.eq("status"') &&
+      listFn.includes('.order("requested_at"'),
+    "list query remains unfiltered source of truth",
+  );
+  assert(
+    absagenPage.includes("listCancellationRequests") &&
+      !absagenPage.includes("listPendingCancellationRequests"),
+    "page uses full listCancellationRequests",
+  );
+  assert(
+    absagenLayout.includes("cancellations.view"),
+    "permissions unchanged",
+  );
+  assert(
+    actions.includes("requireCancellationsManage") &&
+      actions.includes("decideCancellationRequestAction") &&
+      !board.includes("updateApplicationStatus"),
+    "no cancellation/application status mutations from tab navigation",
+  );
+  assert(
+    !board.includes(".from(\"cancellation_requests\").delete") &&
+      !actions.includes('.from("cancellation_requests").delete'),
+    "no deletion of cancellation records",
+  );
+
+  const emptyPartition = partitionCancellationRequests([]);
+  assert(
+    emptyPartition.active.length === 0 && emptyPartition.archived.length === 0,
+    "empty partitions for empty input",
+  );
 
   return "ok";
 }
