@@ -63,6 +63,31 @@ export function runAdminNavBadgesChecks() {
     "monotonic advance RPC hardened",
   );
   assert(
+    migration.includes("application.id = p_seen_id") &&
+      migration.includes("application.created_at = p_seen_until") &&
+      migration.includes("request.id = p_seen_id") &&
+      migration.includes("request.requested_at = p_seen_until") &&
+      migration.includes("Reject arbitrary / future cursors") &&
+      migration.includes("RETURN false"),
+    "advance validates cursor against visible authoritative rows",
+  );
+  // Mark-seen must not re-derive DB max (that would swallow concurrent arrivals).
+  const advanceFnStart = migration.indexOf(
+    "CREATE OR REPLACE FUNCTION public.advance_admin_nav_seen_state",
+  );
+  const advanceFnEnd = migration.indexOf(
+    "CREATE OR REPLACE FUNCTION public.get_admin_nav_badge_counts",
+  );
+  assert(advanceFnStart >= 0 && advanceFnEnd > advanceFnStart, "advance fn bounds");
+  const advanceFn = migration.slice(advanceFnStart, advanceFnEnd);
+  assert(
+    !advanceFn.includes("admin_nav_max_applications_cursor") &&
+      !advanceFn.includes("admin_nav_max_cancellations_cursor") &&
+      !advanceFn.includes("seen_until := now()") &&
+      !advanceFn.includes("seen_until = now()"),
+    "mark-seen keeps client snapshot cursor; no server max/now rewrite",
+  );
+  assert(
     migration.includes("get_admin_nav_badge_counts") &&
       migration.includes("admin_nav_ensure_bootstrap") &&
       migration.includes("'-infinity'::timestamptz") &&

@@ -225,6 +225,35 @@ BEGIN
     RAISE EXCEPTION 'Not authorized';
   END IF;
 
+  -- Reject arbitrary / future cursors. The supplied pair must match one
+  -- currently visible authoritative row so clients cannot suppress unread
+  -- badges by advancing past reality. Snapshot callers still pass the max
+  -- loaded row; concurrent newer arrivals remain unread.
+  IF p_nav_key = 'applications' THEN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.applications AS application
+      WHERE application.id = p_seen_id
+        AND application.created_at = p_seen_until
+        AND application.archived_at IS NULL
+    ) THEN
+      RETURN false;
+    END IF;
+  ELSE
+    IF NOT EXISTS (
+      SELECT 1
+      FROM public.cancellation_requests AS request
+      INNER JOIN public.applications AS application
+        ON application.id = request.application_id
+      INNER JOIN public.tournaments AS tournament
+        ON tournament.id = application.tournament_id
+      WHERE request.id = p_seen_id
+        AND request.requested_at = p_seen_until
+    ) THEN
+      RETURN false;
+    END IF;
+  END IF;
+
   INSERT INTO public.admin_nav_seen_state (
     user_id,
     nav_key,

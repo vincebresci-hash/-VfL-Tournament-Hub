@@ -47,6 +47,8 @@ export async function markAdminNavSeenAction(input: {
     return { advanced: false, error: null };
   }
 
+  // Cursor must be the max loaded snapshot row. The RPC rejects pairs that do
+  // not match a visible authoritative DB row (blocks future-cursor suppression).
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("advance_admin_nav_seen_state", {
     p_nav_key: input.navKey,
