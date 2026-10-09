@@ -63,6 +63,7 @@ import { runGuestApplicationFieldsChecks } from "@/lib/applications/guest-applic
 import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-application-fields-checks";
 import { runMultiTeamApplicationChecks } from "@/lib/applications/multi-team-application-checks";
 import { runRpcUuidArrayChecks } from "@/lib/applications/rpc-uuid-array-checks";
+import { runAdminNavBadgesChecks } from "@/lib/admin/admin-nav-badges-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runPublicCancellationGuidanceChecks } from "@/lib/cancellations/public-cancellation-guidance-checks";
@@ -160,6 +161,7 @@ try {
   const optionalApplicationFieldsChecks = runOptionalApplicationFieldsChecks();
   const multiTeamApplicationChecks = runMultiTeamApplicationChecks();
   const rpcUuidArrayChecks = runRpcUuidArrayChecks();
+  const adminNavBadgesChecks = runAdminNavBadgesChecks();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const publicCancellationGuidanceChecks = runPublicCancellationGuidanceChecks();
@@ -267,6 +269,7 @@ try {
   console.log(`optional-application-fields-checks: ${optionalApplicationFieldsChecks}`);
   console.log(`multi-team-application-checks: ${multiTeamApplicationChecks}`);
   console.log(`rpc-uuid-array-checks: ${rpcUuidArrayChecks}`);
+  console.log(`admin-nav-badges-checks: ${adminNavBadgesChecks}`);
   console.log(`cancellation-requests-checks: ${cancellationRequestsChecks}`);
   console.log(`cancellation-email-hotfix-checks: ${cancellationEmailHotfixChecks}`);
   console.log(`public-cancellation-guidance-checks: ${publicCancellationGuidanceChecks}`);
