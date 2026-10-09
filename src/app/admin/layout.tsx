@@ -6,6 +6,8 @@ import { loadAdminNavBadgeCountsAction } from "@/lib/admin/nav-badge-actions";
 import { emptyAdminNavBadgeCounts } from "@/lib/admin/nav-badges";
 import { getAuthSession } from "@/lib/auth/session";
 import { canManageSystem } from "@/lib/auth/roles";
+import { canAccessInbox } from "@/lib/inbox/access";
+import { loadInboxUnreadCount } from "@/lib/inbox/queries";
 import { loadUserAuthorization } from "@/lib/rbac/queries";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const badgeCounts = session
     ? await loadAdminNavBadgeCountsAction()
     : { counts: emptyAdminNavBadgeCounts, ready: false };
+  const inboxUnreadCount =
+    session && canAccessInbox(session, authorization) ? await loadInboxUnreadCount() : 0;
 
   return (
     <AdminDataProvider>
@@ -30,6 +34,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         effectivePermissions={authorization?.permissions ?? []}
         isSuperAdmin={session ? canManageSystem(session.user.role) : false}
         badgeCounts={badgeCounts.counts}
+        inboxUnreadCount={inboxUnreadCount}
       >
         {children}
       </AdminShell>

@@ -410,6 +410,94 @@ export type AdminNavSeenStateRow = {
   updated_at: string;
 };
 
+export type InboxProcessingStatusRow = "open" | "in_progress" | "done";
+
+export type InboxMailboxRow = {
+  id: string;
+  label: string;
+  folder: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InboxSyncStateRow = {
+  mailbox_id: string;
+  folder: string;
+  uidvalidity: number | null;
+  cursor_uid: number;
+  backfill_cutoff_at: string | null;
+  backfill_complete: boolean;
+  last_synced_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  lock_token: string | null;
+  lock_acquired_at: string | null;
+  lock_expires_at: string | null;
+  updated_at: string;
+};
+
+export type InboxMessageRow = {
+  id: string;
+  mailbox_id: string;
+  folder: string;
+  uidvalidity: number;
+  imap_uid: number;
+  message_id_header: string | null;
+  in_reply_to: string | null;
+  references_header: string | null;
+  thread_key: string;
+  from_address: string;
+  from_name: string;
+  to_addresses: Json;
+  cc_addresses: Json;
+  subject: string;
+  sent_at: string | null;
+  received_at: string;
+  snippet: string;
+  body_text: string | null;
+  body_html_sanitized: string | null;
+  has_attachments: boolean;
+  size_bytes: number | null;
+  imap_flags: Json;
+  is_unread_local: boolean;
+  processing_status: InboxProcessingStatusRow;
+  processed_at: string | null;
+  processed_by: string | null;
+  synced_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InboxAttachmentRow = {
+  id: string;
+  message_id: string;
+  part_index: number;
+  filename: string;
+  content_type: string | null;
+  size_bytes: number;
+  content_id: string | null;
+  storage_path: string | null;
+  checksum_sha256: string | null;
+  stored: boolean;
+  skip_reason: string | null;
+  retry_count: number;
+  last_repair_at: string | null;
+  last_repair_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InboxStorageLeaseRow = {
+  storage_path: string;
+  mailbox_id: string;
+  message_id: string | null;
+  attachment_id: string | null;
+  lock_token: string | null;
+  committed: boolean;
+  created_at: string;
+};
+
 export type EmailLogStatusRow = "sent" | "failed" | "skipped";
 
 export type EmailLogRow = {
@@ -851,6 +939,71 @@ export type Database = {
           seen_id: string;
         },
         Partial<AdminNavSeenStateRow>
+      >;
+      inbox_mailboxes: Table<
+        InboxMailboxRow,
+        Partial<InboxMailboxRow> & { label?: string; folder?: string },
+        Partial<InboxMailboxRow>
+      >;
+      inbox_sync_state: Table<
+        InboxSyncStateRow,
+        Partial<InboxSyncStateRow> & { mailbox_id: string },
+        Partial<InboxSyncStateRow>,
+        [
+          {
+            foreignKeyName: "inbox_sync_state_mailbox_id_fkey";
+            columns: ["mailbox_id"];
+            isOneToOne: true;
+            referencedRelation: "inbox_mailboxes";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      inbox_messages: Table<
+        InboxMessageRow,
+        Partial<InboxMessageRow> & {
+          mailbox_id: string;
+          folder: string;
+          uidvalidity: number;
+          imap_uid: number;
+          thread_key: string;
+          received_at: string;
+        },
+        Partial<InboxMessageRow>,
+        [
+          {
+            foreignKeyName: "inbox_messages_mailbox_id_fkey";
+            columns: ["mailbox_id"];
+            isOneToOne: false;
+            referencedRelation: "inbox_mailboxes";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      inbox_attachments: Table<
+        InboxAttachmentRow,
+        Partial<InboxAttachmentRow> & {
+          message_id: string;
+          filename: string;
+        },
+        Partial<InboxAttachmentRow>,
+        [
+          {
+            foreignKeyName: "inbox_attachments_message_id_fkey";
+            columns: ["message_id"];
+            isOneToOne: false;
+            referencedRelation: "inbox_messages";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      inbox_storage_leases: Table<
+        InboxStorageLeaseRow,
+        Partial<InboxStorageLeaseRow> & {
+          storage_path: string;
+          mailbox_id: string;
+        },
+        Partial<InboxStorageLeaseRow>
       >;
       email_logs: Table<
         EmailLogRow,
@@ -1360,6 +1513,147 @@ export type Database = {
           p_nav_key: string;
           p_seen_until: string;
           p_seen_id: string;
+        };
+        Returns: boolean;
+      };
+      acquire_inbox_sync_lock: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_ttl_seconds?: number;
+        };
+        Returns: boolean;
+      };
+      release_inbox_sync_lock: {
+        Args: { p_mailbox_id: string; p_lock_token: string };
+        Returns: boolean;
+      };
+      assert_inbox_sync_lock: {
+        Args: { p_mailbox_id: string; p_lock_token: string };
+        Returns: boolean;
+      };
+      advance_inbox_sync_cursor: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_uidvalidity: number;
+          p_cursor_uid: number;
+          p_backfill_complete?: boolean | null;
+          p_last_error?: string | null;
+          p_success?: boolean;
+        };
+        Returns: boolean;
+      };
+      upsert_inbox_message_from_sync: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_folder: string;
+          p_uidvalidity: number;
+          p_imap_uid: number;
+          p_message_id_header: string | null;
+          p_in_reply_to: string | null;
+          p_references_header: string | null;
+          p_thread_key: string;
+          p_from_address: string;
+          p_from_name: string;
+          p_to_addresses: Json;
+          p_cc_addresses: Json;
+          p_subject: string;
+          p_sent_at: string | null;
+          p_received_at: string;
+          p_snippet: string;
+          p_body_text: string | null;
+          p_body_html_sanitized: string | null;
+          p_has_attachments: boolean;
+          p_size_bytes: number | null;
+          p_imap_flags: Json;
+        };
+        Returns: string;
+      };
+      set_inbox_message_local_state: {
+        Args: {
+          p_message_id: string;
+          p_is_unread_local?: boolean | null;
+          p_processing_status?: string | null;
+        };
+        Returns: boolean;
+      };
+      get_inbox_unread_count: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
+      get_inbox_sync_status: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          mailbox_id: string;
+          folder: string;
+          uidvalidity: number | null;
+          cursor_uid: number;
+          backfill_complete: boolean;
+          backfill_cutoff_at: string | null;
+          last_synced_at: string | null;
+          last_success_at: string | null;
+          last_error: string | null;
+        }>;
+      };
+      claim_inbox_sync_lock_for_mutation: {
+        Args: { p_mailbox_id: string; p_lock_token: string };
+        Returns: boolean;
+      };
+      upsert_inbox_attachment_from_sync: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_message_id: string;
+          p_part_index: number;
+          p_filename: string;
+          p_content_type: string | null;
+          p_size_bytes: number;
+          p_content_id: string | null;
+          p_storage_path: string | null;
+          p_checksum_sha256: string | null;
+          p_stored: boolean;
+          p_skip_reason: string | null;
+        };
+        Returns: Array<{
+          attachment_id: string;
+          previous_storage_path: string | null;
+          kept_existing: boolean;
+        }>;
+      };
+      register_inbox_storage_lease: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_storage_path: string;
+          p_message_id?: string | null;
+          p_attachment_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      commit_inbox_storage_lease: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_storage_path: string;
+        };
+        Returns: boolean;
+      };
+      list_expired_inbox_storage_leases: {
+        Args: { p_max_age_seconds?: number; p_limit?: number };
+        Returns: Array<{ storage_path: string; mailbox_id: string }>;
+      };
+      delete_inbox_storage_lease: {
+        Args: { p_storage_path: string };
+        Returns: boolean;
+      };
+      mark_inbox_attachment_repair_attempt: {
+        Args: {
+          p_mailbox_id: string;
+          p_lock_token: string;
+          p_attachment_id: string;
+          p_error_code?: string | null;
         };
         Returns: boolean;
       };
