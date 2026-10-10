@@ -80,17 +80,22 @@ jobs:
             exit 1
           fi
           docker info >/dev/null
+          # Fail closed if historical enum-safe migration fingerprints drift.
+          node scripts/ci/inbox-sql/verify-enum-safe-fingerprints.mjs
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: 2.120.0
 
-      - name: Start local Supabase
+      - name: Disable CLI auto migration apply (runner config only)
+        run: node scripts/ci/inbox-sql/disable-auto-migrations.mjs
+
+      - name: Start local Supabase (no project migrations)
         run: supabase start
 
-      - name: Apply full migration chain (local reset)
-        run: supabase db reset --yes
+      - name: Apply migrations with enum-safe CI boundaries
+        run: node scripts/ci/inbox-sql/apply-migrations.mjs
 
       - name: Run inbox SQL integration harness
         run: node scripts/ci/inbox-sql/run.mjs
