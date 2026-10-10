@@ -5,6 +5,9 @@
  * - Applies every file in supabase/migrations in lexicographic order.
  * - For two fingerprint-pinned historical files, commits enum ADD VALUE
  *   statements before executing the full original file (unchanged on disk).
+ * - For one fingerprint-pinned historical file, drops tournament_public_roster(text)
+ *   (no CASCADE) after verifying the old RETURNS TABLE shape, then applies the
+ *   full original file in the same transaction.
  * - Never connects using DATABASE_URL / remote hosts / production secrets.
  * - Records applied versions in supabase_migrations.schema_migrations.
  */
@@ -13,6 +16,11 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ENUM_SAFE_MIGRATIONS } from "./enum-safe-migrations.mjs";
+import {
+  FUNCTION_RETURN_COMPAT_MIGRATIONS,
+  assertResultColumnsMatch,
+  parseTableResultColumns,
+} from "./function-return-compat-migrations.mjs";
 import { createPgClient, loadLocalSupabaseEnv } from "./lib.mjs";
 
 function sha256(content) {
@@ -47,6 +55,32 @@ function assertEnumSafeSpec(filename, content) {
         `Expected enum statement missing from ${filename}. Fail closed.\n${statement}`,
       );
     }
+  }
+
+  return spec;
+}
+
+function assertFunctionReturnCompatSpec(filename, content) {
+  const spec = FUNCTION_RETURN_COMPAT_MIGRATIONS[filename];
+  if (!spec) {
+    return null;
+  }
+
+  const digest = sha256(content);
+  if (digest !== spec.sha256) {
+    throw new Error(
+      `Fingerprint mismatch for ${filename}: expected ${spec.sha256}, got ${digest}. ` +
+        "Fail closed — refusing function return-type compat on an unexpected historical file.",
+    );
+  }
+
+  if (spec.dropStatement.includes("CASCADE") || /cascade/i.test(spec.dropStatement)) {
+    throw new Error("Refusing function return-type compat: DROP must never use CASCADE");
+  }
+  if (spec.dropStatement !== "DROP FUNCTION public.tournament_public_roster(text);") {
+    throw new Error(
+      `Refusing function return-type compat: unexpected DROP statement: ${spec.dropStatement}`,
+    );
   }
 
   return spec;
@@ -170,6 +204,145 @@ async function applyEnumSafeMigration(client, filename, content, spec) {
   }
 }
 
+async function getRosterFunctionMeta(client) {
+  const { rows } = await client.query(`
+    SELECT
+      p.oid,
+      pg_get_function_identity_arguments(p.oid) AS identity_args,
+      pg_get_function_result(p.oid) AS result_type,
+      p.prosecdef AS security_definer,
+      COALESCE(p.proconfig, ARRAY[]::text[]) AS config
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.proname = 'tournament_public_roster'
+      AND pg_get_function_identity_arguments(p.oid) = 'text'
+  `);
+  return rows[0] || null;
+}
+
+async function assertNoBlockingDependents(client, functionOid) {
+  const { rows } = await client.query(
+    `
+    SELECT pg_describe_object(d.classid, d.objid, d.objsubid) AS dependent, d.deptype
+    FROM pg_depend d
+    WHERE d.refobjid = $1::oid
+      AND d.deptype = 'n'
+    ORDER BY 1
+    `,
+    [functionOid],
+  );
+  if (rows.length > 0) {
+    const list = rows.map((row) => `${row.dependent} (deptype=${row.deptype})`).join("; ");
+    throw new Error(
+      `Refusing DROP FUNCTION public.tournament_public_roster(text): unexpected dependents: ${list}`,
+    );
+  }
+}
+
+/**
+ * Verify old 8-column shape, DROP without CASCADE, apply original file — one transaction.
+ */
+async function applyFunctionReturnCompatMigration(client, filename, content, spec) {
+  await client.query("BEGIN");
+  try {
+    const meta = await getRosterFunctionMeta(client);
+    if (!meta) {
+      throw new Error(
+        `Expected ${spec.functionIdentity} to exist before compat DROP (from earlier migrations)`,
+      );
+    }
+
+    const actualColumns = parseTableResultColumns(meta.result_type);
+    assertResultColumnsMatch(
+      actualColumns,
+      spec.expectedOldResultColumns,
+      `${filename}::pre-drop return shape`,
+    );
+
+    await assertNoBlockingDependents(client, meta.oid);
+
+    await execSql(client, spec.dropStatement, `${filename}::compat-drop`);
+    await execSql(client, content, `${filename}::full-after-compat-drop`);
+
+    const after = await getRosterFunctionMeta(client);
+    if (!after) {
+      throw new Error(`${spec.functionIdentity} missing after applying ${filename}`);
+    }
+    assertResultColumnsMatch(
+      parseTableResultColumns(after.result_type),
+      spec.expectedNewResultColumns,
+      `${filename}::post-apply return shape`,
+    );
+
+    await client.query("COMMIT");
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore
+    }
+    throw error;
+  }
+}
+
+async function assertFinalTournamentPublicRoster(client) {
+  const spec = FUNCTION_RETURN_COMPAT_MIGRATIONS["20260825160000_participant_logos.sql"];
+  const meta = await getRosterFunctionMeta(client);
+  if (!meta) {
+    throw new Error("Final assertion: public.tournament_public_roster(text) missing");
+  }
+
+  assertResultColumnsMatch(
+    parseTableResultColumns(meta.result_type),
+    spec.expectedNewResultColumns,
+    "final tournament_public_roster return shape",
+  );
+
+  if (!meta.security_definer) {
+    throw new Error("Final assertion: tournament_public_roster must be SECURITY DEFINER");
+  }
+
+  const config = Array.isArray(meta.config) ? meta.config : [];
+  const searchPath = config.find((entry) => /^search_path\s*=/i.test(entry));
+  if (!searchPath || !/search_path\s*=\s*public\b/i.test(searchPath)) {
+    throw new Error(
+      `Final assertion: expected search_path=public, got ${JSON.stringify(config)}`,
+    );
+  }
+
+  const { rows: grants } = await client.query(`
+    SELECT
+      has_function_privilege('anon', 'public.tournament_public_roster(text)', 'EXECUTE') AS anon_exec,
+      has_function_privilege('authenticated', 'public.tournament_public_roster(text)', 'EXECUTE') AS auth_exec,
+      has_function_privilege('public', 'public.tournament_public_roster(text)', 'EXECUTE') AS public_exec
+  `);
+  if (!grants[0]?.anon_exec || !grants[0]?.auth_exec) {
+    throw new Error(
+      "Final assertion: EXECUTE must be granted to anon and authenticated",
+    );
+  }
+  if (grants[0]?.public_exec) {
+    throw new Error("Final assertion: PUBLIC must not retain EXECUTE (REVOKE ALL FROM PUBLIC)");
+  }
+
+  // Later historical replacement (20260913200000) keeps the 10-column shape and
+  // prefers application logo overrides — confirm that body landed.
+  const { rows: defRows } = await client.query(
+    `SELECT pg_get_functiondef($1::oid) AS definition`,
+    [meta.oid],
+  );
+  const definition = defRows[0]?.definition || "";
+  if (!definition.includes("logo_manual_override")) {
+    throw new Error(
+      "Final assertion: expected later application_participant_logos body (logo_manual_override)",
+    );
+  }
+  if (!definition.includes("SECURITY DEFINER")) {
+    throw new Error("Final assertion: function definition missing SECURITY DEFINER");
+  }
+}
+
 async function main() {
   if (process.env.INBOX_SQL_CI !== "1") {
     throw new Error("Refusing to run outside INBOX_SQL_CI=1");
@@ -197,12 +370,25 @@ async function main() {
       throw new Error(`Allowlisted migration missing from disk: ${filename}`);
     }
   }
+  for (const filename of Object.keys(FUNCTION_RETURN_COMPAT_MIGRATIONS)) {
+    if (!files.includes(filename)) {
+      throw new Error(`Function-return compat allowlisted migration missing: ${filename}`);
+    }
+  }
+
+  // A migration must not be in both special-case allowlists.
+  for (const filename of Object.keys(FUNCTION_RETURN_COMPAT_MIGRATIONS)) {
+    if (ENUM_SAFE_MIGRATIONS[filename]) {
+      throw new Error(`Migration ${filename} is in both enum-safe and function-return allowlists`);
+    }
+  }
 
   const client = createPgClient(env.dbUrl);
   await client.connect();
 
   let applied = 0;
   let enumSafe = 0;
+  let functionReturnCompat = 0;
 
   try {
     // Guard: project migrations must not already be applied by supabase start.
@@ -235,17 +421,29 @@ async function main() {
       const version = migrationVersion(filename);
       const fullPath = join(migrationsDir, filename);
       const content = readFileSync(fullPath, "utf8");
-      const spec = assertEnumSafeSpec(filename, content);
+      const enumSpec = assertEnumSafeSpec(filename, content);
+      const returnCompatSpec = assertFunctionReturnCompatSpec(filename, content);
 
       if (await isApplied(client, version)) {
         throw new Error(`Migration ${version} unexpectedly already recorded`);
       }
 
-      process.stdout.write(`Applying ${filename}${spec ? " [enum-safe]" : ""} ... `);
+      let label = "";
+      if (enumSpec) label = " [enum-safe]";
+      if (returnCompatSpec) label = " [function-return-compat]";
+      process.stdout.write(`Applying ${filename}${label} ... `);
 
-      if (spec) {
-        await applyEnumSafeMigration(client, filename, content, spec);
+      if (enumSpec) {
+        await applyEnumSafeMigration(client, filename, content, enumSpec);
         enumSafe += 1;
+      } else if (returnCompatSpec) {
+        await applyFunctionReturnCompatMigration(
+          client,
+          filename,
+          content,
+          returnCompatSpec,
+        );
+        functionReturnCompat += 1;
       } else {
         await applyStandardMigration(client, filename, content);
       }
@@ -277,8 +475,11 @@ async function main() {
       throw new Error("inbox_messages missing after full migration apply");
     }
 
+    await assertFinalTournamentPublicRoster(client);
+    console.log("[function-return-compat] final tournament_public_roster assertions ok");
+
     console.log(
-      `Applied ${applied} migrations (${enumSafe} enum-safe special-cased). History recorded.`,
+      `Applied ${applied} migrations (${enumSafe} enum-safe, ${functionReturnCompat} function-return-compat). History recorded.`,
     );
   } finally {
     await client.end();
