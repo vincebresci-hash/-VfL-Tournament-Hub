@@ -84,6 +84,7 @@ export const adminNavigationGroups: AdminNavGroup[] = [
     items: [
       { href: "/admin/kommunikation", label: "Nachrichten", icon: IconMessage },
       { href: "/admin/emails", label: "E-Mail-Vorlagen", icon: IconMail },
+      { href: "/admin/posteingang", label: "Posteingang", icon: IconMail },
       { href: "/admin/news", label: "News", icon: IconNews },
     ],
   },

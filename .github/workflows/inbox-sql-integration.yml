@@ -1,0 +1,106 @@
+# Isolated inbox PostgreSQL/Supabase integration tests.
+# Runs ONLY against disposable local Supabase containers on GitHub-hosted runners.
+#
+# FORBIDDEN in this workflow:
+# - remote project linking / remote migration apply commands
+# - production DATABASE_URL or Supabase secrets
+# - IONOS / IMAP / Resend credentials
+# - deploy / merge / production SQL
+
+name: Inbox SQL Integration
+
+on:
+  pull_request:
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/config.toml"
+      - "scripts/ci/inbox-sql/**"
+      - ".github/workflows/inbox-sql-integration.yml"
+      - "src/lib/inbox/**"
+      - "package.json"
+      - "package-lock.json"
+
+concurrency:
+  group: inbox-sql-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  inbox-sql-integration:
+    name: Local Supabase inbox SQL tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    # No GitHub environments, no production secrets.
+    env:
+      # Refuse remote Supabase CLI auth even if an org secret leaked into the job.
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+      # Harness reads local status only — never repository secrets.
+      INBOX_SQL_CI: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Security preflight (no remote / no secrets)
+        run: |
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+            echo "SUPABASE_ACCESS_TOKEN must be empty for this job" >&2
+            exit 1
+          fi
+          if [[ -n "${DATABASE_URL:-}" ]]; then
+            echo "DATABASE_URL must not be set — local supabase status only" >&2
+            exit 1
+          fi
+          if [[ -n "${RESEND_API_KEY:-}" || -n "${INBOX_IMAP_PASSWORD:-}" ]]; then
+            echo "Outbound/IONOS secrets must not be present" >&2
+            exit 1
+          fi
+          # Match real command invocations only (not this preflight's pattern text).
+          if grep -R -n -E '^[[:space:]]*supabase[[:space:]]+(link|db[[:space:]]+push)|migration[[:space:]]+up[[:space:]]+--linked' \
+            .github/workflows/inbox-sql-integration.yml scripts/ci/inbox-sql; then
+            echo "Remote Supabase commands are forbidden in this workflow/harness" >&2
+            exit 1
+          fi
+          if grep -R -n -E 'https?://[^[:space:]]*supabase\.co|db\.[^[:space:]]+\.supabase\.co' \
+            scripts/ci/inbox-sql; then
+            echo "Production Supabase host references are forbidden" >&2
+            exit 1
+          fi
+          docker info >/dev/null
+          # Fail closed if historical CI-compat migration fingerprints drift.
+          node scripts/ci/inbox-sql/verify-enum-safe-fingerprints.mjs
+          node scripts/ci/inbox-sql/verify-function-return-compat-fingerprints.mjs
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Disable CLI auto migration apply (runner config only)
+        run: node scripts/ci/inbox-sql/disable-auto-migrations.mjs
+
+      - name: Start local Supabase (no project migrations)
+        run: supabase start
+
+      - name: Apply migrations with CI-only enum/function-return compat
+        run: node scripts/ci/inbox-sql/apply-migrations.mjs
+
+      - name: Run inbox SQL integration harness
+        run: node scripts/ci/inbox-sql/run.mjs
+
+      - name: Stop local Supabase (destroy data)
+        if: always()
+        run: supabase stop --no-backup

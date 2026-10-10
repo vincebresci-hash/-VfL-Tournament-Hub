@@ -12,6 +12,10 @@ import {
   formatAdminNavBadgeCount,
   type AdminNavBadgeCounts,
 } from "@/lib/admin/nav-badges";
+import {
+  formatInboxUnreadBadgeCount,
+  inboxUnreadBadgeAriaLabel,
+} from "@/lib/inbox/inbox-badges";
 import { canSeeAdminNavItem } from "@/lib/rbac/admin-access";
 import type { Permission } from "@/types/rbac";
 
@@ -20,6 +24,8 @@ type AdminSidebarProps = {
   effectivePermissions: Permission[];
   isSuperAdmin: boolean;
   badgeCounts?: AdminNavBadgeCounts;
+  /** Separate from applications/cancellations badge counts. */
+  inboxUnreadCount?: number;
 };
 
 function isNavItemActive(pathname: string, href: string, exact?: boolean) {
@@ -35,6 +41,7 @@ export function AdminSidebar({
   effectivePermissions,
   isSuperAdmin,
   badgeCounts = emptyAdminNavBadgeCounts,
+  inboxUnreadCount = 0,
 }: AdminSidebarProps) {
   const pathname = usePathname();
   const permissionSet = new Set(effectivePermissions);
@@ -80,8 +87,18 @@ export function AdminSidebar({
                 {group.items.map((item) => {
                   const active = isNavItemActive(pathname, item.href, item.exact);
                   const Icon = item.icon;
-                  const count = item.badgeKey ? badgeCounts[item.badgeKey] : 0;
-                  const badge = formatAdminNavBadgeCount(count);
+                  const isInbox = item.href === "/admin/posteingang";
+                  const count = isInbox
+                    ? inboxUnreadCount
+                    : item.badgeKey
+                      ? badgeCounts[item.badgeKey]
+                      : 0;
+                  const badge = isInbox
+                    ? formatInboxUnreadBadgeCount(count)
+                    : formatAdminNavBadgeCount(count);
+                  const ariaLabel = isInbox
+                    ? inboxUnreadBadgeAriaLabel(count)
+                    : adminNavBadgeAriaLabel(item.label, count);
 
                   return (
                     <li key={item.href}>
@@ -108,7 +125,7 @@ export function AdminSidebar({
                                 ? "bg-navy text-brand-yellow"
                                 : "bg-brand-yellow text-navy",
                             )}
-                            aria-label={adminNavBadgeAriaLabel(item.label, count)}
+                            aria-label={ariaLabel}
                           >
                             {badge}
                           </span>
