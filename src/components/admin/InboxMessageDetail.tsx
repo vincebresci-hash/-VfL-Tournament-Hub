@@ -17,12 +17,15 @@ import {
   updateInboxMessageLocalStateAction,
 } from "@/lib/inbox/actions";
 import { formatDateTimeDe } from "@/lib/format";
-import { wrapInboxHtmlForSandbox } from "@/lib/inbox/sanitize-html";
+import { INBOX_HTML_CSP } from "@/lib/inbox/sanitize-html";
 import { cn } from "@/lib/cn";
 import type { InboxMessageDetail as InboxMessageDetailType } from "@/lib/inbox/types";
 
-/** Soft ceiling so ultrawide admins stay readable (~1200px). */
-const READING_SHELL = "max-w-[1200px]";
+/**
+ * Outlook-like reading pane: use admin width up to ~1400px so ultrawide
+ * desktops are not dominated by empty gutters, without full-bleed stretch.
+ */
+const READING_SHELL = "max-w-[1400px]";
 
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
@@ -51,6 +54,25 @@ function formatAddressLine(entries: { name: string; address: string }[]): string
     .join(", ");
 }
 
+/**
+ * Detail-only srcdoc chrome for sandboxed HTML.
+ * - Keeps inbox CSP (script-src 'none'); no scripts / no same-origin.
+ * - Does NOT force a global font-size (preserves sender inline sizes).
+ * - Centers typical fixed-width email tables in a wide pane (Gmail/Outlook feel).
+ */
+function wrapDetailEmailSrcDoc(sanitizedHtml: string): string {
+  const styles = [
+    "html{-webkit-text-size-adjust:100%;height:100%;}",
+    /* No font-size here — avoid shrinking emails that inherit from body. */
+    "body{margin:0;padding:20px 12px 28px;font-family:system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif;color:#111;word-wrap:break-word;overflow-wrap:anywhere;display:flex;flex-direction:column;align-items:center;box-sizing:border-box;}",
+    "body>*{max-width:100%;}",
+    "a{color:#0b3d5c;}",
+    "table{border-collapse:collapse;}",
+  ].join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta http-equiv="Content-Security-Policy" content="${INBOX_HTML_CSP}" /><style>${styles}</style></head><body>${sanitizedHtml}</body></html>`;
+}
+
 export function InboxMessageDetailView({ message, canManage }: InboxMessageDetailProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -69,12 +91,12 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
   const senderDisplay = message.fromName || message.fromAddress;
 
   return (
-    <div className={cn(adminCardShellClass, "overflow-hidden bg-white")}>
-      {/* Sticky status toolbar — full shell width, soft max */}
-      <div className="sticky top-0 z-10 border-b border-line/60 bg-white/95 backdrop-blur-md">
+    <div className={cn(adminCardShellClass, "bg-white")}>
+      {/* Compact Outlook-style command bar */}
+      <div className="sticky top-0 z-10 border-b border-line/50 bg-white/95 backdrop-blur-md">
         <div
           className={cn(
-            "mx-auto flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8 xl:px-10",
+            "mx-auto flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8",
             READING_SHELL,
           )}
         >
@@ -82,15 +104,15 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
             href="/admin/posteingang"
             className={cn(
               adminSecondaryButtonClass,
-              "h-8 rounded-full border-line/70 px-3 text-[11px] tracking-[0.04em]",
+              "h-8 rounded-md border-line/70 px-3 text-[11px] tracking-[0.04em]",
             )}
           >
             ← Posteingang
           </Link>
 
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
             {message.isUnreadLocal ? (
-              <span className="rounded-full bg-brand-yellow/30 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
+              <span className="rounded-md bg-brand-yellow/30 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
                 Ungelesen
               </span>
             ) : null}
@@ -98,7 +120,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
             {canManage ? (
               <>
                 <div
-                  className="inline-flex max-w-full flex-wrap gap-0.5 rounded-full border border-line/70 bg-surface/70 p-0.5"
+                  className="inline-flex max-w-full flex-wrap gap-0.5 rounded-md border border-line/60 bg-surface/60 p-0.5"
                   role="group"
                   aria-label="Bearbeitungsstatus"
                 >
@@ -110,9 +132,9 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                         type="button"
                         disabled={pending || active}
                         className={cn(
-                          "h-7 rounded-full px-2.5 text-[10px] font-semibold tracking-[0.04em] uppercase transition-colors",
+                          "h-7 rounded px-2.5 text-[10px] font-semibold tracking-[0.04em] uppercase transition-colors",
                           active
-                            ? "bg-navy text-white shadow-sm"
+                            ? "bg-navy text-white"
                             : "text-muted hover:bg-white hover:text-ink disabled:opacity-50",
                         )}
                         onClick={() => {
@@ -135,7 +157,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                   disabled={pending}
                   className={cn(
                     adminSecondaryButtonClass,
-                    "h-8 rounded-full px-3 text-[10px] tracking-[0.04em]",
+                    "h-8 rounded-md px-3 text-[10px] tracking-[0.04em]",
                   )}
                   onClick={() => {
                     startTransition(async () => {
@@ -151,7 +173,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                 </button>
               </>
             ) : (
-              <span className="rounded-full bg-navy/5 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy/80 uppercase">
+              <span className="rounded-md bg-navy/5 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy/80 uppercase">
                 {INBOX_STATUS_LABEL[message.processingStatus]}
               </span>
             )}
@@ -159,20 +181,15 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
         </div>
       </div>
 
-      {/* Reading shell */}
-      <div
-        className={cn(
-          "mx-auto w-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7 xl:px-10",
-          READING_SHELL,
-        )}
-      >
-        {/* Subject = primary headline */}
-        <h1 className="text-[1.45rem] leading-snug font-semibold tracking-[-0.025em] text-ink sm:text-[1.8rem] sm:leading-tight">
+      {/* Reading shell — wider on ultrawide, still capped */}
+      <div className={cn("mx-auto w-full px-4 py-4 sm:px-6 sm:py-5 lg:px-8", READING_SHELL)}>
+        {/* Subject */}
+        <h1 className="text-[1.35rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.65rem] sm:leading-tight">
           {message.subject || "(Kein Betreff)"}
         </h1>
 
-        {/* Sender row */}
-        <header className="mt-4 flex gap-3 border-b border-line/60 pb-4 sm:mt-5 sm:gap-3.5 sm:pb-5">
+        {/* Sender / recipients / date — Gmail-like density, Outlook clarity */}
+        <header className="mt-3 flex gap-3 border-b border-line/50 pb-3.5 sm:mt-3.5 sm:pb-4">
           <InboxSenderAvatar
             fromName={message.fromName}
             fromAddress={message.fromAddress}
@@ -181,65 +198,66 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
             className="mt-0.5"
           />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <div className="min-w-0">
-                <p className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink sm:text-[16px]">
-                  {senderDisplay}
-                </p>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+              <p className="min-w-0 truncate text-[14px] sm:text-[15px]">
+                <span className="font-semibold tracking-[-0.01em] text-ink">{senderDisplay}</span>
                 {message.fromName ? (
-                  <p className="mt-0.5 truncate text-[12px] text-muted sm:text-[13px]">
-                    {message.fromAddress}
-                  </p>
+                  <span className="text-muted"> &lt;{message.fromAddress}&gt;</span>
                 ) : null}
-              </div>
+              </p>
               <time
                 dateTime={message.receivedAt}
-                className="shrink-0 text-[12px] text-muted tabular-nums sm:text-[13px]"
+                className="shrink-0 text-[12px] text-muted tabular-nums"
               >
                 {formatDateTimeDe(message.receivedAt)}
               </time>
             </div>
-
-            <dl className="mt-2.5 space-y-0.5 text-[12px] sm:text-[13px]">
-              <div className="grid grid-cols-[2.25rem_1fr] gap-x-2 sm:grid-cols-[2.5rem_1fr]">
-                <dt className="text-muted">An</dt>
-                <dd className="min-w-0 break-words text-ink/80">{toLine}</dd>
+            <dl className="mt-1.5 space-y-0.5 text-[12px] text-ink/75">
+              <div className="flex flex-wrap gap-x-1.5">
+                <dt className="text-muted">An:</dt>
+                <dd className="min-w-0 break-words">{toLine}</dd>
               </div>
               {ccLine ? (
-                <div className="grid grid-cols-[2.25rem_1fr] gap-x-2 sm:grid-cols-[2.5rem_1fr]">
-                  <dt className="text-muted">Cc</dt>
-                  <dd className="min-w-0 break-words text-ink/80">{ccLine}</dd>
+                <div className="flex flex-wrap gap-x-1.5">
+                  <dt className="text-muted">Cc:</dt>
+                  <dd className="min-w-0 break-words">{ccLine}</dd>
                 </div>
               ) : null}
             </dl>
           </div>
         </header>
 
-        {/* Body — no nested card border */}
-        <section className="mt-5 sm:mt-6">
-          <p className="mb-2.5 text-[11px] leading-4 text-muted">
+        {/*
+          Body iframe:
+          - Tall viewport-based min-height reduces nested scrolling for typical mail
+            (auto-height needs scripts / same-origin — intentionally not used).
+          - Width fills the reading shell; email tables stay sender-sized and centered
+            via srcdoc chrome.
+        */}
+        <section className="mt-4">
+          <p className="mb-2 text-[11px] leading-4 text-muted">
             Externe Bilder und aktive Inhalte sind aus Sicherheitsgründen blockiert.
           </p>
           {message.bodyHtmlSanitized ? (
             <iframe
-              className="min-h-[50vh] w-full border-0 bg-white sm:min-h-[60vh] lg:min-h-[min(68vh,720px)]"
+              className="block w-full border-0 bg-white min-h-[calc(100dvh-13.5rem)] sm:min-h-[calc(100dvh-12.5rem)]"
               // No scripts / no same-origin — inbox-only sandbox + CSP srcdoc.
               sandbox="allow-popups allow-popups-to-escape-sandbox"
               referrerPolicy="no-referrer"
               title="Nachrichtentext"
-              srcDoc={wrapInboxHtmlForSandbox(message.bodyHtmlSanitized)}
+              srcDoc={wrapDetailEmailSrcDoc(message.bodyHtmlSanitized)}
             />
           ) : (
-            <pre className="min-h-[40vh] whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em] text-ink sm:min-h-[50vh] lg:min-h-[min(60vh,640px)]">
+            <pre className="min-h-[calc(100dvh-16rem)] whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em] text-ink">
               {message.bodyText || "Kein Textinhalt."}
             </pre>
           )}
         </section>
 
-        {/* Compact attachment strip */}
+        {/* Compact attachment rows */}
         {message.attachments.length > 0 ? (
-          <section className="mt-6 border-t border-line/60 pt-5 sm:mt-7">
-            <div className="mb-2.5 flex items-center gap-2">
+          <section className="mt-5 border-t border-line/50 pt-4">
+            <div className="mb-2 flex items-center gap-2">
               <InboxAttachmentIcon className="text-navy/55" />
               <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
                 Anhänge
@@ -248,16 +266,16 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                 {message.attachments.length}
               </span>
             </div>
-            <ul className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line/60 bg-surface/25">
+            <ul className="divide-y divide-line/50 overflow-hidden rounded-lg border border-line/50 bg-surface/20">
               {message.attachments.map((attachment) => (
                 <li
                   key={attachment.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-3.5"
+                  className="flex items-center justify-between gap-3 px-3 py-2 sm:px-3.5"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span
                       aria-hidden
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-navy ring-1 ring-inset ring-line/80"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-navy ring-1 ring-inset ring-line/70"
                     >
                       <InboxAttachmentIcon className="text-navy" />
                     </span>
@@ -278,7 +296,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                       type="button"
                       className={cn(
                         adminPrimaryButtonClass,
-                        "h-8 shrink-0 rounded-full px-3 text-[10px]",
+                        "h-8 shrink-0 rounded-md px-3 text-[10px]",
                       )}
                       onClick={() => {
                         void createInboxAttachmentDownloadUrlAction(attachment.id).then((result) => {
