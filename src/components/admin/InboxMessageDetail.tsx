@@ -22,10 +22,10 @@ import { cn } from "@/lib/cn";
 import type { InboxMessageDetail as InboxMessageDetailType } from "@/lib/inbox/types";
 
 /**
- * Outlook-like reading column: wide enough for admin work, capped so
- * ultrawide gutters stay outside the reader (not inside the message).
+ * Ultrawide-friendly reading column. Caps below full bleed so line length
+ * stays usable; gutters remain outside the reader on very wide displays.
  */
-const READING_SHELL = "max-w-[1120px]";
+const READING_SHELL = "max-w-[1600px]";
 
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
@@ -60,20 +60,26 @@ function formatAddressLine(entries: { name: string; address: string }[]): string
  * Security: reuses INBOX_HTML_CSP (script-src 'none'); iframe stays without
  * allow-scripts / allow-same-origin.
  *
- * Typography: inbox sanitization strips style attributes, <style>, width, and
- * font tags — so a readable body baseline does not override surviving sender
- * styles (semantic tags / structure remain as sanitized).
+ * Typography: sanitization strips style/width/font tags, so an 18px body
+ * baseline is presentation chrome for unstyled HTML — not a rewrite of
+ * surviving semantic structure.
  *
- * Layout: left-aligned flow (Outlook/Gmail). Flex centering was removed — it
- * shrink-wrapped children in a wide iframe and created large side voids.
+ * Tables: only common top-level layout tables are expanded to the pane.
+ * Nested tables keep intrinsic width (not a blanket width:100%).
  */
 function wrapDetailEmailSrcDoc(sanitizedHtml: string): string {
   const styles = [
     "html{-webkit-text-size-adjust:100%;}",
-    "body{margin:0;padding:4px 2px 20px;font-family:system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif;font-size:16px;line-height:1.55;color:#111;word-wrap:break-word;overflow-wrap:anywhere;}",
+    "body{margin:0;padding:8px 4px 24px;font-family:system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif;font-size:18px;line-height:1.6;color:#111;word-wrap:break-word;overflow-wrap:anywhere;overflow-x:auto;}",
     "a{color:#0b3d5c;}",
     "table{border-collapse:collapse;max-width:100%;}",
+    /* Top-level / single-root layout tables only — nested tables stay auto. */
+    "body>table{width:100%;max-width:100%;}",
+    "body>div:only-child>table:only-child{width:100%;max-width:100%;}",
+    "table table{width:auto;max-width:100%;}",
     "td,th{word-break:break-word;}",
+    /* Readable measure for free-flow paragraphs in a wide pane. */
+    "body>p{max-width:72ch;}",
     "pre,code{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.9375em;}",
     "p{margin:0 0 0.85em;}",
     "p:last-child{margin-bottom:0;}",
@@ -100,9 +106,17 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
   const senderDisplay = message.fromName || message.fromAddress;
 
   return (
-    <div className={cn(adminCardShellClass, "bg-white")}>
+    <div
+      className={cn(
+        adminCardShellClass,
+        "flex flex-col bg-white",
+        // Large screens: one Outlook-like pane height so the iframe (not the page)
+        // is the primary body scroll region. Mobile keeps natural page flow.
+        "lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem]",
+      )}
+    >
       {/* Compact Outlook-style command bar */}
-      <div className="sticky top-0 z-10 border-b border-line/50 bg-white/95 backdrop-blur-md">
+      <div className="sticky top-0 z-10 shrink-0 border-b border-line/50 bg-white/95 backdrop-blur-md">
         <div
           className={cn(
             "mx-auto flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8",
@@ -190,69 +204,74 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
         </div>
       </div>
 
-      <div className={cn("mx-auto w-full px-4 py-4 sm:px-6 sm:py-5 lg:px-8", READING_SHELL)}>
-        {/* Subject — primary headline */}
-        <h1 className="text-[1.4rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.7rem] sm:leading-tight">
-          {message.subject || "(Kein Betreff)"}
-        </h1>
+      <div
+        className={cn(
+          "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8",
+          READING_SHELL,
+        )}
+      >
+        <div className="shrink-0">
+          {/* Subject — primary headline */}
+          <h1 className="text-[1.4rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.7rem] sm:leading-tight">
+            {message.subject || "(Kein Betreff)"}
+          </h1>
 
-        {/* Sender / recipients / date — clearer hierarchy */}
-        <header className="mt-4 flex gap-3.5 border-b border-line/50 pb-4 sm:mt-5 sm:gap-4 sm:pb-5">
-          <InboxSenderAvatar
-            fromName={message.fromName}
-            fromAddress={message.fromAddress}
-            unread={message.isUnreadLocal}
-            size="md"
-            className="mt-0.5"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-              <div className="min-w-0">
-                <p className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink sm:text-[16px]">
-                  {senderDisplay}
-                </p>
-                {message.fromName ? (
-                  <p className="mt-0.5 truncate text-[13px] text-muted sm:text-[14px]">
-                    {message.fromAddress}
+          {/* Sender / recipients / date — clearer hierarchy */}
+          <header className="mt-4 flex gap-3.5 border-b border-line/50 pb-4 sm:mt-5 sm:gap-4 sm:pb-5">
+            <InboxSenderAvatar
+              fromName={message.fromName}
+              fromAddress={message.fromAddress}
+              unread={message.isUnreadLocal}
+              size="md"
+              className="mt-0.5"
+            />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink sm:text-[16px]">
+                    {senderDisplay}
                   </p>
-                ) : null}
-              </div>
-              <time
-                dateTime={message.receivedAt}
-                className="shrink-0 text-[13px] text-muted tabular-nums sm:text-[14px]"
-              >
-                {formatDateTimeDe(message.receivedAt)}
-              </time>
-            </div>
-            <dl className="mt-2.5 space-y-1 text-[13px] sm:text-[14px]">
-              <div className="flex flex-wrap gap-x-2">
-                <dt className="shrink-0 font-medium text-muted">An</dt>
-                <dd className="min-w-0 break-words text-ink/85">{toLine}</dd>
-              </div>
-              {ccLine ? (
-                <div className="flex flex-wrap gap-x-2">
-                  <dt className="shrink-0 font-medium text-muted">Cc</dt>
-                  <dd className="min-w-0 break-words text-ink/85">{ccLine}</dd>
+                  {message.fromName ? (
+                    <p className="mt-0.5 truncate text-[13px] text-muted sm:text-[14px]">
+                      {message.fromAddress}
+                    </p>
+                  ) : null}
                 </div>
-              ) : null}
-            </dl>
-          </div>
-        </header>
+                <time
+                  dateTime={message.receivedAt}
+                  className="shrink-0 text-[13px] text-muted tabular-nums sm:text-[14px]"
+                >
+                  {formatDateTimeDe(message.receivedAt)}
+                </time>
+              </div>
+              <dl className="mt-2.5 space-y-1 text-[13px] sm:text-[14px]">
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="shrink-0 font-medium text-muted">An</dt>
+                  <dd className="min-w-0 break-words text-ink/85">{toLine}</dd>
+                </div>
+                {ccLine ? (
+                  <div className="flex flex-wrap gap-x-2">
+                    <dt className="shrink-0 font-medium text-muted">Cc</dt>
+                    <dd className="min-w-0 break-words text-ink/85">{ccLine}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            </div>
+          </header>
+        </div>
 
         {/*
           Body iframe — Outlook-style reading pane:
-          - One primary scroll region sized to remaining viewport (not a short
-            box inside a tall empty page, and not html{height:100%} which caused
-            phantom scrollbars).
+          - On lg+, flex-1 fills remaining card height (single primary scroll).
           - Auto-height would need scripts / same-origin — intentionally unused.
         */}
-        <section className="mt-4 sm:mt-5">
-          <p className="mb-2 text-[11px] leading-4 text-muted">
+        <section className="mt-4 flex min-h-0 flex-1 flex-col sm:mt-5">
+          <p className="mb-2 shrink-0 text-[11px] leading-4 text-muted">
             Externe Bilder und aktive Inhalte sind aus Sicherheitsgründen blockiert.
           </p>
           {message.bodyHtmlSanitized ? (
             <iframe
-              className="block w-full border-0 bg-white h-[calc(100dvh-16.5rem)] min-h-[22rem] max-h-[56rem]"
+              className="block w-full min-h-[20rem] flex-1 border-0 bg-white lg:min-h-0"
               // No scripts / no same-origin — inbox-only sandbox + CSP srcdoc.
               sandbox="allow-popups allow-popups-to-escape-sandbox"
               referrerPolicy="no-referrer"
@@ -260,7 +279,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
               srcDoc={wrapDetailEmailSrcDoc(message.bodyHtmlSanitized)}
             />
           ) : (
-            <pre className="min-h-[22rem] whitespace-pre-wrap font-sans text-[16px] leading-[1.55] tracking-[-0.01em] text-ink">
+            <pre className="min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap font-sans text-[18px] leading-[1.6] tracking-[-0.01em] text-ink lg:min-h-0">
               {message.bodyText || "Kein Textinhalt."}
             </pre>
           )}
@@ -268,7 +287,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
 
         {/* Compact attachment rows */}
         {message.attachments.length > 0 ? (
-          <section className="mt-5 border-t border-line/50 pt-4">
+          <section className="mt-4 shrink-0 border-t border-line/50 pt-4 sm:mt-5">
             <div className="mb-2 flex items-center gap-2">
               <InboxAttachmentIcon className="text-navy/55" />
               <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
