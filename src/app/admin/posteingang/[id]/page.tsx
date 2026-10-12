@@ -1,26 +1,61 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { InboxMessageDetailView } from "@/components/admin/InboxMessageDetail";
 import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
+import { InboxWorkspace } from "@/components/admin/InboxWorkspace";
 import { getAuthSession } from "@/lib/auth/session";
-import { canManageInbox } from "@/lib/inbox/access";
-import { getInboxMessageDetail } from "@/lib/inbox/queries";
+import { canManageInbox, canTriggerInboxSync } from "@/lib/inbox/access";
+import {
+  getInboxMessageDetail,
+  getInboxSyncStateView,
+  listInboxMessages,
+} from "@/lib/inbox/queries";
 import { loadUserAuthorization } from "@/lib/rbac/queries";
+import type { InboxProcessingStatus } from "@/lib/inbox/types";
 
 export const metadata: Metadata = { title: "Nachricht" };
 export const dynamic = "force-dynamic";
 
 type Params = Promise<{ id: string }>;
+type SearchParams = Promise<{
+  q?: string;
+  status?: string;
+  unread?: string;
+}>;
 
-export default async function AdminInboxMessagePage({ params }: { params: Params }) {
+function parseStatus(value: string | undefined): InboxProcessingStatus | "all" {
+  if (value === "open" || value === "in_progress" || value === "done") {
+    return value;
+  }
+  return "all";
+}
+
+export default async function AdminInboxMessagePage({
+  params,
+  searchParams,
+}: {
+  params: Params;
+  searchParams: SearchParams;
+}) {
   const { id } = await params;
+  const sp = await searchParams;
+  const query = sp.q ?? "";
+  const status = parseStatus(sp.status);
+  const unreadOnly = sp.unread === "1";
+
   const session = await getAuthSession();
   const authorization = session ? await loadUserAuthorization(session.user.id) : null;
-  const { message, ready } = await getInboxMessageDetail(id);
+  const [{ messages, ready: listReady }, { state }, { message, ready: detailReady }] =
+    await Promise.all([
+      listInboxMessages({ query, status, unreadOnly }),
+      getInboxSyncStateView(),
+      getInboxMessageDetail(id),
+    ]);
+
+  const ready = listReady && detailReady;
 
   if (!ready) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <AdminPageHeader title="Nachricht" description="Posteingang" />
         <AdminNotice>
           Bitte zuerst die Posteingang-Migration im Supabase SQL Editor ausführen.
@@ -34,15 +69,16 @@ export default async function AdminInboxMessagePage({ params }: { params: Params
   }
 
   return (
-    <div className="space-y-5">
-      <AdminPageHeader
-        title="Nachricht"
-        description="Lokaler Bearbeitungsstatus — unabhängig vom IONOS-Postfach."
-      />
-      <InboxMessageDetailView
-        message={message}
-        canManage={canManageInbox(session, authorization)}
-      />
-    </div>
+    <InboxWorkspace
+      key={`inbox|${query}|${status}|${unreadOnly ? "1" : "0"}`}
+      messages={messages}
+      syncState={state}
+      canSync={canTriggerInboxSync(session, authorization)}
+      canManage={canManageInbox(session, authorization)}
+      initialQuery={query}
+      initialStatus={status}
+      initialUnreadOnly={unreadOnly}
+      selectedMessage={message}
+    />
   );
 }

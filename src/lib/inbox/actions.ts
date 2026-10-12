@@ -9,10 +9,11 @@ import {
 } from "@/lib/inbox/access";
 import { sanitizeInboxFilename } from "@/lib/inbox/attachments-safe";
 import { INBOX_ATTACHMENT_BUCKET, INBOX_SIGNED_URL_TTL_SECONDS } from "@/lib/inbox/config";
+import { getInboxMessageDetail } from "@/lib/inbox/queries";
 import { runInboxSyncBatch } from "@/lib/inbox/sync";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { InboxProcessingStatus } from "@/lib/inbox/types";
+import type { InboxMessageDetail, InboxProcessingStatus } from "@/lib/inbox/types";
 
 async function requireInboxSession() {
   const access = await requireAdminSession();
@@ -60,6 +61,37 @@ export async function markInboxMessageReadAction(messageId: string) {
     messageId,
     isUnreadLocal: false,
   });
+}
+
+const INBOX_MESSAGE_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * Read-only detail fetch for the two-pane workspace.
+ * Auth: same gate as the detail route (admin session + inbox.view via canAccessInbox).
+ * Data: same getInboxMessageDetail() user-scoped Supabase client (RLS) + re-sanitize.
+ * Does not run IMAP sync.
+ */
+export async function getInboxMessageDetailAction(messageId: string): Promise<{
+  message: InboxMessageDetail | null;
+  error: string | null;
+}> {
+  const access = await requireInboxSession();
+  if (access.error || !access.session) {
+    return { message: null, error: access.error ?? "Nicht autorisiert." };
+  }
+  if (!INBOX_MESSAGE_ID_RE.test(messageId.trim())) {
+    return { message: null, error: "Ungültige Nachrichten-ID." };
+  }
+
+  const { message, ready } = await getInboxMessageDetail(messageId.trim());
+  if (!ready) {
+    return { message: null, error: "Posteingang ist noch nicht bereit." };
+  }
+  if (!message) {
+    return { message: null, error: "Nachricht nicht gefunden." };
+  }
+  return { message, error: null };
 }
 
 export async function triggerInboxSyncAction(): Promise<{

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { InboxBoard } from "@/components/admin/InboxBoard";
-import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
+import { AdminNotice } from "@/components/admin/AdminPanel";
+import { InboxWorkspace } from "@/components/admin/InboxWorkspace";
 import { getAuthSession } from "@/lib/auth/session";
-import { canTriggerInboxSync } from "@/lib/inbox/access";
+import { canManageInbox, canTriggerInboxSync } from "@/lib/inbox/access";
 import { getInboxSyncStateView, listInboxMessages } from "@/lib/inbox/queries";
 import { loadUserAuthorization } from "@/lib/rbac/queries";
 import type { InboxProcessingStatus } from "@/lib/inbox/types";
@@ -40,26 +40,25 @@ export default async function AdminInboxPage({
     getInboxSyncStateView(),
   ]);
 
+  if (!ready) {
+    return (
+      <AdminNotice>
+        Bitte zuerst die Posteingang-Migration im Supabase SQL Editor ausführen.
+      </AdminNotice>
+    );
+  }
+
   return (
-    <div className="space-y-5">
-      <AdminPageHeader
-        title="Posteingang"
-        description="Eingehende Turnier-E-Mails lesen und lokal bearbeiten — ohne Versand und ohne Änderungen am IONOS-Postfach."
-      />
-      {!ready ? (
-        <AdminNotice>
-          Bitte zuerst die Posteingang-Migration im Supabase SQL Editor ausführen.
-        </AdminNotice>
-      ) : (
-        <InboxBoard
-          messages={messages}
-          syncState={state}
-          canSync={canTriggerInboxSync(session, authorization)}
-          initialQuery={query}
-          initialStatus={status}
-          initialUnreadOnly={unreadOnly}
-        />
-      )}
-    </div>
+    <InboxWorkspace
+      key={`inbox|${query}|${status}|${unreadOnly ? "1" : "0"}`}
+      messages={messages}
+      syncState={state}
+      canSync={canTriggerInboxSync(session, authorization)}
+      canManage={canManageInbox(session, authorization)}
+      initialQuery={query}
+      initialStatus={status}
+      initialUnreadOnly={unreadOnly}
+      selectedMessage={null}
+    />
   );
 }
