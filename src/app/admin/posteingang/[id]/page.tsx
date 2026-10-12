@@ -20,7 +20,7 @@ export default async function AdminInboxMessagePage({ params }: { params: Params
 
   if (!ready) {
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         <AdminPageHeader title="Nachricht" description="Posteingang" />
         <AdminNotice>
           Bitte zuerst die Posteingang-Migration im Supabase SQL Editor ausführen.
@@ -33,16 +33,11 @@ export default async function AdminInboxMessagePage({ params }: { params: Params
     notFound();
   }
 
+  // Subject inside the reader is the primary headline — no duplicate page header.
   return (
-    <div className="space-y-5">
-      <AdminPageHeader
-        title="Nachricht"
-        description="Lokaler Bearbeitungsstatus — unabhängig vom IONOS-Postfach."
-      />
-      <InboxMessageDetailView
-        message={message}
-        canManage={canManageInbox(session, authorization)}
-      />
-    </div>
+    <InboxMessageDetailView
+      message={message}
+      canManage={canManageInbox(session, authorization)}
+    />
   );
 }

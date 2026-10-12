@@ -10,7 +10,6 @@ import {
 } from "@/components/admin/AdminPanel";
 import { InboxAttachmentIcon } from "@/components/admin/inbox/InboxAttachmentIcon";
 import { InboxSenderAvatar } from "@/components/admin/inbox/InboxSenderAvatar";
-import { InboxStatusBadge } from "@/components/admin/inbox/InboxStatusBadge";
 import { INBOX_STATUS_LABEL } from "@/components/admin/inbox/status";
 import {
   createInboxAttachmentDownloadUrlAction,
@@ -22,8 +21,8 @@ import { wrapInboxHtmlForSandbox } from "@/lib/inbox/sanitize-html";
 import { cn } from "@/lib/cn";
 import type { InboxMessageDetail as InboxMessageDetailType } from "@/lib/inbox/types";
 
-/** Comfortable desktop reading width (~900–1000px). */
-const READING_WIDTH = "max-w-[960px]";
+/** Soft ceiling so ultrawide admins stay readable (~1200px). */
+const READING_SHELL = "max-w-[1200px]";
 
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
@@ -71,21 +70,25 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
 
   return (
     <div className={cn(adminCardShellClass, "overflow-hidden bg-white")}>
-      {/* Toolbar — uses full shell width; controls align to reading column */}
-      <div className="sticky top-0 z-10 border-b border-line/70 bg-white/95 px-4 py-2.5 backdrop-blur-md sm:px-6 lg:px-8">
-        <div className={cn("mx-auto flex w-full flex-wrap items-center justify-between gap-2", READING_WIDTH)}>
+      {/* Sticky status toolbar — full shell width, soft max */}
+      <div className="sticky top-0 z-10 border-b border-line/60 bg-white/95 backdrop-blur-md">
+        <div
+          className={cn(
+            "mx-auto flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8 xl:px-10",
+            READING_SHELL,
+          )}
+        >
           <Link
             href="/admin/posteingang"
             className={cn(
               adminSecondaryButtonClass,
-              "h-8 rounded-full border-line/80 bg-white px-3 text-[11px] font-semibold tracking-[0.04em]",
+              "h-8 rounded-full border-line/70 px-3 text-[11px] tracking-[0.04em]",
             )}
           >
             ← Posteingang
           </Link>
 
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
-            <InboxStatusBadge status={message.processingStatus} />
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 sm:gap-2">
             {message.isUnreadLocal ? (
               <span className="rounded-full bg-brand-yellow/30 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
                 Ungelesen
@@ -95,7 +98,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
             {canManage ? (
               <>
                 <div
-                  className="inline-flex max-w-full flex-wrap gap-0.5 rounded-full border border-line/80 bg-surface/80 p-0.5"
+                  className="inline-flex max-w-full flex-wrap gap-0.5 rounded-full border border-line/70 bg-surface/70 p-0.5"
                   role="group"
                   aria-label="Bearbeitungsstatus"
                 >
@@ -147,25 +150,35 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                   Als ungelesen
                 </button>
               </>
-            ) : null}
+            ) : (
+              <span className="rounded-full bg-navy/5 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy/80 uppercase">
+                {INBOX_STATUS_LABEL[message.processingStatus]}
+              </span>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Reading column — ~960px, uses admin content width without nested squeeze */}
-      <div className={cn("mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 lg:px-8", READING_WIDTH)}>
-        {/* Subject */}
-        <h1 className="text-[1.4rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.75rem] sm:leading-tight">
+      {/* Reading shell */}
+      <div
+        className={cn(
+          "mx-auto w-full px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-7 xl:px-10",
+          READING_SHELL,
+        )}
+      >
+        {/* Subject = primary headline */}
+        <h1 className="text-[1.45rem] leading-snug font-semibold tracking-[-0.025em] text-ink sm:text-[1.8rem] sm:leading-tight">
           {message.subject || "(Kein Betreff)"}
         </h1>
 
-        {/* Message header — flat Apple Mail identity, minimal chrome */}
-        <header className="mt-5 flex gap-3.5 border-b border-line/70 pb-5 sm:gap-4 sm:pb-6">
+        {/* Sender row */}
+        <header className="mt-4 flex gap-3 border-b border-line/60 pb-4 sm:mt-5 sm:gap-3.5 sm:pb-5">
           <InboxSenderAvatar
             fromName={message.fromName}
             fromAddress={message.fromAddress}
             unread={message.isUnreadLocal}
             size="md"
+            className="mt-0.5"
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -174,7 +187,9 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
                   {senderDisplay}
                 </p>
                 {message.fromName ? (
-                  <p className="mt-0.5 truncate text-[13px] text-muted">{message.fromAddress}</p>
+                  <p className="mt-0.5 truncate text-[12px] text-muted sm:text-[13px]">
+                    {message.fromAddress}
+                  </p>
                 ) : null}
               </div>
               <time
@@ -185,66 +200,64 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
               </time>
             </div>
 
-            <dl className="mt-3 space-y-1 text-[13px]">
-              <div className="grid grid-cols-[2.75rem_1fr] gap-x-2 sm:grid-cols-[3rem_1fr]">
+            <dl className="mt-2.5 space-y-0.5 text-[12px] sm:text-[13px]">
+              <div className="grid grid-cols-[2.25rem_1fr] gap-x-2 sm:grid-cols-[2.5rem_1fr]">
                 <dt className="text-muted">An</dt>
-                <dd className="min-w-0 break-words text-ink/85">{toLine}</dd>
+                <dd className="min-w-0 break-words text-ink/80">{toLine}</dd>
               </div>
               {ccLine ? (
-                <div className="grid grid-cols-[2.75rem_1fr] gap-x-2 sm:grid-cols-[3rem_1fr]">
+                <div className="grid grid-cols-[2.25rem_1fr] gap-x-2 sm:grid-cols-[2.5rem_1fr]">
                   <dt className="text-muted">Cc</dt>
-                  <dd className="min-w-0 break-words text-ink/85">{ccLine}</dd>
+                  <dd className="min-w-0 break-words text-ink/80">{ccLine}</dd>
                 </div>
               ) : null}
             </dl>
           </div>
         </header>
 
-        {/* Body */}
-        <section className="mt-6">
-          <p className="mb-3 text-[11px] leading-4 text-muted">
+        {/* Body — no nested card border */}
+        <section className="mt-5 sm:mt-6">
+          <p className="mb-2.5 text-[11px] leading-4 text-muted">
             Externe Bilder und aktive Inhalte sind aus Sicherheitsgründen blockiert.
           </p>
           {message.bodyHtmlSanitized ? (
-            <div className="overflow-hidden rounded-xl border border-line/70 bg-white">
-              <iframe
-                className="min-h-[420px] w-full bg-white sm:min-h-[560px] lg:min-h-[640px]"
-                // No scripts / no same-origin — inbox-only sandbox + CSP srcdoc.
-                sandbox="allow-popups allow-popups-to-escape-sandbox"
-                referrerPolicy="no-referrer"
-                title="Nachrichtentext"
-                srcDoc={wrapInboxHtmlForSandbox(message.bodyHtmlSanitized)}
-              />
-            </div>
+            <iframe
+              className="min-h-[50vh] w-full border-0 bg-white sm:min-h-[60vh] lg:min-h-[min(68vh,720px)]"
+              // No scripts / no same-origin — inbox-only sandbox + CSP srcdoc.
+              sandbox="allow-popups allow-popups-to-escape-sandbox"
+              referrerPolicy="no-referrer"
+              title="Nachrichtentext"
+              srcDoc={wrapInboxHtmlForSandbox(message.bodyHtmlSanitized)}
+            />
           ) : (
-            <pre className="min-h-[320px] whitespace-pre-wrap rounded-xl border border-line/70 bg-surface/20 px-5 py-5 text-[15px] leading-7 tracking-[-0.01em] text-ink sm:min-h-[420px] sm:px-6 sm:py-6 lg:min-h-[520px]">
+            <pre className="min-h-[40vh] whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em] text-ink sm:min-h-[50vh] lg:min-h-[min(60vh,640px)]">
               {message.bodyText || "Kein Textinhalt."}
             </pre>
           )}
         </section>
 
-        {/* Attachments */}
+        {/* Compact attachment strip */}
         {message.attachments.length > 0 ? (
-          <section className="mt-7 border-t border-line/70 pt-6">
-            <div className="mb-3 flex items-center gap-2">
-              <InboxAttachmentIcon className="text-navy/60" />
-              <h2 className="text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">
+          <section className="mt-6 border-t border-line/60 pt-5 sm:mt-7">
+            <div className="mb-2.5 flex items-center gap-2">
+              <InboxAttachmentIcon className="text-navy/55" />
+              <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
                 Anhänge
               </h2>
-              <span className="rounded-full bg-navy/5 px-2 py-0.5 text-[11px] font-semibold text-navy/70">
+              <span className="text-[11px] font-semibold text-navy/55">
                 {message.attachments.length}
               </span>
             </div>
-            <ul className="grid gap-2 sm:grid-cols-2">
+            <ul className="divide-y divide-line/60 overflow-hidden rounded-xl border border-line/60 bg-surface/25">
               {message.attachments.map((attachment) => (
                 <li
                   key={attachment.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-line/70 bg-surface/30 px-3.5 py-3"
+                  className="flex items-center justify-between gap-3 px-3 py-2.5 sm:px-3.5"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex min-w-0 items-center gap-2.5">
                     <span
                       aria-hidden
-                      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-navy ring-1 ring-inset ring-line"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-navy ring-1 ring-inset ring-line/80"
                     >
                       <InboxAttachmentIcon className="text-navy" />
                     </span>
