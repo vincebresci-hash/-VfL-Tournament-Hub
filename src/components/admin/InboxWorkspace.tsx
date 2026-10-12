@@ -298,8 +298,12 @@ export function InboxWorkspace({
         {/* List pane — ~440px on desktop (clamped for smaller viewports); full width on mobile */}
         <section
           className={cn(
-            "flex min-h-0 min-w-0 flex-col border-line lg:w-[clamp(17.5rem,40%,27.5rem)] lg:shrink-0 lg:border-r",
-            selectedId ? "hidden lg:flex" : "flex flex-1",
+            // Desktop: fixed ~440px column (clamp). Never flex-grow — that made the
+            // list widen when the empty reading pane shared the row (flex-1 on both).
+            "flex min-h-0 min-w-0 flex-col border-line lg:w-[clamp(17.5rem,40%,27.5rem)] lg:shrink-0 lg:grow-0 lg:border-r",
+            // Mobile: list fills when nothing selected; hide when reading.
+            // lg:flex-none cancels mobile flex-1 so width stays clamped on desktop.
+            selectedId ? "hidden lg:flex" : "flex flex-1 lg:flex-none",
           )}
           aria-label="Nachrichtenliste"
         >
