@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   adminCardShellClass,
   adminCompactPrimaryButtonClass,
@@ -11,8 +11,14 @@ import {
 } from "@/components/admin/AdminPanel";
 import { InboxFilterBar } from "@/components/admin/inbox/InboxFilterBar";
 import { InboxMessageList } from "@/components/admin/inbox/InboxMessageList";
-import { InboxMessageDetailView } from "@/components/admin/InboxMessageDetail";
-import { triggerInboxSyncAction } from "@/lib/inbox/actions";
+import {
+  InboxMessageDetailView,
+  type InboxDetailLocalStatePatch,
+} from "@/components/admin/InboxMessageDetail";
+import {
+  getInboxMessageDetailAction,
+  triggerInboxSyncAction,
+} from "@/lib/inbox/actions";
 import { formatDateTimeDe } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type {
@@ -34,6 +40,13 @@ type InboxWorkspaceProps = {
   selectedMessage: InboxMessageDetail | null;
 };
 
+type ListPatch = {
+  isUnreadLocal?: boolean;
+  processingStatus?: InboxProcessingStatus;
+};
+
+type HistoryMode = "push" | "replace" | "none";
+
 function buildInboxFilterQuery(input: {
   query: string;
   status: InboxProcessingStatus | "all";
@@ -50,6 +63,11 @@ function buildInboxFilterQuery(input: {
     params.set("unread", "1");
   }
   return params.toString();
+}
+
+function parseSelectedIdFromPath(pathname: string): string | null {
+  const match = /^\/admin\/posteingang\/([^/]+)$/.exec(pathname);
+  return match?.[1] ?? null;
 }
 
 function InboxReadingEmptyState() {
@@ -77,14 +95,26 @@ export function InboxWorkspace({
   selectedMessage,
 }: InboxWorkspaceProps) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  // Local draft state is reset when the parent remounts via `key` (filter/selection URL).
+  const [syncPending, startSyncTransition] = useTransition();
+  const [, startDetailTransition] = useTransition();
+  const [filterPending, startFilterTransition] = useTransition();
+  const [detailLoading, setDetailLoading] = useState(false);
+  // Local draft state is reset when the parent remounts via filter `key`.
   const [query, setQuery] = useState(initialQuery);
   const [status, setStatus] = useState(initialStatus);
   const [unreadOnly, setUnreadOnly] = useState(initialUnreadOnly);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [activeDetail, setActiveDetail] = useState<InboxMessageDetail | null>(selectedMessage);
+  const [highlightedId, setHighlightedId] = useState<string | null>(selectedMessage?.id ?? null);
+  const [listPatches, setListPatches] = useState<Record<string, ListPatch>>({});
+  const detailRequestSeq = useRef(0);
+  const activeDetailIdRef = useRef<string | null>(selectedMessage?.id ?? null);
 
-  const selectedId = selectedMessage?.id ?? null;
+  useEffect(() => {
+    activeDetailIdRef.current = activeDetail?.id ?? null;
+  }, [activeDetail?.id]);
+
+  const selectedId = highlightedId;
   const filterQs = buildInboxFilterQuery({ query, status, unreadOnly });
   const listHref = filterQs ? `/admin/posteingang?${filterQs}` : "/admin/posteingang";
 
@@ -93,6 +123,110 @@ export function InboxWorkspace({
       ? `/admin/posteingang/${messageId}?${filterQs}`
       : `/admin/posteingang/${messageId}`;
   }
+
+  const displayMessages = useMemo(() => {
+    return messages
+      .map((message) => {
+        const patch = listPatches[message.id];
+        return patch ? { ...message, ...patch } : message;
+      })
+      .filter((message) => {
+        if (status !== "all" && message.processingStatus !== status) {
+          return false;
+        }
+        if (unreadOnly && !message.isUnreadLocal) {
+          return false;
+        }
+        return true;
+      });
+  }, [messages, listPatches, status, unreadOnly]);
+
+  const handleLocalStateChange = useCallback((patch: InboxDetailLocalStatePatch) => {
+    setListPatches((current) => ({
+      ...current,
+      [patch.messageId]: {
+        ...current[patch.messageId],
+        ...(patch.isUnreadLocal !== undefined ? { isUnreadLocal: patch.isUnreadLocal } : {}),
+        ...(patch.processingStatus !== undefined
+          ? { processingStatus: patch.processingStatus }
+          : {}),
+      },
+    }));
+    setActiveDetail((current) => {
+      if (!current || current.id !== patch.messageId) {
+        return current;
+      }
+      return {
+        ...current,
+        ...(patch.isUnreadLocal !== undefined ? { isUnreadLocal: patch.isUnreadLocal } : {}),
+        ...(patch.processingStatus !== undefined
+          ? { processingStatus: patch.processingStatus }
+          : {}),
+      };
+    });
+  }, []);
+
+  const loadDetail = useCallback(
+    (messageId: string, historyMode: HistoryMode) => {
+      if (messageId === activeDetailIdRef.current && highlightedId === messageId) {
+        return;
+      }
+
+      setHighlightedId(messageId);
+      const seq = ++detailRequestSeq.current;
+      setDetailLoading(true);
+
+      startDetailTransition(async () => {
+        const result = await getInboxMessageDetailAction(messageId);
+        if (seq !== detailRequestSeq.current) {
+          return;
+        }
+        setDetailLoading(false);
+
+        if (!result.message) {
+          setHighlightedId(activeDetailIdRef.current);
+          return;
+        }
+
+        setActiveDetail(result.message);
+        activeDetailIdRef.current = result.message.id;
+
+        if (historyMode === "none") {
+          return;
+        }
+
+        const href = messageHref(result.message.id);
+        const state = { ...(window.history.state as object), inboxMessageId: result.message.id };
+        if (historyMode === "push") {
+          window.history.pushState(state, "", href);
+        } else {
+          window.history.replaceState(state, "", href);
+        }
+      });
+    },
+    // messageHref depends on filterQs from closure — remount on filter key keeps this fresh
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filterQs captured via messageHref
+    [highlightedId, filterQs],
+  );
+
+  // Sync UI when the user uses browser back/forward after pushState/replaceState selection.
+  useEffect(() => {
+    function onPopState() {
+      const id = parseSelectedIdFromPath(window.location.pathname);
+      if (id) {
+        loadDetail(id, "none");
+        return;
+      }
+      detailRequestSeq.current += 1;
+      setDetailLoading(false);
+      setActiveDetail(null);
+      setHighlightedId(null);
+      activeDetailIdRef.current = null;
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [loadDetail]);
 
   function navigateWithFilters(next?: {
     query?: string;
@@ -113,23 +247,24 @@ export function InboxWorkspace({
       : qs
         ? `/admin/posteingang?${qs}`
         : "/admin/posteingang";
-    startTransition(() => {
+    // Filter changes intentionally use Next navigation to refetch the list.
+    startFilterTransition(() => {
       router.replace(path);
     });
   }
 
+  /**
+   * Selection loads detail only (server action + history URL update).
+   * Does not call triggerInboxSyncAction, router.refresh, or RSC list/sync refetch.
+   */
   function selectMessage(messageId: string) {
-    if (messageId === selectedId) {
-      return;
-    }
-    startTransition(() => {
-      router.replace(messageHref(messageId));
-    });
+    const historyMode: HistoryMode = activeDetailIdRef.current ? "replace" : "push";
+    loadDetail(messageId, historyMode);
   }
 
   function runSync() {
     setSyncMessage(null);
-    startTransition(async () => {
+    startSyncTransition(async () => {
       const result = await triggerInboxSyncAction();
       if (!result.ok) {
         setSyncMessage(result.error ?? "Sync fehlgeschlagen.");
@@ -142,11 +277,13 @@ export function InboxWorkspace({
           : `Sync: ${batch?.stored ?? 0} gespeichert` +
               (batch?.timedOut ? " (Zeitbudget — bitte erneut auslösen)." : "."),
       );
+      setListPatches({});
       router.refresh();
     });
   }
 
-  const unreadInView = messages.filter((message) => message.isUnreadLocal).length;
+  const unreadInView = displayMessages.filter((message) => message.isUnreadLocal).length;
+  const showDetailLoading = detailLoading && highlightedId !== activeDetail?.id;
 
   return (
     <div
@@ -174,7 +311,8 @@ export function InboxWorkspace({
                     Posteingang
                   </p>
                   <span className="rounded-md bg-navy/5 px-1.5 py-0.5 text-[11px] font-semibold text-navy/70">
-                    {messages.length} {messages.length === 1 ? "Nachricht" : "Nachrichten"}
+                    {displayMessages.length}{" "}
+                    {displayMessages.length === 1 ? "Nachricht" : "Nachrichten"}
                     {unreadInView > 0 ? ` · ${unreadInView} ungelesen` : ""}
                   </span>
                 </div>
@@ -198,11 +336,11 @@ export function InboxWorkspace({
               {canSync ? (
                 <button
                   type="button"
-                  disabled={pending}
+                  disabled={syncPending}
                   className={adminPrimaryButtonClass}
                   onClick={runSync}
                 >
-                  {pending ? "Synchronisiere…" : "Jetzt synchronisieren"}
+                  {syncPending ? "Synchronisiere…" : "Jetzt synchronisieren"}
                 </button>
               ) : null}
             </div>
@@ -224,24 +362,29 @@ export function InboxWorkspace({
             onSubmit={() => navigateWithFilters()}
           />
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div
+            className={cn(
+              "min-h-0 flex-1 overflow-y-auto",
+              filterPending && "opacity-95",
+            )}
+          >
             <InboxMessageList
-              messages={messages}
+              messages={displayMessages}
               selectedId={selectedId}
               getHref={(message) => messageHref(message.id)}
               onSelect={selectMessage}
             />
           </div>
 
-          {canSync && messages.length > 8 ? (
+          {canSync && displayMessages.length > 8 ? (
             <div className="shrink-0 border-t border-line bg-surface/40 px-4 py-3 sm:hidden">
               <button
                 type="button"
-                disabled={pending}
+                disabled={syncPending}
                 className={cn(adminCompactPrimaryButtonClass, "w-full")}
                 onClick={runSync}
               >
-                Synchronisieren
+                {syncPending ? "Synchronisiere…" : "Synchronisieren"}
               </button>
             </div>
           ) : null}
@@ -250,12 +393,18 @@ export function InboxWorkspace({
         {/* Reading pane — full width on mobile when selected; ~65% on desktop */}
         <section
           className={cn(
-            "flex min-h-0 min-w-0 flex-col bg-white",
+            "relative flex min-h-0 min-w-0 flex-col bg-white",
             selectedId ? "flex flex-1" : "hidden lg:flex lg:flex-1",
           )}
           aria-label="Nachrichteninhalt"
+          aria-busy={showDetailLoading || undefined}
         >
-          {selectedMessage ? (
+          {showDetailLoading ? (
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 border-b border-line/60 bg-white/90 px-4 py-2 text-[12px] text-muted backdrop-blur-sm">
+              Nachricht wird geladen…
+            </div>
+          ) : null}
+          {activeDetail ? (
             <>
               <div className="flex shrink-0 items-center gap-2 border-b border-line/50 px-4 py-2 lg:hidden">
                 <Link
@@ -270,10 +419,11 @@ export function InboxWorkspace({
               </div>
               <div className="min-h-0 flex-1 overflow-hidden">
                 <InboxMessageDetailView
-                  message={selectedMessage}
+                  message={activeDetail}
                   canManage={canManage}
                   variant="pane"
                   className="h-full min-h-0 border-0 shadow-none ring-0"
+                  onLocalStateChange={handleLocalStateChange}
                 />
               </div>
             </>

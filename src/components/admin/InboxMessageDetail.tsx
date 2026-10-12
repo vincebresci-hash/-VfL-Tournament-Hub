@@ -19,7 +19,10 @@ import {
 import { formatDateTimeDe } from "@/lib/format";
 import { INBOX_HTML_CSP } from "@/lib/inbox/sanitize-html";
 import { cn } from "@/lib/cn";
-import type { InboxMessageDetail as InboxMessageDetailType } from "@/lib/inbox/types";
+import type {
+  InboxMessageDetail as InboxMessageDetailType,
+  InboxProcessingStatus,
+} from "@/lib/inbox/types";
 
 /**
  * Ultrawide-friendly reading column for the standalone detail route.
@@ -29,15 +32,26 @@ const READING_SHELL = "max-w-[1600px]";
 
 export type InboxMessageDetailVariant = "page" | "pane";
 
+export type InboxDetailLocalStatePatch = {
+  messageId: string;
+  isUnreadLocal?: boolean;
+  processingStatus?: InboxProcessingStatus;
+};
+
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
   canManage: boolean;
   /**
-   * `page` — standalone `/admin/posteingang/[id]` (default, current UX).
-   * `pane` — prepared for a future embedded two-pane reader (not used by routes yet).
+   * `page` — standalone route chrome.
+   * `pane` — embedded two-pane reader.
    */
   variant?: InboxMessageDetailVariant;
   className?: string;
+  /**
+   * When set (workspace pane), local status/unread updates notify the parent
+   * instead of calling router.refresh() — avoids list/sync-state refetch.
+   */
+  onLocalStateChange?: (patch: InboxDetailLocalStatePatch) => void;
 };
 
 function formatBytes(size: number): string {
@@ -101,19 +115,35 @@ export function InboxMessageDetailView({
   canManage,
   variant = "page",
   className,
+  onLocalStateChange,
 }: InboxMessageDetailProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const isPane = variant === "pane";
 
+  function afterLocalChange(patch: InboxDetailLocalStatePatch) {
+    if (onLocalStateChange) {
+      onLocalStateChange(patch);
+      return;
+    }
+    router.refresh();
+  }
+
   useEffect(() => {
     if (!message.isUnreadLocal || !canManage) {
       return;
     }
-    void markInboxMessageReadAction(message.id).then(() => {
+    void markInboxMessageReadAction(message.id).then((result) => {
+      if (!result.ok) {
+        return;
+      }
+      if (onLocalStateChange) {
+        onLocalStateChange({ messageId: message.id, isUnreadLocal: false });
+        return;
+      }
       router.refresh();
     });
-  }, [message.id, message.isUnreadLocal, canManage, router]);
+  }, [message.id, message.isUnreadLocal, canManage, onLocalStateChange, router]);
 
   const toLine = formatAddressLine(message.toAddresses);
   const ccLine = message.ccAddresses.length ? formatAddressLine(message.ccAddresses) : null;
@@ -182,11 +212,17 @@ export function InboxMessageDetailView({
                         )}
                         onClick={() => {
                           startTransition(async () => {
-                            await updateInboxMessageLocalStateAction({
+                            const result = await updateInboxMessageLocalStateAction({
                               messageId: message.id,
                               processingStatus: status,
                             });
-                            router.refresh();
+                            if (!result.ok) {
+                              return;
+                            }
+                            afterLocalChange({
+                              messageId: message.id,
+                              processingStatus: status,
+                            });
                           });
                         }}
                       >
@@ -204,11 +240,17 @@ export function InboxMessageDetailView({
                   )}
                   onClick={() => {
                     startTransition(async () => {
-                      await updateInboxMessageLocalStateAction({
+                      const result = await updateInboxMessageLocalStateAction({
                         messageId: message.id,
                         isUnreadLocal: true,
                       });
-                      router.refresh();
+                      if (!result.ok) {
+                        return;
+                      }
+                      afterLocalChange({
+                        messageId: message.id,
+                        isUnreadLocal: true,
+                      });
                     });
                   }}
                 >
