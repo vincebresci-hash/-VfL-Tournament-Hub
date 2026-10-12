@@ -165,7 +165,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
             fromName={message.fromName}
             fromAddress={message.fromAddress}
             unread={message.isUnreadLocal}
-            size="lg"
+            size="md"
           />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
