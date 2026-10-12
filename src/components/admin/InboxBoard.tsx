@@ -90,16 +90,21 @@ export function InboxBoard({
   const unreadInView = messages.filter((message) => message.isUnreadLocal).length;
 
   return (
-    <div className={cn(adminCardShellClass, "overflow-hidden")}>
+    <div
+      className={cn(
+        adminCardShellClass,
+        "overflow-hidden bg-[#f7f8fa] shadow-[0_1px_3px_rgba(16,24,40,0.06)]",
+      )}
+    >
       {/* Sync + workspace header */}
-      <div className="border-b border-line bg-gradient-to-b from-surface/80 to-white px-4 py-4 sm:px-5 sm:py-5">
+      <div className="border-b border-line/80 bg-white/90 px-4 py-4 backdrop-blur-sm sm:px-5 sm:py-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
+              <p className="text-[12px] font-semibold tracking-[-0.01em] text-ink">
                 Posteingang
               </p>
-              <span className="rounded-md bg-navy/5 px-1.5 py-0.5 text-[11px] font-semibold text-navy/70">
+              <span className="rounded-full bg-navy/5 px-2 py-0.5 text-[11px] font-semibold text-navy/70">
                 {messages.length} {messages.length === 1 ? "Nachricht" : "Nachrichten"}
                 {unreadInView > 0 ? ` · ${unreadInView} ungelesen` : ""}
               </span>
@@ -125,7 +130,7 @@ export function InboxBoard({
             <button
               type="button"
               disabled={pending}
-              className={adminPrimaryButtonClass}
+              className={cn(adminPrimaryButtonClass, "rounded-full")}
               onClick={() => {
                 setSyncMessage(null);
                 startTransition(async () => {
@@ -153,7 +158,7 @@ export function InboxBoard({
 
       {/* Filters */}
       <form
-        className="border-b border-line bg-white px-4 py-3 sm:px-5"
+        className="border-b border-line/80 bg-white px-4 py-3 sm:px-5"
         onSubmit={(event) => {
           event.preventDefault();
           applyFilters();
@@ -164,7 +169,7 @@ export function InboxBoard({
             <span className="sr-only">Suche</span>
             <span
               aria-hidden
-              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
+              className="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-muted"
             >
               <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                 <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.5" />
@@ -179,13 +184,13 @@ export function InboxBoard({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className={cn(adminFilterControlClass, "pl-9")}
+              className={cn(adminFilterControlClass, "rounded-full border-line/80 pl-10")}
               placeholder="Betreff, Absender…"
             />
           </label>
 
           <div
-            className="flex flex-wrap gap-1 rounded-lg border border-line bg-surface/50 p-1"
+            className="flex flex-wrap gap-0.5 rounded-full border border-line/80 bg-[#f2f3f5] p-0.5"
             role="group"
             aria-label="Status filtern"
           >
@@ -196,9 +201,9 @@ export function InboxBoard({
                   key={option.value}
                   type="button"
                   className={cn(
-                    "h-8 rounded-md px-2.5 text-[11px] font-semibold tracking-[0.04em] uppercase transition-colors",
+                    "h-8 rounded-full px-2.5 text-[11px] font-semibold tracking-[0.04em] uppercase transition-colors",
                     active
-                      ? "bg-white text-navy shadow-sm ring-1 ring-line"
+                      ? "bg-white text-navy shadow-sm ring-1 ring-line/80"
                       : "text-muted hover:text-ink",
                   )}
                   onClick={() => {
@@ -213,7 +218,7 @@ export function InboxBoard({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-line bg-white px-3 text-[13px] text-ink select-none">
+            <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-full border border-line/80 bg-white px-3.5 text-[13px] text-ink select-none">
               <input
                 type="checkbox"
                 checked={unreadOnly}
@@ -225,7 +230,7 @@ export function InboxBoard({
               />
               Nur ungelesen
             </label>
-            <button type="submit" className={adminSecondaryButtonClass}>
+            <button type="submit" className={cn(adminSecondaryButtonClass, "rounded-full")}>
               Filtern
             </button>
           </div>
@@ -234,8 +239,8 @@ export function InboxBoard({
 
       {/* Message list */}
       {messages.length === 0 ? (
-        <div className="px-5 py-14 text-center">
-          <p className="font-display text-[15px] font-bold tracking-wide text-ink uppercase">
+        <div className="bg-white px-5 py-16 text-center">
+          <p className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
             Keine Nachrichten
           </p>
           <p className="mx-auto mt-2 max-w-sm text-[14px] leading-6 text-muted">
@@ -244,7 +249,7 @@ export function InboxBoard({
           </p>
         </div>
       ) : (
-        <ul className="divide-y divide-line/80">
+        <ul className="divide-y divide-line/70 bg-white">
           {messages.map((message) => {
             const sender = message.fromName || message.fromAddress;
             return (
@@ -252,15 +257,15 @@ export function InboxBoard({
                 <Link
                   href={`/admin/posteingang/${message.id}`}
                   className={cn(
-                    "group relative flex gap-3 px-4 py-3.5 transition-colors sm:gap-4 sm:px-5 sm:py-3.5",
-                    "hover:bg-surface/70 focus-visible:bg-surface/70 focus-visible:outline-none",
-                    message.isUnreadLocal ? "bg-[#fffdf3]/70" : "bg-white",
+                    "group relative flex gap-3 px-4 py-3.5 transition-colors sm:gap-3.5 sm:px-5",
+                    "hover:bg-[#f3f5f8] focus-visible:bg-[#f3f5f8] focus-visible:outline-none",
+                    message.isUnreadLocal ? "bg-[#fffdf5]" : "bg-white",
                   )}
                 >
                   {message.isUnreadLocal ? (
                     <span
                       aria-hidden
-                      className="absolute top-0 bottom-0 left-0 w-1 bg-brand-yellow"
+                      className="absolute top-3 bottom-3 left-0 w-[3px] rounded-r-full bg-brand-yellow"
                     />
                   ) : null}
 
@@ -268,16 +273,17 @@ export function InboxBoard({
                     fromName={message.fromName}
                     fromAddress={message.fromAddress}
                     unread={message.isUnreadLocal}
+                    size="sm"
                     className="mt-0.5"
                   />
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                           <p
                             className={cn(
-                              "truncate text-[14px]",
+                              "truncate text-[14px] tracking-[-0.01em]",
                               message.isUnreadLocal
                                 ? "font-semibold text-ink"
                                 : "font-medium text-ink/90",
@@ -293,7 +299,7 @@ export function InboxBoard({
                         </div>
                         <p
                           className={cn(
-                            "mt-0.5 truncate text-[14px] sm:text-[15px]",
+                            "mt-0.5 truncate text-[14px] tracking-[-0.01em] sm:text-[15px]",
                             message.isUnreadLocal
                               ? "font-semibold text-ink"
                               : "font-medium text-ink/85",
@@ -340,11 +346,11 @@ export function InboxBoard({
 
       {/* Mobile-friendly hint when sync available but list scrolled — compact CTA echo */}
       {canSync && messages.length > 8 ? (
-        <div className="border-t border-line bg-surface/40 px-4 py-3 sm:hidden">
+        <div className="border-t border-line/80 bg-white px-4 py-3 sm:hidden">
           <button
             type="button"
             disabled={pending}
-            className={cn(adminCompactPrimaryButtonClass, "w-full")}
+            className={cn(adminCompactPrimaryButtonClass, "w-full rounded-full")}
             onClick={() => {
               setSyncMessage(null);
               startTransition(async () => {

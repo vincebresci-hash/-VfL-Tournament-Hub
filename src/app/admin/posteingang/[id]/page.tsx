@@ -34,10 +34,10 @@ export default async function AdminInboxMessagePage({ params }: { params: Params
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <AdminPageHeader
         title="Nachricht"
-        description="Lokaler Bearbeitungsstatus — unabhängig vom IONOS-Postfach."
+        description="Lokaler Status — ohne Änderungen am IONOS-Postfach."
       />
       <InboxMessageDetailView
         message={message}

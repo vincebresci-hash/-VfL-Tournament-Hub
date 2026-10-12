@@ -41,7 +41,7 @@ export default async function AdminInboxPage({
   ]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <AdminPageHeader
         title="Posteingang"
         description="Eingehende Turnier-E-Mails lesen und lokal bearbeiten — ohne Versand und ohne Änderungen am IONOS-Postfach."

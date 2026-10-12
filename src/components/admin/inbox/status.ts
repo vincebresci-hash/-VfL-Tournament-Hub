@@ -9,9 +9,9 @@ export const INBOX_STATUS_LABEL: Record<InboxProcessingStatus, string> = {
 };
 
 const STATUS_TONE: Record<InboxProcessingStatus, string> = {
-  open: "bg-[#eef4fb] text-navy ring-1 ring-inset ring-navy/10",
-  in_progress: "bg-[#fff7db] text-[#6b5300] ring-1 ring-inset ring-brand-yellow/50",
-  done: "bg-[#eef7f0] text-[#1f6b3a] ring-1 ring-inset ring-[#1f6b3a]/15",
+  open: "rounded-full bg-[#eef4fb] text-navy ring-1 ring-inset ring-navy/10",
+  in_progress: "rounded-full bg-[#fff7db] text-[#6b5300] ring-1 ring-inset ring-brand-yellow/45",
+  done: "rounded-full bg-[#eef7f0] text-[#1f6b3a] ring-1 ring-inset ring-[#1f6b3a]/15",
 };
 
 export function inboxStatusBadgeClass(status: InboxProcessingStatus): string {
