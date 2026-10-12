@@ -22,10 +22,10 @@ import { cn } from "@/lib/cn";
 import type { InboxMessageDetail as InboxMessageDetailType } from "@/lib/inbox/types";
 
 /**
- * Outlook-like reading pane: use admin width up to ~1400px so ultrawide
- * desktops are not dominated by empty gutters, without full-bleed stretch.
+ * Outlook-like reading column: wide enough for admin work, capped so
+ * ultrawide gutters stay outside the reader (not inside the message).
  */
-const READING_SHELL = "max-w-[1400px]";
+const READING_SHELL = "max-w-[1120px]";
 
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
@@ -56,18 +56,27 @@ function formatAddressLine(entries: { name: string; address: string }[]): string
 
 /**
  * Detail-only srcdoc chrome for sandboxed HTML.
- * - Keeps inbox CSP (script-src 'none'); no scripts / no same-origin.
- * - Does NOT force a global font-size (preserves sender inline sizes).
- * - Centers typical fixed-width email tables in a wide pane (Gmail/Outlook feel).
+ *
+ * Security: reuses INBOX_HTML_CSP (script-src 'none'); iframe stays without
+ * allow-scripts / allow-same-origin.
+ *
+ * Typography: inbox sanitization strips style attributes, <style>, width, and
+ * font tags — so a readable body baseline does not override surviving sender
+ * styles (semantic tags / structure remain as sanitized).
+ *
+ * Layout: left-aligned flow (Outlook/Gmail). Flex centering was removed — it
+ * shrink-wrapped children in a wide iframe and created large side voids.
  */
 function wrapDetailEmailSrcDoc(sanitizedHtml: string): string {
   const styles = [
-    "html{-webkit-text-size-adjust:100%;height:100%;}",
-    /* No font-size here — avoid shrinking emails that inherit from body. */
-    "body{margin:0;padding:20px 12px 28px;font-family:system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif;color:#111;word-wrap:break-word;overflow-wrap:anywhere;display:flex;flex-direction:column;align-items:center;box-sizing:border-box;}",
-    "body>*{max-width:100%;}",
+    "html{-webkit-text-size-adjust:100%;}",
+    "body{margin:0;padding:4px 2px 20px;font-family:system-ui,-apple-system,\"Segoe UI\",Roboto,sans-serif;font-size:16px;line-height:1.55;color:#111;word-wrap:break-word;overflow-wrap:anywhere;}",
     "a{color:#0b3d5c;}",
-    "table{border-collapse:collapse;}",
+    "table{border-collapse:collapse;max-width:100%;}",
+    "td,th{word-break:break-word;}",
+    "pre,code{white-space:pre-wrap;word-break:break-word;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.9375em;}",
+    "p{margin:0 0 0.85em;}",
+    "p:last-child{margin-bottom:0;}",
   ].join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta http-equiv="Content-Security-Policy" content="${INBOX_HTML_CSP}" /><style>${styles}</style></head><body>${sanitizedHtml}</body></html>`;
@@ -181,15 +190,14 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
         </div>
       </div>
 
-      {/* Reading shell — wider on ultrawide, still capped */}
       <div className={cn("mx-auto w-full px-4 py-4 sm:px-6 sm:py-5 lg:px-8", READING_SHELL)}>
-        {/* Subject */}
-        <h1 className="text-[1.35rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.65rem] sm:leading-tight">
+        {/* Subject — primary headline */}
+        <h1 className="text-[1.4rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.7rem] sm:leading-tight">
           {message.subject || "(Kein Betreff)"}
         </h1>
 
-        {/* Sender / recipients / date — Gmail-like density, Outlook clarity */}
-        <header className="mt-3 flex gap-3 border-b border-line/50 pb-3.5 sm:mt-3.5 sm:pb-4">
+        {/* Sender / recipients / date — clearer hierarchy */}
+        <header className="mt-4 flex gap-3.5 border-b border-line/50 pb-4 sm:mt-5 sm:gap-4 sm:pb-5">
           <InboxSenderAvatar
             fromName={message.fromName}
             fromAddress={message.fromAddress}
@@ -198,29 +206,33 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
             className="mt-0.5"
           />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
-              <p className="min-w-0 truncate text-[14px] sm:text-[15px]">
-                <span className="font-semibold tracking-[-0.01em] text-ink">{senderDisplay}</span>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <div className="min-w-0">
+                <p className="truncate text-[15px] font-semibold tracking-[-0.01em] text-ink sm:text-[16px]">
+                  {senderDisplay}
+                </p>
                 {message.fromName ? (
-                  <span className="text-muted"> &lt;{message.fromAddress}&gt;</span>
+                  <p className="mt-0.5 truncate text-[13px] text-muted sm:text-[14px]">
+                    {message.fromAddress}
+                  </p>
                 ) : null}
-              </p>
+              </div>
               <time
                 dateTime={message.receivedAt}
-                className="shrink-0 text-[12px] text-muted tabular-nums"
+                className="shrink-0 text-[13px] text-muted tabular-nums sm:text-[14px]"
               >
                 {formatDateTimeDe(message.receivedAt)}
               </time>
             </div>
-            <dl className="mt-1.5 space-y-0.5 text-[12px] text-ink/75">
-              <div className="flex flex-wrap gap-x-1.5">
-                <dt className="text-muted">An:</dt>
-                <dd className="min-w-0 break-words">{toLine}</dd>
+            <dl className="mt-2.5 space-y-1 text-[13px] sm:text-[14px]">
+              <div className="flex flex-wrap gap-x-2">
+                <dt className="shrink-0 font-medium text-muted">An</dt>
+                <dd className="min-w-0 break-words text-ink/85">{toLine}</dd>
               </div>
               {ccLine ? (
-                <div className="flex flex-wrap gap-x-1.5">
-                  <dt className="text-muted">Cc:</dt>
-                  <dd className="min-w-0 break-words">{ccLine}</dd>
+                <div className="flex flex-wrap gap-x-2">
+                  <dt className="shrink-0 font-medium text-muted">Cc</dt>
+                  <dd className="min-w-0 break-words text-ink/85">{ccLine}</dd>
                 </div>
               ) : null}
             </dl>
@@ -228,19 +240,19 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
         </header>
 
         {/*
-          Body iframe:
-          - Tall viewport-based min-height reduces nested scrolling for typical mail
-            (auto-height needs scripts / same-origin — intentionally not used).
-          - Width fills the reading shell; email tables stay sender-sized and centered
-            via srcdoc chrome.
+          Body iframe — Outlook-style reading pane:
+          - One primary scroll region sized to remaining viewport (not a short
+            box inside a tall empty page, and not html{height:100%} which caused
+            phantom scrollbars).
+          - Auto-height would need scripts / same-origin — intentionally unused.
         */}
-        <section className="mt-4">
+        <section className="mt-4 sm:mt-5">
           <p className="mb-2 text-[11px] leading-4 text-muted">
             Externe Bilder und aktive Inhalte sind aus Sicherheitsgründen blockiert.
           </p>
           {message.bodyHtmlSanitized ? (
             <iframe
-              className="block w-full border-0 bg-white min-h-[calc(100dvh-13.5rem)] sm:min-h-[calc(100dvh-12.5rem)]"
+              className="block w-full border-0 bg-white h-[calc(100dvh-16.5rem)] min-h-[22rem] max-h-[56rem]"
               // No scripts / no same-origin — inbox-only sandbox + CSP srcdoc.
               sandbox="allow-popups allow-popups-to-escape-sandbox"
               referrerPolicy="no-referrer"
@@ -248,7 +260,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
               srcDoc={wrapDetailEmailSrcDoc(message.bodyHtmlSanitized)}
             />
           ) : (
-            <pre className="min-h-[calc(100dvh-16rem)] whitespace-pre-wrap text-[15px] leading-7 tracking-[-0.01em] text-ink">
+            <pre className="min-h-[22rem] whitespace-pre-wrap font-sans text-[16px] leading-[1.55] tracking-[-0.01em] text-ink">
               {message.bodyText || "Kein Textinhalt."}
             </pre>
           )}
