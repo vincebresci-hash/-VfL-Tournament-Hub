@@ -295,16 +295,16 @@ export function InboxWorkspace({
       )}
     >
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {/* List pane — full width on mobile when nothing selected; ~35% on desktop */}
+        {/* List pane — ~440px on desktop (clamped for smaller viewports); full width on mobile */}
         <section
           className={cn(
-            "flex min-h-0 min-w-0 flex-col border-line lg:w-[35%] lg:max-w-[28rem] lg:min-w-[18rem] lg:border-r",
+            "flex min-h-0 min-w-0 flex-col border-line lg:w-[clamp(17.5rem,40%,27.5rem)] lg:shrink-0 lg:border-r",
             selectedId ? "hidden lg:flex" : "flex flex-1",
           )}
           aria-label="Nachrichtenliste"
         >
-          <div className="shrink-0 border-b border-line bg-gradient-to-b from-surface/80 to-white px-4 py-4 sm:px-5 sm:py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="shrink-0 border-b border-line bg-gradient-to-b from-surface/70 to-white px-3 py-3 sm:px-3.5">
+            <div className="flex flex-wrap items-start justify-between gap-2.5">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
@@ -316,7 +316,7 @@ export function InboxWorkspace({
                     {unreadInView > 0 ? ` · ${unreadInView} ungelesen` : ""}
                   </span>
                 </div>
-                <p className="mt-1.5 text-[13px] leading-5 text-muted">
+                <p className="mt-1 text-[12px] leading-4 text-muted">
                   {syncState?.lastSuccessAt
                     ? `Zuletzt synchronisiert: ${formatDateTimeDe(syncState.lastSuccessAt)}`
                     : "Noch keine erfolgreiche Synchronisation."}
@@ -390,11 +390,11 @@ export function InboxWorkspace({
           ) : null}
         </section>
 
-        {/* Reading pane — full width on mobile when selected; ~65% on desktop */}
+        {/* Reading pane — flexible remainder of the workspace */}
         <section
           className={cn(
-            "relative flex min-h-0 min-w-0 flex-col bg-white",
-            selectedId ? "flex flex-1" : "hidden lg:flex lg:flex-1",
+            "relative flex min-h-0 min-w-0 flex-1 flex-col bg-white",
+            selectedId ? "flex" : "hidden lg:flex",
           )}
           aria-label="Nachrichteninhalt"
           aria-busy={showDetailLoading || undefined}

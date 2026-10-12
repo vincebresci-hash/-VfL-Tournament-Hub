@@ -160,10 +160,11 @@ export function InboxMessageDetailView({
       )}
     >
       {/* Compact Outlook-style command bar */}
-      <div className="sticky top-0 z-10 shrink-0 border-b border-line/50 bg-white/95 backdrop-blur-md">
+      <div className="sticky top-0 z-10 shrink-0 border-b border-line/40 bg-white/95 backdrop-blur-md">
         <div
           className={cn(
-            "mx-auto flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8",
+            "mx-auto flex w-full flex-wrap items-center justify-between gap-2",
+            isPane ? "px-4 py-2 sm:px-5" : "px-4 py-2 sm:px-6 lg:px-8",
             !isPane && READING_SHELL,
           )}
         >
@@ -268,18 +269,31 @@ export function InboxMessageDetailView({
 
       <div
         className={cn(
-          "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8",
+          "mx-auto flex min-h-0 w-full flex-1 flex-col",
+          isPane ? "px-4 py-3 sm:px-5 sm:py-4" : "px-4 py-4 sm:px-6 sm:py-5 lg:px-8",
           !isPane && READING_SHELL,
         )}
       >
         <div className="shrink-0">
           {/* Subject — primary headline */}
-          <h1 className="text-[1.4rem] leading-snug font-semibold tracking-[-0.02em] text-ink sm:text-[1.7rem] sm:leading-tight">
+          <h1
+            className={cn(
+              "leading-snug font-semibold tracking-[-0.02em] text-ink sm:leading-tight",
+              isPane
+                ? "text-[1.25rem] sm:text-[1.45rem]"
+                : "text-[1.4rem] sm:text-[1.7rem]",
+            )}
+          >
             {message.subject || "(Kein Betreff)"}
           </h1>
 
           {/* Sender / recipients / date — clearer hierarchy */}
-          <header className="mt-4 flex gap-3.5 border-b border-line/50 pb-4 sm:mt-5 sm:gap-4 sm:pb-5">
+          <header
+            className={cn(
+              "flex gap-3 border-b border-line/40",
+              isPane ? "mt-3 pb-3 sm:gap-3.5" : "mt-4 gap-3.5 pb-4 sm:mt-5 sm:gap-4 sm:pb-5",
+            )}
+          >
             <InboxSenderAvatar
               fromName={message.fromName}
               fromAddress={message.fromAddress}
@@ -327,7 +341,7 @@ export function InboxMessageDetailView({
           - On lg+, flex-1 fills remaining card height (single primary scroll).
           - Auto-height would need scripts / same-origin — intentionally unused.
         */}
-        <section className="mt-4 flex min-h-0 flex-1 flex-col sm:mt-5">
+        <section className={cn("flex min-h-0 flex-1 flex-col", isPane ? "mt-3" : "mt-4 sm:mt-5")}>
           <p className="mb-2 shrink-0 text-[11px] leading-4 text-muted">
             Externe Bilder und aktive Inhalte sind aus Sicherheitsgründen blockiert.
           </p>
@@ -349,7 +363,12 @@ export function InboxMessageDetailView({
 
         {/* Compact attachment rows */}
         {message.attachments.length > 0 ? (
-          <section className="mt-4 shrink-0 border-t border-line/50 pt-4 sm:mt-5">
+          <section
+            className={cn(
+              "shrink-0 border-t border-line/40",
+              isPane ? "mt-3 pt-3" : "mt-4 pt-4 sm:mt-5",
+            )}
+          >
             <div className="mb-2 flex items-center gap-2">
               <InboxAttachmentIcon className="text-navy/55" />
               <h2 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">

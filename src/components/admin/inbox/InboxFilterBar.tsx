@@ -41,18 +41,22 @@ export function InboxFilterBar({
 }: InboxFilterBarProps) {
   return (
     <form
-      className={cn("border-b border-line bg-white px-4 py-3 sm:px-5", className)}
+      className={cn("shrink-0 border-b border-line bg-white px-3 py-2.5 sm:px-3.5", className)}
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <label className="relative min-w-0 flex-1">
+      {/*
+        Always stacked: the list pane is ~440px, so a horizontal toolbar
+        crushed the search icon into the status chips ("Offen").
+      */}
+      <div className="flex flex-col gap-2.5">
+        <label className="relative block w-full min-w-0">
           <span className="sr-only">Suche</span>
           <span
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted"
+            className="pointer-events-none absolute top-1/2 left-3 z-10 -translate-y-1/2 text-muted"
           >
             <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none">
               <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" strokeWidth="1.5" />
@@ -67,13 +71,13 @@ export function InboxFilterBar({
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            className={cn(adminFilterControlClass, "pl-9")}
+            className={cn(adminFilterControlClass, "relative z-0 w-full min-w-0 pl-9")}
             placeholder="Betreff, Absender…"
           />
         </label>
 
         <div
-          className="flex flex-wrap gap-1 rounded-lg border border-line bg-surface/50 p-1"
+          className="flex w-full min-w-0 shrink-0 flex-wrap gap-1 rounded-lg border border-line bg-surface/50 p-1"
           role="group"
           aria-label="Status filtern"
         >
@@ -84,7 +88,7 @@ export function InboxFilterBar({
                 key={option.value}
                 type="button"
                 className={cn(
-                  "h-8 rounded-md px-2.5 text-[11px] font-semibold tracking-[0.04em] uppercase transition-colors",
+                  "h-8 min-w-0 shrink-0 rounded-md px-2 text-[10px] font-semibold tracking-[0.04em] uppercase transition-colors sm:px-2.5 sm:text-[11px]",
                   active
                     ? "bg-white text-navy shadow-sm ring-1 ring-line"
                     : "text-muted hover:text-ink",
@@ -97,17 +101,20 @@ export function InboxFilterBar({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-line bg-white px-3 text-[13px] text-ink select-none">
+        <div className="flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2">
+          <label className="inline-flex h-9 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg border border-line bg-white px-2.5 text-[12px] text-ink select-none sm:h-10 sm:text-[13px]">
             <input
               type="checkbox"
               checked={unreadOnly}
               onChange={(event) => onUnreadOnlyChange(event.target.checked)}
-              className="rounded border-line text-navy focus:ring-brand-yellow"
+              className="shrink-0 rounded border-line text-navy focus:ring-brand-yellow"
             />
-            Nur ungelesen
+            <span className="truncate">Nur ungelesen</span>
           </label>
-          <button type="submit" className={adminSecondaryButtonClass}>
+          <button
+            type="submit"
+            className={cn(adminSecondaryButtonClass, "h-9 shrink-0 px-3 text-[11px] sm:h-10")}
+          >
             Filtern
           </button>
         </div>

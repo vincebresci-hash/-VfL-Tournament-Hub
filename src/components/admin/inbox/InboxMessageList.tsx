@@ -37,7 +37,7 @@ export function InboxMessageList({
   }
 
   return (
-    <ul className={cn("divide-y divide-line/80", className)}>
+    <ul className={cn("divide-y divide-line/60", className)}>
       {messages.map((message) => (
         <InboxMessageListRow
           key={message.id}

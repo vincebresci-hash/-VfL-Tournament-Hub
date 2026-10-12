@@ -48,75 +48,78 @@ export function InboxMessageListRow({
           onSelect(message.id);
         }}
         className={cn(
-          "group relative flex gap-3 px-4 py-3.5 transition-colors sm:gap-4 sm:px-5 sm:py-3.5",
-          "hover:bg-surface/70 focus-visible:bg-surface/70 focus-visible:outline-none",
-          message.isUnreadLocal ? "bg-[#fffdf3]/70" : "bg-white",
-          selected && "bg-navy/[0.04] ring-1 ring-inset ring-navy/15",
+          "group relative flex gap-2.5 px-3 py-2.5 transition-colors sm:gap-3 sm:px-3.5",
+          "hover:bg-surface/75 focus-visible:bg-surface/75 focus-visible:outline-none",
+          selected
+            ? "bg-navy/[0.045]"
+            : message.isUnreadLocal
+              ? "bg-[#fffdf3]/75"
+              : "bg-white",
         )}
       >
-        {message.isUnreadLocal ? (
-          <span aria-hidden className="absolute top-0 bottom-0 left-0 w-1 bg-brand-yellow" />
+        {/* Yellow rail: selected (strong) or unread (softer) */}
+        {selected || message.isUnreadLocal ? (
+          <span
+            aria-hidden
+            className={cn(
+              "absolute top-0 bottom-0 left-0 w-0.5",
+              selected ? "bg-brand-yellow" : "bg-brand-yellow/65",
+            )}
+          />
         ) : null}
 
         <InboxSenderAvatar
           fromName={message.fromName}
           fromAddress={message.fromAddress}
           unread={message.isUnreadLocal}
+          size="sm"
           className="mt-0.5"
         />
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <p
-                  className={cn(
-                    "truncate text-[14px]",
-                    message.isUnreadLocal ? "font-semibold text-ink" : "font-medium text-ink/90",
-                  )}
-                >
-                  {sender}
-                </p>
-                {message.fromName && message.fromAddress ? (
-                  <p className="hidden truncate text-[12px] text-muted sm:block">
-                    {message.fromAddress}
-                  </p>
-                ) : null}
-              </div>
-              <p
-                className={cn(
-                  "mt-0.5 truncate text-[14px] sm:text-[15px]",
-                  message.isUnreadLocal ? "font-semibold text-ink" : "font-medium text-ink/85",
-                )}
-              >
-                {message.subject || "(Kein Betreff)"}
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-1.5">
-              <time
-                dateTime={message.receivedAt}
-                className={cn(
-                  "text-[12px] tabular-nums",
-                  message.isUnreadLocal ? "font-semibold text-navy" : "text-muted",
-                )}
-              >
-                {formatInboxListTimestamp(message.receivedAt)}
-              </time>
-              <InboxStatusBadge status={message.processingStatus} />
-            </div>
+          <div className="flex items-start justify-between gap-2">
+            <p
+              className={cn(
+                "min-w-0 flex-1 truncate text-[13px] leading-5",
+                message.isUnreadLocal || selected
+                  ? "font-semibold text-ink"
+                  : "font-medium text-ink/90",
+              )}
+            >
+              {sender}
+            </p>
+            <time
+              dateTime={message.receivedAt}
+              className={cn(
+                "shrink-0 pt-0.5 text-[11px] leading-4 tabular-nums",
+                message.isUnreadLocal ? "font-semibold text-navy" : "text-muted",
+              )}
+            >
+              {formatInboxListTimestamp(message.receivedAt)}
+            </time>
           </div>
 
-          <div className="mt-1 flex items-center gap-2">
-            {message.hasAttachments ? (
-              <InboxAttachmentIcon className="shrink-0 opacity-80" />
-            ) : null}
-            {message.snippet ? (
-              <p className="line-clamp-1 min-w-0 flex-1 text-[13px] leading-5 text-muted">
-                {message.snippet}
-              </p>
-            ) : (
-              <p className="text-[13px] text-muted/70">Kein Vorschautext</p>
+          <p
+            className={cn(
+              "mt-0.5 truncate text-[13px] leading-5",
+              message.isUnreadLocal || selected
+                ? "font-semibold text-ink"
+                : "font-medium text-ink/80",
             )}
+          >
+            {message.subject || "(Kein Betreff)"}
+          </p>
+
+          <div className="mt-1 flex items-center gap-1.5">
+            {message.hasAttachments ? (
+              <InboxAttachmentIcon className="shrink-0 opacity-70" />
+            ) : null}
+            <p className="line-clamp-1 min-w-0 flex-1 text-[12px] leading-4 text-muted">
+              {message.snippet || "Kein Vorschautext"}
+            </p>
+            <span className="shrink-0">
+              <InboxStatusBadge status={message.processingStatus} />
+            </span>
           </div>
         </div>
       </Link>
