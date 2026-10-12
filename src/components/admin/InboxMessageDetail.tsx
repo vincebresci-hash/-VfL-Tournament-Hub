@@ -22,14 +22,22 @@ import { cn } from "@/lib/cn";
 import type { InboxMessageDetail as InboxMessageDetailType } from "@/lib/inbox/types";
 
 /**
- * Ultrawide-friendly reading column. Caps below full bleed so line length
- * stays usable; gutters remain outside the reader on very wide displays.
+ * Ultrawide-friendly reading column for the standalone detail route.
+ * Pane mode skips this cap so the embedded reader can fill its column.
  */
 const READING_SHELL = "max-w-[1600px]";
+
+export type InboxMessageDetailVariant = "page" | "pane";
 
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
   canManage: boolean;
+  /**
+   * `page` — standalone `/admin/posteingang/[id]` (default, current UX).
+   * `pane` — prepared for a future embedded two-pane reader (not used by routes yet).
+   */
+  variant?: InboxMessageDetailVariant;
+  className?: string;
 };
 
 function formatBytes(size: number): string {
@@ -88,9 +96,15 @@ function wrapDetailEmailSrcDoc(sanitizedHtml: string): string {
   return `<!DOCTYPE html><html><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta http-equiv="Content-Security-Policy" content="${INBOX_HTML_CSP}" /><style>${styles}</style></head><body>${sanitizedHtml}</body></html>`;
 }
 
-export function InboxMessageDetailView({ message, canManage }: InboxMessageDetailProps) {
+export function InboxMessageDetailView({
+  message,
+  canManage,
+  variant = "page",
+  className,
+}: InboxMessageDetailProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const isPane = variant === "pane";
 
   useEffect(() => {
     if (!message.isUnreadLocal || !canManage) {
@@ -108,11 +122,11 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
   return (
     <div
       className={cn(
-        adminCardShellClass,
+        !isPane && adminCardShellClass,
         "flex flex-col bg-white",
-        // Large screens: one Outlook-like pane height so the iframe (not the page)
-        // is the primary body scroll region. Mobile keeps natural page flow.
-        "lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem]",
+        // Page: full-route Outlook height. Pane: fill the future reading column.
+        isPane ? "h-full min-h-0" : "lg:h-[calc(100dvh-8rem)] lg:min-h-[36rem]",
+        className,
       )}
     >
       {/* Compact Outlook-style command bar */}
@@ -120,18 +134,24 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
         <div
           className={cn(
             "mx-auto flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-6 lg:px-8",
-            READING_SHELL,
+            !isPane && READING_SHELL,
           )}
         >
-          <Link
-            href="/admin/posteingang"
-            className={cn(
-              adminSecondaryButtonClass,
-              "h-8 rounded-md border-line/70 px-3 text-[11px] tracking-[0.04em]",
-            )}
-          >
-            ← Posteingang
-          </Link>
+          {!isPane ? (
+            <Link
+              href="/admin/posteingang"
+              className={cn(
+                adminSecondaryButtonClass,
+                "h-8 rounded-md border-line/70 px-3 text-[11px] tracking-[0.04em]",
+              )}
+            >
+              ← Posteingang
+            </Link>
+          ) : (
+            <span className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+              Nachricht
+            </span>
+          )}
 
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
             {message.isUnreadLocal ? (
@@ -207,7 +227,7 @@ export function InboxMessageDetailView({ message, canManage }: InboxMessageDetai
       <div
         className={cn(
           "mx-auto flex min-h-0 w-full flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5 lg:px-8",
-          READING_SHELL,
+          !isPane && READING_SHELL,
         )}
       >
         <div className="shrink-0">
