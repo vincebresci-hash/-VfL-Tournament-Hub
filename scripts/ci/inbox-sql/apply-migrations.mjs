@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { ENUM_SAFE_MIGRATIONS } from "./enum-safe-migrations.mjs";
+import { resolveFunctionMeta } from "./function-catalog-lookup.mjs";
 import {
   FUNCTION_RETURN_COMPAT_MIGRATIONS,
   assertResultColumnsMatch,
@@ -204,21 +205,26 @@ async function applyEnumSafeMigration(client, filename, content, spec) {
   }
 }
 
+/**
+ * Resolve public.tournament_public_roster(text) via to_regprocedure.
+ * Do not compare pg_get_function_identity_arguments() to bare "text" —
+ * named parameters format as "p_slug text" and that equality misses the function.
+ */
 async function getRosterFunctionMeta(client) {
-  const { rows } = await client.query(`
-    SELECT
-      p.oid,
-      pg_get_function_identity_arguments(p.oid) AS identity_args,
-      pg_get_function_result(p.oid) AS result_type,
-      p.prosecdef AS security_definer,
-      COALESCE(p.proconfig, ARRAY[]::text[]) AS config
-    FROM pg_proc p
-    JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname = 'public'
-      AND p.proname = 'tournament_public_roster'
-      AND pg_get_function_identity_arguments(p.oid) = 'text'
-  `);
-  return rows[0] || null;
+  const meta = await resolveFunctionMeta(
+    client,
+    "public.tournament_public_roster(text)",
+  );
+  if (!meta) {
+    return null;
+  }
+  return {
+    oid: meta.oid,
+    identity_args: meta.identityArgs,
+    result_type: meta.resultType,
+    security_definer: meta.securityDefiner,
+    config: meta.config,
+  };
 }
 
 async function assertNoBlockingDependents(client, functionOid) {

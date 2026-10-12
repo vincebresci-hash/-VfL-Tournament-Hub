@@ -83,6 +83,7 @@ jobs:
           # Fail closed if historical CI-compat migration fingerprints drift.
           node scripts/ci/inbox-sql/verify-enum-safe-fingerprints.mjs
           node scripts/ci/inbox-sql/verify-function-return-compat-fingerprints.mjs
+          node scripts/ci/inbox-sql/function-catalog-lookup.test.mjs
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
