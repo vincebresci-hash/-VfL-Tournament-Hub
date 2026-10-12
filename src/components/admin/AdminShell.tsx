@@ -16,6 +16,7 @@ type AdminShellProps = {
   effectivePermissions: Permission[];
   isSuperAdmin: boolean;
   badgeCounts?: AdminNavBadgeCounts;
+  inboxUnreadCount?: number;
 };
 
 export function AdminShell({
@@ -23,6 +24,7 @@ export function AdminShell({
   effectivePermissions,
   isSuperAdmin,
   badgeCounts = emptyAdminNavBadgeCounts,
+  inboxUnreadCount = 0,
 }: AdminShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -84,6 +86,7 @@ export function AdminShell({
             effectivePermissions={effectivePermissions}
             isSuperAdmin={isSuperAdmin}
             badgeCounts={badgeCounts}
+            inboxUnreadCount={inboxUnreadCount}
           />
         </div>
       </aside>
@@ -92,7 +95,7 @@ export function AdminShell({
         className={cn(
           "fixed inset-0 z-40 bg-navy/50 lg:hidden",
           open ? "block" : "hidden",
-        )}
+          )}
         onClick={() => setOpen(false)}
         aria-hidden="true"
       />
@@ -108,6 +111,7 @@ export function AdminShell({
           effectivePermissions={effectivePermissions}
           isSuperAdmin={isSuperAdmin}
           badgeCounts={badgeCounts}
+          inboxUnreadCount={inboxUnreadCount}
         />
       </div>
 

@@ -17,6 +17,7 @@ export const ADMIN_ROUTE_PERMISSIONS: Array<{
   { prefix: "/admin/partner", permissions: ["partners.view"] },
   { prefix: "/admin/kommunikation", permissions: ["communications.view"] },
   { prefix: "/admin/emails", permissions: ["communications.view"] },
+  { prefix: "/admin/posteingang", permissions: ["inbox.view"] },
   { prefix: "/admin/einstellungen", permissions: ["users.manage", "tournaments.manage"] },
 ];
 
@@ -35,6 +36,7 @@ const NAV_PERMISSIONS: Record<string, Permission[]> = {
   "/admin/news": ["news.view"],
   "/admin/kommunikation": ["communications.view"],
   "/admin/emails": ["communications.view"],
+  "/admin/posteingang": ["inbox.view"],
   "/admin/profil": [],
   "/admin/einstellungen": ["users.manage", "tournaments.manage"],
 };

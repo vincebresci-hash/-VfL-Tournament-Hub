@@ -27,6 +27,8 @@ export const RBAC_PERMISSIONS = [
   "cancellations.view",
   "cancellations.decide",
   "cancellations.manage",
+  "inbox.view",
+  "inbox.manage",
 ] as const;
 
 export type Permission = (typeof RBAC_PERMISSIONS)[number];

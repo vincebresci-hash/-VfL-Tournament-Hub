@@ -315,12 +315,63 @@ export function runRbacChecks() {
     }),
     "COMMUNICATION_MANAGER: payments.manage BLOCKED",
   );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["COMMUNICATION_MANAGER"],
+      overrides: [],
+      permission: "inbox.view",
+    }),
+    "COMMUNICATION_MANAGER: inbox.view BLOCKED",
+  );
+  assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["COMMUNICATION_MANAGER"],
+      overrides: [],
+      permission: "inbox.manage",
+    }),
+    "COMMUNICATION_MANAGER: inbox.manage BLOCKED",
+  );
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["ADMIN"],
+      overrides: [],
+      permission: "inbox.view",
+    }),
+    "ADMIN: inbox.view PASS",
+  );
+  assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "super-admin",
+      roleKeys: ["SUPER_ADMIN"],
+      overrides: [],
+      permission: "inbox.manage",
+    }),
+    "SUPER_ADMIN: inbox.manage PASS",
+  );
+  assert(
+    !ROLE_PERMISSIONS.COMMUNICATION_MANAGER.includes("inbox.view") &&
+      !ROLE_PERMISSIONS.COMMUNICATION_MANAGER.includes("inbox.manage"),
+    "COMMUNICATION_MANAGER role matrix excludes inbox",
+  );
+  assert(
+    ROLE_PERMISSIONS.ADMIN.includes("inbox.view") &&
+      ROLE_PERMISSIONS.ADMIN.includes("inbox.manage"),
+    "ADMIN role matrix includes inbox",
+  );
 
   // Multi-role
   const multiRole = mergePermissions(["APPLICATION_MANAGER", "COMMUNICATION_MANAGER"], []);
   assert(multiRole.has("applications.manage"), "multi-role applications PASS");
   assert(multiRole.has("communications.manage"), "multi-role communications PASS");
   assert(!multiRole.has("payments.manage"), "multi-role finance BLOCKED");
+  assert(!multiRole.has("inbox.view"), "multi-role inbox BLOCKED");
 
   // CLUB_ADMIN
   assert(
