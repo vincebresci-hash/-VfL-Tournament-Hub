@@ -41,26 +41,24 @@ export default async function AdminInboxPage({
   ]);
 
   return (
-    <div>
+    <div className="space-y-5">
       <AdminPageHeader
         title="Posteingang"
-        description="Lesen und lokal bearbeiten von eingehenden Turnier-E-Mails. Kein Versand und keine Änderungen auf dem IONOS-Postfach."
+        description="Eingehende Turnier-E-Mails lesen und lokal bearbeiten — ohne Versand und ohne Änderungen am IONOS-Postfach."
       />
       {!ready ? (
         <AdminNotice>
           Bitte zuerst die Posteingang-Migration im Supabase SQL Editor ausführen.
         </AdminNotice>
       ) : (
-        <div className="mt-8">
-          <InboxBoard
-            messages={messages}
-            syncState={state}
-            canSync={canTriggerInboxSync(session, authorization)}
-            initialQuery={query}
-            initialStatus={status}
-            initialUnreadOnly={unreadOnly}
-          />
-        </div>
+        <InboxBoard
+          messages={messages}
+          syncState={state}
+          canSync={canTriggerInboxSync(session, authorization)}
+          initialQuery={query}
+          initialStatus={status}
+          initialUnreadOnly={unreadOnly}
+        />
       )}
     </div>
   );
