@@ -29,6 +29,7 @@ import {
   escapePostgrestSearchTerm,
   searchTermAltersFilterStructure,
 } from "@/lib/inbox/search";
+import { runInboxReplyChecks } from "@/lib/inbox/reply-checks";
 import { ROLE_PERMISSIONS, resolvePermissionAccess } from "@/lib/rbac/permissions";
 
 function assert(condition: boolean, message: string) {
@@ -483,6 +484,9 @@ export function runInboxChecks() {
     !upsertFn.includes("is_unread_local =") && !upsertFn.includes("processing_status ="),
     "message upsert never writes local status",
   );
+
+  // --- Phase 1 SMTP reply foundation (isolated; no send action yet) ---
+  assert(runInboxReplyChecks() === "ok", "inbox reply foundation checks");
 
   return "ok";
 }

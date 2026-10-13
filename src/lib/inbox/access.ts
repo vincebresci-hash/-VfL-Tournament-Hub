@@ -33,6 +33,20 @@ export function canManageInbox(
   return hasPermissionInAuthorization(authorization, session, "inbox.manage");
 }
 
+/** Send IONOS SMTP replies (separate from local status management). */
+export function canReplyInbox(
+  session: AuthSession | null | undefined,
+  authorization: Authorization | null | undefined,
+): boolean {
+  if (!session || !authorization) {
+    return false;
+  }
+  if (canManageSystem(session.user.role)) {
+    return true;
+  }
+  return hasPermissionInAuthorization(authorization, session, "inbox.reply");
+}
+
 /** Manual sync trigger: SUPER_ADMIN only. */
 export function canTriggerInboxSync(
   session: AuthSession | null | undefined,

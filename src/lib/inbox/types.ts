@@ -2,6 +2,29 @@ export const INBOX_PROCESSING_STATUSES = ["open", "in_progress", "done"] as cons
 
 export type InboxProcessingStatus = (typeof INBOX_PROCESSING_STATUSES)[number];
 
+export const INBOX_REPLY_STATUSES = [
+  "pending",
+  "sending",
+  "sent",
+  "failed",
+  "uncertain",
+] as const;
+
+export type InboxReplyStatus = (typeof INBOX_REPLY_STATUSES)[number];
+
+/** Local outbound reply audit row (IONOS SMTP; not Resend / email_logs). */
+export type InboxReplyListItem = {
+  id: string;
+  parentMessageId: string;
+  toAddress: string;
+  subject: string;
+  status: InboxReplyStatus;
+  error: string | null;
+  createdAt: string;
+  sentAt: string | null;
+  attachmentCount: number;
+};
+
 export type InboxAddress = {
   address: string;
   name: string;
@@ -39,6 +62,9 @@ export type InboxMessageDetail = InboxMessageListItem & {
   folder: string;
   imapUid: number;
   messageIdHeader: string | null;
+  /** Present in DB; exposed for reply threading in a later phase. */
+  inReplyTo?: string | null;
+  referencesHeader?: string | null;
   attachments: InboxAttachmentItem[];
 };
 
