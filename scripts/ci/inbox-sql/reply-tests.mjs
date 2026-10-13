@@ -749,6 +749,317 @@ export async function runInboxReplySqlTests(ctx) {
     assert(after === before, "rollback must not leave partial reply rows");
   });
 
+  await test("reply-phase2: authenticated claim → service_role finalize all states", async () => {
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+    });
+
+    for (const status of ["sent", "failed", "uncertain"]) {
+      const key = uuid(50 + ["sent", "failed", "uncertain"].indexOf(status));
+      const claim = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+        claimReply(client, {
+          parentId: messageId,
+          key,
+          to,
+          subject: "Re: Hello CI",
+          body: `finalize-${status}`,
+        }),
+      );
+      assert(claim.send_allowed === true, `claim for ${status}`);
+      assert(claim.reply_status === "sending", `status sending before finalize ${status}`);
+
+      const finalized = await withServiceRoleTransaction(env.dbUrl, async (client) => {
+        const result = await client.query(
+          `SELECT public.finalize_inbox_reply_send($1::uuid, $2::text, $3::text, $4::text) AS ok`,
+          [claim.reply_id, status, status === "sent" ? null : `err-${status}`, "250 MOCK"],
+        );
+        return result.rows[0].ok;
+      });
+      assert(finalized === true, `finalize ${status} should succeed`);
+
+      const row = await withPostgresTransaction(env.dbUrl, async (client) => {
+        const result = await client.query(
+          `SELECT status FROM public.inbox_replies WHERE id = $1`,
+          [claim.reply_id],
+        );
+        return result.rows[0];
+      });
+      assert(row.status === status, `durable status ${status}, got ${row.status}`);
+
+      // Clear unresolved / terminal rows so the next status claim is allowed.
+      await withServiceRoleTransaction(env.dbUrl, async (client) => {
+        await client.query(`DELETE FROM public.inbox_replies WHERE id = $1`, [claim.reply_id]);
+      });
+    }
+  });
+
+  await test("reply-phase2: authenticated cannot finalize; smtp_response redacted", async () => {
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+    });
+
+    const claim = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: uuid(60),
+        to,
+        subject: "Re: Hello CI",
+        body: "finalize authz",
+      }),
+    );
+    assert(claim.send_allowed === true, "claim for finalize authz");
+
+    const denied = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
+      try {
+        await client.query(
+          `SELECT public.finalize_inbox_reply_send($1::uuid, 'sent', NULL, '250 ok')`,
+          [claim.reply_id],
+        );
+        return { denied: false };
+      } catch (error) {
+        return { denied: isPermissionDenied(error), message: error.message };
+      }
+    });
+    assert(denied.denied === true, "authenticated finalize must be denied");
+
+    const stored = await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      const result = await client.query(
+        `SELECT public.finalize_inbox_reply_send(
+           $1::uuid, 'failed', 'x password=supersecret', 'AUTH PLAIN dXNlcjpwYXNz password=leak'
+         ) AS ok`,
+        [claim.reply_id],
+      );
+      assert(result.rows[0].ok === true, "service_role finalize ok");
+      const row = await client.query(
+        `SELECT status, error, smtp_response FROM public.inbox_replies WHERE id = $1`,
+        [claim.reply_id],
+      );
+      return row.rows[0];
+    });
+    assert(stored.status === "failed", "status failed after finalize");
+    assert(!`${stored.error || ""}`.includes("supersecret"), "error redacted");
+    assert(`${stored.error || ""}`.includes("[redacted]"), "error has redaction marker");
+    assert(!`${stored.smtp_response || ""}`.includes("leak"), "smtp_response password redacted");
+    assert(!`${stored.smtp_response || ""}`.includes("dXNlcjpwYXNz"), "AUTH payload redacted");
+
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+    });
+  });
+
+  await test("reply-phase2: domain init + mismatch; header_injection + invalid_input", async () => {
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+      await client.query(
+        `UPDATE public.inbox_mailboxes
+         SET reply_message_id_domain = NULL
+         WHERE id = $1`,
+        [mailboxId],
+      );
+    });
+
+    const noDomain = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: uuid(70),
+        to,
+        subject: "Re: domain",
+        body: "needs domain",
+      }),
+    );
+    assert(noDomain.error_code === "domain_not_configured", "null domain blocks claim");
+
+    // Trusted service_role initializes domain (mirrors Phase 2 ensureMailboxMessageIdDomain).
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(
+        `UPDATE public.inbox_mailboxes
+         SET reply_message_id_domain = 'example.test'
+         WHERE id = $1 AND reply_message_id_domain IS NULL`,
+        [mailboxId],
+      );
+    });
+
+    const afterInit = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: uuid(71),
+        to,
+        subject: "Re: domain",
+        body: "domain ready",
+      }),
+    );
+    assert(afterInit.send_allowed === true, "claim works after domain init");
+    assert(
+      `${afterInit.message_id_header || ""}`.endsWith("@example.test"),
+      "Message-ID uses mailbox domain",
+    );
+
+    // Finalize prior sending so subsequent claim error codes are observable.
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(
+        `SELECT public.finalize_inbox_reply_send($1::uuid, 'failed', 'cleanup', NULL)`,
+        [afterInit.reply_id],
+      );
+      // Claim SQL rejects inbox.local even if the column CHECK format allows it.
+      await client.query(
+        `UPDATE public.inbox_mailboxes
+         SET reply_message_id_domain = 'inbox.local'
+         WHERE id = $1`,
+        [mailboxId],
+      );
+    });
+
+    const localDomain = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: uuid(72),
+        to,
+        subject: "Re: local",
+        body: "local domain blocked",
+      }),
+    );
+    assert(
+      localDomain.error_code === "domain_not_configured",
+      `inbox.local must be rejected by claim, got ${localDomain.error_code}`,
+    );
+
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(
+        `UPDATE public.inbox_mailboxes
+         SET reply_message_id_domain = 'example.test'
+         WHERE id = $1`,
+        [mailboxId],
+      );
+    });
+
+    const invalid = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: uuid(73),
+        to,
+        subject: "",
+        body: "empty subject",
+      }),
+    );
+    assert(invalid.error_code === "invalid_input", `expected invalid_input, got ${invalid.error_code}`);
+
+    const inject = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: uuid(74),
+        to,
+        subject: "Re: bad\nBcc: evil@x",
+        body: "inject",
+      }),
+    );
+    assert(inject.error_code === "header_injection", `expected header_injection, got ${inject.error_code}`);
+
+    // Junk domain rejected by CHECK constraint (mismatch / invalid format).
+    const junkRejected = await withPostgresTransaction(env.dbUrl, async (client) => {
+      try {
+        await client.query(
+          `UPDATE public.inbox_mailboxes
+           SET reply_message_id_domain = 'not a domain'
+           WHERE id = $1`,
+          [mailboxId],
+        );
+        return false;
+      } catch (error) {
+        return error.code === "23514";
+      }
+    });
+    assert(junkRejected === true, "junk domain rejected by CHECK");
+
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(
+        `UPDATE public.inbox_mailboxes
+         SET reply_message_id_domain = 'example.test'
+         WHERE id = $1`,
+        [mailboxId],
+      );
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+    });
+  });
+
+  await test("reply-phase2: duplicate prevention + finalize-once semantics", async () => {
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+    });
+
+    const keyA = uuid(80);
+    const keyB = uuid(81);
+    const first = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: keyA,
+        to,
+        subject: "Re: Hello CI",
+        body: "dup-a",
+      }),
+    );
+    assert(first.send_allowed === true, "first claim");
+
+    const secondKey = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: keyB,
+        to,
+        subject: "Re: Hello CI",
+        body: "dup-b",
+      }),
+    );
+    assert(secondKey.error_code === "unresolved_reply_exists", "different key blocked while sending");
+
+    const ok = await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      const result = await client.query(
+        `SELECT public.finalize_inbox_reply_send($1::uuid, 'sent', NULL, '250 MOCK') AS ok`,
+        [first.reply_id],
+      );
+      return result.rows[0].ok;
+    });
+    assert(ok === true, "first finalize ok");
+
+    const secondFinalize = await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      const result = await client.query(
+        `SELECT public.finalize_inbox_reply_send($1::uuid, 'failed', 'late', NULL) AS ok`,
+        [first.reply_id],
+      );
+      return result.rows[0].ok;
+    });
+    assert(secondFinalize === false, "finalize must be one-shot on non-sending rows");
+
+    const replay = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) =>
+      claimReply(client, {
+        parentId: messageId,
+        key: keyA,
+        to,
+        subject: "Re: Hello CI",
+        body: "dup-a",
+      }),
+    );
+    assert(replay.send_allowed === false, "same key never re-authorizes SMTP");
+    assert(replay.already_existed === true, "same key already_existed");
+    assert(replay.reply_status === "sent", "durable sent preserved");
+
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
+        users.admin.id,
+      ]);
+    });
+  });
+
   await test("reply-regression: legacy inbox SELECT/local-state still work", async () => {
     const rows = await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       const selected = await client.query(

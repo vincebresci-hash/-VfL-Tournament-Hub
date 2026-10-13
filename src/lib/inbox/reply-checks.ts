@@ -66,6 +66,13 @@ export function runInboxReplyChecks() {
   assert(migration.includes("pg_advisory_xact_lock"), "per-actor advisory lock");
   assert(migration.includes("reply_status text"), "claim OUT column reply_status (avoids status ambiguity)");
   assert(migration.includes("rate_limited"), "rate limit error in claim");
+  assert(
+    migration.includes("v_smtp := regexp_replace(v_smtp"),
+    "finalize redacts smtp_response credentials",
+  );
+  assert(migration.includes("recipient_locked"), "recipient_locked claim error_code");
+  assert(migration.includes("header_injection"), "header_injection claim error_code");
+  assert(migration.includes("not_authorized"), "not_authorized claim error_code");
   assert(migration.includes("interval '10 minutes'"), "rate limit window in claim");
   assert(migration.includes("unresolved_reply_exists"), "parent unresolved blocker");
   assert(migration.includes("send_abandoned_timeout"), "stale sending → uncertain");
@@ -118,8 +125,27 @@ export function runInboxReplyChecks() {
   assert(!smtpClient.includes("@/lib/email"), "smtp-client no Resend import");
   assert(!actions.includes('from "@/lib/email'), "actions still no Resend");
   assert(!sync.includes('from "@/lib/email'), "sync still no Resend");
-  assert(!actions.includes("sendInboxSmtpMail"), "Phase 1: no send wired in actions yet");
-  assert(!detailUi.includes("sendInboxReply"), "Phase 1: no reply UI action yet");
+  assert(actions.includes("sendInboxReplyAction"), "Phase 2: send action exported");
+  assert(
+    existsSync(join(process.cwd(), "src/lib/inbox/reply-send-action.ts")),
+    "Phase 2: reply-send-action module",
+  );
+  const sendAction = read("src/lib/inbox/reply-send-action.ts");
+  const sendCore = read("src/lib/inbox/reply-send.ts");
+  assert(sendAction.includes("sendInboxSmtpMail"), "Phase 2: IONOS SMTP wired");
+  assert(sendAction.includes("finalize_inbox_reply_send"), "Phase 2: service finalize wired");
+  assert(sendAction.includes("createServiceRoleClient"), "Phase 2: finalize via service_role");
+  assert(sendAction.includes("emitInboxReplyOperationalAlert"), "Phase 2: ops alert on compensation fail");
+  assert(sendCore.includes("mapClaimErrorCode"), "Phase 2: claim error mapping");
+  assert(sendCore.includes("recipient_locked"), "Phase 2: maps recipient_locked");
+  assert(sendCore.includes("header_injection"), "Phase 2: maps header_injection");
+  assert(sendCore.includes("redactInboxSmtpAuditText"), "Phase 2: audit redaction helper");
+  assert(
+    sendCore.includes('input.attachments !== undefined && input.attachments !== null'),
+    "Phase 2: rejects any attachments value",
+  );
+  assert(!sendAction.includes("@/lib/email"), "Phase 2: send action no Resend");
+  assert(!detailUi.includes("sendInboxReplyAction"), "Phase 2: no reply UI action yet");
   assert(sanitize.includes("INBOX_HTML_CSP"), "CSP preserved");
   assert(detailUi.includes('sandbox="allow-popups allow-popups-to-escape-sandbox"'), "sandbox preserved");
   assert(access.includes("canReplyInbox"), "canReplyInbox helper");

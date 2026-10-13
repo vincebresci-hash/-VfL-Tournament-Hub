@@ -561,14 +561,20 @@ BEGIN
     v_error := NULL;
   END IF;
 
-  -- Never persist credential-like substrings.
+  -- Never persist credential-like substrings (error + smtp_response).
   IF v_error IS NOT NULL THEN
     v_error := regexp_replace(v_error, 'pass(word)?[=:]\s*\S+', 'password=[redacted]', 'gi');
+    v_error := regexp_replace(v_error, 'AUTH\s+[A-Z0-9_-]+\s+\S+', 'AUTH [redacted]', 'gi');
+    v_error := regexp_replace(v_error, '(user(name)?|login)[=:]\s*\S+', '\1=[redacted]', 'gi');
   END IF;
 
   v_smtp := left(trim(COALESCE(p_smtp_response, '')), 500);
   IF length(v_smtp) = 0 THEN
     v_smtp := NULL;
+  ELSE
+    v_smtp := regexp_replace(v_smtp, 'pass(word)?[=:]\s*\S+', 'password=[redacted]', 'gi');
+    v_smtp := regexp_replace(v_smtp, 'AUTH\s+[A-Z0-9_-]+\s+\S+', 'AUTH [redacted]', 'gi');
+    v_smtp := regexp_replace(v_smtp, '(user(name)?|login)[=:]\s*\S+', '\1=[redacted]', 'gi');
   END IF;
 
   UPDATE public.inbox_replies

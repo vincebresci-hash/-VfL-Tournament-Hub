@@ -417,8 +417,40 @@ export type InboxMailboxRow = {
   label: string;
   folder: string;
   is_active: boolean;
+  /** DNS domain for outbound reply Message-IDs (IONOS From domain). */
+  reply_message_id_domain: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type InboxReplyStatusRow =
+  | "pending"
+  | "sending"
+  | "sent"
+  | "failed"
+  | "uncertain";
+
+export type InboxReplyRow = {
+  id: string;
+  mailbox_id: string;
+  parent_message_id: string;
+  idempotency_key: string;
+  to_address: string;
+  subject: string;
+  body_text: string;
+  body_html: string | null;
+  message_id_header: string;
+  in_reply_to_header: string | null;
+  references_header: string | null;
+  status: InboxReplyStatusRow;
+  error: string | null;
+  smtp_response: string | null;
+  provider: "ionos-smtp";
+  attachment_count: number;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  sent_at: string | null;
 };
 
 export type InboxSyncStateRow = {
@@ -1004,6 +1036,36 @@ export type Database = {
           mailbox_id: string;
         },
         Partial<InboxStorageLeaseRow>
+      >;
+      inbox_replies: Table<
+        InboxReplyRow,
+        Partial<InboxReplyRow> & {
+          mailbox_id: string;
+          parent_message_id: string;
+          idempotency_key: string;
+          to_address: string;
+          subject: string;
+          body_text: string;
+          message_id_header: string;
+          created_by: string;
+        },
+        Partial<InboxReplyRow>,
+        [
+          {
+            foreignKeyName: "inbox_replies_mailbox_id_fkey";
+            columns: ["mailbox_id"];
+            isOneToOne: false;
+            referencedRelation: "inbox_mailboxes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbox_replies_parent_message_id_fkey";
+            columns: ["parent_message_id"];
+            isOneToOne: false;
+            referencedRelation: "inbox_messages";
+            referencedColumns: ["id"];
+          },
+        ]
       >;
       email_logs: Table<
         EmailLogRow,
@@ -1654,6 +1716,53 @@ export type Database = {
           p_lock_token: string;
           p_attachment_id: string;
           p_error_code?: string | null;
+        };
+        Returns: boolean;
+      };
+      count_inbox_replies_since: {
+        Args: { p_since: string };
+        Returns: number;
+      };
+      claim_inbox_reply_send: {
+        Args: {
+          p_parent_message_id: string;
+          p_idempotency_key: string;
+          p_to_address: string;
+          p_subject: string;
+          p_body_text: string;
+        };
+        Returns: Array<{
+          reply_id: string | null;
+          reply_status: string | null;
+          send_allowed: boolean;
+          already_existed: boolean;
+          error_code: string | null;
+          message_id_header: string | null;
+          in_reply_to_header: string | null;
+          references_header: string | null;
+        }>;
+      };
+      finalize_inbox_reply_send: {
+        Args: {
+          p_reply_id: string;
+          p_status: string;
+          p_error?: string | null;
+          p_smtp_response?: string | null;
+        };
+        Returns: boolean;
+      };
+      expire_stale_inbox_reply_sends: {
+        Args: {
+          p_actor_user_id?: string | null;
+          p_stale_after_seconds?: number;
+        };
+        Returns: number;
+      };
+      reconcile_inbox_reply_status: {
+        Args: {
+          p_reply_id: string;
+          p_status: string;
+          p_note?: string | null;
         };
         Returns: boolean;
       };

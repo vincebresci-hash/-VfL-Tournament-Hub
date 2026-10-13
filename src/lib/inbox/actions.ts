@@ -10,10 +10,23 @@ import {
 import { sanitizeInboxFilename } from "@/lib/inbox/attachments-safe";
 import { INBOX_ATTACHMENT_BUCKET, INBOX_SIGNED_URL_TTL_SECONDS } from "@/lib/inbox/config";
 import { getInboxMessageDetail } from "@/lib/inbox/queries";
+import { sendInboxReplyAction as sendInboxReplyActionImpl } from "@/lib/inbox/reply-send-action";
+import type { SendInboxReplyInput, SendInboxReplyResult } from "@/lib/inbox/reply-send";
 import { runInboxSyncBatch } from "@/lib/inbox/sync";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { InboxMessageDetail, InboxProcessingStatus } from "@/lib/inbox/types";
+
+/**
+ * Phase 2: send an IONOS SMTP reply for an inbox message.
+ * Auth: admin session + inbox.view + inbox.reply.
+ * Claim: authenticated RPC. Finalize: service_role only. Never Resend.
+ */
+export async function sendInboxReplyAction(
+  input: SendInboxReplyInput,
+): Promise<SendInboxReplyResult> {
+  return sendInboxReplyActionImpl(input);
+}
 
 async function requireInboxSession() {
   const access = await requireAdminSession();
