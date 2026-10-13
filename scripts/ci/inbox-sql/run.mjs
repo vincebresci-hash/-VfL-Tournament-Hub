@@ -20,6 +20,7 @@ import {
   withPostgresTransaction,
   withServiceRoleTransaction,
 } from "./lib.mjs";
+import { runInboxReplySqlTests } from "./reply-tests.mjs";
 
 const USERS = {
   superAdmin: {
@@ -134,6 +135,7 @@ async function seedUsersAndRoles(dbUrl, supabase) {
 
 async function seedMailbox(dbUrl) {
   return withPostgresTransaction(dbUrl, async (client) => {
+    await client.query(`DELETE FROM public.inbox_replies`);
     await client.query(`DELETE FROM public.inbox_storage_leases`);
     await client.query(`DELETE FROM public.inbox_attachments`);
     await client.query(`DELETE FROM public.inbox_messages`);
@@ -141,8 +143,8 @@ async function seedMailbox(dbUrl) {
     await client.query(`DELETE FROM public.inbox_mailboxes`);
 
     const mailbox = await client.query(
-      `INSERT INTO public.inbox_mailboxes (label, folder, is_active)
-       VALUES ('CI Inbox', 'INBOX', true)
+      `INSERT INTO public.inbox_mailboxes (label, folder, is_active, reply_message_id_domain)
+       VALUES ('CI Inbox', 'INBOX', true, 'example.test')
        RETURNING id`,
     );
     const mailboxId = mailbox.rows[0].id;
@@ -175,6 +177,7 @@ async function main() {
         "inbox_messages",
         "inbox_attachments",
         "inbox_storage_leases",
+        "inbox_replies",
       ]) {
         const { rows } = await client.query(
           `SELECT c.relrowsecurity AS rls
@@ -206,6 +209,11 @@ async function main() {
         "list_expired_inbox_storage_leases",
         "delete_inbox_storage_lease",
         "mark_inbox_attachment_repair_attempt",
+        "claim_inbox_reply_send",
+        "finalize_inbox_reply_send",
+        "reconcile_inbox_reply_status",
+        "expire_stale_inbox_reply_sends",
+        "count_inbox_replies_since",
       ];
       for (const name of required) {
         const { rows } = await client.query(
@@ -780,6 +788,18 @@ async function main() {
         activeToken,
       ]);
     });
+  });
+
+  // ---------------------------------------------------------------------------
+  // F. Inbox replies (SMTP foundation) — real SQL concurrency / authz
+  // ---------------------------------------------------------------------------
+  assert(messageId, "parent messageId required for reply SQL tests");
+  await runInboxReplySqlTests({
+    env,
+    users: USERS,
+    mailboxId,
+    messageId,
+    test,
   });
 
   console.log("");
