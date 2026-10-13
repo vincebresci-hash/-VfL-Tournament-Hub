@@ -260,7 +260,8 @@ CREATE OR REPLACE FUNCTION public.claim_inbox_reply_send(
 )
 RETURNS TABLE (
   reply_id uuid,
-  status text,
+  -- Named reply_status to avoid PL/pgSQL ambiguity with inbox_replies.status.
+  reply_status text,
   send_allowed boolean,
   already_existed boolean,
   error_code text,
@@ -356,7 +357,7 @@ BEGIN
   IF FOUND THEN
     RETURN QUERY SELECT
       v_existing.id,
-      v_existing.status,
+      v_existing.status::text,
       false,
       true,
       NULL::text,
@@ -495,7 +496,7 @@ BEGIN
   IF FOUND THEN
     RETURN QUERY SELECT
       v_inserted.id,
-      v_inserted.status,
+      v_inserted.status::text,
       true,
       false,
       NULL::text,
@@ -520,7 +521,7 @@ BEGIN
 
   RETURN QUERY SELECT
     v_existing.id,
-    v_existing.status,
+    v_existing.status::text,
     false,
     true,
     NULL::text,

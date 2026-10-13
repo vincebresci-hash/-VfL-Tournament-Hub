@@ -684,7 +684,7 @@ export async function runInboxReplySqlTests(ctx) {
     );
     assert(replay.already_existed === true, "replay should already_existed");
     assert(replay.send_allowed === false, "replay must not send again");
-    assert(replay.status === "sent", "replay status should remain sent");
+    assert(replay.reply_status === "sent", "replay status should remain sent");
 
     await withServiceRoleTransaction(env.dbUrl, async (client) => {
       await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
