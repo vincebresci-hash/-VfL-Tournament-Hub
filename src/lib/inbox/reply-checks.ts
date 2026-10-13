@@ -64,6 +64,7 @@ export function runInboxReplyChecks() {
   assert(!migration.includes("UNIQUE (idempotency_key)"), "no global idempotency unique");
   assert(migration.includes("idempotency_key uuid NOT NULL"), "UUID idempotency at DB");
   assert(migration.includes("pg_advisory_xact_lock"), "per-actor advisory lock");
+  assert(migration.includes("reply_status text"), "claim OUT column reply_status (avoids status ambiguity)");
   assert(migration.includes("rate_limited"), "rate limit error in claim");
   assert(migration.includes("interval '10 minutes'"), "rate limit window in claim");
   assert(migration.includes("unresolved_reply_exists"), "parent unresolved blocker");
