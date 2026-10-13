@@ -14,28 +14,14 @@ import {
   withServiceRoleTransaction,
 } from "./lib.mjs";
 
+/** Bound CI hangs: statement/lock waits must not block the job indefinitely. */
+const CI_STATEMENT_TIMEOUT = "15s";
+const CI_LOCK_TIMEOUT = "5s";
+
 function uuid(n) {
   // Deterministic UUIDv4-shaped ids for CI (version nibble = 4, variant = 8).
   const hex = String(n).padStart(12, "0");
   return `aaaaaaaa-bbbb-4ccc-8ddd-${hex}`;
-}
-
-async function openAuthenticatedClient(dbUrl, userId) {
-  const client = createPgClient(dbUrl);
-  await client.connect();
-  await client.query("BEGIN");
-  await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId]);
-  await client.query("SELECT set_config('request.jwt.claim.role', 'authenticated', true)");
-  await client.query("SELECT set_config('request.jwt.claims', $1, true)", [
-    JSON.stringify({ sub: userId, role: "authenticated", aud: "authenticated" }),
-  ]);
-  await client.query("SET LOCAL ROLE authenticated");
-  const uid = await client.query(`SELECT auth.uid() AS uid`);
-  if (uid.rows[0]?.uid !== userId) {
-    await client.end();
-    throw new Error(`auth.uid() mismatch for concurrent client: ${uid.rows[0]?.uid}`);
-  }
-  return client;
 }
 
 async function claimReply(client, { parentId, key, to, subject, body }) {
@@ -46,6 +32,45 @@ async function claimReply(client, { parentId, key, to, subject, body }) {
     [parentId, key, to, subject, body],
   );
   return result.rows[0];
+}
+
+/**
+ * Run one authenticated claim in its own connection/transaction.
+ *
+ * IMPORTANT: commit immediately after claim returns. Holding BEGIN open across
+ * Promise.all while claim_inbox_reply_send holds pg_advisory_xact_lock deadlocks
+ * (peer waits for lock; holder waits for Promise.all before COMMIT).
+ */
+async function claimReplyInOwnTransaction(dbUrl, userId, input) {
+  const client = createPgClient(dbUrl);
+  await client.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`SET LOCAL statement_timeout = '${CI_STATEMENT_TIMEOUT}'`);
+    await client.query(`SET LOCAL lock_timeout = '${CI_LOCK_TIMEOUT}'`);
+    await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId]);
+    await client.query("SELECT set_config('request.jwt.claim.role', 'authenticated', true)");
+    await client.query("SELECT set_config('request.jwt.claims', $1, true)", [
+      JSON.stringify({ sub: userId, role: "authenticated", aud: "authenticated" }),
+    ]);
+    await client.query("SET LOCAL ROLE authenticated");
+    const uid = await client.query(`SELECT auth.uid() AS uid`);
+    if (uid.rows[0]?.uid !== userId) {
+      throw new Error(`auth.uid() mismatch for concurrent client: ${uid.rows[0]?.uid}`);
+    }
+    const row = await claimReply(client, input);
+    await client.query("COMMIT");
+    return row;
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // ignore rollback errors
+    }
+    throw error;
+  } finally {
+    await client.end();
+  }
 }
 
 /**
@@ -339,40 +364,27 @@ export async function runInboxReplySqlTests(ctx) {
     });
 
     const key = uuid(10);
-    const clientA = await openAuthenticatedClient(env.dbUrl, users.admin.id);
-    const clientB = await openAuthenticatedClient(env.dbUrl, users.admin.id);
-    try {
-      const [a, b] = await Promise.all([
-        claimReply(clientA, {
-          parentId: messageId,
-          key,
-          to,
-          subject: "Re: Hello CI",
-          body: "same-key concurrent A",
-        }),
-        claimReply(clientB, {
-          parentId: messageId,
-          key,
-          to,
-          subject: "Re: Hello CI",
-          body: "same-key concurrent B",
-        }),
-      ]);
-      await clientA.query("COMMIT");
-      await clientB.query("COMMIT");
+    const payload = {
+      parentId: messageId,
+      key,
+      to,
+      subject: "Re: Hello CI",
+      body: "same-key concurrent",
+    };
+    // Each claim commits in its own transaction (releases advisory xact lock).
+    const [a, b] = await Promise.all([
+      claimReplyInOwnTransaction(env.dbUrl, users.admin.id, payload),
+      claimReplyInOwnTransaction(env.dbUrl, users.admin.id, {
+        ...payload,
+        body: "same-key concurrent B",
+      }),
+    ]);
 
-      const allowed = [a, b].filter((row) => row.send_allowed === true);
-      assert(allowed.length === 1, `expected 1 send_allowed, got ${allowed.length}`);
-      const denied = [a, b].filter((row) => row.send_allowed === false);
-      assert(denied.length === 1, "expected one replay/denied claim");
-      assert(
-        a.reply_id === b.reply_id,
-        "same actor+key must resolve to one reply_id",
-      );
-    } finally {
-      await clientA.end();
-      await clientB.end();
-    }
+    const allowed = [a, b].filter((row) => row.send_allowed === true);
+    assert(allowed.length === 1, `expected 1 send_allowed, got ${allowed.length}`);
+    const denied = [a, b].filter((row) => row.send_allowed === false);
+    assert(denied.length === 1, "expected one replay/denied claim");
+    assert(a.reply_id === b.reply_id, "same actor+key must resolve to one reply_id");
   });
 
   await test("reply-concurrency: different keys same actor → unresolved blocks second", async () => {
@@ -550,47 +562,39 @@ export async function runInboxReplySqlTests(ctx) {
     });
 
     const keys = [uuid(20), uuid(21), uuid(22), uuid(23), uuid(24)];
-    const clients = await Promise.all(
-      keys.map(() => openAuthenticatedClient(env.dbUrl, users.admin.id)),
+    const results = await Promise.all(
+      keys.map((key, index) =>
+        claimReplyInOwnTransaction(env.dbUrl, users.admin.id, {
+          parentId: parentIds[index],
+          key,
+          to,
+          subject: "Re: Hello CI",
+          body: `rate-limit burst ${index}`,
+        }),
+      ),
     );
-    try {
-      const results = await Promise.all(
-        clients.map((client, index) =>
-          claimReply(client, {
-            parentId: parentIds[index],
-            key: keys[index],
-            to,
-            subject: "Re: Hello CI",
-            body: `rate-limit burst ${index}`,
-          }),
-        ),
+
+    const allowed = results.filter((row) => row.send_allowed === true);
+    const limited = results.filter((row) => row.error_code === "rate_limited");
+
+    assert(allowed.length <= 2, `rate limit exceeded: ${allowed.length} allowed`);
+    assert(limited.length >= 3, `expected >=3 rate_limited, got ${limited.length}`);
+    assert(
+      allowed.length + limited.length === results.length,
+      `unexpected codes: ${results.map((row) => row.error_code || "ok").join(",")}`,
+    );
+
+    const total = await withPostgresTransaction(env.dbUrl, async (client) => {
+      const result = await client.query(
+        `SELECT COUNT(*)::int AS n
+         FROM public.inbox_replies
+         WHERE created_by = $1
+           AND created_at >= now() - interval '10 minutes'`,
+        [users.admin.id],
       );
-      await Promise.all(clients.map((client) => client.query("COMMIT")));
-
-      const allowed = results.filter((row) => row.send_allowed === true);
-      const limited = results.filter((row) => row.error_code === "rate_limited");
-
-      assert(allowed.length <= 2, `rate limit exceeded: ${allowed.length} allowed`);
-      assert(limited.length >= 3, `expected >=3 rate_limited, got ${limited.length}`);
-      assert(
-        allowed.length + limited.length === results.length,
-        `unexpected codes: ${results.map((row) => row.error_code || "ok").join(",")}`,
-      );
-
-      const total = await withPostgresTransaction(env.dbUrl, async (client) => {
-        const result = await client.query(
-          `SELECT COUNT(*)::int AS n
-           FROM public.inbox_replies
-           WHERE created_by = $1
-             AND created_at >= now() - interval '10 minutes'`,
-          [users.admin.id],
-        );
-        return result.rows[0].n;
-      });
-      assert(total <= 20, `window count ${total} exceeds 20`);
-    } finally {
-      await Promise.all(clients.map((client) => client.end()));
-    }
+      return result.rows[0].n;
+    });
+    assert(total <= 20, `window count ${total} exceeds 20`);
 
     await withServiceRoleTransaction(env.dbUrl, async (client) => {
       await client.query(`DELETE FROM public.inbox_replies WHERE created_by = $1`, [
@@ -703,6 +707,8 @@ export async function runInboxReplySqlTests(ctx) {
     await client.connect();
     try {
       await client.query("BEGIN");
+      await client.query(`SET LOCAL statement_timeout = '${CI_STATEMENT_TIMEOUT}'`);
+      await client.query(`SET LOCAL lock_timeout = '${CI_LOCK_TIMEOUT}'`);
       await client.query("SAVEPOINT sp_reply_fail");
       let failed = false;
       try {

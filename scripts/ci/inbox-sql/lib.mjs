@@ -83,12 +83,21 @@ async function assertSessionRole(client, expectedRole) {
   }
 }
 
+async function applyCiTimeouts(client) {
+  // Prevent indefinite hangs in GitHub Actions (advisory-lock / statement stalls).
+  if (process.env.INBOX_SQL_CI === "1") {
+    await client.query("SET LOCAL statement_timeout = '30s'");
+    await client.query("SET LOCAL lock_timeout = '10s'");
+  }
+}
+
 /** Begin a transaction as authenticated with JWT claims for auth.uid(). */
 export async function withAuthenticatedTransaction(dbUrl, userId, fn) {
   const client = createPgClient(dbUrl);
   await client.connect();
   try {
     await client.query("BEGIN");
+    await applyCiTimeouts(client);
     await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId]);
     await client.query("SELECT set_config('request.jwt.claim.role', 'authenticated', true)");
     await client.query("SELECT set_config('request.jwt.claims', $1, true)", [
@@ -123,6 +132,7 @@ export async function withServiceRoleTransaction(dbUrl, fn) {
   await client.connect();
   try {
     await client.query("BEGIN");
+    await applyCiTimeouts(client);
     await client.query("SET LOCAL ROLE service_role");
     await assertSessionRole(client, "service_role");
     const result = await fn(client);
