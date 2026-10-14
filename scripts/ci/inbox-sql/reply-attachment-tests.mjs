@@ -245,7 +245,7 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
       assert(created.rows[0].error_code == null, "create failed");
     });
 
-    // Same-user must not be able to SELECT storage_path column.
+    // Same-user must not be able to SELECT storage_path column (own txn: error aborts tx).
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       await expectError(
         () =>
@@ -258,7 +258,9 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
           /permission denied for column|column .*storage_path/i.test(String(error?.message || error)),
         "authenticated must not SELECT storage_path",
       );
+    });
 
+    await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       const meta = await client.query(
         `SELECT id, filename, status FROM public.inbox_reply_uploads WHERE id = $1::uuid`,
         [uploadId],
@@ -334,6 +336,15 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
   });
 
   await test("reply-attach: quotas + extension + size gates", async () => {
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(
+        `DELETE FROM public.inbox_reply_uploads
+         WHERE created_by = $1::uuid AND parent_message_id = $2::uuid
+           AND status IN ('uploading', 'staging')`,
+        [users.admin.id, messageId],
+      );
+    });
+
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       const ids = [];
       for (let i = 0; i < 5; i += 1) {
@@ -514,6 +525,9 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
         isPermissionDenied,
         "authenticated must not register lease",
       );
+    });
+
+    await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       await client.query(`SELECT * FROM public.remove_inbox_reply_upload($1::uuid)`, [uploadId]);
     });
   });

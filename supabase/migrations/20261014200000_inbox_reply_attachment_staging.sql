@@ -147,10 +147,11 @@ CREATE INDEX IF NOT EXISTS inbox_reply_upload_leases_cleanup_idx
 ALTER TABLE public.inbox_reply_uploads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inbox_reply_upload_leases ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON TABLE public.inbox_reply_uploads FROM PUBLIC, anon;
+-- Clear default privileges (Supabase may GRANT SELECT on new public tables).
+REVOKE ALL ON TABLE public.inbox_reply_uploads FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.inbox_reply_upload_leases FROM PUBLIC, anon, authenticated;
 
--- Column-level SELECT: everything except storage_path.
+-- Column-level SELECT: everything except storage_path (H3).
 GRANT SELECT (
   id,
   mailbox_id,
@@ -171,7 +172,6 @@ GRANT SELECT (
   purged_at
 ) ON TABLE public.inbox_reply_uploads TO authenticated;
 
-REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public.inbox_reply_uploads FROM authenticated;
 GRANT ALL ON TABLE public.inbox_reply_uploads TO service_role;
 GRANT ALL ON TABLE public.inbox_reply_upload_leases TO service_role;
 

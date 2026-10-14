@@ -712,12 +712,13 @@ export async function runInboxReplySqlTests(ctx) {
       await client.query("SAVEPOINT sp_reply_fail");
       let failed = false;
       try {
+        // Phase 4a allows 0–5; 6 must still fail the range check.
         await client.query(
           `INSERT INTO public.inbox_replies (
              mailbox_id, parent_message_id, idempotency_key, to_address, subject,
              body_text, message_id_header, status, attachment_count, created_by
            ) VALUES (
-             $1, $2, $3::uuid, $4, 'x', 'y', 'mid@example.test', 'sending', 1, $5
+             $1, $2, $3::uuid, $4, 'x', 'y', 'mid@example.test', 'sending', 6, $5
            )`,
           [mailboxId, messageId, uuid(40), to, users.admin.id],
         );

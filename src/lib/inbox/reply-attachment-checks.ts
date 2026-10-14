@@ -75,6 +75,12 @@ export function runInboxReplyAttachmentChecks() {
     migration.includes("GRANT SELECT (\n  id,"),
     "H3 column-level SELECT without storage_path",
   );
+  assert(
+    migration.includes(
+      "REVOKE ALL ON TABLE public.inbox_reply_uploads FROM PUBLIC, anon, authenticated",
+    ),
+    "H3 clears default SELECT before column grant",
+  );
   assert(!migration.includes("storage_path\n) ON TABLE public.inbox_reply_uploads TO authenticated"), "path not granted");
   assert(migration.includes("RETURNS TABLE (\n  upload_id uuid,\n  error_code text\n)"), "create RPC no path");
   assert(migration.includes("committed = false"), "M4 lease required for commit");
