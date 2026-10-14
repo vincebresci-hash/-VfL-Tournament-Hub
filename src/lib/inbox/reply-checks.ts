@@ -25,6 +25,7 @@ import {
   isInboxReplyRateLimited,
   messageIdDomainFromEmail,
   normalizeReplySubject,
+  stripReplySubjectPrefixes,
   validateInboxReplyDraft,
   validateIdempotencyKey,
   validateReplySubject,
@@ -231,6 +232,24 @@ export function runInboxReplyChecks() {
     "recipient mismatch blocked",
   );
   assert(normalizeReplySubject("", "Hallo") === "Re: Hallo", "Re prefix");
+  assert(normalizeReplySubject("", "Re: Hallo") === "Re: Hallo", "preserve single Re");
+  assert(normalizeReplySubject("", "AW: Hallo") === "AW: Hallo", "preserve single AW");
+  assert(normalizeReplySubject("", "aw: Hallo") === "AW: Hallo", "normalize aw casing");
+  assert(normalizeReplySubject("", "Re: Re: Hallo") === "Re: Hallo", "collapse repeated Re");
+  assert(normalizeReplySubject("", "AW: AW: Hallo") === "AW: Hallo", "collapse repeated AW");
+  assert(normalizeReplySubject("", "Re: AW: Hallo") === "Re: Hallo", "collapse mixed Re AW");
+  assert(normalizeReplySubject("", "AW: Re: Hallo") === "AW: Hallo", "collapse mixed AW Re");
+  assert(
+    normalizeReplySubject("Re: AW: Re: Turnier", "AW: Turnier") === "Re: Turnier",
+    "collapse draft mixed stack",
+  );
+  assert(
+    stripReplySubjectPrefixes("Re: AW: Hallo").core === "Hallo" &&
+      stripReplySubjectPrefixes("Re: AW: Hallo").firstPrefix === "Re",
+    "strip helper keeps first prefix",
+  );
+  assert(composerUi.includes("scrollIntoView"), "Phase 3 polish: composer scrolls into view");
+  assert(composerUi.includes("preventScroll"), "Phase 3 polish: focus without page jump");
   assert(containsHeaderInjection("Betreff\nBcc: evil@x"), "CRLF detected");
   assert(!validateReplySubject("ok\r\ninject").ok, "subject injection rejected");
   const draft = validateInboxReplyDraft({
@@ -242,6 +261,15 @@ export function runInboxReplyChecks() {
     idempotencyKey: "550e8400-e29b-41d4-a716-446655440000",
   });
   assert(draft.ok && draft.subject.startsWith("Re:"), "draft ok");
+  const awDraft = validateInboxReplyDraft({
+    requestedTo: "a@b.co",
+    originalFromAddress: "a@b.co",
+    subject: "",
+    originalSubject: "AW: Frage",
+    bodyText: "Danke für Ihre Nachricht.",
+    idempotencyKey: "550e8400-e29b-41d4-a716-446655440001",
+  });
+  assert(awDraft.ok && awDraft.subject === "AW: Frage", "draft preserves AW prefix");
   assert(!validateIdempotencyKey("not-a-uuid").ok, "bad idempotency rejected");
 
   // --- Message-ID domain (H3) ---

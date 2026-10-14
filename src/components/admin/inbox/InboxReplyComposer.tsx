@@ -100,6 +100,7 @@ export function InboxReplyComposer({
   onOutcome,
 }: InboxReplyComposerProps) {
   const formId = useId();
+  const sectionRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [subject, setSubject] = useState(() =>
     normalizeReplySubject("", originalSubject),
@@ -117,12 +118,32 @@ export function InboxReplyComposer({
   const submitLockRef = useRef(false);
   const mountedRef = useRef(true);
 
-  // Focus body when opened; never carry draft across parents (parent remounts via key).
+  // Scroll the composer into the reading-pane scrollport, then focus the textarea.
+  // preventScroll avoids a second jump of the window / outer page.
   useEffect(() => {
     mountedRef.current = true;
-    bodyRef.current?.focus();
+    const section = sectionRef.current;
+    const body = bodyRef.current;
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    // nearest keeps motion inside the overflow-y pane instead of scrolling the document.
+    section?.scrollIntoView({
+      behavior: reduceMotion ? "auto" : "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+
+    const focusTimer = window.setTimeout(() => {
+      if (!mountedRef.current) {
+        return;
+      }
+      body?.focus({ preventScroll: true });
+    }, reduceMotion ? 0 : 50);
+
     return () => {
       mountedRef.current = false;
+      window.clearTimeout(focusTimer);
     };
   }, []);
 
@@ -221,6 +242,7 @@ export function InboxReplyComposer({
 
   return (
     <section
+      ref={sectionRef}
       className="shrink-0 rounded-lg border border-line/60 bg-gradient-to-b from-surface/50 to-white"
       aria-label="Antwort verfassen"
     >

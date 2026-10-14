@@ -90,12 +90,51 @@ export function assertReplyRecipientLocked(input: {
   return { ok: true, toAddress: requested };
 }
 
+/** Leading reply markers used by English (Re) and German (AW) clients. */
+const REPLY_PREFIX_RE = /^(re|aw)\s*:\s*/i;
+
+export type InboxReplySubjectPrefix = "Re" | "AW";
+
+/**
+ * Strip stacked / mixed reply prefixes (Re:/AW:) and remember the first one.
+ * Examples: "Re: AW: Hallo" → core "Hallo", first "Re"; "AW: Hallo" → keep "AW".
+ */
+export function stripReplySubjectPrefixes(value: string): {
+  core: string;
+  firstPrefix: InboxReplySubjectPrefix | null;
+} {
+  let remaining = value.trim().replace(/\s+/g, " ");
+  let firstPrefix: InboxReplySubjectPrefix | null = null;
+
+  while (remaining.length > 0) {
+    const match = REPLY_PREFIX_RE.exec(remaining);
+    if (!match) {
+      break;
+    }
+    if (!firstPrefix) {
+      firstPrefix = match[1]!.toLowerCase() === "aw" ? "AW" : "Re";
+    }
+    remaining = remaining.slice(match[0].length).trimStart();
+  }
+
+  return {
+    core: remaining.trim() || "(ohne Betreff)",
+    firstPrefix,
+  };
+}
+
+/**
+ * Normalize a reply subject to a single reply prefix.
+ * - Preserves an existing single "AW:" or "Re:" prefix.
+ * - Collapses repeated / mixed stacks ("Re: AW:", "AW: Re:", "Re: Re:") to one prefix
+ *   (keeps the first marker found).
+ * - Adds "Re:" when no reply prefix is present.
+ */
 export function normalizeReplySubject(subject: string, originalSubject: string): string {
   const base = (subject.trim() || originalSubject.trim() || "(ohne Betreff)").trim();
-  if (/^\s*re\s*:/i.test(base)) {
-    return base.replace(/\s+/g, " ").trim();
-  }
-  return `Re: ${base}`.replace(/\s+/g, " ").trim();
+  const { core, firstPrefix } = stripReplySubjectPrefixes(base);
+  const prefix = firstPrefix ?? "Re";
+  return `${prefix}: ${core}`.replace(/\s+/g, " ").trim();
 }
 
 export function validateReplySubject(subject: string): {
