@@ -12,6 +12,13 @@ import { INBOX_ATTACHMENT_BUCKET, INBOX_SIGNED_URL_TTL_SECONDS } from "@/lib/inb
 import { getInboxMessageDetail } from "@/lib/inbox/queries";
 import { sendInboxReplyAction as sendInboxReplyActionImpl } from "@/lib/inbox/reply-send-action";
 import type { SendInboxReplyInput, SendInboxReplyResult } from "@/lib/inbox/reply-send";
+import {
+  createInboxReplyAttachmentDownloadUrlAction as createInboxReplyAttachmentDownloadUrlActionImpl,
+  createInboxReplyAttachmentPreviewUrlAction as createInboxReplyAttachmentPreviewUrlActionImpl,
+  purgeExpiredInboxReplyAttachmentsAction as purgeExpiredInboxReplyAttachmentsActionImpl,
+  removeInboxReplyAttachmentAction as removeInboxReplyAttachmentActionImpl,
+  uploadInboxReplyAttachmentAction as uploadInboxReplyAttachmentActionImpl,
+} from "@/lib/inbox/reply-attachment-actions";
 import { runInboxSyncBatch } from "@/lib/inbox/sync";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -21,11 +28,37 @@ import type { InboxMessageDetail, InboxProcessingStatus } from "@/lib/inbox/type
  * Phase 2: send an IONOS SMTP reply for an inbox message.
  * Auth: admin session + inbox.view + inbox.reply.
  * Claim: authenticated RPC. Finalize: service_role only. Never Resend.
+ * Phase 4a: still rejects attachment payloads until Phase 4b bind/SMTP.
  */
 export async function sendInboxReplyAction(
   input: SendInboxReplyInput,
 ): Promise<SendInboxReplyResult> {
   return sendInboxReplyActionImpl(input);
+}
+
+/** Phase 4a: stage outbound reply attachment (no SMTP). */
+export async function uploadInboxReplyAttachmentAction(formData: FormData) {
+  return uploadInboxReplyAttachmentActionImpl(formData);
+}
+
+/** Phase 4a: remove unused staging upload. */
+export async function removeInboxReplyAttachmentAction(uploadId: string) {
+  return removeInboxReplyAttachmentActionImpl(uploadId);
+}
+
+/** Phase 4a: short-lived image preview URL. */
+export async function createInboxReplyAttachmentPreviewUrlAction(uploadId: string) {
+  return createInboxReplyAttachmentPreviewUrlActionImpl(uploadId);
+}
+
+/** Phase 4a: forced-download signed URL. */
+export async function createInboxReplyAttachmentDownloadUrlAction(uploadId: string) {
+  return createInboxReplyAttachmentDownloadUrlActionImpl(uploadId);
+}
+
+/** Phase 4a: SUPER_ADMIN-triggered purge of expired staging / retention-elapsed objects. */
+export async function purgeExpiredInboxReplyAttachmentsAction(limit?: number) {
+  return purgeExpiredInboxReplyAttachmentsActionImpl(limit);
 }
 
 async function requireInboxSession() {

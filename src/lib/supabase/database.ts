@@ -453,6 +453,43 @@ export type InboxReplyRow = {
   sent_at: string | null;
 };
 
+export type InboxReplyUploadStatusRow =
+  | "uploading"
+  | "staging"
+  | "bound"
+  | "purged"
+  | "rejected";
+
+/** Phase 4a outbound reply attachment staging / audit metadata. */
+export type InboxReplyUploadRow = {
+  id: string;
+  mailbox_id: string;
+  parent_message_id: string;
+  reply_id: string | null;
+  created_by: string;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  checksum_sha256: string | null;
+  storage_path: string | null;
+  status: InboxReplyUploadStatusRow;
+  error_code: string | null;
+  expires_at: string;
+  retain_until: string | null;
+  created_at: string;
+  updated_at: string;
+  bound_at: string | null;
+  purged_at: string | null;
+};
+
+export type InboxReplyUploadLeaseRow = {
+  storage_path: string;
+  upload_id: string;
+  created_by: string;
+  committed: boolean;
+  created_at: string;
+};
+
 export type InboxSyncStateRow = {
   mailbox_id: string;
   folder: string;
@@ -1066,6 +1103,44 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ]
+      >;
+      inbox_reply_uploads: Table<
+        InboxReplyUploadRow,
+        Partial<InboxReplyUploadRow> & {
+          mailbox_id: string;
+          parent_message_id: string;
+          created_by: string;
+          filename: string;
+          content_type: string;
+          size_bytes: number;
+          expires_at: string;
+        },
+        Partial<InboxReplyUploadRow>,
+        [
+          {
+            foreignKeyName: "inbox_reply_uploads_mailbox_id_fkey";
+            columns: ["mailbox_id"];
+            isOneToOne: false;
+            referencedRelation: "inbox_mailboxes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "inbox_reply_uploads_parent_message_id_fkey";
+            columns: ["parent_message_id"];
+            isOneToOne: false;
+            referencedRelation: "inbox_messages";
+            referencedColumns: ["id"];
+          },
+        ]
+      >;
+      inbox_reply_upload_leases: Table<
+        InboxReplyUploadLeaseRow,
+        Partial<InboxReplyUploadLeaseRow> & {
+          storage_path: string;
+          upload_id: string;
+          created_by: string;
+        },
+        Partial<InboxReplyUploadLeaseRow>
       >;
       email_logs: Table<
         EmailLogRow,
@@ -1764,6 +1839,66 @@ export type Database = {
           p_status: string;
           p_note?: string | null;
         };
+        Returns: boolean;
+      };
+      create_inbox_reply_upload: {
+        Args: {
+          p_parent_message_id: string;
+          p_upload_id: string;
+          p_filename: string;
+          p_content_type: string;
+          p_size_bytes: number;
+        };
+        Returns: Array<{
+          upload_id: string | null;
+          error_code: string | null;
+        }>;
+      };
+      remove_inbox_reply_upload: {
+        Args: { p_upload_id: string };
+        Returns: Array<{
+          ok: boolean;
+          error_code: string | null;
+        }>;
+      };
+      get_inbox_reply_upload_storage_path: {
+        Args: { p_upload_id: string };
+        Returns: string | null;
+      };
+      register_inbox_reply_upload_lease: {
+        Args: {
+          p_upload_id: string;
+          p_storage_path: string;
+          p_created_by: string;
+        };
+        Returns: boolean;
+      };
+      commit_inbox_reply_upload: {
+        Args: {
+          p_upload_id: string;
+          p_checksum_sha256: string;
+          p_size_bytes: number;
+        };
+        Returns: boolean;
+      };
+      reject_inbox_reply_upload: {
+        Args: { p_upload_id: string; p_error_code?: string | null };
+        Returns: boolean;
+      };
+      list_purgeable_inbox_reply_uploads: {
+        Args: { p_limit?: number };
+        Returns: Array<{
+          upload_id: string;
+          storage_path: string;
+          reason: string;
+        }>;
+      };
+      mark_inbox_reply_upload_purged: {
+        Args: { p_upload_id: string; p_reason?: string | null };
+        Returns: boolean;
+      };
+      set_inbox_reply_upload_retention: {
+        Args: { p_upload_id: string; p_retain_days?: number };
         Returns: boolean;
       };
       reserve_cancellation_email_send: {

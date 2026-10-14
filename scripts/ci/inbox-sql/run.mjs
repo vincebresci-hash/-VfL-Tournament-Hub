@@ -20,6 +20,7 @@ import {
   withPostgresTransaction,
   withServiceRoleTransaction,
 } from "./lib.mjs";
+import { runInboxReplyAttachmentSqlTests } from "./reply-attachment-tests.mjs";
 import { runInboxReplySqlTests } from "./reply-tests.mjs";
 
 const USERS = {
@@ -795,6 +796,17 @@ async function main() {
   // ---------------------------------------------------------------------------
   assert(messageId, "parent messageId required for reply SQL tests");
   await runInboxReplySqlTests({
+    env,
+    users: USERS,
+    mailboxId,
+    messageId,
+    test,
+  });
+
+  // ---------------------------------------------------------------------------
+  // G. Outbound reply attachment staging (Phase 4a) — no SMTP bind
+  // ---------------------------------------------------------------------------
+  await runInboxReplyAttachmentSqlTests({
     env,
     users: USERS,
     mailboxId,

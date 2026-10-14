@@ -29,6 +29,7 @@ import {
   escapePostgrestSearchTerm,
   searchTermAltersFilterStructure,
 } from "@/lib/inbox/search";
+import { runInboxReplyAttachmentChecks } from "@/lib/inbox/reply-attachment-checks";
 import { runInboxReplyChecks } from "@/lib/inbox/reply-checks";
 import { runInboxReplySendChecks } from "@/lib/inbox/reply-send-checks";
 import { ROLE_PERMISSIONS, resolvePermissionAccess } from "@/lib/rbac/permissions";
@@ -491,6 +492,8 @@ export function runInboxChecks() {
 
   // --- Phase 1 SMTP reply foundation + Phase 2 send action (mocked SMTP) ---
   assert(runInboxReplyChecks() === "ok", "inbox reply foundation checks");
+  // --- Phase 4a outbound attachment staging (no SMTP bind yet) ---
+  assert(runInboxReplyAttachmentChecks() === "ok", "inbox reply attachment staging checks");
 
   return "ok";
 }
