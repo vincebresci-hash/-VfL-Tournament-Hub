@@ -66,6 +66,8 @@ export type InboxMessageDetail = InboxMessageListItem & {
   inReplyTo?: string | null;
   referencesHeader?: string | null;
   attachments: InboxAttachmentItem[];
+  /** Outbound IONOS replies for this parent (newest first). */
+  replies?: InboxReplyListItem[];
 };
 
 export type InboxSyncStateView = {

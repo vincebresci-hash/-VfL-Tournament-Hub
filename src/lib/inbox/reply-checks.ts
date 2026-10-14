@@ -145,11 +145,44 @@ export function runInboxReplyChecks() {
     "Phase 2: rejects any attachments value",
   );
   assert(!sendAction.includes("@/lib/email"), "Phase 2: send action no Resend");
-  assert(!detailUi.includes("sendInboxReplyAction"), "Phase 2: no reply UI action yet");
   assert(sanitize.includes("INBOX_HTML_CSP"), "CSP preserved");
   assert(detailUi.includes('sandbox="allow-popups allow-popups-to-escape-sandbox"'), "sandbox preserved");
   assert(access.includes("canReplyInbox"), "canReplyInbox helper");
   assert(existsSync(join(process.cwd(), "src/lib/inbox/reply-validation.ts")), "validation module");
+
+  // --- Phase 3: Outlook inline reply composer ---
+  const composerUi = read("src/components/admin/inbox/InboxReplyComposer.tsx");
+  const workspaceUi = read("src/components/admin/InboxWorkspace.tsx");
+  const inboxIndexPage = read("src/app/admin/posteingang/page.tsx");
+  const inboxDetailPage = read("src/app/admin/posteingang/[id]/page.tsx");
+  const queries = read("src/lib/inbox/queries.ts");
+  assert(existsSync(join(process.cwd(), "src/components/admin/inbox/InboxReplyComposer.tsx")), "Phase 3: composer");
+  assert(existsSync(join(process.cwd(), "src/components/admin/inbox/InboxReplyList.tsx")), "Phase 3: reply list");
+  assert(detailUi.includes("InboxMessageReplySection"), "Phase 3: detail mounts reply section");
+  assert(detailUi.includes("canReply"), "Phase 3: detail gates on canReply");
+  assert(detailUi.includes("InboxReplyActionButton"), "Phase 3: Antworten control");
+  assert(detailUi.includes("key={message.id}"), "Phase 3: reply section remounts per message");
+  assert(workspaceUi.includes("key={activeDetail.id}"), "Phase 3: detail remounts on selection");
+  assert(composerUi.includes("sendInboxReplyAction"), "Phase 3: composer uses send action");
+  assert(composerUi.includes("normalizeReplySubject"), "Phase 3: Re: subject normalization");
+  assert(composerUi.includes('readOnly'), "Phase 3: recipient locked readOnly");
+  assert(composerUi.includes("Abbrechen"), "Phase 3: cancel control");
+  assert(composerUi.includes("Senden"), "Phase 3: send control");
+  assert(composerUi.includes("uncertain"), "Phase 3: uncertain delivery state");
+  assert(composerUi.includes("Anhang hinzufügen"), "Phase 3: attachment slot reserved");
+  assert(composerUi.includes("disabled"), "Phase 3: attachments disabled for now");
+  assert(!composerUi.includes("attachments:"), "Phase 3: never passes attachments payload");
+  assert(composerUi.includes("createIdempotencyKey"), "Phase 3: client idempotency key");
+  assert(
+    composerUi.includes("Never mint a new idempotency key") ||
+      composerUi.includes("never retry automatically"),
+    "Phase 3: no uncertain auto-retry",
+  );
+  assert(workspaceUi.includes("canReply"), "Phase 3: workspace threads canReply");
+  assert(inboxIndexPage.includes("canReplyInbox"), "Phase 3: index page authz");
+  assert(inboxDetailPage.includes("canReplyInbox"), "Phase 3: detail page authz");
+  assert(queries.includes("listInboxRepliesForMessage"), "Phase 3: reply list query");
+  assert(queries.includes("error: null"), "Phase 3: never surfaces raw SMTP error blobs");
 
   // --- SMTP TLS / From (H3/H6) ---
   assert(smtpClient.includes("rejectUnauthorized: true"), "TLS cert verification");

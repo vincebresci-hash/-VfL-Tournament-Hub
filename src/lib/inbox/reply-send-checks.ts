@@ -212,7 +212,17 @@ function runStaticReplySendChecks() {
   assert(!sendAction.includes("@/lib/email"), "no Resend/email provider in send action");
   assert(!actions.includes("@/lib/email"), "actions still isolated from Resend");
   assert(!sync.includes("sendInboxSmtpMail"), "IMAP sync does not send SMTP replies");
-  assert(!detailUi.includes("sendInboxReplyAction"), "Phase 2: no reply UI wiring yet");
+  // Phase 3: composer owns the client call; detail must not invoke the action directly.
+  assert(!detailUi.includes("sendInboxReplyAction"), "detail does not call send action directly");
+  assert(detailUi.includes("InboxMessageReplySection"), "Phase 3: detail embeds reply section");
+  const composerUi = read("src/components/admin/inbox/InboxReplyComposer.tsx");
+  assert(composerUi.includes("sendInboxReplyAction"), "Phase 3: composer wires send action");
+  assert(composerUi.includes("smtp_uncertain"), "Phase 3: handles uncertain without retry");
+  assert(
+    read("src/components/admin/inbox/InboxMessageReplySection.tsx").includes("key={message.id}") ||
+      detailUi.includes("key={message.id}"),
+    "Phase 3: keyed remount for draft isolation",
+  );
   assert(smtpClient.includes("rejectUnauthorized: true"), "TLS fail-closed preserved");
   assert(sendCore.includes("shouldAutoRetrySmtp"), "auto-retry policy consulted");
   assert(sendCore.includes("attachments_not_supported"), "attachment rejection reserved");

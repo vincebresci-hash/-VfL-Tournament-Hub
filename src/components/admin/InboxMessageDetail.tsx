@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   adminCardShellClass,
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
 } from "@/components/admin/AdminPanel";
 import { InboxAttachmentIcon } from "@/components/admin/inbox/InboxAttachmentIcon";
+import {
+  InboxMessageReplySection,
+  InboxReplyActionButton,
+} from "@/components/admin/inbox/InboxMessageReplySection";
 import { InboxSenderAvatar } from "@/components/admin/inbox/InboxSenderAvatar";
 import { INBOX_STATUS_LABEL } from "@/components/admin/inbox/status";
 import {
@@ -41,6 +45,8 @@ export type InboxDetailLocalStatePatch = {
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
   canManage: boolean;
+  /** Send IONOS SMTP replies (inbox.reply). Separate from local status management. */
+  canReply?: boolean;
   /**
    * `page` — standalone route chrome.
    * `pane` — embedded two-pane reader.
@@ -52,6 +58,8 @@ type InboxMessageDetailProps = {
    * instead of calling router.refresh() — avoids list/sync-state refetch.
    */
   onLocalStateChange?: (patch: InboxDetailLocalStatePatch) => void;
+  /** After a reply send attempt, parent may replace the active detail (incl. replies). */
+  onDetailReload?: (message: InboxMessageDetailType) => void;
 };
 
 function formatBytes(size: number): string {
@@ -113,13 +121,18 @@ function wrapDetailEmailSrcDoc(sanitizedHtml: string): string {
 export function InboxMessageDetailView({
   message,
   canManage,
+  canReply = false,
   variant = "page",
   className,
   onLocalStateChange,
+  onDetailReload,
 }: InboxMessageDetailProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [composerOpen, setComposerOpen] = useState(false);
   const isPane = variant === "pane";
+  // Parent remounts this view with key={message.id} so composer drafts reset on selection change.
+  const replyComposerActive = canReply && composerOpen;
 
   function afterLocalChange(patch: InboxDetailLocalStatePatch) {
     if (onLocalStateChange) {
@@ -189,6 +202,13 @@ export function InboxMessageDetailView({
               <span className="rounded-md bg-brand-yellow/30 px-2 py-0.5 text-[10px] font-semibold tracking-[0.06em] text-navy uppercase">
                 Ungelesen
               </span>
+            ) : null}
+
+            {canReply ? (
+              <InboxReplyActionButton
+                disabled={replyComposerActive}
+                onClick={() => setComposerOpen(true)}
+              />
             ) : null}
 
             {canManage ? (
@@ -270,6 +290,8 @@ export function InboxMessageDetailView({
       <div
         className={cn(
           "mx-auto flex min-h-0 w-full flex-1 flex-col",
+          // When composing, scroll the whole reading column so the composer stays reachable on mobile.
+          replyComposerActive ? "overflow-y-auto" : "",
           isPane ? "px-4 py-3 sm:px-5 sm:py-4" : "px-4 py-4 sm:px-6 sm:py-5 lg:px-8",
           !isPane && READING_SHELL,
         )}
@@ -339,15 +361,27 @@ export function InboxMessageDetailView({
         {/*
           Body iframe — Outlook-style reading pane:
           - On lg+, flex-1 fills remaining card height (single primary scroll).
+          - When the reply composer is open, use a capped height so the composer stays reachable.
           - Auto-height would need scripts / same-origin — intentionally unused.
         */}
-        <section className={cn("flex min-h-0 flex-1 flex-col", isPane ? "mt-3" : "mt-4 sm:mt-5")}>
+        <section
+          className={cn(
+            "flex min-h-0 flex-col",
+            replyComposerActive ? "mt-3 shrink-0" : "flex-1",
+            !replyComposerActive && (isPane ? "mt-3" : "mt-4 sm:mt-5"),
+          )}
+        >
           <p className="mb-2 shrink-0 text-[11px] leading-4 text-muted">
             Externe Bilder und aktive Inhalte sind aus Sicherheitsgründen blockiert.
           </p>
           {message.bodyHtmlSanitized ? (
             <iframe
-              className="block w-full min-h-[20rem] flex-1 border-0 bg-white lg:min-h-0"
+              className={cn(
+                "block w-full border-0 bg-white",
+                replyComposerActive
+                  ? "h-[min(40vh,22rem)] min-h-[12rem]"
+                  : "min-h-[20rem] flex-1 lg:min-h-0",
+              )}
               // No scripts / no same-origin — inbox-only sandbox + CSP srcdoc.
               sandbox="allow-popups allow-popups-to-escape-sandbox"
               referrerPolicy="no-referrer"
@@ -355,7 +389,14 @@ export function InboxMessageDetailView({
               srcDoc={wrapDetailEmailSrcDoc(message.bodyHtmlSanitized)}
             />
           ) : (
-            <pre className="min-h-[20rem] flex-1 overflow-auto whitespace-pre-wrap font-sans text-[18px] leading-[1.6] tracking-[-0.01em] text-ink lg:min-h-0">
+            <pre
+              className={cn(
+                "overflow-auto whitespace-pre-wrap font-sans text-[18px] leading-[1.6] tracking-[-0.01em] text-ink",
+                replyComposerActive
+                  ? "max-h-[min(40vh,22rem)] min-h-[12rem]"
+                  : "min-h-[20rem] flex-1 lg:min-h-0",
+              )}
+            >
               {message.bodyText || "Kein Textinhalt."}
             </pre>
           )}
@@ -434,6 +475,17 @@ export function InboxMessageDetailView({
             </ul>
           </section>
         ) : null}
+
+        {/* key={message.id}: draft + optimistic reply state never follows a selection change. */}
+        <InboxMessageReplySection
+          key={message.id}
+          message={message}
+          canReply={canReply}
+          isPane={isPane}
+          composerOpen={composerOpen}
+          onComposerOpenChange={setComposerOpen}
+          onDetailReload={onDetailReload}
+        />
       </div>
     </div>
   );

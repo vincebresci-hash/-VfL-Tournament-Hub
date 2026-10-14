@@ -1,4 +1,4 @@
-import type { InboxProcessingStatus } from "@/lib/inbox/types";
+import type { InboxProcessingStatus, InboxReplyStatus } from "@/lib/inbox/types";
 import { adminStatusBadgeClass } from "@/components/admin/AdminPanel";
 import { cn } from "@/lib/cn";
 
@@ -6,6 +6,14 @@ export const INBOX_STATUS_LABEL: Record<InboxProcessingStatus, string> = {
   open: "Offen",
   in_progress: "In Bearbeitung",
   done: "Erledigt",
+};
+
+export const INBOX_REPLY_STATUS_LABEL: Record<InboxReplyStatus, string> = {
+  pending: "Ausstehend",
+  sending: "Wird gesendet",
+  sent: "Gesendet",
+  failed: "Fehlgeschlagen",
+  uncertain: "Unklar",
 };
 
 const STATUS_TONE: Record<InboxProcessingStatus, string> = {

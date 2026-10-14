@@ -33,6 +33,8 @@ type InboxWorkspaceProps = {
   syncState: InboxSyncStateView | null;
   canSync: boolean;
   canManage: boolean;
+  /** IONOS SMTP reply (inbox.reply). */
+  canReply?: boolean;
   initialQuery: string;
   initialStatus: InboxProcessingStatus | "all";
   initialUnreadOnly: boolean;
@@ -89,6 +91,7 @@ export function InboxWorkspace({
   syncState,
   canSync,
   canManage,
+  canReply = false,
   initialQuery,
   initialStatus,
   initialUnreadOnly,
@@ -423,11 +426,19 @@ export function InboxWorkspace({
               </div>
               <div className="min-h-0 flex-1 overflow-hidden">
                 <InboxMessageDetailView
+                  key={activeDetail.id}
                   message={activeDetail}
                   canManage={canManage}
+                  canReply={canReply}
                   variant="pane"
                   className="h-full min-h-0 border-0 shadow-none ring-0"
                   onLocalStateChange={handleLocalStateChange}
+                  onDetailReload={(next) => {
+                    if (next.id !== activeDetailIdRef.current) {
+                      return;
+                    }
+                    setActiveDetail(next);
+                  }}
                 />
               </div>
             </>

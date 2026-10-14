@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AdminNotice, AdminPageHeader } from "@/components/admin/AdminPanel";
 import { InboxWorkspace } from "@/components/admin/InboxWorkspace";
 import { getAuthSession } from "@/lib/auth/session";
-import { canManageInbox, canTriggerInboxSync } from "@/lib/inbox/access";
+import { canManageInbox, canReplyInbox, canTriggerInboxSync } from "@/lib/inbox/access";
 import {
   getInboxMessageDetail,
   getInboxSyncStateView,
@@ -75,6 +75,7 @@ export default async function AdminInboxMessagePage({
       syncState={state}
       canSync={canTriggerInboxSync(session, authorization)}
       canManage={canManageInbox(session, authorization)}
+      canReply={canReplyInbox(session, authorization)}
       initialQuery={query}
       initialStatus={status}
       initialUnreadOnly={unreadOnly}
