@@ -6,6 +6,16 @@ import {
   shouldAutoRetrySmtp,
   type InboxReplyFinalizeStatus,
 } from "@/lib/inbox/reply-lifecycle";
+import {
+  canStartInboxReplySmtp,
+  evaluateInboxReplyAttachmentRuntimeBudget,
+  INBOX_REPLY_DEPLOYMENT_MAX_DURATION_SECONDS,
+} from "@/lib/inbox/reply-attachment-runtime";
+import {
+  INBOX_REPLY_ATTACHMENT_MAX_COUNT,
+  INBOX_REPLY_ATTACHMENT_MAX_FILE_BYTES,
+  INBOX_REPLY_ATTACHMENT_MAX_TOTAL_BYTES,
+} from "@/lib/inbox/reply-attachment-limits";
 import { assertMessageIdDomain } from "@/lib/inbox/reply-headers";
 import { validateInboxReplyDraft } from "@/lib/inbox/reply-validation";
 import type { InboxReplyStatus } from "@/lib/inbox/types";
@@ -23,6 +33,12 @@ export type InboxReplySmtpConfig = {
   messageIdDomain: string;
 };
 
+export type InboxReplySmtpAttachment = {
+  filename: string;
+  contentType: string;
+  content: Buffer;
+};
+
 export type InboxReplySmtpMailInput = {
   to: string;
   subject: string;
@@ -30,6 +46,7 @@ export type InboxReplySmtpMailInput = {
   messageId: string;
   inReplyTo?: string | null;
   references?: string | null;
+  attachments?: ReadonlyArray<InboxReplySmtpAttachment>;
 };
 
 export type InboxReplySmtpSendResult =
@@ -56,9 +73,19 @@ export const CLAIM_INBOX_REPLY_SQL_ERROR_CODES = [
   "unresolved_reply_exists",
   "rate_limited",
   "claim_race",
+  "attachment_invalid",
+  "attachment_duplicate",
+  "attachment_quota_count",
+  "attachment_quota_bytes",
+  "idempotency_attachment_conflict",
 ] as const;
 
 export type ClaimInboxReplySqlErrorCode = (typeof CLAIM_INBOX_REPLY_SQL_ERROR_CODES)[number];
+
+/** Phase 4b: only staging upload UUIDs — never paths or raw bytes from the browser. */
+export type SendInboxReplyAttachmentRef = {
+  uploadId: string;
+};
 
 export type SendInboxReplyInput = {
   parentMessageId: string;
@@ -67,10 +94,10 @@ export type SendInboxReplyInput = {
   bodyText: string;
   idempotencyKey: string;
   /**
-   * Reserved for a later phase. Phase 2 rejects any supplied attachments value.
-   * Do not accept filesystem paths or raw binary here.
+   * Ordered staging upload IDs to bind and send. Omit/empty = text-only.
+   * Rejects non-UUID shapes and any path-like values.
    */
-  attachments?: ReadonlyArray<unknown> | null;
+  attachments?: ReadonlyArray<SendInboxReplyAttachmentRef> | null;
 };
 
 export type SendInboxReplyErrorCode =
@@ -79,7 +106,9 @@ export type SendInboxReplyErrorCode =
   | "invalid_parent_id"
   | "parent_not_found"
   | "validation"
-  | "attachments_not_supported"
+  | "attachments_invalid"
+  | "attachments_runtime_budget"
+  | "attachment_load_failed"
   | "smtp_not_configured"
   | "domain_not_configured"
   | "domain_mismatch"
@@ -90,6 +119,16 @@ export type SendInboxReplyErrorCode =
   | "smtp_failed"
   | "smtp_uncertain"
   | "already_exists";
+
+export type InboxReplyBoundUploadMeta = {
+  uploadId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  checksumSha256: string;
+  storagePath: string;
+  bindOrdinal: number | null;
+};
 
 export type SendInboxReplyResult = {
   ok: boolean;
@@ -151,7 +190,18 @@ export type InboxReplySendDeps = {
     toAddress: string;
     subject: string;
     bodyText: string;
+    uploadIds: string[];
   }) => Promise<{ row: InboxReplyClaimRow | null; error: string | null }>;
+  /** service_role: bound upload metadata after successful claim (includes storage_path). */
+  listBoundUploads?: (
+    replyId: string,
+  ) => Promise<{ rows: InboxReplyBoundUploadMeta[]; error: string | null }>;
+  /** service_role: download bytes for one storage path; never log contents. */
+  downloadBoundUpload?: (input: {
+    storagePath: string;
+    expectedSizeBytes: number;
+    expectedChecksumSha256: string;
+  }) => Promise<{ content: Buffer | null; error: string | null }>;
   sendSmtp: (
     config: InboxReplySmtpConfig,
     mail: InboxReplySmtpMailInput,
@@ -167,6 +217,15 @@ export type InboxReplySendDeps = {
    * Optional in unit tests; wired in the real action.
    */
   emitOperationalAlert?: (alert: InboxReplyOperationalAlert) => void;
+  /**
+   * Opt-in for attachment SMTP (tests / future longer route).
+   * Production keeps this false until E2E attachment SMTP validation.
+   */
+  allowAttachmentSend?: boolean;
+  /** Injectable clock for budget tests (defaults to Date.now). */
+  nowMs?: () => number;
+  /** Override segment maxDuration for budget tests. */
+  deploymentMaxDurationSeconds?: number;
 };
 
 function fail(
@@ -255,12 +314,78 @@ export function mapClaimErrorCode(code: string | null | undefined): {
         errorCode: "claim_failed",
         message: "Antwort konnte nicht vorbereitet werden. Bitte erneut versuchen.",
       };
+    case "attachment_invalid":
+      return {
+        errorCode: "attachments_invalid",
+        message: "Ein oder mehrere Anhänge sind ungültig, abgelaufen oder nicht bereit.",
+      };
+    case "attachment_duplicate":
+      return {
+        errorCode: "attachments_invalid",
+        message: "Doppelte Anhänge sind nicht erlaubt.",
+      };
+    case "attachment_quota_count":
+      return {
+        errorCode: "attachments_invalid",
+        message: `Höchstens ${INBOX_REPLY_ATTACHMENT_MAX_COUNT} Anhänge sind erlaubt.`,
+      };
+    case "attachment_quota_bytes":
+      return {
+        errorCode: "attachments_invalid",
+        message: "Die Gesamtgröße der Anhänge ist zu groß.",
+      };
+    case "idempotency_attachment_conflict":
+      return {
+        errorCode: "already_exists",
+        message:
+          "Für diesen Idempotenzschlüssel existiert bereits eine Antwort mit anderen Anhängen.",
+      };
     default:
       return {
         errorCode: "claim_failed",
         message: "Antwort konnte nicht vorbereitet werden.",
       };
   }
+}
+
+/** Parse/validate browser-supplied attachment refs (UUIDs only). */
+export function normalizeInboxReplyAttachmentRefs(
+  attachments: SendInboxReplyInput["attachments"],
+):
+  | { ok: true; uploadIds: string[] }
+  | { ok: false; message: string } {
+  if (attachments === undefined || attachments === null) {
+    return { ok: true, uploadIds: [] };
+  }
+  if (!Array.isArray(attachments)) {
+    return { ok: false, message: "Anhangangaben sind ungültig." };
+  }
+  if (attachments.length > INBOX_REPLY_ATTACHMENT_MAX_COUNT) {
+    return {
+      ok: false,
+      message: `Höchstens ${INBOX_REPLY_ATTACHMENT_MAX_COUNT} Anhänge sind erlaubt.`,
+    };
+  }
+  const uploadIds: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of attachments) {
+    if (!entry || typeof entry !== "object") {
+      return { ok: false, message: "Anhangangaben sind ungültig." };
+    }
+    const uploadId = String((entry as SendInboxReplyAttachmentRef).uploadId ?? "").trim();
+    if (!PARENT_MESSAGE_ID_RE.test(uploadId)) {
+      return { ok: false, message: "Anhang-ID ist ungültig." };
+    }
+    if (uploadId.includes("/") || uploadId.includes("\\") || uploadId.includes("..")) {
+      return { ok: false, message: "Anhang-ID ist ungültig." };
+    }
+    if (seen.has(uploadId)) {
+      return { ok: false, message: "Doppelte Anhänge sind nicht erlaubt." };
+    }
+    seen.add(uploadId);
+    uploadIds.push(uploadId);
+  }
+  return { ok: true, uploadIds };
 }
 
 function isReplyStatus(value: string | null | undefined): value is InboxReplyStatus {
@@ -437,13 +562,19 @@ async function finalizeAfterSmtp(input: {
 }
 
 /**
- * Phase 2 orchestrator: auth → validate → ensure Message-ID domain → claim →
- * IONOS SMTP (once) → service_role finalize (+ compensating uncertain). Never auto-retries.
+ * Phase 2/4b orchestrator: auth → validate → runtime budget → claim (+bind) →
+ * service_role load/verify bytes → IONOS SMTP (once) → finalize.
+ * Never auto-retries uncertain. Never accepts browser storage paths.
  */
 export async function executeInboxReplySend(
   input: SendInboxReplyInput,
   deps: InboxReplySendDeps,
 ): Promise<SendInboxReplyResult> {
+  const nowMs = deps.nowMs ?? (() => Date.now());
+  const startedAtMs = nowMs();
+  const deploymentMaxDurationSeconds =
+    deps.deploymentMaxDurationSeconds ?? INBOX_REPLY_DEPLOYMENT_MAX_DURATION_SECONDS;
+
   const access = await deps.requireSession();
   if (access.error || !access.session || !access.authorization) {
     return fail("unauthorized", access.error ?? "Nicht autorisiert.");
@@ -452,13 +583,11 @@ export async function executeInboxReplySend(
     return fail("forbidden", "Keine Berechtigung zum Antworten.");
   }
 
-  // L1: reject any supplied attachments value in v1 (not only non-empty arrays).
-  if (input.attachments !== undefined && input.attachments !== null) {
-    return fail(
-      "attachments_not_supported",
-      "Anhänge werden für Antworten noch nicht unterstützt.",
-    );
+  const attachmentRefs = normalizeInboxReplyAttachmentRefs(input.attachments);
+  if (!attachmentRefs.ok) {
+    return fail("attachments_invalid", attachmentRefs.message);
   }
+  const uploadIds = attachmentRefs.uploadIds;
 
   const parentMessageId = input.parentMessageId.trim();
   if (!PARENT_MESSAGE_ID_RE.test(parentMessageId)) {
@@ -490,6 +619,18 @@ export async function executeInboxReplySend(
     return fail("validation", draft.message);
   }
 
+  // Fail closed before claim until allowAttachmentSend is explicitly enabled.
+  // Size uses actual metadata after bound list (M6); early gate skips size (totalBytes=0).
+  const budget = evaluateInboxReplyAttachmentRuntimeBudget({
+    attachmentCount: uploadIds.length,
+    totalBytes: 0,
+    allowAttachmentSend: deps.allowAttachmentSend,
+    deploymentMaxDurationSeconds,
+  });
+  if (!budget.ok) {
+    return fail(budget.code, budget.message);
+  }
+
   const domainReady = await deps.ensureMessageIdDomain({
     mailboxId: parent.mailboxId,
     messageIdDomain: smtpConfig.messageIdDomain,
@@ -504,6 +645,7 @@ export async function executeInboxReplySend(
     toAddress: draft.toAddress,
     subject: draft.subject,
     bodyText: draft.bodyText,
+    uploadIds,
   });
   if (claim.error || !claim.row) {
     return fail("claim_failed", "Antwort konnte nicht vorbereitet werden.");
@@ -580,12 +722,144 @@ export async function executeInboxReplySend(
     });
   }
 
-  // Policy guard: never auto-retry for any status (including uncertain).
   if (shouldAutoRetrySmtp(claimed.status ?? "sending")) {
     return fail("claim_failed", "Antwort konnte nicht vorbereitet werden.", {
       replyId: claimed.replyId,
       status: claimed.status,
     });
+  }
+
+  let smtpAttachments: InboxReplySmtpAttachment[] | undefined;
+  if (uploadIds.length > 0) {
+    if (!deps.listBoundUploads || !deps.downloadBoundUpload) {
+      return fail("attachment_load_failed", "Anhänge konnten nicht geladen werden.", {
+        replyId: claimed.replyId,
+        status: claimed.status,
+      });
+    }
+
+    const listed = await deps.listBoundUploads(claimed.replyId);
+    if (listed.error || listed.rows.length !== uploadIds.length) {
+      await deps.finalizeReply({
+        replyId: claimed.replyId,
+        status: "failed",
+        error: "attachment_list_mismatch",
+        smtpResponse: null,
+      });
+      return fail("attachment_load_failed", "Anhänge konnten nicht geladen werden.", {
+        replyId: claimed.replyId,
+        status: "failed",
+        sendAttempted: false,
+      });
+    }
+
+    let totalBytes = 0;
+    smtpAttachments = [];
+    for (const meta of listed.rows) {
+      if (
+        meta.sizeBytes <= 0 ||
+        meta.sizeBytes > INBOX_REPLY_ATTACHMENT_MAX_FILE_BYTES ||
+        !meta.storagePath ||
+        !meta.checksumSha256
+      ) {
+        await deps.finalizeReply({
+          replyId: claimed.replyId,
+          status: "failed",
+          error: "attachment_meta_invalid",
+          smtpResponse: null,
+        });
+        return fail("attachment_load_failed", "Anhänge konnten nicht geladen werden.", {
+          replyId: claimed.replyId,
+          status: "failed",
+          sendAttempted: false,
+        });
+      }
+      totalBytes += meta.sizeBytes;
+      if (totalBytes > INBOX_REPLY_ATTACHMENT_MAX_TOTAL_BYTES) {
+        await deps.finalizeReply({
+          replyId: claimed.replyId,
+          status: "failed",
+          error: "attachment_quota_bytes",
+          smtpResponse: null,
+        });
+        return fail("attachments_invalid", "Die Gesamtgröße der Anhänge ist zu groß.", {
+          replyId: claimed.replyId,
+          status: "failed",
+          sendAttempted: false,
+        });
+      }
+
+      const downloaded = await deps.downloadBoundUpload({
+        storagePath: meta.storagePath,
+        expectedSizeBytes: meta.sizeBytes,
+        expectedChecksumSha256: meta.checksumSha256,
+      });
+      if (downloaded.error || !downloaded.content) {
+        await deps.finalizeReply({
+          replyId: claimed.replyId,
+          status: "failed",
+          error: "attachment_download_failed",
+          smtpResponse: null,
+        });
+        return fail("attachment_load_failed", "Anhänge konnten nicht geladen werden.", {
+          replyId: claimed.replyId,
+          status: "failed",
+          sendAttempted: false,
+        });
+      }
+
+      smtpAttachments.push({
+        filename: meta.filename,
+        contentType: meta.contentType,
+        content: downloaded.content,
+      });
+    }
+
+    // M6: authoritative size gate from validated bound metadata.
+    const sizeBudget = evaluateInboxReplyAttachmentRuntimeBudget({
+      attachmentCount: smtpAttachments.length,
+      totalBytes,
+      allowAttachmentSend: true,
+      deploymentMaxDurationSeconds,
+    });
+    if (!sizeBudget.ok) {
+      await deps.finalizeReply({
+        replyId: claimed.replyId,
+        status: "failed",
+        error: "attachments_runtime_budget",
+        smtpResponse: null,
+      });
+      return fail(sizeBudget.code, sizeBudget.message, {
+        replyId: claimed.replyId,
+        status: "failed",
+        sendAttempted: false,
+      });
+    }
+  }
+
+  // H2: never start SMTP when remaining wall-clock cannot cover send + finalize reserve.
+  if (
+    !canStartInboxReplySmtp({
+      startedAtMs,
+      nowMs: nowMs(),
+      deploymentMaxDurationSeconds,
+    })
+  ) {
+    await deps.finalizeReply({
+      replyId: claimed.replyId,
+      status: "failed",
+      error: "smtp_budget_exhausted_pre_send",
+      smtpResponse: null,
+    });
+    return fail(
+      "attachments_runtime_budget",
+      "Nicht genügend Server-Zeitbudget für den Versand. Bitte später erneut versuchen.",
+      {
+        replyId: claimed.replyId,
+        status: "failed",
+        sendAttempted: false,
+      },
+    );
   }
 
   const smtpResult = await deps.sendSmtp(smtpConfig, {
@@ -595,6 +869,7 @@ export async function executeInboxReplySend(
     messageId: claimed.messageIdHeader,
     inReplyTo: claimed.inReplyToHeader,
     references: claimed.referencesHeader,
+    attachments: smtpAttachments,
   });
 
   return finalizeAfterSmtp({

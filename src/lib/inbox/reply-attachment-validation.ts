@@ -170,6 +170,53 @@ export function assertReplyAttachmentDeclaredSize(size: number): {
   return { ok: true };
 }
 
+/**
+ * Metadata-only validation before issuing a direct-upload authorization.
+ * Does not inspect bytes (those are validated on finalize after Storage write).
+ */
+export function validateInboxReplyAttachmentMeta(input: {
+  filename: string;
+  contentType: string | null | undefined;
+  sizeBytes: number;
+}): InboxReplyAttachmentValidationResult {
+  const sizeCheck = assertReplyAttachmentDeclaredSize(input.sizeBytes);
+  if (!sizeCheck.ok) {
+    return sizeCheck;
+  }
+
+  const filename = sanitizeInboxFilename(input.filename);
+  if (!filename || (filename === "anhang" && !input.filename.trim())) {
+    return { ok: false, code: "filename_invalid", message: "Dateiname ist ungültig." };
+  }
+
+  const ext = inboxFilenameExtension(filename);
+  if (!isReplyAttachmentExtension(ext)) {
+    return {
+      ok: false,
+      code: "extension_blocked",
+      message: "Dateityp ist nicht erlaubt.",
+    };
+  }
+
+  const declared = normalizeDeclaredMime(input.contentType);
+  const allowedMimes = INBOX_REPLY_ATTACHMENT_MIME_BY_EXT[ext];
+  if (!declared || !allowedMimes.includes(declared)) {
+    return {
+      ok: false,
+      code: "mime_blocked",
+      message: "Dateityp (MIME) ist nicht erlaubt.",
+    };
+  }
+
+  return {
+    ok: true,
+    filename,
+    extension: ext,
+    contentType: declared,
+    sizeBytes: input.sizeBytes,
+  };
+}
+
 export function validateInboxReplyAttachmentBytes(input: {
   filename: string;
   contentType: string | null | undefined;

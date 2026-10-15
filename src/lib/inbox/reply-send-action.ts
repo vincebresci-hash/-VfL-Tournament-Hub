@@ -1,13 +1,16 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { requireAdminSession } from "@/lib/auth/guards";
 import { canAccessInbox, canReplyInbox } from "@/lib/inbox/access";
+import { INBOX_REPLY_ATTACHMENT_BUCKET } from "@/lib/inbox/reply-attachment-config";
 import {
   executeInboxReplySend,
   parseClaimInboxReplyRow,
   redactInboxSmtpAuditText,
   resolveMailboxMessageIdDomainUpdate,
+  type InboxReplyBoundUploadMeta,
   type InboxReplyOperationalAlert,
   type SendInboxReplyInput,
   type SendInboxReplyResult,
@@ -163,6 +166,7 @@ async function claimReplySend(input: {
   toAddress: string;
   subject: string;
   bodyText: string;
+  uploadIds: string[];
 }) {
   // Authenticated user client — claim RPC enforces inbox.view + inbox.reply + recipient lock.
   const supabase = await createClient();
@@ -172,6 +176,7 @@ async function claimReplySend(input: {
     p_to_address: input.toAddress,
     p_subject: input.subject,
     p_body_text: input.bodyText,
+    p_upload_ids: input.uploadIds.length > 0 ? input.uploadIds : null,
   });
 
   if (error) {
@@ -184,6 +189,78 @@ async function claimReplySend(input: {
     return { row: null, error: "unexpected claim payload" };
   }
   return { row, error: null };
+}
+
+async function listBoundUploadsForReply(
+  replyId: string,
+): Promise<{ rows: InboxReplyBoundUploadMeta[]; error: string | null }> {
+  let service;
+  try {
+    service = createServiceRoleClient();
+  } catch {
+    return { rows: [], error: "service_role unavailable" };
+  }
+
+  const { data, error } = await service.rpc("list_inbox_reply_bound_uploads", {
+    p_reply_id: replyId,
+  });
+  if (error) {
+    return { rows: [], error: "list_bound_failed" };
+  }
+
+  const rows: InboxReplyBoundUploadMeta[] = [];
+  for (const row of data ?? []) {
+    if (
+      typeof row.upload_id !== "string" ||
+      typeof row.filename !== "string" ||
+      typeof row.content_type !== "string" ||
+      typeof row.size_bytes !== "number" ||
+      typeof row.checksum_sha256 !== "string" ||
+      typeof row.storage_path !== "string"
+    ) {
+      return { rows: [], error: "list_bound_shape" };
+    }
+    rows.push({
+      uploadId: row.upload_id,
+      filename: row.filename,
+      contentType: row.content_type,
+      sizeBytes: row.size_bytes,
+      checksumSha256: row.checksum_sha256,
+      storagePath: row.storage_path,
+      bindOrdinal: typeof row.bind_ordinal === "number" ? row.bind_ordinal : null,
+    });
+  }
+  return { rows, error: null };
+}
+
+async function downloadBoundUploadBytes(input: {
+  storagePath: string;
+  expectedSizeBytes: number;
+  expectedChecksumSha256: string;
+}): Promise<{ content: Buffer | null; error: string | null }> {
+  let service;
+  try {
+    service = createServiceRoleClient();
+  } catch {
+    return { content: null, error: "service_role unavailable" };
+  }
+
+  const { data, error } = await service.storage
+    .from(INBOX_REPLY_ATTACHMENT_BUCKET)
+    .download(input.storagePath);
+  if (error || !data) {
+    return { content: null, error: "storage_download_failed" };
+  }
+
+  const content = Buffer.from(await data.arrayBuffer());
+  if (content.length !== input.expectedSizeBytes) {
+    return { content: null, error: "size_mismatch" };
+  }
+  const digest = createHash("sha256").update(content).digest("hex");
+  if (digest !== input.expectedChecksumSha256.toLowerCase()) {
+    return { content: null, error: "checksum_mismatch" };
+  }
+  return { content, error: null };
 }
 
 async function finalizeReplySend(input: {
@@ -244,9 +321,13 @@ export async function sendInboxReplyAction(
     loadParentMessage: loadParentMessageForReply,
     ensureMessageIdDomain: ensureMailboxMessageIdDomain,
     claimReply: claimReplySend,
+    listBoundUploads: listBoundUploadsForReply,
+    downloadBoundUpload: downloadBoundUploadBytes,
     sendSmtp: sendInboxSmtpMail,
     finalizeReply: finalizeReplySend,
     emitOperationalAlert: emitInboxReplyOperationalAlert,
+    // Hobby Fluid maxDuration=180 leaves SMTP+finalize headroom; keep fail-closed until E2E approval.
+    allowAttachmentSend: false,
   });
 
   if (result.ok || result.sendAttempted) {

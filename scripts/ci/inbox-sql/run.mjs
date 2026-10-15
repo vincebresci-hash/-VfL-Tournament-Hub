@@ -20,6 +20,7 @@ import {
   withPostgresTransaction,
   withServiceRoleTransaction,
 } from "./lib.mjs";
+import { runInboxReplyAttachmentSendSqlTests } from "./reply-attachment-send-tests.mjs";
 import { runInboxReplyAttachmentSqlTests } from "./reply-attachment-tests.mjs";
 import { runInboxReplySqlTests } from "./reply-tests.mjs";
 
@@ -807,6 +808,18 @@ async function main() {
   // G. Outbound reply attachment staging (Phase 4a) — no SMTP bind
   // ---------------------------------------------------------------------------
   await runInboxReplyAttachmentSqlTests({
+    env,
+    users: USERS,
+    mailboxId,
+    messageId,
+    test,
+    supabase,
+  });
+
+  // ---------------------------------------------------------------------------
+  // H. Outbound reply attachment bind/send (Phase 4b) — SQL only, no SMTP
+  // ---------------------------------------------------------------------------
+  await runInboxReplyAttachmentSendSqlTests({
     env,
     users: USERS,
     mailboxId,

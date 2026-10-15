@@ -476,6 +476,7 @@ export type InboxReplyUploadRow = {
   error_code: string | null;
   expires_at: string;
   retain_until: string | null;
+  bind_ordinal: number | null;
   created_at: string;
   updated_at: string;
   bound_at: string | null;
@@ -1805,6 +1806,7 @@ export type Database = {
           p_to_address: string;
           p_subject: string;
           p_body_text: string;
+          p_upload_ids?: string[] | null;
         };
         Returns: Array<{
           reply_id: string | null;
@@ -1815,6 +1817,18 @@ export type Database = {
           message_id_header: string | null;
           in_reply_to_header: string | null;
           references_header: string | null;
+        }>;
+      };
+      list_inbox_reply_bound_uploads: {
+        Args: { p_reply_id: string };
+        Returns: Array<{
+          upload_id: string;
+          filename: string;
+          content_type: string;
+          size_bytes: number;
+          checksum_sha256: string;
+          storage_path: string;
+          bind_ordinal: number | null;
         }>;
       };
       finalize_inbox_reply_send: {

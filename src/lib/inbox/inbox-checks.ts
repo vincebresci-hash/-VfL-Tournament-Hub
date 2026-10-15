@@ -135,8 +135,8 @@ export function runInboxChecks() {
   );
   assert(!apiRoute.includes("CRON_SECRET"), "API docs no CRON_SECRET");
   assert(apiRoute.includes("Not enabled on Hobby via vercel.json"), "live cron sync remains disabled");
-  assert(posteingangLayout.includes("maxDuration = 10"), "admin segment maxDuration");
-  assert(apiRoute.includes("maxDuration = 10"), "API maxDuration");
+  assert(posteingangLayout.includes("maxDuration = 180"), "admin segment maxDuration 180");
+  assert(apiRoute.includes("maxDuration = 10"), "API sync maxDuration stays 10");
   try {
     read("vercel.json");
     assert(false, "vercel.json must not exist");

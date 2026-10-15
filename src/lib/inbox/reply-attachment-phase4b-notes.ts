@@ -1,34 +1,52 @@
 /**
- * Phase 4b send architecture notes (Hobby-safe).
+ * Phase 4b send + staging architecture notes (Hobby Fluid runtime).
  *
- * Vercel Hobby constraints observed for `/admin/posteingang`:
- * - `maxDuration = 10` on the admin inbox layout (server actions share this ceiling).
- * - Current SMTP send timeout is 15s — already tight vs Hobby wall-clock.
- * - Base64 MIME overhead ≈ +33% on attachment bytes.
- * - Platform request body limits still apply; actions reject File.size > 5 MiB before buffering.
+ * Confirmed deployment:
+ * - Vercel Hobby plan with Fluid Compute ENABLED (plan maxDuration 300s)
+ * - `src/app/admin/posteingang/layout.tsx`: maxDuration = 180
+ * - `/api/inbox/sync`: maxDuration = 10 (unchanged)
+ * - SMTP timeouts: connection 15s / socket 90s / send race 90s
+ * - Finalize + uncertain compensation reserve: 20s (SMTP not started if remaining < 110s)
+ * - Approved attachment caps: 5 files / 5 MiB / 12 MiB total (+ ~33% MIME)
  *
- * ZIP/OOXML residual risk (M2): server never fully decompresses; it enforces compressed
- * size + local-header count. Clients that download and expand may still hit bombs.
+ * Staging (direct upload):
+ * - Browser uploads via Supabase signed upload URL (upsert: false)
+ * - Server issues token after RBAC + create RPC + lease for exact structured path
+ * - Finalize deadline: 15m from created_at (server-enforced); platform JWT may outlive it
+ * - reject_inbox_reply_upload only while status=uploading (H1 concurrent-safe)
+ * - No authenticated storage.objects policies; no privileged credentials in the browser
  *
- * Safe Phase 4b approach (do not implement here):
- * 1. Keep approved caps (5 MiB / file, 12 MiB total, 5 files) so encode+SMTP fits a short window.
- * 2. Prefer a dedicated Node route/action segment with an explicit higher `maxDuration`
- *    only if Preview/Prod plan allows it; otherwise fail closed before SMTP when
- *    estimated MIME size cannot finish within remaining budget.
- * 3. Never auto-retry after uncertain delivery (attachments bound to the same reply).
- * 4. Stream/download via service_role with declared-size checks; abort if bytes ≠ size_bytes.
- * 5. Do not raise limits to IONOS’s larger account caps on Hobby without a duration plan.
- * 6. Never purge bound attachments while reply status is sending/uncertain or retain_until
- *    is in the future (mark_inbox_reply_upload_purged revalidates eligibility).
+ * Platform kill note:
+ * - A hard Vercel termination during SMTP can leave delivery uncertain.
+ * - Never auto-resend; use reconcile runbook / ops review.
+ *
+ * Architecture decision (fail closed for SMTP attachments):
+ * - Runtime budget is Hobby-compatible at 180s, but production keeps
+ *   `allowAttachmentSend: false` until end-to-end validation.
  */
 
 export const INBOX_REPLY_ATTACHMENT_PHASE4B_HOBBY_NOTES = {
-  adminInboxMaxDurationSeconds: 10,
-  smtpSendTimeoutMs: 15_000,
+  adminInboxMaxDurationSeconds: 180,
+  hobbyFluidMaxDurationSeconds: 300,
+  fluidComputeEnabled: true,
+  smtpConnectionTimeoutMs: 15_000,
+  smtpSocketTimeoutMs: 90_000,
+  smtpSendTimeoutMs: 90_000,
+  smtpFinalizeReserveMs: 20_000,
   recommendedMaxTotalRawBytes: 12 * 1024 * 1024,
   mimeOverheadFactor: 1.33,
   requiresDedicatedLongerRoute: false,
+  directToSupabaseUpload: true,
+  noAuthenticatedStoragePolicies: true,
+  rejectOnlyWhileUploading: true,
+  signedUploadJwtPlatformControlled: true,
+  finalizeMaxAgeMs: 15 * 60 * 1000,
   uncertainNeverAutoResend: true,
+  platformKillLeavesUncertain: true,
   rejectFileSizeBeforeBuffer: true,
   zipBombResidualClientSideOnly: true,
+  quotaAbuseBoundedAccepted: true,
+  boundPreviewRequiresInboxView: true,
+  attachmentSendEnabledOnCurrentDeployment: false,
+  architectureDecision: "HOBBY_FLUID_180S_WAIT_E2E_ENABLE",
 } as const;

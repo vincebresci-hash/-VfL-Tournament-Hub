@@ -68,11 +68,15 @@ function fakeSession(): AuthSession {
 
 type Harness = {
   smtpCalls: number;
+  lastSmtpMail: Parameters<InboxReplySendDeps["sendSmtp"]>[1] | null;
   finalizeCalls: Array<{ status: string; error: string | null; smtpResponse: string | null }>;
   alerts: InboxReplyOperationalAlert[];
   claimImpl: InboxReplySendDeps["claimReply"];
   sendImpl: InboxReplySendDeps["sendSmtp"];
   finalizeImpl?: InboxReplySendDeps["finalizeReply"];
+  listBoundUploads?: InboxReplySendDeps["listBoundUploads"];
+  downloadBoundUpload?: InboxReplySendDeps["downloadBoundUpload"];
+  allowAttachmentSend: boolean;
   canReply: boolean;
   smtpConfig: InboxReplySmtpConfig | null;
   parent: typeof PARENT | null;
@@ -81,6 +85,8 @@ type Harness = {
   /** If set, first N finalize calls fail, then succeed. */
   finalizeFailCount: number;
   sessionError: string | null;
+  nowMs?: () => number;
+  deploymentMaxDurationSeconds?: number;
 };
 
 function createHarness(overrides?: Partial<Harness>): {
@@ -89,6 +95,7 @@ function createHarness(overrides?: Partial<Harness>): {
 } {
   const state: Harness = {
     smtpCalls: 0,
+    lastSmtpMail: null,
     finalizeCalls: [],
     alerts: [],
     canReply: true,
@@ -98,6 +105,7 @@ function createHarness(overrides?: Partial<Harness>): {
     finalizeOk: true,
     finalizeFailCount: 0,
     sessionError: null,
+    allowAttachmentSend: false,
     claimImpl: async () => ({
       row: {
         replyId: "550e8400-e29b-41d4-a716-4466554400bb",
@@ -134,8 +142,14 @@ function createHarness(overrides?: Partial<Harness>): {
     loadParentMessage: async () => state.parent,
     ensureMessageIdDomain: async () => state.domainResult,
     claimReply: async (input) => state.claimImpl(input),
+    listBoundUploads: state.listBoundUploads,
+    downloadBoundUpload: state.downloadBoundUpload,
+    allowAttachmentSend: state.allowAttachmentSend,
+    nowMs: state.nowMs,
+    deploymentMaxDurationSeconds: state.deploymentMaxDurationSeconds,
     sendSmtp: async (config, mail) => {
       state.smtpCalls += 1;
+      state.lastSmtpMail = mail;
       assert(!JSON.stringify(mail).includes(config.password), "password leaked into mail");
       return state.sendImpl(config, mail);
     },
@@ -187,17 +201,20 @@ function runStaticReplySendChecks() {
   );
   assert(actions.includes("sendInboxReplyAction"), "actions exports sendInboxReplyAction");
 
-  // M2: real wiring — claim uses user client; finalize/domain use service_role.
+  // M2: real wiring — claim uses user client; finalize/domain/downloads use service_role.
   const claimFnStart = sendAction.indexOf("async function claimReplySend");
+  const listBoundStart = sendAction.indexOf("async function listBoundUploadsForReply");
   const finalizeFnStart = sendAction.indexOf("async function finalizeReplySend");
   const domainFnStart = sendAction.indexOf("async function ensureMailboxMessageIdDomain");
   assert(claimFnStart >= 0 && finalizeFnStart >= 0 && domainFnStart >= 0, "wiring helpers present");
-  const claimSlice = sendAction.slice(claimFnStart, finalizeFnStart);
+  assert(listBoundStart > claimFnStart, "listBound follows claim helper");
+  const claimSlice = sendAction.slice(claimFnStart, listBoundStart);
   const finalizeSlice = sendAction.slice(finalizeFnStart);
   const domainSlice = sendAction.slice(domainFnStart, claimFnStart);
   assert(claimSlice.includes("createClient()"), "claim uses authenticated createClient");
   assert(!claimSlice.includes("createServiceRoleClient"), "claim must not use service_role");
   assert(claimSlice.includes("claim_inbox_reply_send"), "claim RPC wired");
+  assert(claimSlice.includes("p_upload_ids"), "claim passes upload ids");
   assert(finalizeSlice.includes("createServiceRoleClient"), "finalize uses service_role");
   assert(finalizeSlice.includes("finalize_inbox_reply_send"), "finalize RPC wired");
   assert(
@@ -224,12 +241,26 @@ function runStaticReplySendChecks() {
     "Phase 3: keyed remount for draft isolation",
   );
   assert(smtpClient.includes("rejectUnauthorized: true"), "TLS fail-closed preserved");
+  assert(smtpClient.includes("attachments"), "Phase 4b SMTP attachments supported");
   assert(sendCore.includes("shouldAutoRetrySmtp"), "auto-retry policy consulted");
-  assert(sendCore.includes("attachments_not_supported"), "attachment rejection reserved");
+  assert(sendCore.includes("normalizeInboxReplyAttachmentRefs"), "Phase 4b upload id normalize");
+  assert(sendCore.includes("evaluateInboxReplyAttachmentRuntimeBudget"), "Hobby budget gate");
+  assert(sendAction.includes("allowAttachmentSend: false"), "production fail-closed for attachments");
+  assert(sendAction.includes("list_inbox_reply_bound_uploads"), "bound upload list wired");
+  assert(sendAction.includes("downloadBoundUploadBytes"), "checksum download wired");
   assert(
-    sendCore.includes('input.attachments !== undefined && input.attachments !== null'),
-    "L1 rejects any attachments value",
+    existsSync(join(process.cwd(), "supabase/migrations/20261014210000_inbox_reply_attachment_send.sql")),
+    "Phase 4b migration exists",
   );
+  const phase4bMigration = read("supabase/migrations/20261014210000_inbox_reply_attachment_send.sql");
+  assert(phase4bMigration.includes("p_upload_ids uuid[]"), "claim accepts upload ids");
+  assert(phase4bMigration.includes("idempotency_attachment_conflict"), "idempotency conflict code");
+  assert(phase4bMigration.includes("retain_until = now() + interval '30 days'"), "retention on finalize");
+  const composerUiPhase4 = read("src/components/admin/inbox/InboxReplyComposer.tsx");
+  assert(composerUiPhase4.includes("disabled"), "composer attachment still disabled");
+  assert(!composerUiPhase4.includes("beginInboxReplyAttachmentUploadAction"), "composer not begin-wired");
+  assert(!composerUiPhase4.includes("finalizeInboxReplyAttachmentUploadAction"), "composer not finalize-wired");
+  assert(!composerUiPhase4.includes("uploadInboxReplyAttachmentToSignedUrl"), "composer not direct-upload-wired");
   assert(
     sendCore.includes("finalize_primary_failed") || sendCore.includes("compensation"),
     "H2 compensation path present",
@@ -371,21 +402,224 @@ async function runMockedSmtpReplySendChecks() {
   {
     const { deps, state } = createHarness();
     const result = await executeInboxReplySend(
-      { ...BASE_INPUT, attachments: [] },
-      deps,
-    );
-    assert(result.errorCode === "attachments_not_supported", "empty array attachments blocked");
-    assert(state.smtpCalls === 0, "no SMTP with empty attachments array");
-  }
-
-  {
-    const { deps, state } = createHarness();
-    const result = await executeInboxReplySend(
       { ...BASE_INPUT, attachments: { name: "x.pdf" } as unknown as [] },
       deps,
     );
-    assert(result.errorCode === "attachments_not_supported", "object attachments blocked");
+    assert(result.errorCode === "attachments_invalid", "object attachments blocked");
     assert(state.smtpCalls === 0, "no SMTP with object attachments");
+  }
+
+  {
+    // Hobby fail-closed: attachments refused before claim/SMTP.
+    const { deps, state } = createHarness({
+      allowAttachmentSend: false,
+      claimImpl: async () => {
+        throw new Error("claim must not run when budget blocks attachments");
+      },
+    });
+    const result = await executeInboxReplySend(
+      {
+        ...BASE_INPUT,
+        attachments: [{ uploadId: "550e8400-e29b-41d4-a716-4466554400f1" }],
+      },
+      deps,
+    );
+    assert(result.errorCode === "attachments_runtime_budget", "Hobby budget blocks attachments");
+    assert(state.smtpCalls === 0, "no SMTP when budget blocks");
+  }
+
+  {
+    const pdfBytes = Buffer.from("%PDF-1.4\n%%EOF\n");
+    const uploadId = "550e8400-e29b-41d4-a716-4466554400f1";
+    let claimedUploadIds: string[] | null = null;
+    const { deps, state } = createHarness({
+      allowAttachmentSend: true,
+      claimImpl: async (input) => {
+        claimedUploadIds = input.uploadIds;
+        return {
+          row: {
+            replyId: "550e8400-e29b-41d4-a716-4466554400bb",
+            status: "sending",
+            sendAllowed: true,
+            alreadyExisted: false,
+            errorCode: null,
+            messageIdHeader: "abc@vfl-kirchheim.de",
+            inReplyToHeader: "<parent@example.com>",
+            referencesHeader: "<root@example.com> <parent@example.com>",
+          },
+          error: null,
+        };
+      },
+      listBoundUploads: async () => ({
+        rows: [
+          {
+            uploadId,
+            filename: "plan.pdf",
+            contentType: "application/pdf",
+            sizeBytes: pdfBytes.length,
+            checksumSha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            storagePath: "mb/msg/user/upload/plan.pdf",
+            bindOrdinal: 1,
+          },
+        ],
+        error: null,
+      }),
+      downloadBoundUpload: async () => ({
+        // Force checksum path: return bytes; harness download ignores expected hash here —
+        // production action verifies. For this unit test we stub verified bytes.
+        content: pdfBytes,
+        error: null,
+      }),
+    });
+    // Override list checksum to match stub download (downloadBoundUpload ignores verify in harness).
+    const result = await executeInboxReplySend(
+      { ...BASE_INPUT, attachments: [{ uploadId }] },
+      deps,
+    );
+    assert(result.ok === true, "attachment send ok with allowAttachmentSend");
+    assert(state.smtpCalls === 1, "SMTP invoked once with attachments");
+    assert(JSON.stringify(claimedUploadIds) === JSON.stringify([uploadId]), "claim got upload ids");
+    assert(state.lastSmtpMail?.attachments?.length === 1, "MIME attachment present");
+    assert(state.lastSmtpMail?.attachments?.[0]?.filename === "plan.pdf", "safe filename");
+    assert(state.lastSmtpMail?.attachments?.[0]?.contentType === "application/pdf", "content type");
+    assert(
+      state.lastSmtpMail?.attachments?.[0]?.content.length === pdfBytes.length,
+      "byte length preserved",
+    );
+  }
+
+  {
+    const uploadId = "550e8400-e29b-41d4-a716-4466554400f2";
+    const { deps, state } = createHarness({
+      allowAttachmentSend: true,
+      listBoundUploads: async () => ({
+        rows: [
+          {
+            uploadId,
+            filename: "plan.pdf",
+            contentType: "application/pdf",
+            sizeBytes: 10,
+            checksumSha256: "a".repeat(64),
+            storagePath: "path/plan.pdf",
+            bindOrdinal: 1,
+          },
+        ],
+        error: null,
+      }),
+      downloadBoundUpload: async () => ({ content: null, error: "checksum_mismatch" }),
+    });
+    const result = await executeInboxReplySend(
+      { ...BASE_INPUT, attachments: [{ uploadId }] },
+      deps,
+    );
+    assert(result.errorCode === "attachment_load_failed", "checksum/download failure");
+    assert(state.smtpCalls === 0, "no SMTP after download failure");
+    assert(state.finalizeCalls.some((c) => c.status === "failed"), "finalize failed after load error");
+  }
+
+  {
+    // H2: slow storage exhausts pre-SMTP budget → no SMTP, finalize failed (never uncertain auto-resend).
+    const pdfBytes = Buffer.from("%PDF-1.4\n%%EOF\n");
+    const uploadId = "550e8400-e29b-41d4-a716-4466554400f4";
+    let clock = 1_000_000;
+    const { deps, state } = createHarness({
+      allowAttachmentSend: true,
+      deploymentMaxDurationSeconds: 180,
+      nowMs: () => clock,
+      listBoundUploads: async () => ({
+        rows: [
+          {
+            uploadId,
+            filename: "slow.pdf",
+            contentType: "application/pdf",
+            sizeBytes: pdfBytes.length,
+            checksumSha256: "b".repeat(64),
+            storagePath: "mb/msg/user/upload/slow.pdf",
+            bindOrdinal: 1,
+          },
+        ],
+        error: null,
+      }),
+      downloadBoundUpload: async () => {
+        clock += 120_000; // slow download burns wall clock
+        return { content: pdfBytes, error: null };
+      },
+    });
+    const result = await executeInboxReplySend(
+      { ...BASE_INPUT, attachments: [{ uploadId }] },
+      deps,
+    );
+    assert(result.errorCode === "attachments_runtime_budget", "budget blocks SMTP after slow download");
+    assert(state.smtpCalls === 0, "SMTP must not start without remaining budget");
+    assert(
+      state.finalizeCalls.some((c) => c.status === "failed" && c.error === "smtp_budget_exhausted_pre_send"),
+      "failed finalize without SMTP attempt",
+    );
+  }
+
+  {
+    // H2: slow SMTP still invokes once; uncertain path never auto-retries (sendImpl returns uncertain).
+    const pdfBytes = Buffer.from("%PDF-1.4\n%%EOF\n");
+    const uploadId = "550e8400-e29b-41d4-a716-4466554400f5";
+    const { deps, state } = createHarness({
+      allowAttachmentSend: true,
+      deploymentMaxDurationSeconds: 180,
+      listBoundUploads: async () => ({
+        rows: [
+          {
+            uploadId,
+            filename: "ok.pdf",
+            contentType: "application/pdf",
+            sizeBytes: pdfBytes.length,
+            checksumSha256: "c".repeat(64),
+            storagePath: "mb/msg/user/upload/ok.pdf",
+            bindOrdinal: 1,
+          },
+        ],
+        error: null,
+      }),
+      downloadBoundUpload: async () => ({ content: pdfBytes, error: null }),
+      sendImpl: async () => ({
+        outcome: "uncertain",
+        error: "SMTP send timed out",
+        response: null,
+      }),
+    });
+    const result = await executeInboxReplySend(
+      { ...BASE_INPUT, attachments: [{ uploadId }] },
+      deps,
+    );
+    assert(result.errorCode === "smtp_uncertain", "slow/timeout SMTP → uncertain");
+    assert(state.smtpCalls === 1, "SMTP exactly once");
+    assert(state.finalizeCalls[0]?.status === "uncertain", "finalize uncertain");
+  }
+
+  {
+    const { deps, state } = createHarness({
+      allowAttachmentSend: true,
+      claimImpl: async () => ({
+        row: {
+          replyId: null,
+          status: null,
+          sendAllowed: false,
+          alreadyExisted: false,
+          errorCode: "attachment_invalid",
+          messageIdHeader: null,
+          inReplyToHeader: null,
+          referencesHeader: null,
+        },
+        error: null,
+      }),
+    });
+    const result = await executeInboxReplySend(
+      {
+        ...BASE_INPUT,
+        attachments: [{ uploadId: "550e8400-e29b-41d4-a716-4466554400f3" }],
+      },
+      deps,
+    );
+    assert(result.errorCode === "attachments_invalid", "invalid staging blocked");
+    assert(state.smtpCalls === 0, "no SMTP when claim rejects attachments");
   }
 
   {

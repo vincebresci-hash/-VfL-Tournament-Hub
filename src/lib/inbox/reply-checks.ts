@@ -142,8 +142,12 @@ export function runInboxReplyChecks() {
   assert(sendCore.includes("header_injection"), "Phase 2: maps header_injection");
   assert(sendCore.includes("redactInboxSmtpAuditText"), "Phase 2: audit redaction helper");
   assert(
-    sendCore.includes('input.attachments !== undefined && input.attachments !== null'),
-    "Phase 2: rejects any attachments value",
+    sendCore.includes("normalizeInboxReplyAttachmentRefs"),
+    "Phase 4b: attachment refs normalized (UUID upload ids only)",
+  );
+  assert(
+    sendCore.includes("evaluateInboxReplyAttachmentRuntimeBudget"),
+    "Phase 4b: Hobby runtime budget gate",
   );
   assert(!sendAction.includes("@/lib/email"), "Phase 2: send action no Resend");
   assert(sanitize.includes("INBOX_HTML_CSP"), "CSP preserved");

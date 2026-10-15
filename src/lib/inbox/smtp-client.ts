@@ -1,10 +1,25 @@
 import "server-only";
 
 import type { InboxSmtpConfig } from "@/lib/inbox/smtp-config";
+import {
+  INBOX_REPLY_DEPLOYMENT_MAX_DURATION_SECONDS,
+  INBOX_SMTP_CONNECTION_TIMEOUT_MS,
+  INBOX_SMTP_SEND_TIMEOUT_MS,
+  INBOX_SMTP_SOCKET_TIMEOUT_MS,
+} from "@/lib/inbox/reply-attachment-runtime";
 
-export const INBOX_SMTP_CONNECTION_TIMEOUT_MS = 8_000;
-export const INBOX_SMTP_SOCKET_TIMEOUT_MS = 12_000;
-export const INBOX_SMTP_SEND_TIMEOUT_MS = 15_000;
+export {
+  INBOX_SMTP_CONNECTION_TIMEOUT_MS,
+  INBOX_SMTP_SEND_TIMEOUT_MS,
+  INBOX_SMTP_SOCKET_TIMEOUT_MS,
+};
+
+export type InboxSmtpAttachmentInput = {
+  filename: string;
+  contentType: string;
+  /** Raw bytes — never logged. */
+  content: Buffer;
+};
 
 export type InboxSmtpMailInput = {
   to: string;
@@ -13,6 +28,7 @@ export type InboxSmtpMailInput = {
   messageId: string;
   inReplyTo?: string | null;
   references?: string | null;
+  attachments?: ReadonlyArray<InboxSmtpAttachmentInput>;
 };
 
 export type InboxSmtpSendResult =
@@ -141,12 +157,23 @@ export function safeSmtpErrorMessage(error: unknown): string {
  * Send one plain-text reply via IONOS SMTP.
  * TLS is required; certificate verification fails closed.
  * Does not retry. Caller owns idempotency + uncertain handling.
+ *
+ * Timeouts are bounded below {@link INBOX_REPLY_DEPLOYMENT_MAX_DURATION_SECONDS}.
  */
 export async function sendInboxSmtpMail(
   config: InboxSmtpConfig,
   mail: InboxSmtpMailInput,
 ): Promise<InboxSmtpSendResult> {
   let transport: NodemailerTransport | null = null;
+
+  // Static assert: SMTP race must leave headroom under the segment deadline.
+  if (INBOX_SMTP_SEND_TIMEOUT_MS >= INBOX_REPLY_DEPLOYMENT_MAX_DURATION_SECONDS * 1000) {
+    return {
+      outcome: "failed",
+      error: "SMTP-Zeitbudget ist falsch konfiguriert.",
+      response: null,
+    };
+  }
 
   try {
     const nodemailer = await loadNodemailer();
@@ -179,6 +206,14 @@ export async function sendInboxSmtpMail(
       headers.References = mail.references;
     }
 
+    const attachments =
+      mail.attachments?.map((attachment) => ({
+        filename: attachment.filename,
+        contentType: attachment.contentType,
+        content: attachment.content,
+        contentDisposition: "attachment" as const,
+      })) ?? undefined;
+
     const sendPromise = transport.sendMail({
       from: formatFrom(config),
       to: mail.to,
@@ -186,6 +221,7 @@ export async function sendInboxSmtpMail(
       text: mail.text,
       messageId: mail.messageId.startsWith("<") ? mail.messageId : `<${mail.messageId}>`,
       headers,
+      attachments,
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {

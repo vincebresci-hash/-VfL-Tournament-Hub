@@ -13,11 +13,12 @@ import { getInboxMessageDetail } from "@/lib/inbox/queries";
 import { sendInboxReplyAction as sendInboxReplyActionImpl } from "@/lib/inbox/reply-send-action";
 import type { SendInboxReplyInput, SendInboxReplyResult } from "@/lib/inbox/reply-send";
 import {
+  beginInboxReplyAttachmentUploadAction as beginInboxReplyAttachmentUploadActionImpl,
   createInboxReplyAttachmentDownloadUrlAction as createInboxReplyAttachmentDownloadUrlActionImpl,
   createInboxReplyAttachmentPreviewUrlAction as createInboxReplyAttachmentPreviewUrlActionImpl,
+  finalizeInboxReplyAttachmentUploadAction as finalizeInboxReplyAttachmentUploadActionImpl,
   purgeExpiredInboxReplyAttachmentsAction as purgeExpiredInboxReplyAttachmentsActionImpl,
   removeInboxReplyAttachmentAction as removeInboxReplyAttachmentActionImpl,
-  uploadInboxReplyAttachmentAction as uploadInboxReplyAttachmentActionImpl,
 } from "@/lib/inbox/reply-attachment-actions";
 import { runInboxSyncBatch } from "@/lib/inbox/sync";
 import { createClient } from "@/lib/supabase/server";
@@ -36,9 +37,22 @@ export async function sendInboxReplyAction(
   return sendInboxReplyActionImpl(input);
 }
 
-/** Phase 4a: stage outbound reply attachment (no SMTP). */
-export async function uploadInboxReplyAttachmentAction(formData: FormData) {
-  return uploadInboxReplyAttachmentActionImpl(formData);
+/**
+ * Phase 4a/4b: issue short-lived direct-to-Supabase upload authorization.
+ * Client uploads bytes with the returned token; then call finalize.
+ */
+export async function beginInboxReplyAttachmentUploadAction(input: {
+  parentMessageId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+}) {
+  return beginInboxReplyAttachmentUploadActionImpl(input);
+}
+
+/** Phase 4a/4b: verify Storage object and promote to staging (no SMTP). */
+export async function finalizeInboxReplyAttachmentUploadAction(uploadId: string) {
+  return finalizeInboxReplyAttachmentUploadActionImpl(uploadId);
 }
 
 /** Phase 4a: remove unused staging upload. */
