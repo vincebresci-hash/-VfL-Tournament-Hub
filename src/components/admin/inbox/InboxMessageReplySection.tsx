@@ -16,6 +16,8 @@ import type {
 
 type InboxMessageReplySectionProps = {
   message: InboxMessageDetailType;
+  /** Authenticated actor for session draft scoping. */
+  actorId: string;
   canReply: boolean;
   isPane: boolean;
   /** Driven by parent so the reading layout can shrink while composing. */
@@ -30,6 +32,7 @@ type InboxMessageReplySectionProps = {
  */
 export function InboxMessageReplySection({
   message,
+  actorId,
   canReply,
   isPane,
   composerOpen,
@@ -88,6 +91,7 @@ export function InboxMessageReplySection({
         <div className={cn("shrink-0 pb-2", isPane ? "mt-3" : "mt-4 sm:mt-5")}>
           <InboxReplyComposer
             parentMessageId={message.id}
+            actorId={actorId}
             lockedToAddress={message.fromAddress}
             lockedToDisplay={lockedToDisplay}
             originalSubject={message.subject}

@@ -581,6 +581,159 @@ export async function finalizeInboxReplyAttachmentUploadAction(uploadId: string)
 }
 
 /**
+ * Phase 4c: list the current actor's staging uploads for a parent message.
+ * Used to restore the composer attachment list after remount (cancel / message switch).
+ *
+ * Authorization (aligned with begin / inbound attachment download):
+ * - Authenticated actor with inbox.view + inbox.reply
+ * - Parent message must exist and remain visible under RLS (mailbox access)
+ * - Rows scoped to created_by = actor and parent_message_id
+ * Never returns storage_path or signed tokens.
+ */
+export async function listInboxReplyStagingAttachmentsAction(
+  parentMessageId: string,
+): Promise<{
+  ok: boolean;
+  uploads: InboxReplyUploadListItem[];
+  error: string | null;
+  errorCode: string | null;
+}> {
+  const access = await requireReplyAttachmentSession();
+  if (access.error || !access.session) {
+    return {
+      ok: false,
+      uploads: [],
+      error: access.error ?? "Nicht autorisiert.",
+      errorCode: "unauthorized",
+    };
+  }
+
+  const parentId = parentMessageId.trim();
+  if (!/^[0-9a-f-]{36}$/i.test(parentId)) {
+    return {
+      ok: false,
+      uploads: [],
+      error: "Ungültige Nachrichten-ID.",
+      errorCode: "invalid_input",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Same parent/mailbox visibility gate as beginInboxReplyAttachmentUploadAction:
+  // inbox_messages SELECT is RLS-scoped to authorized mailbox access.
+  const { data: parent, error: parentError } = await supabase
+    .from("inbox_messages")
+    .select("id")
+    .eq("id", parentId)
+    .maybeSingle();
+  if (parentError || !parent) {
+    return {
+      ok: false,
+      uploads: [],
+      error: "Nachricht nicht gefunden.",
+      errorCode: "parent_not_found",
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("inbox_reply_uploads")
+    .select(
+      "id, parent_message_id, filename, content_type, size_bytes, status, created_at, expires_at",
+    )
+    .eq("parent_message_id", parentId)
+    .eq("created_by", access.session.user.id)
+    .eq("status", "staging")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return {
+      ok: false,
+      uploads: [],
+      error: "Staging-Anhänge konnten nicht geladen werden.",
+      errorCode: "list_failed",
+    };
+  }
+
+  // Defense in depth: list item mapper never exposes storage_path / tokens.
+  const uploads = (data ?? []).map((row) => toUploadListItem(row));
+  return { ok: true, uploads, error: null, errorCode: null };
+}
+
+/**
+ * Phase 4c H1: abandon only while server status is still `uploading`.
+ * Uses atomic reject_inbox_reply_upload — no-op once staging/bound (race-safe).
+ * Never deletes successfully finalized staging objects.
+ */
+export async function abandonUnfinishedInboxReplyAttachmentAction(
+  uploadId: string,
+): Promise<{
+  ok: boolean;
+  abandoned: boolean;
+  error: string | null;
+  errorCode: string | null;
+}> {
+  const access = await requireReplyAttachmentSession();
+  if (access.error || !access.session) {
+    return {
+      ok: false,
+      abandoned: false,
+      error: access.error ?? "Nicht autorisiert.",
+      errorCode: "unauthorized",
+    };
+  }
+
+  const id = uploadId.trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    return {
+      ok: false,
+      abandoned: false,
+      error: "Ungültige Upload-ID.",
+      errorCode: "invalid_input",
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: meta, error: metaError } = await supabase
+    .from("inbox_reply_uploads")
+    .select("id, status, created_by")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (metaError || !meta) {
+    // Already gone — treat as cleaned up.
+    return { ok: true, abandoned: false, error: null, errorCode: "not_found" };
+  }
+  if (meta.created_by !== access.session.user.id) {
+    return {
+      ok: false,
+      abandoned: false,
+      error: "Keine Berechtigung.",
+      errorCode: "forbidden",
+    };
+  }
+  if (meta.status === "staging" || meta.status === "bound") {
+    return {
+      ok: true,
+      abandoned: false,
+      error: null,
+      errorCode: "not_unfinished",
+    };
+  }
+  if (meta.status !== "uploading") {
+    return { ok: true, abandoned: false, error: null, errorCode: "not_unfinished" };
+  }
+
+  const storagePath = await getUploadStoragePath(id);
+  const abandoned = await rejectUploadingAndDeleteStorage(id, storagePath, "abandoned_by_client");
+  if (!abandoned) {
+    // Lost the race to finalize — staging/bound must remain.
+    return { ok: true, abandoned: false, error: null, errorCode: "not_unfinished" };
+  }
+  return { ok: true, abandoned: true, error: null, errorCode: null };
+}
+
+/**
  * Phase 4a: remove an unused staging upload owned by the actor.
  */
 export async function removeInboxReplyAttachmentAction(uploadId: string): Promise<{

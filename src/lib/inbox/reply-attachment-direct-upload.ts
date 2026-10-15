@@ -7,7 +7,7 @@
  * 2. Browser: uploadInboxReplyAttachmentToSignedUrl(authorization, file)
  * 3. Server: finalizeInboxReplyAttachmentUploadAction(uploadId)
  *
- * Composer UI must stay unwired until product approval.
+ * Phase 4c composer may call this from the browser. Never log tokens or URLs.
  */
 
 export const INBOX_REPLY_ATTACHMENT_DIRECT_UPLOAD_BUCKET = "inbox-reply-attachments" as const;
@@ -62,6 +62,7 @@ export function assertDirectUploadAuthorizationBinding(
 export async function uploadInboxReplyAttachmentToSignedUrl(
   authorization: InboxReplyDirectUploadClientAuthorization,
   file: Blob,
+  options?: { signal?: AbortSignal },
 ): Promise<InboxReplyDirectUploadClientResult> {
   const binding = assertDirectUploadAuthorizationBinding(authorization, authorization.uploadId);
   if (!binding.ok) {
@@ -83,6 +84,7 @@ export async function uploadInboxReplyAttachmentToSignedUrl(
         "Content-Type": authorization.contentType,
       },
       body: file,
+      signal: options?.signal,
     });
 
     if (!response.ok) {
@@ -93,7 +95,14 @@ export async function uploadInboxReplyAttachmentToSignedUrl(
       };
     }
     return { ok: true };
-  } catch {
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      return {
+        ok: false,
+        error: "Upload abgebrochen.",
+        errorCode: "upload_aborted",
+      };
+    }
     return {
       ok: false,
       error: "Direkt-Upload zu Storage fehlgeschlagen.",

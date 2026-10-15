@@ -174,9 +174,12 @@ export function runInboxReplyChecks() {
   assert(composerUi.includes("Abbrechen"), "Phase 3: cancel control");
   assert(composerUi.includes("Senden"), "Phase 3: send control");
   assert(composerUi.includes("uncertain"), "Phase 3: uncertain delivery state");
-  assert(composerUi.includes("Anhang hinzufügen"), "Phase 3: attachment slot reserved");
-  assert(composerUi.includes("disabled"), "Phase 3: attachments disabled for now");
-  assert(!composerUi.includes("attachments:"), "Phase 3: never passes attachments payload");
+  const attachmentPanelUi = read("src/components/admin/inbox/InboxReplyAttachmentPanel.tsx");
+  assert(composerUi.includes("InboxReplyAttachmentPanel"), "Phase 4c: attachment panel wired");
+  assert(attachmentPanelUi.includes("Anhang hinzufügen"), "Phase 4c: attachment picker control present");
+  assert(composerUi.includes("composerAttachmentsBlockSend"), "Phase 4c: send blocked with attachments");
+  assert(composerUi.includes("allowAttachmentSend: false"), "Phase 4c: composer documents SMTP gate");
+  assert(!composerUi.includes("attachments:"), "Phase 4c: never passes attachments payload while gated");
   assert(composerUi.includes("createIdempotencyKey"), "Phase 3: client idempotency key");
   assert(
     composerUi.includes("Never mint a new idempotency key") ||

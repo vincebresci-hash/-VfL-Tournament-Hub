@@ -29,6 +29,11 @@ import {
   assertDirectUploadAuthorizationBinding,
 } from "@/lib/inbox/reply-attachment-direct-upload";
 import {
+  composerAttachmentsBlockSend,
+  resolveInboxReplyAttachmentContentType,
+  validateComposerAttachmentSelection,
+} from "@/lib/inbox/reply-attachment-composer";
+import {
   INBOX_REPLY_ZIP_BOMB_RESIDUAL_RISK,
   assertReplyAttachmentDeclaredSize,
   countZipLocalHeaders,
@@ -258,12 +263,60 @@ export function runInboxReplyAttachmentChecks() {
   assert(sendCore.includes("canStartInboxReplySmtp"), "send gates SMTP on remaining budget");
   assert(sendCore.includes("totalBytes: 0"), "early budget skips max-size placeholder");
 
-  // --- Phase 4b gates ---
+  // --- Phase 4b/4c gates ---
   assert(sendCore.includes("normalizeInboxReplyAttachmentRefs"), "upload id normalize");
-  assert(composerUi.includes("disabled"), "attachment control still disabled");
-  assert(!composerUi.includes("beginInboxReplyAttachmentUploadAction"), "composer not begin-wired");
+  const attachmentPanel = read("src/components/admin/inbox/InboxReplyAttachmentPanel.tsx");
+  const composerHelpers = read("src/lib/inbox/reply-attachment-composer.ts");
+  assert(composerUi.includes("InboxReplyAttachmentPanel"), "Phase 4c panel in composer");
+  assert(composerUi.includes("composerAttachmentsBlockSend"), "Phase 4c send unavailable with attachments");
+  assert(attachmentPanel.includes("beginInboxReplyAttachmentUploadAction"), "panel begin-wired");
+  assert(attachmentPanel.includes("finalizeInboxReplyAttachmentUploadAction"), "panel finalize-wired");
+  assert(attachmentPanel.includes("uploadInboxReplyAttachmentToSignedUrl"), "panel PUT-wired");
+  assert(attachmentPanel.includes("generationRef"), "stale upload generation guard");
+  assert(attachmentPanel.includes("abandonUnfinishedInboxReplyAttachmentAction"), "H1 abandon unfinished only");
+  assert(attachmentPanel.includes("decideUnmountAutoCleanup"), "H1 unmount decision helper");
+  assert(attachmentPanel.includes("decideStaleFinalizeOutcome"), "H1 stale finalize decision");
+  assert(attachmentPanel.includes("listInboxReplyStagingAttachmentsAction"), "staged restore on remount");
+  assert(attachmentPanel.includes("decideRemoveAfterAbandon"), "M2 remove/finalize reconcile");
+  assert(attachmentPanel.includes("decideRemoveAfterStagingRemove"), "M2 staging remove follow-up");
+  assert(attachmentPanel.includes("reconcileAsStaged"), "M2 never silent-hide staged");
+  assert(attachmentPanel.includes("aria-live"), "M2 status live region");
+  assert(attachmentPanel.includes("Schritt"), "M1 step labels not byte percent");
+  assert(!attachmentPanel.includes("aria-valuenow"), "M1 no misleading percent progressbar");
+  assert(attachmentPanel.includes("abortByLocalIdRef"), "LOW abort controllers in ref");
+  assert(composerUi.includes("window.confirm"), "M3 discard confirmation");
+  assert(composerUi.includes("clearReplyComposerDraft"), "draft cleared on discard/send");
+  assert(composerUi.includes("readReplyComposerDraft"), "draft restored on open");
+  assert(composerUi.includes("actorId"), "draft keyed by actor");
+  assert(composerHelpers.includes("attachments_runtime_budget"), "maps server gate error");
+  assert(composerHelpers.includes("cleanupPending"), "M4 cleanupPending quota field");
+  assert(actions.includes("abandonUnfinishedInboxReplyAttachmentAction"), "abandon action exported");
+  assert(actions.includes("listInboxReplyStagingAttachmentsAction"), "list staging action exported");
+  assert(
+    attachmentActions.includes("listInboxReplyStagingAttachmentsAction") &&
+      attachmentActions.includes('from("inbox_messages")') &&
+      attachmentActions.includes('errorCode: "parent_not_found"'),
+    "M1 listStaging parent visibility gate",
+  );
+  assert(
+    attachmentActions.includes("Never returns storage_path or signed tokens") ||
+      attachmentActions.includes("never exposes storage_path"),
+    "M1 list never returns paths/tokens",
+  );
   assert(!sync.includes("inbox_reply_uploads"), "IMAP sync isolation");
   assert(detailUi.includes('sandbox="allow-popups allow-popups-to-escape-sandbox"'), "sandbox preserved");
+  assert(sendAction.includes("allowAttachmentSend: false"), "SMTP attachment send remains false");
+  const phase4cNotes = read("src/lib/inbox/reply-attachment-phase4c-notes.ts");
+  assert(phase4cNotes.includes("stagedSurvivesUnmount: true"), "4c staged survives unmount");
+  assert(phase4cNotes.includes("listStagingRequiresParentVisibility: true"), "M1 documented");
+  assert(phase4cNotes.includes("removeFinalizeRaceReconciles: true"), "M2 documented");
+  assert(phase4cNotes.includes("sessionDraftSubjectBodyOnly: true"), "draft persistence documented");
+  assert(phase4cNotes.includes("mockedReactComponentTests: true"), "M3 React tests documented");
+  assert(phase4cNotes.includes("browserE2EPending: true"), "browser E2E gap documented");
+  const draftHelper = read("src/lib/inbox/reply-composer-draft.ts");
+  assert(draftHelper.includes("Never stores upload tokens"), "draft no tokens");
+  assert(draftHelper.includes("buildReplyComposerDraftStorageKey"), "draft key helper");
+  assert(existsSync(join(process.cwd(), "src/components/admin/inbox/InboxReplyAttachmentPanel.test.tsx")), "M3 React test file");
 
   assert(INBOX_REPLY_ATTACHMENT_MAX_FILE_BYTES === 5 * 1024 * 1024, "5 MiB per file");
   assert(INBOX_REPLY_ATTACHMENT_MAX_TOTAL_BYTES === 12 * 1024 * 1024, "12 MiB total");
@@ -361,6 +414,120 @@ export function runInboxReplyAttachmentChecks() {
   assert(sqlTests.includes("foreign upload UUID"), "M2 foreign lock test");
   assert(sqlTests.includes("tampered lease path"), "lease path tamper test");
   assert(sqlTests.includes("storage_path format binds"), "path binding format test");
+  assert(sqlTests.includes("dual-session concurrent finalize"), "H1 dual-session test");
+
+  // --- Phase 4c composer helpers ---
+  assert(
+    resolveInboxReplyAttachmentContentType("plan.docx", "") ===
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "empty browser MIME resolves from extension",
+  );
+  assert(
+    resolveInboxReplyAttachmentContentType("x.exe", "application/octet-stream") === null,
+    "blocked extension stays null",
+  );
+  assert(
+    validateComposerAttachmentSelection({
+      filename: "a.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 100,
+      existingCount: 5,
+      existingTotalBytes: 0,
+    }).ok === false,
+    "count quota enforced client-side",
+  );
+  assert(
+    validateComposerAttachmentSelection({
+      filename: "a.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 4 * 1024 * 1024,
+      existingCount: 2,
+      existingTotalBytes: 9 * 1024 * 1024,
+    }).ok === false,
+    "total byte quota enforced client-side",
+  );
+  assert(
+    validateComposerAttachmentSelection({
+      filename: "ok.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 1024,
+      existingCount: 0,
+      existingTotalBytes: 0,
+    }).ok === true,
+    "valid selection accepted",
+  );
+  assert(
+    composerAttachmentsBlockSend([]).blocked === false,
+    "empty list does not block text send",
+  );
+  assert(
+    composerAttachmentsBlockSend([
+      {
+        localId: "1",
+        parentMessageId: "p",
+        filename: "a.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        status: "uploading",
+        uploadId: null,
+        error: null,
+        errorCode: null,
+      },
+    ]).blocked === true,
+    "pending upload blocks send",
+  );
+  assert(
+    composerAttachmentsBlockSend([
+      {
+        localId: "1",
+        parentMessageId: "p",
+        filename: "a.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        status: "failed",
+        uploadId: null,
+        error: "x",
+        errorCode: "storage_network_error",
+      },
+    ]).blocked === true,
+    "failed upload blocks send",
+  );
+  assert(
+    composerAttachmentsBlockSend([
+      {
+        localId: "1",
+        parentMessageId: "p",
+        filename: "a.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        status: "staged",
+        uploadId: "550e8400-e29b-41d4-a716-4466554400aa",
+        error: null,
+        errorCode: null,
+      },
+    ]).blocked === true,
+    "staged attachments block send while SMTP gate closed",
+  );
+  assert(
+    composerAttachmentsBlockSend([
+      {
+        localId: "1",
+        parentMessageId: "p",
+        filename: "a.pdf",
+        contentType: "application/pdf",
+        sizeBytes: 10,
+        status: "staged",
+        uploadId: "550e8400-e29b-41d4-a716-4466554400aa",
+        error: null,
+        errorCode: null,
+      },
+    ]).reason?.includes("nicht freigeschaltet") === true,
+    "gate message clarifies send unavailable",
+  );
+
+  const lifecycle = read("src/lib/inbox/reply-attachment-lifecycle.ts");
+  assert(lifecycle.includes("ignore_ui_only"), "stale finalize ignore helper");
+  assert(lifecycle.includes("abandon_if_still_uploading"), "abandon unfinished helper");
 
   return "ok";
 }

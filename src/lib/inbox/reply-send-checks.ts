@@ -257,10 +257,21 @@ function runStaticReplySendChecks() {
   assert(phase4bMigration.includes("idempotency_attachment_conflict"), "idempotency conflict code");
   assert(phase4bMigration.includes("retain_until = now() + interval '30 days'"), "retention on finalize");
   const composerUiPhase4 = read("src/components/admin/inbox/InboxReplyComposer.tsx");
-  assert(composerUiPhase4.includes("disabled"), "composer attachment still disabled");
-  assert(!composerUiPhase4.includes("beginInboxReplyAttachmentUploadAction"), "composer not begin-wired");
-  assert(!composerUiPhase4.includes("finalizeInboxReplyAttachmentUploadAction"), "composer not finalize-wired");
-  assert(!composerUiPhase4.includes("uploadInboxReplyAttachmentToSignedUrl"), "composer not direct-upload-wired");
+  const attachmentPanel = read("src/components/admin/inbox/InboxReplyAttachmentPanel.tsx");
+  assert(composerUiPhase4.includes("InboxReplyAttachmentPanel"), "Phase 4c panel mounted");
+  assert(composerUiPhase4.includes("composerAttachmentsBlockSend"), "Phase 4c client send gate");
+  assert(composerUiPhase4.includes("allowAttachmentSend: false"), "Phase 4c UI keeps SMTP gate closed");
+  assert(!composerUiPhase4.includes("attachments:"), "composer does not forward attachment refs while gated");
+  assert(attachmentPanel.includes("beginInboxReplyAttachmentUploadAction"), "panel begin-wired");
+  assert(attachmentPanel.includes("finalizeInboxReplyAttachmentUploadAction"), "panel finalize-wired");
+  assert(attachmentPanel.includes("uploadInboxReplyAttachmentToSignedUrl"), "panel direct-upload-wired");
+  assert(attachmentPanel.includes("removeInboxReplyAttachmentAction"), "panel remove-wired");
+  assert(attachmentPanel.includes("abandonUnfinishedInboxReplyAttachmentAction"), "panel H1 abandon-wired");
+  assert(attachmentPanel.includes("listInboxReplyStagingAttachmentsAction"), "panel restore-wired");
+  assert(attachmentPanel.includes("local scope only"), "signed authorization not stored in React state");
+  assert(!attachmentPanel.includes("console.log"), "panel never logs upload details");
+  assert(!attachmentPanel.includes("console.info"), "panel never info-logs upload details");
+  assert(!attachmentPanel.includes("console.debug"), "panel never debug-logs upload details");
   assert(
     sendCore.includes("finalize_primary_failed") || sendCore.includes("compensation"),
     "H2 compensation path present",

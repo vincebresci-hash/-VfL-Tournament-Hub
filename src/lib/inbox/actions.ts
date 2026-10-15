@@ -13,10 +13,12 @@ import { getInboxMessageDetail } from "@/lib/inbox/queries";
 import { sendInboxReplyAction as sendInboxReplyActionImpl } from "@/lib/inbox/reply-send-action";
 import type { SendInboxReplyInput, SendInboxReplyResult } from "@/lib/inbox/reply-send";
 import {
+  abandonUnfinishedInboxReplyAttachmentAction as abandonUnfinishedInboxReplyAttachmentActionImpl,
   beginInboxReplyAttachmentUploadAction as beginInboxReplyAttachmentUploadActionImpl,
   createInboxReplyAttachmentDownloadUrlAction as createInboxReplyAttachmentDownloadUrlActionImpl,
   createInboxReplyAttachmentPreviewUrlAction as createInboxReplyAttachmentPreviewUrlActionImpl,
   finalizeInboxReplyAttachmentUploadAction as finalizeInboxReplyAttachmentUploadActionImpl,
+  listInboxReplyStagingAttachmentsAction as listInboxReplyStagingAttachmentsActionImpl,
   purgeExpiredInboxReplyAttachmentsAction as purgeExpiredInboxReplyAttachmentsActionImpl,
   removeInboxReplyAttachmentAction as removeInboxReplyAttachmentActionImpl,
 } from "@/lib/inbox/reply-attachment-actions";
@@ -55,9 +57,22 @@ export async function finalizeInboxReplyAttachmentUploadAction(uploadId: string)
   return finalizeInboxReplyAttachmentUploadActionImpl(uploadId);
 }
 
-/** Phase 4a: remove unused staging upload. */
+/** Phase 4a: remove unused staging upload (explicit user action). */
 export async function removeInboxReplyAttachmentAction(uploadId: string) {
   return removeInboxReplyAttachmentActionImpl(uploadId);
+}
+
+/** Phase 4c: restore actor staging rows for a parent after remount. */
+export async function listInboxReplyStagingAttachmentsAction(parentMessageId: string) {
+  return listInboxReplyStagingAttachmentsActionImpl(parentMessageId);
+}
+
+/**
+ * Phase 4c H1: abandon only while still uploading (atomic).
+ * Safe for unmount / stale pipelines — never deletes staging/bound.
+ */
+export async function abandonUnfinishedInboxReplyAttachmentAction(uploadId: string) {
+  return abandonUnfinishedInboxReplyAttachmentActionImpl(uploadId);
 }
 
 /** Phase 4a: short-lived image preview URL. */

@@ -33,6 +33,8 @@ type InboxWorkspaceProps = {
   syncState: InboxSyncStateView | null;
   canSync: boolean;
   canManage: boolean;
+  /** Authenticated actor for composer session draft scoping. */
+  actorId?: string;
   /** IONOS SMTP reply (inbox.reply). */
   canReply?: boolean;
   initialQuery: string;
@@ -91,6 +93,7 @@ export function InboxWorkspace({
   syncState,
   canSync,
   canManage,
+  actorId = "",
   canReply = false,
   initialQuery,
   initialStatus,
@@ -429,6 +432,7 @@ export function InboxWorkspace({
                   key={activeDetail.id}
                   message={activeDetail}
                   canManage={canManage}
+                  actorId={actorId}
                   canReply={canReply}
                   variant="pane"
                   className="h-full min-h-0 border-0 shadow-none ring-0"

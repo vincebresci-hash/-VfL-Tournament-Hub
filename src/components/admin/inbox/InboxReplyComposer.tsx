@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 import {
   adminCompactPrimaryButtonClass,
   adminCompactSecondaryButtonClass,
 } from "@/components/admin/AdminPanel";
+import { InboxReplyAttachmentPanel } from "@/components/admin/inbox/InboxReplyAttachmentPanel";
 import { sendInboxReplyAction } from "@/lib/inbox/actions";
+import {
+  composerAttachmentsBlockSend,
+  type ComposerAttachmentItem,
+} from "@/lib/inbox/reply-attachment-composer";
+import {
+  clearReplyComposerDraft,
+  readReplyComposerDraft,
+  replyComposerDraftHasContent,
+  writeReplyComposerDraft,
+} from "@/lib/inbox/reply-composer-draft";
 import { normalizeReplySubject } from "@/lib/inbox/reply-validation";
 import { cn } from "@/lib/cn";
 import type { InboxReplyListItem } from "@/lib/inbox/types";
@@ -22,6 +33,8 @@ type ComposerPhase =
 export type InboxReplyComposerProps = {
   /** Bound to the open parent message — remount via key when selection changes. */
   parentMessageId: string;
+  /** Authenticated actor id for sessionStorage draft scoping (never cross-user). */
+  actorId: string;
   lockedToAddress: string;
   lockedToDisplay: string;
   originalSubject: string;
@@ -64,6 +77,17 @@ function replyFromResult(
   };
 }
 
+function sessionDraftStore(): Storage | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 const PHASE_BANNER: Record<
   Exclude<ComposerPhase, "editing" | "sending">,
   { tone: string; title: string; body: string }
@@ -92,6 +116,7 @@ const PHASE_BANNER: Record<
 
 export function InboxReplyComposer({
   parentMessageId,
+  actorId,
   lockedToAddress,
   lockedToDisplay,
   originalSubject,
@@ -102,10 +127,18 @@ export function InboxReplyComposer({
   const formId = useId();
   const sectionRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
-  const [subject, setSubject] = useState(() =>
-    normalizeReplySubject("", originalSubject),
-  );
-  const [bodyText, setBodyText] = useState("");
+  const defaultSubject = normalizeReplySubject("", originalSubject);
+  const [subject, setSubject] = useState(() => {
+    const restored = readReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId);
+    if (restored) {
+      return normalizeReplySubject(restored.subject, originalSubject);
+    }
+    return defaultSubject;
+  });
+  const [bodyText, setBodyText] = useState(() => {
+    const restored = readReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId);
+    return restored?.bodyText ?? "";
+  });
   const [idempotencyKey, setIdempotencyKey] = useState(createIdempotencyKey);
   const [phase, setPhase] = useState<ComposerPhase>(() =>
     hasUnresolvedReply ? "blocked" : "editing",
@@ -115,8 +148,72 @@ export function InboxReplyComposer({
       ? "Für diese Nachricht läuft bereits ein Versand oder der Status ist unklar."
       : null,
   );
+  const [attachments, setAttachments] = useState<ComposerAttachmentItem[]>([]);
   const submitLockRef = useRef(false);
   const mountedRef = useRef(true);
+  const attachmentSetKeyRef = useRef("");
+  /** LOW: only refresh idempotency after a clear failed send when the set changes. */
+  const refreshIdempotencyOnAttachChangeRef = useRef(false);
+  const draftsEnabledRef = useRef(phase === "editing" || phase === "failed");
+
+  const handleAttachmentsChange = useCallback((next: ComposerAttachmentItem[]) => {
+    setAttachments(next);
+    // Stable set fingerprint: uploadIds only (ignore localId churn during upload).
+    const stableKey = next
+      .map((item) => item.uploadId)
+      .filter((id): id is string => Boolean(id))
+      .sort()
+      .join(",");
+    if (
+      refreshIdempotencyOnAttachChangeRef.current &&
+      attachmentSetKeyRef.current !== stableKey
+    ) {
+      setIdempotencyKey(createIdempotencyKey());
+      refreshIdempotencyOnAttachChangeRef.current = false;
+    }
+    attachmentSetKeyRef.current = stableKey;
+  }, []);
+
+  // Persist subject/body per actor+parent (never tokens/paths). Skip terminal phases.
+  useEffect(() => {
+    draftsEnabledRef.current = phase === "editing" || phase === "failed";
+    if (!draftsEnabledRef.current) {
+      return;
+    }
+    writeReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId, {
+      subject,
+      bodyText,
+    });
+  }, [actorId, bodyText, parentMessageId, phase, subject]);
+
+  const hasDiscardableWork =
+    replyComposerDraftHasContent({
+      subject,
+      bodyText,
+      defaultSubject,
+    }) ||
+    attachments.some(
+      (item) =>
+        item.status === "staged" ||
+        item.status === "uploading" ||
+        item.status === "authorizing" ||
+        item.status === "finalizing" ||
+        item.status === "queued",
+    );
+
+  function requestCancel() {
+    if (hasDiscardableWork) {
+      const confirmed = window.confirm(
+        "Entwurf verwerfen? Ungespeicherter Text wird gelöscht. Noch nicht gesendete Anhänge bleiben ggf. nur serverseitig im Staging bis zum Ablauf.",
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    clearReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId);
+    // H1: do not delete staged uploads on cancel — TTL/purge + explicit Entfernen.
+    onCancel();
+  }
 
   // Scroll the composer into the reading-pane scrollport, then focus the textarea.
   // preventScroll avoids a second jump of the window / outer page.
@@ -147,19 +244,37 @@ export function InboxReplyComposer({
     };
   }, []);
 
+  const attachmentSendGate = composerAttachmentsBlockSend(attachments);
+  const attachmentsLocked =
+    phase === "sending" ||
+    phase === "sent" ||
+    phase === "uncertain" ||
+    phase === "blocked";
   const sendDisabled =
     phase === "sending" ||
     phase === "sent" ||
     phase === "uncertain" ||
     phase === "blocked" ||
     !bodyText.trim() ||
-    !lockedToAddress.trim();
+    !lockedToAddress.trim() ||
+    attachmentSendGate.blocked;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // Hard stop: never auto-retry or re-send after uncertain / blocked / sent.
-    // sendDisabled already covers those phases plus empty body / in-flight lock.
+    // sendDisabled already covers those phases plus empty body / in-flight lock /
+    // pending-failed attachments / Phase 4c SMTP attachment gate.
     if (submitLockRef.current || sendDisabled) {
+      return;
+    }
+
+    // Defense in depth: never pass attachment refs while allowAttachmentSend is false.
+    // Text-only send remains available when the attachment list is empty.
+    if (attachments.length > 0) {
+      setStatusMessage(
+        attachmentSendGate.reason ??
+          "Anhangversand ist noch nicht freigeschaltet.",
+      );
       return;
     }
 
@@ -183,7 +298,8 @@ export function InboxReplyComposer({
         subject: draft.subject,
         bodyText: draft.bodyText,
         idempotencyKey: draft.idempotencyKey,
-        // Phase 4: omit attachments entirely (server rejects any supplied value).
+        // Phase 4c: attachment SMTP remains gated server-side (allowAttachmentSend: false).
+        // Composer never forwards upload ids while the product gate is closed.
       });
     } catch {
       if (!mountedRef.current) {
@@ -207,6 +323,7 @@ export function InboxReplyComposer({
     onOutcome(result, recorded);
 
     if (result.ok && result.status === "sent") {
+      clearReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId);
       setPhase("sent");
       setStatusMessage(result.error ?? "Antwort wurde gesendet.");
       submitLockRef.current = true; // keep locked — no duplicate submit
@@ -232,6 +349,7 @@ export function InboxReplyComposer({
     setPhase("failed");
     setStatusMessage(result.error ?? "Versand fehlgeschlagen.");
     setIdempotencyKey(createIdempotencyKey());
+    refreshIdempotencyOnAttachChangeRef.current = true;
     submitLockRef.current = false;
   }
 
@@ -340,34 +458,18 @@ export function InboxReplyComposer({
           />
         </div>
 
-        {/* Phase 4 hook: attachment UI reserved, intentionally disabled. */}
-        <div className="rounded-md border border-dashed border-line/70 bg-surface/30 px-3 py-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold tracking-[0.06em] text-muted uppercase">
-                Anhänge
-              </p>
-              <p className="mt-0.5 text-[12px] text-muted">
-                Noch nicht verfügbar — Vorbereitung für eine spätere Version.
-              </p>
-            </div>
-            <button
-              type="button"
-              disabled
-              className={cn(adminCompactSecondaryButtonClass, "shrink-0 opacity-50")}
-              title="Anhänge folgen in Phase 4"
-            >
-              Anhang hinzufügen
-            </button>
-          </div>
-        </div>
+        <InboxReplyAttachmentPanel
+          parentMessageId={parentMessageId}
+          disabled={attachmentsLocked}
+          onAttachmentsChange={handleAttachmentsChange}
+        />
 
         <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
           <button
             type="button"
             className={adminCompactSecondaryButtonClass}
             disabled={phase === "sending"}
-            onClick={onCancel}
+            onClick={requestCancel}
           >
             Abbrechen
           </button>
@@ -375,10 +477,25 @@ export function InboxReplyComposer({
             type="submit"
             className={adminCompactPrimaryButtonClass}
             disabled={sendDisabled}
+            title={
+              attachmentSendGate.blocked
+                ? (attachmentSendGate.reason ?? undefined)
+                : undefined
+            }
+            aria-describedby={
+              attachmentSendGate.blocked && attachments.length > 0
+                ? `${formId}-attach-gate`
+                : undefined
+            }
           >
             {phase === "sending" ? "Senden…" : "Senden"}
           </button>
         </div>
+        {attachmentSendGate.blocked && attachments.length > 0 ? (
+          <p id={`${formId}-attach-gate`} className="sr-only">
+            {attachmentSendGate.reason}
+          </p>
+        ) : null}
       </form>
     </section>
   );

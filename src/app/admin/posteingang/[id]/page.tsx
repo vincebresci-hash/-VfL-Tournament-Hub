@@ -75,6 +75,7 @@ export default async function AdminInboxMessagePage({
       syncState={state}
       canSync={canTriggerInboxSync(session, authorization)}
       canManage={canManageInbox(session, authorization)}
+      actorId={session?.user.id ?? ""}
       canReply={canReplyInbox(session, authorization)}
       initialQuery={query}
       initialStatus={status}

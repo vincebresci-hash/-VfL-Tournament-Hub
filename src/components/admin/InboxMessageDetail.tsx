@@ -45,6 +45,8 @@ export type InboxDetailLocalStatePatch = {
 type InboxMessageDetailProps = {
   message: InboxMessageDetailType;
   canManage: boolean;
+  /** Authenticated actor for composer session draft scoping. */
+  actorId?: string;
   /** Send IONOS SMTP replies (inbox.reply). Separate from local status management. */
   canReply?: boolean;
   /**
@@ -121,6 +123,7 @@ function wrapDetailEmailSrcDoc(sanitizedHtml: string): string {
 export function InboxMessageDetailView({
   message,
   canManage,
+  actorId = "",
   canReply = false,
   variant = "page",
   className,
@@ -480,6 +483,7 @@ export function InboxMessageDetailView({
         <InboxMessageReplySection
           key={message.id}
           message={message}
+          actorId={actorId}
           canReply={canReply}
           isPane={isPane}
           composerOpen={composerOpen}
