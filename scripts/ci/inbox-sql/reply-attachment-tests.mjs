@@ -54,6 +54,36 @@ async function createUploadInOwnTransaction(dbUrl, userId, { parentId, uploadId,
   }
 }
 
+/**
+ * Clear unresolved replies + live staging for actors on a parent so later claim
+ * tests are not blocked by unresolved_reply_exists / quota_count leftovers.
+ */
+async function resetActorOutboundFixtures(dbUrl, { actorIds, parentMessageId }) {
+  await withServiceRoleTransaction(dbUrl, async (client) => {
+    await client.query(
+      `DELETE FROM public.inbox_replies
+       WHERE created_by = ANY($1::uuid[])
+         AND parent_message_id = $2::uuid`,
+      [actorIds, parentMessageId],
+    );
+    await client.query(
+      `DELETE FROM public.inbox_reply_uploads
+       WHERE created_by = ANY($1::uuid[])
+         AND parent_message_id = $2::uuid
+         AND status IN ('uploading', 'staging', 'rejected')`,
+      [actorIds, parentMessageId],
+    );
+    await client.query(
+      `UPDATE public.inbox_reply_uploads
+       SET status = 'purged', storage_path = NULL, purged_at = now(), reply_id = NULL
+       WHERE created_by = ANY($1::uuid[])
+         AND parent_message_id = $2::uuid
+         AND status = 'bound'`,
+      [actorIds, parentMessageId],
+    );
+  });
+}
+
 /** Independent service_role session (own connection) for true dual-session races. */
 async function commitUploadInOwnServiceSession(dbUrl, uploadId, checksum, sizeBytes) {
   const client = createPgClient(dbUrl);
@@ -735,6 +765,10 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
   });
 
   await test("reply-attach: claim still inserts attachment_count 0; idempotency intact", async () => {
+    await resetActorOutboundFixtures(env.dbUrl, {
+      actorIds: [users.admin.id, users.superAdmin.id],
+      parentMessageId: messageId,
+    });
     await withServiceRoleTransaction(env.dbUrl, async (client) => {
       await client.query(
         `UPDATE public.inbox_mailboxes
@@ -744,6 +778,7 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
       );
     });
 
+    let replyId = null;
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       const key = uuid(900);
       const claimed = await client.query(
@@ -754,13 +789,19 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
       );
       assert(claimed.rows[0].error_code == null, `claim failed: ${claimed.rows[0].error_code}`);
       assert(claimed.rows[0].send_allowed === true, "send should be allowed");
+      replyId = claimed.rows[0].reply_id;
 
       const reply = await client.query(
         `SELECT attachment_count, status FROM public.inbox_replies WHERE id = $1`,
-        [claimed.rows[0].reply_id],
+        [replyId],
       );
       assert(Number(reply.rows[0].attachment_count) === 0, "Phase 4a claim still count 0");
       assert(reply.rows[0].status === "sending", "claim status sending");
+    });
+
+    // Do not leave unresolved sending for later claim tests.
+    await withServiceRoleTransaction(env.dbUrl, async (client) => {
+      await client.query(`DELETE FROM public.inbox_replies WHERE id = $1`, [replyId]);
     });
   });
 
@@ -890,6 +931,10 @@ export async function runInboxReplyAttachmentSqlTests(ctx) {
 
   await test("reply-attach M2: foreign upload UUID does not lock/bind", async () => {
     const ownerUpload = uuid(981);
+    await resetActorOutboundFixtures(env.dbUrl, {
+      actorIds: [users.admin.id, users.superAdmin.id],
+      parentMessageId: messageId,
+    });
 
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       const created = await client.query(

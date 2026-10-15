@@ -42,14 +42,42 @@ async function promoteStaging(serviceClient, { uploadId, adminId, size }) {
   assert(committed.rows[0].ok === true, "commit staging failed");
 }
 
+async function resetActorOutboundFixtures(dbUrl, { actorIds, parentMessageId }) {
+  await withServiceRoleTransaction(dbUrl, async (client) => {
+    await client.query(
+      `DELETE FROM public.inbox_replies
+       WHERE created_by = ANY($1::uuid[])
+         AND parent_message_id = $2::uuid`,
+      [actorIds, parentMessageId],
+    );
+    await client.query(
+      `DELETE FROM public.inbox_reply_uploads
+       WHERE created_by = ANY($1::uuid[])
+         AND parent_message_id = $2::uuid
+         AND status IN ('uploading', 'staging', 'rejected')`,
+      [actorIds, parentMessageId],
+    );
+    await client.query(
+      `UPDATE public.inbox_reply_uploads
+       SET status = 'purged', storage_path = NULL, purged_at = now(), reply_id = NULL
+       WHERE created_by = ANY($1::uuid[])
+         AND parent_message_id = $2::uuid
+         AND status = 'bound'`,
+      [actorIds, parentMessageId],
+    );
+  });
+}
+
 /**
  * @param {object} ctx
  */
 export async function runInboxReplyAttachmentSendSqlTests(ctx) {
   const { env, users, mailboxId, messageId, test } = ctx;
   const to = "from@example.test";
+  const actorIds = [users.admin.id, users.superAdmin.id];
 
   await test("reply-attach-send: claim binds staging uploads atomically", async () => {
+    await resetActorOutboundFixtures(env.dbUrl, { actorIds, parentMessageId: messageId });
     const uploadId = uuid(1);
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       await stageUpload(client, {
@@ -107,6 +135,7 @@ export async function runInboxReplyAttachmentSendSqlTests(ctx) {
   });
 
   await test("reply-attach-send: rejects foreign/expired/uncommitted uploads", async () => {
+    await resetActorOutboundFixtures(env.dbUrl, { actorIds, parentMessageId: messageId });
     const foreignId = uuid(20);
     const expiredId = uuid(21);
     const uploadingId = uuid(22);
@@ -175,6 +204,7 @@ export async function runInboxReplyAttachmentSendSqlTests(ctx) {
   });
 
   await test("reply-attach-send: idempotent replay never re-sends; conflict on different set", async () => {
+    await resetActorOutboundFixtures(env.dbUrl, { actorIds, parentMessageId: messageId });
     const a = uuid(40);
     const b = uuid(41);
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
@@ -226,6 +256,7 @@ export async function runInboxReplyAttachmentSendSqlTests(ctx) {
   });
 
   await test("reply-attach-send: finalize sent/failed sets retention; uncertain does not", async () => {
+    await resetActorOutboundFixtures(env.dbUrl, { actorIds, parentMessageId: messageId });
     const uploadId = uuid(60);
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       await stageUpload(client, {
@@ -247,6 +278,8 @@ export async function runInboxReplyAttachmentSendSqlTests(ctx) {
          )`,
         [messageId, uuid(61), to, "Re: ret", "body", [uploadId]],
       );
+      assert(claimed.rows[0].error_code == null, `claim for retention: ${claimed.rows[0].error_code}`);
+      assert(claimed.rows[0].reply_id, "reply_id required for retention finalize");
       replyId = claimed.rows[0].reply_id;
     });
 
@@ -331,6 +364,7 @@ export async function runInboxReplyAttachmentSendSqlTests(ctx) {
   });
 
   await test("reply-attach-send: quota count on claim; duplicates rejected", async () => {
+    await resetActorOutboundFixtures(env.dbUrl, { actorIds, parentMessageId: messageId });
     const ids = Array.from({ length: 6 }, (_, i) => uuid(70 + i));
     await withAuthenticatedTransaction(env.dbUrl, users.admin.id, async (client) => {
       for (const id of ids.slice(0, 5)) {
