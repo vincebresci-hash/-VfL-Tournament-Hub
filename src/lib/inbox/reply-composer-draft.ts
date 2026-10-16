@@ -129,3 +129,160 @@ export function replyComposerDraftHasContent(draft: {
   }
   return draft.subject.trim() !== draft.defaultSubject.trim();
 }
+
+/**
+ * M-A: successful text-only send must clear the draft for the *scoped* actor+parent
+ * that initiated the send — even if the composer has already unmounted.
+ * Never clears a different message's key.
+ */
+export function shouldClearReplyComposerDraftAfterSend(input: {
+  sendOk: boolean;
+  sendStatus: string | null | undefined;
+}): boolean {
+  return input.sendOk === true && input.sendStatus === "sent";
+}
+
+/** M4d-1: in-memory clear notification so remounted composers cannot re-persist a sent draft. */
+export type ReplyComposerDraftClearedEvent = {
+  actorId: string;
+  parentMessageId: string;
+  /** Subject/body that were submitted — used to avoid wiping unrelated user edits. */
+  sentSubject: string;
+  sentBodyText: string;
+  epoch: number;
+};
+
+type DraftClearedRecord = {
+  epoch: number;
+  sentSubject: string;
+  sentBodyText: string;
+};
+
+const draftClearedByKey = new Map<string, DraftClearedRecord>();
+const draftClearedListeners = new Set<(event: ReplyComposerDraftClearedEvent) => void>();
+
+export function getReplyComposerDraftClearedEpoch(
+  actorId: string,
+  parentMessageId: string,
+): number {
+  const key = buildReplyComposerDraftStorageKey(actorId, parentMessageId);
+  if (!key) {
+    return 0;
+  }
+  return draftClearedByKey.get(key)?.epoch ?? 0;
+}
+
+export function getReplyComposerDraftClearedRecord(
+  actorId: string,
+  parentMessageId: string,
+): DraftClearedRecord | null {
+  const key = buildReplyComposerDraftStorageKey(actorId, parentMessageId);
+  if (!key) {
+    return null;
+  }
+  return draftClearedByKey.get(key) ?? null;
+}
+
+export function subscribeReplyComposerDraftCleared(
+  listener: (event: ReplyComposerDraftClearedEvent) => void,
+): () => void {
+  draftClearedListeners.add(listener);
+  return () => {
+    draftClearedListeners.delete(listener);
+  };
+}
+
+/**
+ * Whether a mounted composer should reset UI fields after a scoped send-clear.
+ * Resets only when current fields still match the sent fingerprint (no newer edits).
+ */
+export function shouldResetComposerFieldsAfterScopedSendClear(input: {
+  currentSubject: string;
+  currentBodyText: string;
+  sentSubject: string;
+  sentBodyText: string;
+}): boolean {
+  return (
+    input.currentSubject.trim() === input.sentSubject.trim() &&
+    input.currentBodyText === input.sentBodyText
+  );
+}
+
+/**
+ * Whether persist should be suppressed after a newer send-clear for this scope.
+ * Blocks re-writing the exact sent fingerprint; allows persisting newer user edits.
+ */
+export function shouldSuppressDraftPersistAfterSendClear(input: {
+  seenClearEpoch: number;
+  currentClearEpoch: number;
+  currentSubject: string;
+  currentBodyText: string;
+  sentSubject: string;
+  sentBodyText: string;
+}): boolean {
+  if (input.currentClearEpoch <= input.seenClearEpoch) {
+    return false;
+  }
+  return shouldResetComposerFieldsAfterScopedSendClear({
+    currentSubject: input.currentSubject,
+    currentBodyText: input.currentBodyText,
+    sentSubject: input.sentSubject,
+    sentBodyText: input.sentBodyText,
+  });
+}
+
+/**
+ * Clear only the draft key for the send scope. Safe no-op when store/key unavailable.
+ * Notifies same-tab listeners so a remounted composer cannot resurrect the sent draft.
+ * Returns whether a key was targeted (not whether the browser remove succeeded).
+ */
+export function clearScopedReplyComposerDraftAfterSend(input: {
+  store: ReplyComposerDraftStore | null | undefined;
+  /** Actor id captured at submit — never a later prop. */
+  actorId: string;
+  /** Parent message id captured at submit — never a later prop. */
+  parentMessageId: string;
+  sendOk: boolean;
+  sendStatus: string | null | undefined;
+  /** Exact subject/body submitted with the successful send. */
+  sentSubject?: string;
+  sentBodyText?: string;
+}): { cleared: boolean; key: string | null; epoch: number } {
+  if (!shouldClearReplyComposerDraftAfterSend(input)) {
+    return { cleared: false, key: null, epoch: 0 };
+  }
+  const key = buildReplyComposerDraftStorageKey(input.actorId, input.parentMessageId);
+  if (!key) {
+    return { cleared: false, key: null, epoch: 0 };
+  }
+  clearReplyComposerDraft(input.store, input.actorId, input.parentMessageId);
+
+  const prev = draftClearedByKey.get(key);
+  const epoch = (prev?.epoch ?? 0) + 1;
+  const sentSubject = input.sentSubject ?? "";
+  const sentBodyText = input.sentBodyText ?? "";
+  draftClearedByKey.set(key, { epoch, sentSubject, sentBodyText });
+
+  const event: ReplyComposerDraftClearedEvent = {
+    actorId: input.actorId,
+    parentMessageId: input.parentMessageId,
+    sentSubject,
+    sentBodyText,
+    epoch,
+  };
+  for (const listener of draftClearedListeners) {
+    try {
+      listener(event);
+    } catch {
+      // Listener errors must not break send completion.
+    }
+  }
+
+  return { cleared: true, key, epoch };
+}
+
+/** Test-only: reset in-memory clear registry between React tests. */
+export function resetReplyComposerDraftClearRegistryForTests(): void {
+  draftClearedByKey.clear();
+  draftClearedListeners.clear();
+}

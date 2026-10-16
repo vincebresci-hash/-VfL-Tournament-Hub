@@ -17,7 +17,9 @@
  * Test layers (keep distinct):
  * - node:test pure lifecycle/helpers: `test:inbox-attachment-ui`
  * - vitest+RTL mocked React component tests: `test:inbox-attachment-react`
- * - Real browser/Supabase/SMTP E2E: still pending (`browserE2EPending: true`)
+ *   (panel + composer; Phase 4d M-B)
+ * - Real browser/Supabase/SMTP E2E: still pending — see phase4d notes
+ *   (`browserE2EPending: true`; isolated env not confirmed)
  */
 
 export const INBOX_REPLY_ATTACHMENT_PHASE4C_NOTES = {

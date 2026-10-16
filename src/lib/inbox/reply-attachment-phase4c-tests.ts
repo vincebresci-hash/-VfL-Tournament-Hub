@@ -21,7 +21,7 @@ import {
 } from "@/lib/inbox/reply-attachment-composer";
 import {
   countsTowardClientQuota,
-  decideListStagingParentAccess,
+  decideListStagingAccess,
   decideRemoveAfterAbandon,
   decideRemoveAfterStagingRemove,
   decideStaleFinalizeOutcome,
@@ -257,12 +257,42 @@ describe("simulated message-switch after successful finalize", () => {
   });
 });
 
-describe("M1 listStaging parent/mailbox visibility (negative)", () => {
+describe("M-C listStaging shared authorization (negative)", () => {
+  const parentId = "550e8400-e29b-41d4-a716-4466554400aa";
+
   it("rejects unauthenticated", () => {
     assert.deepEqual(
-      decideListStagingParentAccess({
+      decideListStagingAccess({
         authenticated: false,
-        parentMessageId: "550e8400-e29b-41d4-a716-4466554400aa",
+        canAccessInbox: false,
+        canReplyInbox: false,
+        parentMessageId: parentId,
+        parentVisible: true,
+      }),
+      { ok: false, errorCode: "unauthorized" },
+    );
+  });
+
+  it("rejects inbox.view without inbox.reply", () => {
+    assert.deepEqual(
+      decideListStagingAccess({
+        authenticated: true,
+        canAccessInbox: true,
+        canReplyInbox: false,
+        parentMessageId: parentId,
+        parentVisible: true,
+      }),
+      { ok: false, errorCode: "unauthorized" },
+    );
+  });
+
+  it("rejects reply without inbox.view", () => {
+    assert.deepEqual(
+      decideListStagingAccess({
+        authenticated: true,
+        canAccessInbox: false,
+        canReplyInbox: true,
+        parentMessageId: parentId,
         parentVisible: true,
       }),
       { ok: false, errorCode: "unauthorized" },
@@ -271,9 +301,11 @@ describe("M1 listStaging parent/mailbox visibility (negative)", () => {
 
   it("rejects inaccessible parent/mailbox", () => {
     assert.deepEqual(
-      decideListStagingParentAccess({
+      decideListStagingAccess({
         authenticated: true,
-        parentMessageId: "550e8400-e29b-41d4-a716-4466554400aa",
+        canAccessInbox: true,
+        canReplyInbox: true,
+        parentMessageId: parentId,
         parentVisible: false,
       }),
       { ok: false, errorCode: "parent_not_found" },
@@ -282,8 +314,10 @@ describe("M1 listStaging parent/mailbox visibility (negative)", () => {
 
   it("rejects invalid parent id", () => {
     assert.deepEqual(
-      decideListStagingParentAccess({
+      decideListStagingAccess({
         authenticated: true,
+        canAccessInbox: true,
+        canReplyInbox: true,
         parentMessageId: "not-a-uuid",
         parentVisible: true,
       }),
@@ -291,11 +325,13 @@ describe("M1 listStaging parent/mailbox visibility (negative)", () => {
     );
   });
 
-  it("allows visible parent for authenticated actor", () => {
+  it("allows visible parent for view+reply actor", () => {
     assert.deepEqual(
-      decideListStagingParentAccess({
+      decideListStagingAccess({
         authenticated: true,
-        parentMessageId: "550e8400-e29b-41d4-a716-4466554400aa",
+        canAccessInbox: true,
+        canReplyInbox: true,
+        parentMessageId: parentId,
         parentVisible: true,
       }),
       { ok: true },

@@ -286,6 +286,7 @@ export function runInboxReplyAttachmentChecks() {
   assert(attachmentPanel.includes("abortByLocalIdRef"), "LOW abort controllers in ref");
   assert(composerUi.includes("window.confirm"), "M3 discard confirmation");
   assert(composerUi.includes("clearReplyComposerDraft"), "draft cleared on discard/send");
+  assert(composerUi.includes("clearScopedReplyComposerDraftAfterSend"), "M-A clear after send even if unmounted");
   assert(composerUi.includes("readReplyComposerDraft"), "draft restored on open");
   assert(composerUi.includes("actorId"), "draft keyed by actor");
   assert(composerHelpers.includes("attachments_runtime_budget"), "maps server gate error");
@@ -294,9 +295,13 @@ export function runInboxReplyAttachmentChecks() {
   assert(actions.includes("listInboxReplyStagingAttachmentsAction"), "list staging action exported");
   assert(
     attachmentActions.includes("listInboxReplyStagingAttachmentsAction") &&
+      attachmentActions.includes("decideListStagingAccess") &&
+      attachmentActions.includes("canAccessInbox: access.canAccessInbox") &&
+      attachmentActions.includes("canReplyInbox: access.canReplyInbox") &&
+      attachmentActions.includes("authenticated: access.authenticated") &&
       attachmentActions.includes('from("inbox_messages")') &&
       attachmentActions.includes('errorCode: "parent_not_found"'),
-    "M1 listStaging parent visibility gate",
+    "M4d-2 listStaging shared authz with real permission flags",
   );
   assert(
     attachmentActions.includes("Never returns storage_path or signed tokens") ||
@@ -316,7 +321,12 @@ export function runInboxReplyAttachmentChecks() {
   const draftHelper = read("src/lib/inbox/reply-composer-draft.ts");
   assert(draftHelper.includes("Never stores upload tokens"), "draft no tokens");
   assert(draftHelper.includes("buildReplyComposerDraftStorageKey"), "draft key helper");
+  assert(draftHelper.includes("clearScopedReplyComposerDraftAfterSend"), "M-A scoped clear helper");
   assert(existsSync(join(process.cwd(), "src/components/admin/inbox/InboxReplyAttachmentPanel.test.tsx")), "M3 React test file");
+  assert(existsSync(join(process.cwd(), "src/components/admin/inbox/InboxReplyComposer.test.tsx")), "M-B composer React tests");
+  const phase4dNotes = read("src/lib/inbox/reply-attachment-phase4d-notes.ts");
+  assert(phase4dNotes.includes("isolatedTestEnvironmentConfirmed: false"), "4d E2E env not confirmed");
+  assert(phase4dNotes.includes("realSupabaseUploadTestsAllowed: false"), "4d no live upload tests");
 
   assert(INBOX_REPLY_ATTACHMENT_MAX_FILE_BYTES === 5 * 1024 * 1024, "5 MiB per file");
   assert(INBOX_REPLY_ATTACHMENT_MAX_TOTAL_BYTES === 12 * 1024 * 1024, "12 MiB total");
@@ -528,6 +538,7 @@ export function runInboxReplyAttachmentChecks() {
   const lifecycle = read("src/lib/inbox/reply-attachment-lifecycle.ts");
   assert(lifecycle.includes("ignore_ui_only"), "stale finalize ignore helper");
   assert(lifecycle.includes("abandon_if_still_uploading"), "abandon unfinished helper");
+  assert(lifecycle.includes("decideListStagingAccess"), "M-C shared list authz helper");
 
   return "ok";
 }

@@ -13,8 +13,13 @@ import {
 } from "@/lib/inbox/reply-attachment-composer";
 import {
   clearReplyComposerDraft,
+  clearScopedReplyComposerDraftAfterSend,
+  getReplyComposerDraftClearedEpoch,
+  getReplyComposerDraftClearedRecord,
   readReplyComposerDraft,
   replyComposerDraftHasContent,
+  shouldResetComposerFieldsAfterScopedSendClear,
+  subscribeReplyComposerDraftCleared,
   writeReplyComposerDraft,
 } from "@/lib/inbox/reply-composer-draft";
 import { normalizeReplySubject } from "@/lib/inbox/reply-validation";
@@ -155,6 +160,17 @@ export function InboxReplyComposer({
   /** LOW: only refresh idempotency after a clear failed send when the set changes. */
   const refreshIdempotencyOnAttachChangeRef = useRef(false);
   const draftsEnabledRef = useRef(phase === "editing" || phase === "failed");
+  /** M4d-1: last observed send-clear epoch for this actor+parent (suppress re-persist). */
+  const seenDraftClearEpochRef = useRef(
+    getReplyComposerDraftClearedEpoch(actorId, parentMessageId),
+  );
+  const subjectRef = useRef(subject);
+  const bodyTextRef = useRef(bodyText);
+
+  useEffect(() => {
+    subjectRef.current = subject;
+    bodyTextRef.current = bodyText;
+  }, [subject, bodyText]);
 
   const handleAttachmentsChange = useCallback((next: ComposerAttachmentItem[]) => {
     setAttachments(next);
@@ -174,17 +190,83 @@ export function InboxReplyComposer({
     attachmentSetKeyRef.current = stableKey;
   }, []);
 
+  // M4d-1: when a scoped send clears the draft (possibly from an unmounted instance),
+  // reset matching UI fields and never re-persist the sent fingerprint.
+  useEffect(() => {
+    seenDraftClearEpochRef.current = getReplyComposerDraftClearedEpoch(
+      actorId,
+      parentMessageId,
+    );
+    return subscribeReplyComposerDraftCleared((event) => {
+      if (event.actorId !== actorId || event.parentMessageId !== parentMessageId) {
+        return;
+      }
+      seenDraftClearEpochRef.current = Math.max(
+        seenDraftClearEpochRef.current,
+        event.epoch,
+      );
+      const currentSubject = subjectRef.current;
+      const currentBodyText = bodyTextRef.current;
+      const shouldReset = shouldResetComposerFieldsAfterScopedSendClear({
+        currentSubject,
+        currentBodyText,
+        sentSubject: event.sentSubject,
+        sentBodyText: event.sentBodyText,
+      });
+      if (!shouldReset) {
+        // User already diverged after remount — keep edits and re-persist them now
+        // (write effect may not re-run if state is unchanged by this event).
+        writeReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId, {
+          subject: currentSubject,
+          bodyText: currentBodyText,
+        });
+        return;
+      }
+      setSubject(normalizeReplySubject("", originalSubject));
+      setBodyText("");
+    });
+  }, [actorId, originalSubject, parentMessageId]);
+
   // Persist subject/body per actor+parent (never tokens/paths). Skip terminal phases.
   useEffect(() => {
     draftsEnabledRef.current = phase === "editing" || phase === "failed";
     if (!draftsEnabledRef.current) {
       return;
     }
-    writeReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId, {
+    const store = sessionDraftStore();
+    const cleared = getReplyComposerDraftClearedRecord(actorId, parentMessageId);
+    if (cleared) {
+      if (cleared.epoch > seenDraftClearEpochRef.current) {
+        seenDraftClearEpochRef.current = cleared.epoch;
+      }
+      // M4d-1: never re-persist the exact sent fingerprint after a scoped clear.
+      if (
+        shouldResetComposerFieldsAfterScopedSendClear({
+          currentSubject: subject,
+          currentBodyText: bodyText,
+          sentSubject: cleared.sentSubject,
+          sentBodyText: cleared.sentBodyText,
+        })
+      ) {
+        return;
+      }
+    }
+    if (
+      !replyComposerDraftHasContent({
+        subject,
+        bodyText,
+        defaultSubject,
+      })
+    ) {
+      // Avoid writing empty default drafts after a successful-send UI reset.
+      clearReplyComposerDraft(store, actorId, parentMessageId);
+      return;
+    }
+    writeReplyComposerDraft(store, actorId, parentMessageId, {
       subject,
       bodyText,
     });
-  }, [actorId, bodyText, parentMessageId, phase, subject]);
+  }, [actorId, bodyText, defaultSubject, parentMessageId, phase, subject]);
 
   const hasDiscardableWork =
     replyComposerDraftHasContent({
@@ -282,7 +364,9 @@ export function InboxReplyComposer({
     setPhase("sending");
     setStatusMessage("Antwort wird gesendet…");
 
+    // M-A: capture draft scope at submit — clear must target this message even after unmount.
     const draft = {
+      actorId,
       parentMessageId,
       toAddress: lockedToAddress,
       subject: normalizeReplySubject(subject, originalSubject),
@@ -298,7 +382,7 @@ export function InboxReplyComposer({
         subject: draft.subject,
         bodyText: draft.bodyText,
         idempotencyKey: draft.idempotencyKey,
-        // Phase 4c: attachment SMTP remains gated server-side (allowAttachmentSend: false).
+        // Phase 4c/4d: attachment SMTP remains gated server-side (allowAttachmentSend: false).
         // Composer never forwards upload ids while the product gate is closed.
       });
     } catch {
@@ -313,6 +397,18 @@ export function InboxReplyComposer({
       return;
     }
 
+    // M-A / M4d-1: clear scoped draft on successful send before mount check, and
+    // notify any remounted composer for the same actor+parent (never other keys).
+    clearScopedReplyComposerDraftAfterSend({
+      store: sessionDraftStore(),
+      actorId: draft.actorId,
+      parentMessageId: draft.parentMessageId,
+      sendOk: Boolean(result.ok),
+      sendStatus: result.status,
+      sentSubject: draft.subject,
+      sentBodyText: draft.bodyText,
+    });
+
     if (!mountedRef.current) {
       // Selection changed while send was in flight — do not apply UI to the wrong message.
       // Server-side claim/idempotency still owns delivery; never auto-retry here.
@@ -323,7 +419,6 @@ export function InboxReplyComposer({
     onOutcome(result, recorded);
 
     if (result.ok && result.status === "sent") {
-      clearReplyComposerDraft(sessionDraftStore(), actorId, parentMessageId);
       setPhase("sent");
       setStatusMessage(result.error ?? "Antwort wurde gesendet.");
       submitLockRef.current = true; // keep locked — no duplicate submit

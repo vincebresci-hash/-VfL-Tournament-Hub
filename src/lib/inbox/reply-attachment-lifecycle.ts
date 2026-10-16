@@ -107,26 +107,51 @@ export function countsTowardClientQuota(input: {
   return true;
 }
 
+export type ListStagingAccessDecision =
+  | { ok: true }
+  | {
+      ok: false;
+      errorCode: "unauthorized" | "invalid_input" | "parent_not_found";
+    };
+
 /**
- * M1: shared gate for list/begin — inaccessible parent/mailbox must fail closed.
- * Executable negative-path coverage without Supabase.
+ * M-C: single shared authorization decision for listInboxReplyStagingAttachmentsAction
+ * and its negative tests. Fail closed on missing auth, inbox.view, inbox.reply,
+ * invalid parent id, or RLS-invisible parent/mailbox.
  */
-export function decideListStagingParentAccess(input: {
+export function decideListStagingAccess(input: {
   authenticated: boolean;
+  canAccessInbox: boolean;
+  canReplyInbox: boolean;
   parentMessageId: string;
-  /** Result of RLS-scoped inbox_messages lookup (null/missing = inaccessible). */
+  /** Result of RLS-scoped inbox_messages lookup (false = inaccessible / missing). */
   parentVisible: boolean;
-}): { ok: true } | { ok: false; errorCode: "unauthorized" | "invalid_input" | "parent_not_found" } {
-  if (!input.authenticated) {
+}): ListStagingAccessDecision {
+  if (!input.authenticated || !input.canAccessInbox || !input.canReplyInbox) {
     return { ok: false, errorCode: "unauthorized" };
   }
-  if (!/^[0-9a-f-]{36}$/i.test(input.parentMessageId.trim())) {
+  if (!/^[0-9a-f-]{36}$/i.test(String(input.parentMessageId ?? "").trim())) {
     return { ok: false, errorCode: "invalid_input" };
   }
   if (!input.parentVisible) {
     return { ok: false, errorCode: "parent_not_found" };
   }
   return { ok: true };
+}
+
+/** @deprecated Use decideListStagingAccess — kept as thin alias for older tests. */
+export function decideListStagingParentAccess(input: {
+  authenticated: boolean;
+  parentMessageId: string;
+  parentVisible: boolean;
+}): ListStagingAccessDecision {
+  return decideListStagingAccess({
+    authenticated: input.authenticated,
+    canAccessInbox: input.authenticated,
+    canReplyInbox: input.authenticated,
+    parentMessageId: input.parentMessageId,
+    parentVisible: input.parentVisible,
+  });
 }
 
 export type RemoveAfterAbandonDecision =

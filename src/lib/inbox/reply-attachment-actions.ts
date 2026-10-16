@@ -9,6 +9,7 @@ import {
   INBOX_REPLY_ATTACHMENT_FINALIZE_MAX_AGE_MS,
   INBOX_REPLY_ATTACHMENT_SIGNED_URL_TTL_SECONDS,
 } from "@/lib/inbox/reply-attachment-config";
+import { decideListStagingAccess } from "@/lib/inbox/reply-attachment-lifecycle";
 import {
   assertInboxReplyStoragePathBinding,
   decideFinalizeCommitCleanup,
@@ -50,26 +51,54 @@ export type InboxReplyDirectUploadAuthorization = {
   finalizeDeadlineMs: number;
 };
 
+/**
+ * Session gate for reply-attachment actions.
+ * Always returns explicit permission flags so callers (esp. listStaging) can feed
+ * decideListStagingAccess without hardcoding booleans (M4d-2).
+ * `session` is non-null only when authenticated + inbox.view + inbox.reply.
+ */
 async function requireReplyAttachmentSession() {
   const access = await requireAdminSession();
   if ("error" in access && access.error) {
-    return { error: access.error as string, session: null, authorization: null };
+    return {
+      error: access.error as string,
+      session: null as null,
+      authorization: null as null,
+      authenticated: false,
+      canAccessInbox: false,
+      canReplyInbox: false,
+    };
   }
-  if (!canAccessInbox(access.session, access.authorization)) {
+  const viewOk = canAccessInbox(access.session, access.authorization);
+  const replyOk = canReplyInbox(access.session, access.authorization);
+  if (!viewOk) {
     return {
       error: "Keine Berechtigung für den Posteingang.",
-      session: null,
-      authorization: null,
+      session: null as null,
+      authorization: access.authorization,
+      authenticated: true,
+      canAccessInbox: false,
+      canReplyInbox: replyOk,
     };
   }
-  if (!canReplyInbox(access.session, access.authorization)) {
+  if (!replyOk) {
     return {
       error: "Keine Berechtigung zum Antworten.",
-      session: null,
-      authorization: null,
+      session: null as null,
+      authorization: access.authorization,
+      authenticated: true,
+      canAccessInbox: true,
+      canReplyInbox: false,
     };
   }
-  return { error: null, session: access.session, authorization: access.authorization };
+  return {
+    error: null as null,
+    session: access.session,
+    authorization: access.authorization,
+    authenticated: true,
+    canAccessInbox: true,
+    canReplyInbox: true,
+  };
 }
 
 function checksumSha256(content: Buffer): string {
@@ -599,22 +628,34 @@ export async function listInboxReplyStagingAttachmentsAction(
   errorCode: string | null;
 }> {
   const access = await requireReplyAttachmentSession();
-  if (access.error || !access.session) {
+  const parentId = String(parentMessageId ?? "").trim();
+
+  // M4d-2: feed real session permission flags into the shared decision (no hardcoding).
+  const early = decideListStagingAccess({
+    authenticated: access.authenticated,
+    canAccessInbox: access.canAccessInbox,
+    canReplyInbox: access.canReplyInbox,
+    parentMessageId: parentId,
+    // Parent visibility checked after we have a client; assume false until proven.
+    parentVisible: false,
+  });
+  if (!early.ok && early.errorCode !== "parent_not_found") {
+    return {
+      ok: false,
+      uploads: [],
+      error:
+        early.errorCode === "invalid_input"
+          ? "Ungültige Nachrichten-ID."
+          : (access.error ?? "Nicht autorisiert."),
+      errorCode: early.errorCode,
+    };
+  }
+  if (!access.session) {
     return {
       ok: false,
       uploads: [],
       error: access.error ?? "Nicht autorisiert.",
       errorCode: "unauthorized",
-    };
-  }
-
-  const parentId = parentMessageId.trim();
-  if (!/^[0-9a-f-]{36}$/i.test(parentId)) {
-    return {
-      ok: false,
-      uploads: [],
-      error: "Ungültige Nachrichten-ID.",
-      errorCode: "invalid_input",
     };
   }
 
@@ -627,12 +668,25 @@ export async function listInboxReplyStagingAttachmentsAction(
     .select("id")
     .eq("id", parentId)
     .maybeSingle();
-  if (parentError || !parent) {
+
+  const accessDecision = decideListStagingAccess({
+    authenticated: access.authenticated,
+    canAccessInbox: access.canAccessInbox,
+    canReplyInbox: access.canReplyInbox,
+    parentMessageId: parentId,
+    parentVisible: Boolean(!parentError && parent),
+  });
+  if (!accessDecision.ok) {
     return {
       ok: false,
       uploads: [],
-      error: "Nachricht nicht gefunden.",
-      errorCode: "parent_not_found",
+      error:
+        accessDecision.errorCode === "parent_not_found"
+          ? "Nachricht nicht gefunden."
+          : accessDecision.errorCode === "invalid_input"
+            ? "Ungültige Nachrichten-ID."
+            : "Nicht autorisiert.",
+      errorCode: accessDecision.errorCode,
     };
   }
 

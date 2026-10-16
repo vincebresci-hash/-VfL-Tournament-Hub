@@ -4,14 +4,21 @@
  */
 
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { beforeEach, describe, it } from "node:test";
 import {
   buildReplyComposerDraftStorageKey,
   clearReplyComposerDraft,
+  clearScopedReplyComposerDraftAfterSend,
+  getReplyComposerDraftClearedEpoch,
   parseReplyComposerDraft,
   readReplyComposerDraft,
   replyComposerDraftHasContent,
+  resetReplyComposerDraftClearRegistryForTests,
   serializeReplyComposerDraft,
+  shouldClearReplyComposerDraftAfterSend,
+  shouldResetComposerFieldsAfterScopedSendClear,
+  shouldSuppressDraftPersistAfterSendClear,
+  subscribeReplyComposerDraftCleared,
   writeReplyComposerDraft,
 } from "@/lib/inbox/reply-composer-draft";
 
@@ -135,6 +142,174 @@ describe("reply composer draft persistence", () => {
         subject: "Re: Turnier",
         bodyText: "Hi",
         defaultSubject: "Re: Turnier",
+      }),
+      true,
+    );
+  });
+});
+
+describe("M-A clear draft after send (race-safe)", () => {
+  beforeEach(() => {
+    resetReplyComposerDraftClearRegistryForTests();
+  });
+
+  it("only clears on successful sent status", () => {
+    assert.equal(
+      shouldClearReplyComposerDraftAfterSend({ sendOk: true, sendStatus: "sent" }),
+      true,
+    );
+    assert.equal(
+      shouldClearReplyComposerDraftAfterSend({ sendOk: false, sendStatus: "sent" }),
+      false,
+    );
+    assert.equal(
+      shouldClearReplyComposerDraftAfterSend({ sendOk: true, sendStatus: "failed" }),
+      false,
+    );
+    assert.equal(
+      shouldClearReplyComposerDraftAfterSend({ sendOk: true, sendStatus: "uncertain" }),
+      false,
+    );
+  });
+
+  it("clears scoped draft while leaving sibling message draft intact", () => {
+    const store = memoryStore();
+    writeReplyComposerDraft(store, ACTOR_A, MSG_1, {
+      subject: "Re: A1",
+      bodyText: "sending",
+    });
+    writeReplyComposerDraft(store, ACTOR_A, MSG_2, {
+      subject: "Re: A2",
+      bodyText: "keep",
+    });
+
+    const result = clearScopedReplyComposerDraftAfterSend({
+      store,
+      actorId: ACTOR_A,
+      parentMessageId: MSG_1,
+      sendOk: true,
+      sendStatus: "sent",
+    });
+    assert.equal(result.cleared, true);
+    assert.equal(readReplyComposerDraft(store, ACTOR_A, MSG_1), null);
+    assert.deepEqual(readReplyComposerDraft(store, ACTOR_A, MSG_2), {
+      subject: "Re: A2",
+      bodyText: "keep",
+    });
+  });
+
+  it("does not clear other actor drafts", () => {
+    const store = memoryStore();
+    writeReplyComposerDraft(store, ACTOR_A, MSG_1, {
+      subject: "Re: A",
+      bodyText: "a",
+    });
+    writeReplyComposerDraft(store, ACTOR_B, MSG_1, {
+      subject: "Re: B",
+      bodyText: "b",
+    });
+    clearScopedReplyComposerDraftAfterSend({
+      store,
+      actorId: ACTOR_A,
+      parentMessageId: MSG_1,
+      sendOk: true,
+      sendStatus: "sent",
+    });
+    assert.equal(readReplyComposerDraft(store, ACTOR_A, MSG_1), null);
+    assert.deepEqual(readReplyComposerDraft(store, ACTOR_B, MSG_1), {
+      subject: "Re: B",
+      bodyText: "b",
+    });
+  });
+
+  it("no-ops safely when sessionStorage is unavailable", () => {
+    const result = clearScopedReplyComposerDraftAfterSend({
+      store: null,
+      actorId: ACTOR_A,
+      parentMessageId: MSG_1,
+      sendOk: true,
+      sendStatus: "sent",
+    });
+    assert.equal(result.cleared, true);
+    assert.ok(result.key);
+  });
+
+  it("does not clear on failed send", () => {
+    const store = memoryStore();
+    writeReplyComposerDraft(store, ACTOR_A, MSG_1, {
+      subject: "Re: A",
+      bodyText: "keep-on-fail",
+    });
+    const result = clearScopedReplyComposerDraftAfterSend({
+      store,
+      actorId: ACTOR_A,
+      parentMessageId: MSG_1,
+      sendOk: false,
+      sendStatus: "failed",
+    });
+    assert.equal(result.cleared, false);
+    assert.deepEqual(readReplyComposerDraft(store, ACTOR_A, MSG_1), {
+      subject: "Re: A",
+      bodyText: "keep-on-fail",
+    });
+  });
+
+  it("M4d-1 notifies listeners and bumps epoch on successful clear", () => {
+    resetReplyComposerDraftClearRegistryForTests();
+    const store = memoryStore();
+    writeReplyComposerDraft(store, ACTOR_A, MSG_1, {
+      subject: "Re: A",
+      bodyText: "in-flight",
+    });
+    let notified = false;
+    const unsubscribe = subscribeReplyComposerDraftCleared((event) => {
+      if (event.actorId === ACTOR_A && event.parentMessageId === MSG_1) {
+        notified = true;
+        assert.equal(event.sentBodyText, "in-flight");
+      }
+    });
+    const before = getReplyComposerDraftClearedEpoch(ACTOR_A, MSG_1);
+    clearScopedReplyComposerDraftAfterSend({
+      store,
+      actorId: ACTOR_A,
+      parentMessageId: MSG_1,
+      sendOk: true,
+      sendStatus: "sent",
+      sentSubject: "Re: A",
+      sentBodyText: "in-flight",
+    });
+    unsubscribe();
+    assert.equal(notified, true);
+    assert.equal(getReplyComposerDraftClearedEpoch(ACTOR_A, MSG_1), before + 1);
+  });
+
+  it("M4d-1 suppress persist only for matching sent fingerprint", () => {
+    assert.equal(
+      shouldResetComposerFieldsAfterScopedSendClear({
+        currentSubject: "Re: A",
+        currentBodyText: "same",
+        sentSubject: "Re: A",
+        sentBodyText: "same",
+      }),
+      true,
+    );
+    assert.equal(
+      shouldResetComposerFieldsAfterScopedSendClear({
+        currentSubject: "Re: A",
+        currentBodyText: "edited after remount",
+        sentSubject: "Re: A",
+        sentBodyText: "same",
+      }),
+      false,
+    );
+    assert.equal(
+      shouldSuppressDraftPersistAfterSendClear({
+        seenClearEpoch: 0,
+        currentClearEpoch: 1,
+        currentSubject: "Re: A",
+        currentBodyText: "same",
+        sentSubject: "Re: A",
+        sentBodyText: "same",
       }),
       true,
     );
