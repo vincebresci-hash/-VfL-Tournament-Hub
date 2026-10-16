@@ -2,6 +2,12 @@
  * Session-scoped reply draft persistence (subject + body only).
  * Keyed by authenticated actor + parent message so drafts never leak across users/messages.
  * Never stores upload tokens, storage paths, credentials, or attachment metadata.
+ *
+ * Clear-event coordination (M4d-1 / R1):
+ * - In-memory registry stores only a non-reversible fingerprint of sent subject/body
+ *   (never plaintext message content).
+ * - Composers must keep subject/body refs authoritative synchronously with user edits
+ *   so clear listeners never read a stale post-commit snapshot.
  */
 
 const DRAFT_KEY_PREFIX = "vfl.inbox.replyDraft.v1";
@@ -142,20 +148,34 @@ export function shouldClearReplyComposerDraftAfterSend(input: {
   return input.sendOk === true && input.sendStatus === "sent";
 }
 
-/** M4d-1: in-memory clear notification so remounted composers cannot re-persist a sent draft. */
+/**
+ * Non-reversible fingerprint of sent subject/body for clear-event matching.
+ * Subject is trimmed (matches prior compare semantics); body is exact.
+ * Browser-safe pure hash — never stores or returns plaintext content.
+ */
+export function fingerprintReplyComposerDraft(subject: string, bodyText: string): string {
+  const normalized = `${subject.trim()}\u0000${bodyText}`;
+  // FNV-1a 32-bit + length; collision risk is acceptable for same-tab ephemeral matching.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < normalized.length; i++) {
+    hash ^= normalized.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `v1:${normalized.length}:${(hash >>> 0).toString(16)}`;
+}
+
+/** M4d-1 / R1: in-memory clear notification so remounted composers cannot re-persist a sent draft. */
 export type ReplyComposerDraftClearedEvent = {
   actorId: string;
   parentMessageId: string;
-  /** Subject/body that were submitted — used to avoid wiping unrelated user edits. */
-  sentSubject: string;
-  sentBodyText: string;
+  /** Fingerprint of submitted subject/body — never plaintext. */
+  sentFingerprint: string;
   epoch: number;
 };
 
 type DraftClearedRecord = {
   epoch: number;
-  sentSubject: string;
-  sentBodyText: string;
+  sentFingerprint: string;
 };
 
 const draftClearedByKey = new Map<string, DraftClearedRecord>();
@@ -199,12 +219,11 @@ export function subscribeReplyComposerDraftCleared(
 export function shouldResetComposerFieldsAfterScopedSendClear(input: {
   currentSubject: string;
   currentBodyText: string;
-  sentSubject: string;
-  sentBodyText: string;
+  sentFingerprint: string;
 }): boolean {
   return (
-    input.currentSubject.trim() === input.sentSubject.trim() &&
-    input.currentBodyText === input.sentBodyText
+    fingerprintReplyComposerDraft(input.currentSubject, input.currentBodyText) ===
+    input.sentFingerprint
   );
 }
 
@@ -217,8 +236,7 @@ export function shouldSuppressDraftPersistAfterSendClear(input: {
   currentClearEpoch: number;
   currentSubject: string;
   currentBodyText: string;
-  sentSubject: string;
-  sentBodyText: string;
+  sentFingerprint: string;
 }): boolean {
   if (input.currentClearEpoch <= input.seenClearEpoch) {
     return false;
@@ -226,8 +244,7 @@ export function shouldSuppressDraftPersistAfterSendClear(input: {
   return shouldResetComposerFieldsAfterScopedSendClear({
     currentSubject: input.currentSubject,
     currentBodyText: input.currentBodyText,
-    sentSubject: input.sentSubject,
-    sentBodyText: input.sentBodyText,
+    sentFingerprint: input.sentFingerprint,
   });
 }
 
@@ -244,7 +261,7 @@ export function clearScopedReplyComposerDraftAfterSend(input: {
   parentMessageId: string;
   sendOk: boolean;
   sendStatus: string | null | undefined;
-  /** Exact subject/body submitted with the successful send. */
+  /** Exact subject/body submitted with the successful send (hashed immediately; not retained). */
   sentSubject?: string;
   sentBodyText?: string;
 }): { cleared: boolean; key: string | null; epoch: number } {
@@ -259,15 +276,16 @@ export function clearScopedReplyComposerDraftAfterSend(input: {
 
   const prev = draftClearedByKey.get(key);
   const epoch = (prev?.epoch ?? 0) + 1;
-  const sentSubject = input.sentSubject ?? "";
-  const sentBodyText = input.sentBodyText ?? "";
-  draftClearedByKey.set(key, { epoch, sentSubject, sentBodyText });
+  const sentFingerprint = fingerprintReplyComposerDraft(
+    input.sentSubject ?? "",
+    input.sentBodyText ?? "",
+  );
+  draftClearedByKey.set(key, { epoch, sentFingerprint });
 
   const event: ReplyComposerDraftClearedEvent = {
     actorId: input.actorId,
     parentMessageId: input.parentMessageId,
-    sentSubject,
-    sentBodyText,
+    sentFingerprint,
     epoch,
   };
   for (const listener of draftClearedListeners) {
@@ -285,4 +303,12 @@ export function clearScopedReplyComposerDraftAfterSend(input: {
 export function resetReplyComposerDraftClearRegistryForTests(): void {
   draftClearedByKey.clear();
   draftClearedListeners.clear();
+}
+
+/** Test-only: inspect registry record without exposing plaintext (fingerprint only). */
+export function peekReplyComposerDraftClearedRecordForTests(
+  actorId: string,
+  parentMessageId: string,
+): DraftClearedRecord | null {
+  return getReplyComposerDraftClearedRecord(actorId, parentMessageId);
 }

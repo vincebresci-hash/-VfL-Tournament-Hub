@@ -164,13 +164,22 @@ export function InboxReplyComposer({
   const seenDraftClearEpochRef = useRef(
     getReplyComposerDraftClearedEpoch(actorId, parentMessageId),
   );
+  /**
+   * R1: keep subject/body refs authoritative with every user edit (and programmatic
+   * reset), not via a post-commit useEffect — clear listeners must never see stale text.
+   */
   const subjectRef = useRef(subject);
   const bodyTextRef = useRef(bodyText);
 
-  useEffect(() => {
-    subjectRef.current = subject;
-    bodyTextRef.current = bodyText;
-  }, [subject, bodyText]);
+  const setSubjectImmediate = useCallback((next: string) => {
+    subjectRef.current = next;
+    setSubject(next);
+  }, []);
+
+  const setBodyTextImmediate = useCallback((next: string) => {
+    bodyTextRef.current = next;
+    setBodyText(next);
+  }, []);
 
   const handleAttachmentsChange = useCallback((next: ComposerAttachmentItem[]) => {
     setAttachments(next);
@@ -190,8 +199,9 @@ export function InboxReplyComposer({
     attachmentSetKeyRef.current = stableKey;
   }, []);
 
-  // M4d-1: when a scoped send clears the draft (possibly from an unmounted instance),
+  // M4d-1 / R1: when a scoped send clears the draft (possibly from an unmounted instance),
   // reset matching UI fields and never re-persist the sent fingerprint.
+  // Deps are actor/parent/(original subject for empty reset). Field refs stay outside closures.
   useEffect(() => {
     seenDraftClearEpochRef.current = getReplyComposerDraftClearedEpoch(
       actorId,
@@ -210,8 +220,7 @@ export function InboxReplyComposer({
       const shouldReset = shouldResetComposerFieldsAfterScopedSendClear({
         currentSubject,
         currentBodyText,
-        sentSubject: event.sentSubject,
-        sentBodyText: event.sentBodyText,
+        sentFingerprint: event.sentFingerprint,
       });
       if (!shouldReset) {
         // User already diverged after remount — keep edits and re-persist them now
@@ -222,7 +231,10 @@ export function InboxReplyComposer({
         });
         return;
       }
-      setSubject(normalizeReplySubject("", originalSubject));
+      const nextSubject = normalizeReplySubject("", originalSubject);
+      subjectRef.current = nextSubject;
+      bodyTextRef.current = "";
+      setSubject(nextSubject);
       setBodyText("");
     });
   }, [actorId, originalSubject, parentMessageId]);
@@ -244,8 +256,7 @@ export function InboxReplyComposer({
         shouldResetComposerFieldsAfterScopedSendClear({
           currentSubject: subject,
           currentBodyText: bodyText,
-          sentSubject: cleared.sentSubject,
-          sentBodyText: cleared.sentBodyText,
+          sentFingerprint: cleared.sentFingerprint,
         })
       ) {
         return;
@@ -527,8 +538,11 @@ export function InboxReplyComposer({
             value={subject}
             maxLength={200}
             disabled={phase === "sending" || phase === "sent" || phase === "uncertain" || phase === "blocked"}
-            onChange={(event) => setSubject(event.target.value)}
-            onBlur={() => setSubject((current) => normalizeReplySubject(current, originalSubject))}
+            onChange={(event) => setSubjectImmediate(event.target.value)}
+            onBlur={() => {
+              const next = normalizeReplySubject(subjectRef.current, originalSubject);
+              setSubjectImmediate(next);
+            }}
             className="h-10 w-full rounded-lg border border-line bg-white px-3 text-[13px] text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60"
           />
         </div>
@@ -547,7 +561,7 @@ export function InboxReplyComposer({
             rows={8}
             maxLength={20_000}
             disabled={phase === "sending" || phase === "sent" || phase === "uncertain" || phase === "blocked"}
-            onChange={(event) => setBodyText(event.target.value)}
+            onChange={(event) => setBodyTextImmediate(event.target.value)}
             placeholder="Ihre Antwort als Klartext…"
             className="min-h-[10rem] w-full resize-y rounded-lg border border-line bg-white px-3 py-2.5 text-[15px] leading-6 text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-yellow disabled:opacity-60 sm:min-h-[12rem]"
           />

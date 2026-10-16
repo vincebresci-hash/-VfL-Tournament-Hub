@@ -6,6 +6,7 @@
  *   even if the composer unmounted mid-send.
  * - M-B: InboxReplyComposer.test.tsx (mocked React — not browser E2E).
  * - M-C: decideListStagingAccess shared by listInboxReplyStagingAttachmentsAction + tests.
+ * - R1: subject/body refs updated synchronously on edit; clear registry stores fingerprints only.
  *
  * Attachment SMTP remains fail-closed (`allowAttachmentSend: false`).
  */
@@ -13,6 +14,8 @@
 export const INBOX_REPLY_ATTACHMENT_PHASE4D_NOTES = {
   maDraftClearAfterUnmountSend: true,
   m4d1RemountNoDraftResurrection: true,
+  r1SyncComposerRefsOnEdit: true,
+  r1FingerprintOnlyClearRegistry: true,
   mbComposerReactTests: true,
   m4d3FailedUncertainPreserveDraft: true,
   mcSharedListStagingAuthz: true,
@@ -25,11 +28,17 @@ export const INBOX_REPLY_ATTACHMENT_PHASE4D_NOTES = {
    */
   playwrightProjectConfigured: false,
   /**
-   * Vercel Preview for PR #133 is NOT confirmed to point at an isolated Supabase
-   * project. Treat Preview as potentially production-data-adjacent until proven
-   * otherwise. Do not run real Storage uploads against it without explicit approval.
+   * Step 2 isolation assessment (read-only):
+   * - Known production Supabase project ref: ogopebvpojuvheimzged
+   * - Vercel Preview URL for PR head is distinct from production Vercel host,
+   *   but Preview JS bundles did not expose a NEXT_PUBLIC_SUPABASE_URL hostname,
+   *   and this agent has no read access to Vercel project env vars.
+   * - Local agent process has no SUPABASE_* env set.
+   * - Verdict remains UNKNOWN — do NOT treat Preview as an isolated test project.
    */
   isolatedTestEnvironmentConfirmed: false,
+  previewSupabaseIsolationVerdict: "UNKNOWN" as const,
+  knownProductionSupabaseProjectRef: "ogopebvpojuvheimzged",
   realSupabaseUploadTestsAllowed: false,
   browserE2EPending: true,
 } as const;

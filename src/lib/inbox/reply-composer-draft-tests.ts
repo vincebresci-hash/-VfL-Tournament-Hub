@@ -9,8 +9,10 @@ import {
   buildReplyComposerDraftStorageKey,
   clearReplyComposerDraft,
   clearScopedReplyComposerDraftAfterSend,
+  fingerprintReplyComposerDraft,
   getReplyComposerDraftClearedEpoch,
   parseReplyComposerDraft,
+  peekReplyComposerDraftClearedRecordForTests,
   readReplyComposerDraft,
   replyComposerDraftHasContent,
   resetReplyComposerDraftClearRegistryForTests,
@@ -262,10 +264,12 @@ describe("M-A clear draft after send (race-safe)", () => {
       bodyText: "in-flight",
     });
     let notified = false;
+    let eventFingerprint = "";
+    const expectedFp = fingerprintReplyComposerDraft("Re: A", "in-flight");
     const unsubscribe = subscribeReplyComposerDraftCleared((event) => {
       if (event.actorId === ACTOR_A && event.parentMessageId === MSG_1) {
         notified = true;
-        assert.equal(event.sentBodyText, "in-flight");
+        eventFingerprint = event.sentFingerprint;
       }
     });
     const before = getReplyComposerDraftClearedEpoch(ACTOR_A, MSG_1);
@@ -280,16 +284,22 @@ describe("M-A clear draft after send (race-safe)", () => {
     });
     unsubscribe();
     assert.equal(notified, true);
+    assert.equal(eventFingerprint, expectedFp);
     assert.equal(getReplyComposerDraftClearedEpoch(ACTOR_A, MSG_1), before + 1);
+    const record = peekReplyComposerDraftClearedRecordForTests(ACTOR_A, MSG_1);
+    assert.ok(record);
+    assert.equal(record!.sentFingerprint, expectedFp);
+    // Registry must not retain plaintext message content.
+    assert.equal(JSON.stringify(record).includes("in-flight"), false);
   });
 
-  it("M4d-1 suppress persist only for matching sent fingerprint", () => {
+  it("M4d-1 / R1 suppress persist only for matching sent fingerprint", () => {
+    const sameFp = fingerprintReplyComposerDraft("Re: A", "same");
     assert.equal(
       shouldResetComposerFieldsAfterScopedSendClear({
         currentSubject: "Re: A",
         currentBodyText: "same",
-        sentSubject: "Re: A",
-        sentBodyText: "same",
+        sentFingerprint: sameFp,
       }),
       true,
     );
@@ -297,8 +307,7 @@ describe("M-A clear draft after send (race-safe)", () => {
       shouldResetComposerFieldsAfterScopedSendClear({
         currentSubject: "Re: A",
         currentBodyText: "edited after remount",
-        sentSubject: "Re: A",
-        sentBodyText: "same",
+        sentFingerprint: sameFp,
       }),
       false,
     );
@@ -308,10 +317,20 @@ describe("M-A clear draft after send (race-safe)", () => {
         currentClearEpoch: 1,
         currentSubject: "Re: A",
         currentBodyText: "same",
-        sentSubject: "Re: A",
-        sentBodyText: "same",
+        sentFingerprint: sameFp,
       }),
       true,
     );
+  });
+
+  it("R1 fingerprint is stable, trims subject, and never echoes plaintext", () => {
+    const a = fingerprintReplyComposerDraft("  Re: A  ", "body");
+    const b = fingerprintReplyComposerDraft("Re: A", "body");
+    const c = fingerprintReplyComposerDraft("Re: A", "body ");
+    assert.equal(a, b);
+    assert.notEqual(b, c);
+    assert.equal(a.includes("Re: A"), false);
+    assert.equal(a.includes("body"), false);
+    assert.match(a, /^v1:\d+:[0-9a-f]+$/);
   });
 });

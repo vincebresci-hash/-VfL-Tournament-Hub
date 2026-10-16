@@ -5,12 +5,14 @@
  * Run: npm run test:inbox-attachment-react
  */
 
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InboxReplyComposer } from "@/components/admin/inbox/InboxReplyComposer";
 import {
   buildReplyComposerDraftStorageKey,
+  fingerprintReplyComposerDraft,
+  peekReplyComposerDraftClearedRecordForTests,
   readReplyComposerDraft,
   resetReplyComposerDraftClearRegistryForTests,
   writeReplyComposerDraft,
@@ -375,6 +377,108 @@ describe("InboxReplyComposer drafts (mocked — not E2E)", () => {
       expect(stored?.bodyText).toBe("Newer edit after remount");
     });
     second.unmount();
+  });
+
+  it("R1 remount: clear during rapid keystroke keeps newer edits (sync refs)", async () => {
+    writeReplyComposerDraft(sessionStorage, ACTOR_A, MSG_1, {
+      subject: "Re: Turnier",
+      bodyText: "Original send",
+    });
+
+    let resolveSend: ((value: unknown) => void) | null = null;
+    sendMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
+
+    const first = renderComposer({ parentMessageId: MSG_1 });
+    await waitFor(() => expect(screen.getByDisplayValue("Original send")).toBeTruthy());
+    await userEvent.click(screen.getByRole("button", { name: "Senden" }));
+    await waitFor(() => expect(sendMock).toHaveBeenCalled());
+    first.unmount();
+
+    const second = renderComposer({ parentMessageId: MSG_1 });
+    await waitFor(() => expect(screen.getByDisplayValue("Original send")).toBeTruthy());
+    const body = screen.getByLabelText(/^Nachricht$/i) as HTMLTextAreaElement;
+
+    // fireEvent.change updates refs synchronously in the same turn — no effect flush required.
+    fireEvent.change(body, { target: { value: "Typed after remount before clear" } });
+
+    await act(async () => {
+      resolveSend?.({
+        ok: true,
+        status: "sent",
+        replyId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        error: null,
+        errorCode: null,
+        sendAttempted: true,
+      });
+    });
+
+    expect(screen.getByDisplayValue("Typed after remount before clear")).toBeTruthy();
+    await waitFor(() => {
+      expect(readReplyComposerDraft(sessionStorage, ACTOR_A, MSG_1)?.bodyText).toBe(
+        "Typed after remount before clear",
+      );
+    });
+    const record = peekReplyComposerDraftClearedRecordForTests(ACTOR_A, MSG_1);
+    expect(record?.sentFingerprint).toBe(
+      fingerprintReplyComposerDraft("Re: Turnier", "Original send"),
+    );
+    expect(JSON.stringify(record)).not.toContain("Original send");
+    second.unmount();
+  });
+
+  it("R1 pending send: rapid subject+body edits survive clear without remount", async () => {
+    writeReplyComposerDraft(sessionStorage, ACTOR_A, MSG_1, {
+      subject: "Re: Turnier",
+      bodyText: "Pending body",
+    });
+
+    let resolveSend: ((value: unknown) => void) | null = null;
+    sendMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveSend = resolve;
+        }),
+    );
+
+    renderComposer({ parentMessageId: MSG_1 });
+    await waitFor(() => expect(screen.getByDisplayValue("Pending body")).toBeTruthy());
+    await userEvent.click(screen.getByRole("button", { name: "Senden" }));
+    await waitFor(() => expect(sendMock).toHaveBeenCalled());
+
+    // While send is in flight, composer fields are disabled — remount is the
+    // realistic edit path. Simulate a second composer instance receiving the clear.
+    cleanup();
+    const remounted = renderComposer({ parentMessageId: MSG_1 });
+    await waitFor(() => expect(screen.getByDisplayValue("Pending body")).toBeTruthy());
+
+    const subject = screen.getByLabelText(/^Betreff$/i) as HTMLInputElement;
+    const body = screen.getByLabelText(/^Nachricht$/i) as HTMLTextAreaElement;
+    fireEvent.change(subject, { target: { value: "Re: Rapid subject" } });
+    fireEvent.change(body, { target: { value: "Rapid body mid-flight" } });
+
+    await act(async () => {
+      resolveSend?.({
+        ok: true,
+        status: "sent",
+        replyId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        error: null,
+        errorCode: null,
+        sendAttempted: true,
+      });
+    });
+
+    expect((screen.getByLabelText(/^Betreff$/i) as HTMLInputElement).value).toBe(
+      "Re: Rapid subject",
+    );
+    expect((screen.getByLabelText(/^Nachricht$/i) as HTMLTextAreaElement).value).toBe(
+      "Rapid body mid-flight",
+    );
+    remounted.unmount();
   });
 
   it("keeps attachment SMTP send gate closed (no attachment ids forwarded)", async () => {

@@ -326,6 +326,8 @@ export function runInboxReplyAttachmentChecks() {
   assert(existsSync(join(process.cwd(), "src/components/admin/inbox/InboxReplyComposer.test.tsx")), "M-B composer React tests");
   const phase4dNotes = read("src/lib/inbox/reply-attachment-phase4d-notes.ts");
   assert(phase4dNotes.includes("isolatedTestEnvironmentConfirmed: false"), "4d E2E env not confirmed");
+  assert(phase4dNotes.includes('previewSupabaseIsolationVerdict: "UNKNOWN"'), "4d preview isolation unknown");
+  assert(phase4dNotes.includes("r1SyncComposerRefsOnEdit: true"), "4d R1 sync refs noted");
   assert(phase4dNotes.includes("realSupabaseUploadTestsAllowed: false"), "4d no live upload tests");
 
   assert(INBOX_REPLY_ATTACHMENT_MAX_FILE_BYTES === 5 * 1024 * 1024, "5 MiB per file");
