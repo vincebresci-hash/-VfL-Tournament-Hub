@@ -59,6 +59,56 @@ export const INBOX_SQL_INTEGRATION_CASES = [
     description:
       "mark_inbox_attachment_repair_attempt increments retry_count and stores short error code only.",
   },
+  {
+    id: "reply-permission-denied",
+    description:
+      "COMMUNICATION_MANAGER cannot EXECUTE claim_inbox_reply_send; ADMIN with inbox.view+inbox.reply can.",
+  },
+  {
+    id: "reply-recipient-locked",
+    description:
+      "claim_inbox_reply_send rejects to_address that does not match parent.from_address.",
+  },
+  {
+    id: "reply-idempotency-actor-scoped",
+    description:
+      "Idempotency is UNIQUE(created_by, idempotency_key); another actor's key is invisible and does not leak reply_id.",
+  },
+  {
+    id: "reply-idempotency-no-resend",
+    description:
+      "Second claim with the same actor+idempotency_key returns already_existed + send_allowed=false.",
+  },
+  {
+    id: "reply-rate-limit-atomic",
+    description:
+      "Under concurrent claims with different keys, per-actor advisory lock + count keeps ≤20 rows / 10 minutes.",
+  },
+  {
+    id: "reply-unresolved-blocks-new-key",
+    description:
+      "While sending/uncertain exists for parent+actor, a new idempotency key returns unresolved_reply_exists.",
+  },
+  {
+    id: "reply-stale-sending-to-uncertain",
+    description:
+      "sending older than 15 minutes is rewritten to uncertain before claim decisions; never auto-resends.",
+  },
+  {
+    id: "reply-finalize-service-role-only",
+    description:
+      "authenticated EXECUTE on finalize_inbox_reply_send is denied; service_role can finalize sending→sent|failed|uncertain.",
+  },
+  {
+    id: "reply-reconcile-manual",
+    description:
+      "reconcile_inbox_reply_status allows uncertain|sending→sent|failed for service_role only; no SMTP.",
+  },
+  {
+    id: "reply-message-id-server-side",
+    description:
+      "claim generates message_id_header from mailbox.reply_message_id_domain; domain_not_configured when unset/local.",
+  },
 ] as const;
 
 export function describeInboxSqlIntegrationPlan(): string {

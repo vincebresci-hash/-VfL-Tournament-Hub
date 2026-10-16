@@ -10,6 +10,8 @@ import type {
   InboxMessageDetail,
   InboxMessageListItem,
   InboxProcessingStatus,
+  InboxReplyListItem,
+  InboxReplyStatus,
   InboxSyncStateView,
 } from "@/lib/inbox/types";
 
@@ -99,6 +101,54 @@ export async function listInboxMessages(input?: {
   };
 }
 
+function mapReplyStatus(value: string | null | undefined): InboxReplyStatus {
+  if (
+    value === "pending" ||
+    value === "sending" ||
+    value === "sent" ||
+    value === "failed" ||
+    value === "uncertain"
+  ) {
+    return value;
+  }
+  return "failed";
+}
+
+/** Outbound replies for a parent message (RLS: inbox.view). Newest first. */
+export async function listInboxRepliesForMessage(
+  parentMessageId: string,
+): Promise<{ replies: InboxReplyListItem[]; ready: boolean }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("inbox_replies")
+    .select(
+      "id, parent_message_id, to_address, subject, status, error, created_at, sent_at, attachment_count",
+    )
+    .eq("parent_message_id", parentMessageId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    return { replies: [], ready: !isMissingRelationError(error) };
+  }
+
+  return {
+    ready: true,
+    replies: (data ?? []).map((row) => ({
+      id: row.id,
+      parentMessageId: row.parent_message_id,
+      toAddress: row.to_address,
+      subject: row.subject,
+      status: mapReplyStatus(row.status),
+      // Never surface raw SMTP audit blobs in the UI — only short safe status copy.
+      error: null,
+      createdAt: row.created_at,
+      sentAt: row.sent_at,
+      attachmentCount: row.attachment_count,
+    })),
+  };
+}
+
 export async function getInboxMessageDetail(
   messageId: string,
 ): Promise<{ message: InboxMessageDetail | null; ready: boolean }> {
@@ -118,11 +168,14 @@ export async function getInboxMessageDetail(
     return { message: null, ready: true };
   }
 
-  const { data: attachments } = await supabase
-    .from("inbox_attachments")
-    .select("id, filename, content_type, size_bytes, stored, skip_reason")
-    .eq("message_id", messageId)
-    .order("part_index", { ascending: true });
+  const [{ data: attachments }, repliesResult] = await Promise.all([
+    supabase
+      .from("inbox_attachments")
+      .select("id, filename, content_type, size_bytes, stored, skip_reason")
+      .eq("message_id", messageId)
+      .order("part_index", { ascending: true }),
+    listInboxRepliesForMessage(messageId),
+  ]);
 
   const attachmentItems: InboxAttachmentItem[] = (attachments ?? []).map((row) => ({
     id: row.id,
@@ -159,6 +212,7 @@ export async function getInboxMessageDetail(
       hasAttachments: data.has_attachments,
       uidvalidity: Number(data.uidvalidity),
       attachments: attachmentItems,
+      replies: repliesResult.replies,
     },
   };
 }

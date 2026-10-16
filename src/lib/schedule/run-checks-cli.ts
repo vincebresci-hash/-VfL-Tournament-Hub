@@ -64,7 +64,7 @@ import { runOptionalApplicationFieldsChecks } from "@/lib/applications/optional-
 import { runMultiTeamApplicationChecks } from "@/lib/applications/multi-team-application-checks";
 import { runRpcUuidArrayChecks } from "@/lib/applications/rpc-uuid-array-checks";
 import { runAdminNavBadgesChecks } from "@/lib/admin/admin-nav-badges-checks";
-import { runInboxChecks } from "@/lib/inbox/inbox-checks";
+import { runInboxChecksAsync } from "@/lib/inbox/inbox-checks";
 import { runCancellationRequestsChecks } from "@/lib/cancellations/cancellation-checks";
 import { runCancellationEmailHotfixChecks } from "@/lib/cancellations/cancellation-email-hotfix-checks";
 import { runPublicCancellationGuidanceChecks } from "@/lib/cancellations/public-cancellation-guidance-checks";
@@ -111,7 +111,7 @@ import {
   runMeinTurnierplanTransactionRollbackCheck,
 } from "@/lib/mein-turnierplan-sync-rpc-checks";
 
-try {
+async function main() {
   const schedule = runScheduleSelfChecks();
   const planPreviewChecks = runPlanPreviewChecks();
   const planApplyChecks = runPlanApplyChecks();
@@ -163,7 +163,7 @@ try {
   const multiTeamApplicationChecks = runMultiTeamApplicationChecks();
   const rpcUuidArrayChecks = runRpcUuidArrayChecks();
   const adminNavBadgesChecks = runAdminNavBadgesChecks();
-  const inboxChecks = runInboxChecks();
+  const inboxChecks = await runInboxChecksAsync();
   const cancellationRequestsChecks = runCancellationRequestsChecks();
   const cancellationEmailHotfixChecks = runCancellationEmailHotfixChecks();
   const publicCancellationGuidanceChecks = runPublicCancellationGuidanceChecks();
@@ -337,7 +337,9 @@ try {
   console.log(`team-logo-display-checks: ${teamLogoDisplayChecks}`);
   console.log(`matchday-ui-polish-checks: ${matchdayUiPolishChecks}`);
   console.log(`live-hub-native-c5b-checks: ${liveHubNativeC5BChecks}`);
-} catch (error) {
+}
+
+main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
-}
+});

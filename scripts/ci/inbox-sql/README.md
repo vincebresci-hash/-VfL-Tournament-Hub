@@ -11,6 +11,12 @@ Executable PostgreSQL/Supabase integration tests for the IONOS inbox migration.
 - Does not exercise or modify the outbound Resend email system
 - Historical migration SQL files are never modified
 
+## Reply SQL suite
+
+`run.mjs` loads `reply-tests.mjs` after the legacy inbox cases. Those tests exercise
+`claim_inbox_reply_send` / finalize / reconcile with real concurrent `pg` connections
+(authenticated JWT claims + `SET LOCAL ROLE`). They never call SMTP or Resend.
+
 ## Enum compatibility (CI-only)
 
 Two historical migrations add enum values and use them in the same file, which

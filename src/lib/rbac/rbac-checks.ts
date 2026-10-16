@@ -336,6 +336,16 @@ export function runRbacChecks() {
     "COMMUNICATION_MANAGER: inbox.manage BLOCKED",
   );
   assert(
+    !resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["COMMUNICATION_MANAGER"],
+      overrides: [],
+      permission: "inbox.reply",
+    }),
+    "COMMUNICATION_MANAGER: inbox.reply BLOCKED",
+  );
+  assert(
     resolvePermissionAccess({
       isActive: true,
       profileRole: "admin",
@@ -356,14 +366,26 @@ export function runRbacChecks() {
     "SUPER_ADMIN: inbox.manage PASS",
   );
   assert(
+    resolvePermissionAccess({
+      isActive: true,
+      profileRole: "admin",
+      roleKeys: ["ADMIN"],
+      overrides: [],
+      permission: "inbox.reply",
+    }),
+    "ADMIN: inbox.reply PASS",
+  );
+  assert(
     !ROLE_PERMISSIONS.COMMUNICATION_MANAGER.includes("inbox.view") &&
-      !ROLE_PERMISSIONS.COMMUNICATION_MANAGER.includes("inbox.manage"),
+      !ROLE_PERMISSIONS.COMMUNICATION_MANAGER.includes("inbox.manage") &&
+      !ROLE_PERMISSIONS.COMMUNICATION_MANAGER.includes("inbox.reply"),
     "COMMUNICATION_MANAGER role matrix excludes inbox",
   );
   assert(
     ROLE_PERMISSIONS.ADMIN.includes("inbox.view") &&
-      ROLE_PERMISSIONS.ADMIN.includes("inbox.manage"),
-    "ADMIN role matrix includes inbox",
+      ROLE_PERMISSIONS.ADMIN.includes("inbox.manage") &&
+      ROLE_PERMISSIONS.ADMIN.includes("inbox.reply"),
+    "ADMIN role matrix includes inbox view/manage/reply",
   );
 
   // Multi-role

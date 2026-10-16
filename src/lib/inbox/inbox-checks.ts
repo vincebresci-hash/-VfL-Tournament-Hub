@@ -29,6 +29,9 @@ import {
   escapePostgrestSearchTerm,
   searchTermAltersFilterStructure,
 } from "@/lib/inbox/search";
+import { runInboxReplyAttachmentChecks } from "@/lib/inbox/reply-attachment-checks";
+import { runInboxReplyChecks } from "@/lib/inbox/reply-checks";
+import { runInboxReplySendChecks } from "@/lib/inbox/reply-send-checks";
 import { ROLE_PERMISSIONS, resolvePermissionAccess } from "@/lib/rbac/permissions";
 
 function assert(condition: boolean, message: string) {
@@ -132,8 +135,8 @@ export function runInboxChecks() {
   );
   assert(!apiRoute.includes("CRON_SECRET"), "API docs no CRON_SECRET");
   assert(apiRoute.includes("Not enabled on Hobby via vercel.json"), "live cron sync remains disabled");
-  assert(posteingangLayout.includes("maxDuration = 10"), "admin segment maxDuration");
-  assert(apiRoute.includes("maxDuration = 10"), "API maxDuration");
+  assert(posteingangLayout.includes("maxDuration = 180"), "admin segment maxDuration 180");
+  assert(apiRoute.includes("maxDuration = 10"), "API sync maxDuration stays 10");
   try {
     read("vercel.json");
     assert(false, "vercel.json must not exist");
@@ -472,7 +475,10 @@ export function runInboxChecks() {
   }
   assert(!sync.includes('from "@/lib/email'), "no outbound email import in sync");
   assert(!actions.includes('from "@/lib/email'), "no outbound email import in actions");
-  assert(runChecksCli.includes("runInboxChecks"), "checks wired");
+  assert(
+    runChecksCli.includes("runInboxChecksAsync") || runChecksCli.includes("runInboxChecks"),
+    "checks wired",
+  );
 
   // --- Local status preservation SQL ---
   const upsertFn = migration.slice(
@@ -484,5 +490,16 @@ export function runInboxChecks() {
     "message upsert never writes local status",
   );
 
+  // --- Phase 1 SMTP reply foundation + Phase 2 send action (mocked SMTP) ---
+  assert(runInboxReplyChecks() === "ok", "inbox reply foundation checks");
+  // --- Phase 4a outbound attachment staging (no SMTP bind yet) ---
+  assert(runInboxReplyAttachmentChecks() === "ok", "inbox reply attachment staging checks");
+
+  return "ok";
+}
+
+export async function runInboxChecksAsync(): Promise<"ok"> {
+  assert(runInboxChecks() === "ok", "inbox checks");
+  assert((await runInboxReplySendChecks()) === "ok", "inbox reply send checks");
   return "ok";
 }

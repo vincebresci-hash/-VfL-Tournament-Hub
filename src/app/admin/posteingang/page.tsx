@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { AdminNotice } from "@/components/admin/AdminPanel";
 import { InboxWorkspace } from "@/components/admin/InboxWorkspace";
 import { getAuthSession } from "@/lib/auth/session";
-import { canManageInbox, canTriggerInboxSync } from "@/lib/inbox/access";
+import { canManageInbox, canReplyInbox, canTriggerInboxSync } from "@/lib/inbox/access";
 import { getInboxSyncStateView, listInboxMessages } from "@/lib/inbox/queries";
 import { loadUserAuthorization } from "@/lib/rbac/queries";
 import type { InboxProcessingStatus } from "@/lib/inbox/types";
@@ -55,6 +55,8 @@ export default async function AdminInboxPage({
       syncState={state}
       canSync={canTriggerInboxSync(session, authorization)}
       canManage={canManageInbox(session, authorization)}
+      actorId={session?.user.id ?? ""}
+      canReply={canReplyInbox(session, authorization)}
       initialQuery={query}
       initialStatus={status}
       initialUnreadOnly={unreadOnly}
