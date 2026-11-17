@@ -219,14 +219,14 @@ export function runPaymentStatusChecks() {
   const board = readPaymentsBoard();
 
   assert(
-    queries.includes("tournaments (id, name, date, age_group)"),
-    "payment list select includes tournament id and age_group",
+    queries.includes("tournaments (id, name, slug, date, age_group)"),
+    "payment list select includes tournament id, slug and age_group",
   );
   assert(paymentTypes.includes("tournamentId: string"), "AdminPaymentRecord.tournamentId");
   assert(paymentTypes.includes("ageGroup: string"), "AdminPaymentRecord.ageGroup");
   assert(queries.includes("tournamentId: tournament?.id ?? \"\""), "mapper tournamentId");
   assert(
-    queries.includes("ageGroup: tournament?.age_group ?? \"\""),
+    queries.includes("canonicalTournamentAgeGroup(tournament?.slug, tournament?.age_group)"),
     "mapper uses authoritative tournament age_group",
   );
 
