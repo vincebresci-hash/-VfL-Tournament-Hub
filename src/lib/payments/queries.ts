@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { canonicalTournamentAgeGroup } from "@/lib/tournaments";
 import { isMissingRelationError } from "@/lib/db/errors";
 import { toApplicationPayment } from "@/lib/payments/mappers";
 import type { ApplicationStatus } from "@/types/application";
@@ -12,12 +13,13 @@ const paymentApplicationSelect = `
   payment_status,
   participation_fee,
   paid_at,
-  tournaments (id, name, date, age_group)
+  tournaments (id, name, slug, date, age_group)
 `;
 
 type PaymentTournamentRow = {
   id: string;
   name: string;
+  slug: string;
   date: string;
   age_group: string;
 };
@@ -85,7 +87,7 @@ function toAdminPaymentRecord(
     tournamentId: tournament?.id ?? "",
     tournamentName: tournament?.name ?? "—",
     tournamentDate: tournament?.date ?? "",
-    ageGroup: tournament?.age_group ?? "",
+    ageGroup: canonicalTournamentAgeGroup(tournament?.slug, tournament?.age_group),
     ...toApplicationPayment({
       payment_status: row.payment_status,
       participation_fee: row.participation_fee,

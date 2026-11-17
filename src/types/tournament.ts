@@ -8,6 +8,7 @@ export const AGE_GROUPS = [
   "U13",
   "U14",
   "U15",
+  "B-Jugend",
   "Firmenturnier",
 ] as const;
 
