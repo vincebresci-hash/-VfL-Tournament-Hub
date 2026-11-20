@@ -182,10 +182,11 @@ export function runLeaguePhaseChecks() {
   assert(
     !read("src/lib/db/schedule-actions.ts").includes("league-phase") &&
       !read("src/lib/db/knockout-actions.ts").includes("league-phase") &&
-      !read("src/lib/schedule/plan-preview.ts").includes("league-phase") &&
+      !read("src/lib/db/plan-apply-actions.ts").includes("league-phase") &&
+      !read("src/lib/db/plan-preview-prepare.ts").includes("league-phase") &&
       !read("src/components/admin/TournamentScheduleBoard.tsx").includes("league-phase") &&
       !read("src/components/admin/TournamentKnockoutBoard.tsx").includes("league-phase"),
-    "stage 1 does not reach actions or UI",
+    "league phase stays out of persistence and admin UI",
   );
   assert(
     runChecksCli.includes("runLeaguePhaseChecks") &&
