@@ -19,6 +19,7 @@ import { runTeamLogoDisplayChecks } from "@/lib/tournaments/team-logo-display-ch
 import { runMatchdayUiPolishChecks } from "@/lib/tournaments/matchday-ui-polish-checks";
 import { runLiveHubNativeC5BChecks } from "@/lib/live/live-hub-native-c5b-checks";
 import { runScheduleSelfChecks } from "./run-checks";
+import { runLeaguePhaseChecks } from "./league-phase-checks";
 import { runPlanPreviewChecks } from "./plan-preview-checks";
 import { runPlanApplyChecks } from "./plan-apply-checks";
 import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
@@ -113,6 +114,7 @@ import {
 
 try {
   const schedule = runScheduleSelfChecks();
+  const leaguePhaseChecks = runLeaguePhaseChecks();
   const planPreviewChecks = runPlanPreviewChecks();
   const planApplyChecks = runPlanApplyChecks();
   const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
@@ -223,6 +225,7 @@ try {
   const matchdayUiPolishChecks = runMatchdayUiPolishChecks();
   const liveHubNativeC5BChecks = runLiveHubNativeC5BChecks();
   console.log(`schedule-checks: ${schedule}`);
+  console.log(`league-phase-checks: ${leaguePhaseChecks}`);
   console.log(`plan-preview-checks: ${planPreviewChecks}`);
   console.log(`plan-apply-checks: ${planApplyChecks}`);
   console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
