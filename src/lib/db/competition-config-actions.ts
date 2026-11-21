@@ -12,7 +12,7 @@
 import { revalidatePath } from "next/cache";
 import { isMissingRelationError, toUserFacingDbError } from "@/lib/db/errors";
 import { loadTournamentLifecycleSnapshot } from "@/lib/db/tournament-lifecycle";
-import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import { readConfirmedParticipantIdentities } from "@/lib/db/confirmed-participant-read";
 import { requireScheduleManage, requireTournamentsManage } from "@/lib/rbac/action-access";
 import {
   validateStoredCompetitionColumns,
@@ -77,6 +77,7 @@ async function loadCompetitionConfigurationSnapshot(
   | { status: "not_found" }
   | { status: "missing_columns" }
   | { status: "error"; message: string }
+  | { status: "participant_read_failed"; code: string; message: string }
   | { status: "ok"; snapshot: ConfigurationSaveSnapshot }
 > {
   const supabase = await createClient();
@@ -120,7 +121,7 @@ async function loadCompetitionConfigurationSnapshot(
       .select("phase, status, home_score, away_score")
       .eq("tournament_id", tournamentId),
     loadTournamentLifecycleSnapshot(tournamentId),
-    getTournamentParticipants(tournamentId),
+    readConfirmedParticipantIdentities(tournamentId),
   ]);
 
   if (groups.error || !groups.data) {
@@ -141,6 +142,13 @@ async function loadCompetitionConfigurationSnapshot(
       message: lifecycle.error ?? "Der Turnierstatus konnte nicht gelesen werden.",
     };
   }
+  if (!participants.ok) {
+    return {
+      status: "participant_read_failed",
+      code: participants.code,
+      message: participants.message,
+    };
+  }
 
   return {
     status: "ok",
@@ -157,10 +165,7 @@ async function loadCompetitionConfigurationSnapshot(
         awayScore: match.away_score,
       })),
       effectiveLifecycle: lifecycle.snapshot.effective,
-      participants: participants.map((participant) => ({
-        applicationId: participant.applicationId,
-        externalTeamId: participant.externalTeamId,
-      })),
+      participants: participants.participants,
     },
   };
 }

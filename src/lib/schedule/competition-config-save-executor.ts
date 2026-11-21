@@ -21,7 +21,8 @@ export type ConfigurationSaveStatus =
   | "config_locked"
   | "not_activated"
   | "missing_columns"
-  | "persistence_error";
+  | "persistence_error"
+  | "participant_read_failed";
 
 export type ConfigurationSaveResult = {
   status: ConfigurationSaveStatus;
@@ -51,6 +52,7 @@ export type CompetitionConfigurationSaveDeps = {
     | { status: "not_found" }
     | { status: "missing_columns" }
     | { status: "error"; message: string }
+    | { status: "participant_read_failed"; code: string; message: string }
     | { status: "ok"; snapshot: ConfigurationSaveSnapshot }
   >;
   updateColumns: (input: {
@@ -182,6 +184,9 @@ export async function executeCompetitionConfigurationSave(
   }
   if (loaded.status === "error") {
     return result("persistence_error", "PERSISTENCE_ERROR", loaded.message);
+  }
+  if (loaded.status === "participant_read_failed") {
+    return result("participant_read_failed", loaded.code, loaded.message);
   }
 
   const decision = evaluateCompetitionConfigurationSave(loaded.snapshot, input);

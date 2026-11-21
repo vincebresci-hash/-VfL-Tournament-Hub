@@ -25,6 +25,10 @@ import { runLeagueAdminPreviewChecks } from "./league-admin-preview-checks";
 import { runCompetitionConfigChecks } from "./competition-config-checks";
 import { runCompetitionConfigSaveChecks } from "./competition-config-save-checks";
 import { runCompetitionFormatGuardChecks } from "./competition-format-guard-checks";
+import {
+  runConfirmedParticipantIdentityChecks,
+  runConfirmedParticipantIdentitySaveChecks,
+} from "./confirmed-participant-identity-checks";
 import { runPlanPreviewChecks } from "./plan-preview-checks";
 import { runPlanApplyChecks } from "./plan-apply-checks";
 import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
@@ -126,6 +130,8 @@ try {
   const competitionConfigChecks = runCompetitionConfigChecks();
   const competitionConfigSaveChecks = await runCompetitionConfigSaveChecks();
   const competitionFormatGuardChecks = runCompetitionFormatGuardChecks();
+  const confirmedParticipantIdentityChecks = runConfirmedParticipantIdentityChecks();
+  const confirmedParticipantIdentitySaveChecks = await runConfirmedParticipantIdentitySaveChecks();
   const planPreviewChecks = runPlanPreviewChecks();
   const planApplyChecks = runPlanApplyChecks();
   const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
@@ -242,6 +248,8 @@ try {
   console.log(`competition-config-checks: ${competitionConfigChecks}`);
   console.log(`competition-config-save-checks: ${competitionConfigSaveChecks}`);
   console.log(`competition-format-guard-checks: ${competitionFormatGuardChecks}`);
+  console.log(`confirmed-participant-identity-checks: ${confirmedParticipantIdentityChecks}`);
+  console.log(`confirmed-participant-identity-save-checks: ${confirmedParticipantIdentitySaveChecks}`);
   console.log(`plan-preview-checks: ${planPreviewChecks}`);
   console.log(`plan-apply-checks: ${planApplyChecks}`);
   console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
