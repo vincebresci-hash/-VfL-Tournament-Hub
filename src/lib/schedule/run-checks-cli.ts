@@ -29,6 +29,7 @@ import {
   runConfirmedParticipantIdentityChecks,
   runConfirmedParticipantIdentitySaveChecks,
 } from "./confirmed-participant-identity-checks";
+import { runSaveCompetitionConfigurationSqlChecks } from "./save-competition-configuration-sql-checks";
 import { runPlanPreviewChecks } from "./plan-preview-checks";
 import { runPlanApplyChecks } from "./plan-apply-checks";
 import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
@@ -132,6 +133,7 @@ try {
   const competitionFormatGuardChecks = runCompetitionFormatGuardChecks();
   const confirmedParticipantIdentityChecks = runConfirmedParticipantIdentityChecks();
   const confirmedParticipantIdentitySaveChecks = await runConfirmedParticipantIdentitySaveChecks();
+  const saveCompetitionConfigurationSqlChecks = runSaveCompetitionConfigurationSqlChecks();
   const planPreviewChecks = runPlanPreviewChecks();
   const planApplyChecks = runPlanApplyChecks();
   const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
@@ -250,6 +252,7 @@ try {
   console.log(`competition-format-guard-checks: ${competitionFormatGuardChecks}`);
   console.log(`confirmed-participant-identity-checks: ${confirmedParticipantIdentityChecks}`);
   console.log(`confirmed-participant-identity-save-checks: ${confirmedParticipantIdentitySaveChecks}`);
+  console.log(`save-competition-configuration-sql-checks: ${saveCompetitionConfigurationSqlChecks}`);
   console.log(`plan-preview-checks: ${planPreviewChecks}`);
   console.log(`plan-apply-checks: ${planApplyChecks}`);
   console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
