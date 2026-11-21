@@ -9,6 +9,7 @@ import {
   adminPrimaryButtonClass,
   adminSecondaryButtonClass,
 } from "@/components/admin/AdminPanel";
+import { ChampionsLeagueScheduleFields } from "@/components/admin/ChampionsLeagueScheduleFields";
 import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import { applyTournamentPlanAction } from "@/lib/db/plan-apply-actions";
@@ -21,6 +22,20 @@ import {
   saveTournamentMatchAction,
 } from "@/lib/db/schedule-actions";
 import { isoToDatetimeLocal } from "@/lib/schedule/datetime";
+import {
+  ADMIN_COMPETITION_MODE_LABELS,
+  buildChampionsLeagueAdminPreview,
+  championsLeagueParticipantIds,
+  describeChampionsLeagueConfig,
+  parseMatchesPerTeam,
+  PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE,
+  savedCompetitionMode,
+  savedTournamentPlanTiming,
+  scheduleEditingEnabled,
+  type AdminCompetitionMode,
+  type LeagueAdminParticipant,
+  type LeagueKnockoutCutoff,
+} from "@/lib/schedule/league-admin-preview";
 import {
   GROUP_RESULT_LOCKED_MESSAGE,
   canMutateGroupResults,
@@ -36,6 +51,9 @@ import { MATCH_STATUSES, type MatchStatus, type TournamentFieldRecord, type Tour
 import type { AdminTournamentRecord } from "@/types/admin";
 
 function previewIsApplicable(preview: TournamentPlanPreview, policy: RegenerationPolicyResult) {
+  if (preview.mode === "champions-league") {
+    return false;
+  }
   if (policy.decision !== "allowed" && policy.decision !== "allowedWithConfirmation") {
     return false;
   }
@@ -62,6 +80,8 @@ type TournamentScheduleBoardProps = {
   matches: TournamentMatchRecord[];
   memberIdsByGroupId: Record<string, string[]>;
   teamLabels: Record<string, string>;
+  participants: LeagueAdminParticipant[];
+  canScheduleManage: boolean;
 };
 
 export function TournamentScheduleBoard({
@@ -71,6 +91,8 @@ export function TournamentScheduleBoard({
   matches,
   memberIdsByGroupId,
   teamLabels,
+  participants,
+  canScheduleManage,
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
   const groupMatches = matches.filter((match) => match.phase !== "knockout");
@@ -98,6 +120,21 @@ export function TournamentScheduleBoard({
   const [previewPolicy, setPreviewPolicy] = useState<RegenerationPolicyResult | null>(null);
   const [previewApplyLocked, setPreviewApplyLocked] = useState(false);
   const [previewStatusMessage, setPreviewStatusMessage] = useState<string | null>(null);
+  const savedMode = savedCompetitionMode(groups.length);
+  const [competitionMode, setCompetitionMode] = useState<AdminCompetitionMode>(savedMode);
+  const [leagueMatchesPerTeam, setLeagueMatchesPerTeam] = useState("3");
+  const [leagueCutoff, setLeagueCutoff] = useState<LeagueKnockoutCutoff>(
+    participants.length >= 8 ? 8 : 4,
+  );
+  const leagueParticipantIds = championsLeagueParticipantIds(participants);
+  const leagueDescription = describeChampionsLeagueConfig({
+    participantIds: leagueParticipantIds,
+    matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
+    knockoutCutoff: leagueCutoff,
+  });
+  const scheduleEditingEnabledNow = scheduleEditingEnabled(competitionMode, savedMode);
+  const generateAllowed = scheduleEditingEnabledNow;
+  const previewAllowed = competitionMode === "champions-league" || scheduleEditingEnabledNow;
 
   function clearPreviewState() {
     setPreviewOpen(false);
@@ -121,6 +158,21 @@ export function TournamentScheduleBoard({
   }
 
   async function handlePreview() {
+    if (competitionMode === "champions-league") {
+      handleChampionsLeaguePreview();
+      return;
+    }
+    if (competitionMode !== savedMode) {
+      setPreview(null);
+      setPreviewPolicy(null);
+      setPreviewApplyLocked(false);
+      setPreviewStatusMessage(null);
+      setPreviewError(
+        "Diese Auswahl folgt nicht der gespeicherten Turnierstruktur und wird weder erzeugt noch gespeichert.",
+      );
+      setPreviewOpen(true);
+      return;
+    }
     setPreviewLoading(true);
     setPreviewError(null);
     setError(null);
@@ -139,6 +191,110 @@ export function TournamentScheduleBoard({
     }
     setPreview(result.preview);
     setPreviewPolicy(result.policy);
+    setPreviewOpen(true);
+  }
+
+  function selectCompetitionMode(next: AdminCompetitionMode) {
+    setCompetitionMode(next);
+    clearPreviewState();
+    setConfirmGenerate(false);
+    setConfirmClear(false);
+    setDeleteMatchId(null);
+  }
+
+  function requestClearSchedule() {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      setConfirmClear(false);
+      return;
+    }
+    setConfirmClear(true);
+  }
+
+  function executeClearSchedule() {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      setConfirmClear(false);
+      return;
+    }
+    setConfirmClear(false);
+    void run(() => deleteTournamentScheduleAction(tournament.id));
+  }
+
+  function requestDeleteMatch(matchId: string) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      setDeleteMatchId(null);
+      return;
+    }
+    setDeleteMatchId(matchId);
+  }
+
+  function executeDeleteMatch() {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      setDeleteMatchId(null);
+      return;
+    }
+    const id = deleteMatchId;
+    setDeleteMatchId(null);
+    if (id) {
+      void run(() => deleteTournamentMatchAction(tournament.id, id));
+    }
+  }
+
+  function saveExistingMatch(input: {
+    matchId?: string;
+    groupId: string;
+    fieldId: string;
+    homeApplicationId: string;
+    awayApplicationId: string;
+    scheduledAt: string;
+    status: MatchStatus;
+  }) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return Promise.resolve(false);
+    }
+    return run(() => saveTournamentMatchAction(tournament.id, input));
+  }
+
+  function addMatch(input: {
+    groupId: string;
+    fieldId: string;
+    homeApplicationId: string;
+    awayApplicationId: string;
+    scheduledAt: string;
+    status: MatchStatus;
+  }) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return Promise.resolve(false);
+    }
+    return run(() => saveTournamentMatchAction(tournament.id, input));
+  }
+
+  function handleChampionsLeaguePreview() {
+    setPreviewError(null);
+    setError(null);
+    setNotice(null);
+    setPreviewApplyLocked(false);
+    setPreviewStatusMessage(null);
+    setConfirmApplyReplace(false);
+    if (!canScheduleManage) {
+      setPreview(null);
+      setPreviewPolicy(null);
+      setPreviewError("Keine Berechtigung für diese Aktion.");
+      setPreviewOpen(true);
+      return;
+    }
+    const nextPreview = buildChampionsLeagueAdminPreview({
+      participants,
+      matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
+      knockoutCutoff: leagueCutoff,
+      fields,
+      timing: savedTournamentPlanTiming(tournament),
+    });
+    setPreview(nextPreview);
+    setPreviewPolicy({
+      state: "EMPTY",
+      decision: "blocked",
+      reason: "Champions League wird in diesem Schritt nicht gespeichert.",
+    });
     setPreviewOpen(true);
   }
 
@@ -168,7 +324,10 @@ export function TournamentScheduleBoard({
   }
 
   async function executeApply(confirmReplace: boolean) {
-    if (!preview) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return;
+    }
+    if (!preview || preview.mode === "champions-league") {
       return;
     }
     const fingerprint = preview.inputFingerprint;
@@ -232,6 +391,9 @@ export function TournamentScheduleBoard({
   }
 
   async function executeGenerate(confirmReplace: boolean) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return;
+    }
     setPending(true);
     setError(null);
     setNotice(null);
@@ -288,8 +450,32 @@ export function TournamentScheduleBoard({
     }
   }
 
+  function removeField(index: number) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return;
+    }
+    setFieldNames((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
+  function addField() {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return;
+    }
+    setFieldNames((current) => [...current, fieldDisplayName(current.length)]);
+  }
+
+  function changeScheduleSetting(apply: () => void) {
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return;
+    }
+    apply();
+  }
+
   async function handleSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+      return;
+    }
     await run(() =>
       saveScheduleSettingsAction(tournament.id, {
         matchDurationMinutes: duration,
@@ -328,22 +514,47 @@ export function TournamentScheduleBoard({
 
       <AdminCard title="Spielparameter">
         <form onSubmit={handleSettings} className="grid gap-4">
+          {scheduleEditingEnabledNow ? null : (
+            <p id="preview-only-settings-lock" className="text-[13px] leading-relaxed text-muted" role="status">
+              {PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE}
+            </p>
+          )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <Field id="duration" label="Spielzeit in Minuten">
-              <TextInput id="duration" value={duration} onChange={(event) => setDuration(event.target.value)} />
+              <TextInput
+                id="duration"
+                value={duration}
+                disabled={!scheduleEditingEnabledNow}
+                onChange={(event) => changeScheduleSetting(() => setDuration(event.target.value))}
+                className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+              />
             </Field>
             <Field id="break" label="Pause zwischen Spielen">
-              <TextInput id="break" value={breakMinutes} onChange={(event) => setBreakMinutes(event.target.value)} />
+              <TextInput
+                id="break"
+                value={breakMinutes}
+                disabled={!scheduleEditingEnabledNow}
+                onChange={(event) => changeScheduleSetting(() => setBreakMinutes(event.target.value))}
+                className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+              />
             </Field>
             <Field id="rest" label="Mindestruhezeit">
-              <TextInput id="rest" value={restMinutes} onChange={(event) => setRestMinutes(event.target.value)} />
+              <TextInput
+                id="rest"
+                value={restMinutes}
+                disabled={!scheduleEditingEnabledNow}
+                onChange={(event) => changeScheduleSetting(() => setRestMinutes(event.target.value))}
+                className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
+              />
             </Field>
             <Field id="lunch-start" label="Mittagspause von" optional>
               <TextInput
                 id="lunch-start"
                 type="time"
                 value={lunchStart}
-                onChange={(event) => setLunchStart(event.target.value)}
+                disabled={!scheduleEditingEnabledNow}
+                onChange={(event) => changeScheduleSetting(() => setLunchStart(event.target.value))}
+                className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
             </Field>
             <Field id="lunch-end" label="Mittagspause bis" optional>
@@ -351,7 +562,9 @@ export function TournamentScheduleBoard({
                 id="lunch-end"
                 type="time"
                 value={lunchEnd}
-                onChange={(event) => setLunchEnd(event.target.value)}
+                disabled={!scheduleEditingEnabledNow}
+                onChange={(event) => changeScheduleSetting(() => setLunchEnd(event.target.value))}
+                className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
             </Field>
             <div>
@@ -368,20 +581,27 @@ export function TournamentScheduleBoard({
               <div key={`field-${index}`} className="flex gap-2">
                 <TextInput
                   value={name}
+                  disabled={!scheduleEditingEnabledNow}
                   onChange={(event) =>
-                    setFieldNames((current) =>
-                      current.map((item, itemIndex) => (itemIndex === index ? event.target.value : item)),
+                    changeScheduleSetting(() =>
+                      setFieldNames((current) =>
+                        current.map((item, itemIndex) => (itemIndex === index ? event.target.value : item)),
+                      ),
                     )
                   }
                   aria-label={`Feld ${index + 1}`}
+                  className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
                 />
                 {fieldNames.length > 1 ? (
                   <button
                     type="button"
-                    className="text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase"
-                    onClick={() =>
-                      setFieldNames((current) => current.filter((_, itemIndex) => itemIndex !== index))
+                    disabled={!scheduleEditingEnabledNow}
+                    aria-disabled={!scheduleEditingEnabledNow}
+                    aria-describedby={
+                      scheduleEditingEnabledNow ? undefined : "preview-only-settings-lock"
                     }
+                    className="text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={() => removeField(index)}
                   >
                     Entfernen
                   </button>
@@ -390,8 +610,11 @@ export function TournamentScheduleBoard({
             ))}
             <button
               type="button"
-              onClick={() => setFieldNames((current) => [...current, fieldDisplayName(current.length)])}
-              className="justify-self-start text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue"
+              disabled={!scheduleEditingEnabledNow}
+              aria-disabled={!scheduleEditingEnabledNow}
+              aria-describedby={scheduleEditingEnabledNow ? undefined : "preview-only-settings-lock"}
+              onClick={addField}
+              className="justify-self-start text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
             >
               + Spielfeld hinzufügen
             </button>
@@ -399,7 +622,9 @@ export function TournamentScheduleBoard({
 
           <button
             type="submit"
-            disabled={pending}
+            disabled={pending || !scheduleEditingEnabledNow}
+            aria-disabled={pending || !scheduleEditingEnabledNow}
+            aria-describedby={scheduleEditingEnabledNow ? undefined : "preview-only-settings-lock"}
             className={`${adminPrimaryButtonClass} w-fit`}
           >
             Einstellungen speichern
@@ -408,10 +633,28 @@ export function TournamentScheduleBoard({
       </AdminCard>
 
       <AdminCard title="Spielplan planen">
-        <div className="flex flex-wrap gap-3">
+        <ChampionsLeagueScheduleFields
+          mode={competitionMode}
+          savedModeLabel={ADMIN_COMPETITION_MODE_LABELS[savedMode]}
+          participantCount={leagueParticipantIds.length}
+          participantNames={leagueParticipantIds.map((id) => teamLabels[id] ?? "Team")}
+          matchesPerTeam={leagueMatchesPerTeam}
+          knockoutCutoff={leagueCutoff}
+          description={leagueDescription}
+          onModeChange={selectCompetitionMode}
+          onMatchesPerTeamChange={(value) => {
+            setLeagueMatchesPerTeam(value);
+            clearPreviewState();
+          }}
+          onCutoffChange={(cutoff) => {
+            setLeagueCutoff(cutoff);
+            clearPreviewState();
+          }}
+        />
+        <div className="mt-4 flex flex-wrap gap-3">
           <button
             type="button"
-            disabled={pending || previewLoading}
+            disabled={pending || previewLoading || !previewAllowed}
             onClick={() => void handlePreview()}
             className={adminPrimaryButtonClass}
             aria-busy={previewLoading}
@@ -424,7 +667,7 @@ export function TournamentScheduleBoard({
           </button>
           <button
             type="button"
-            disabled={pending || previewLoading}
+            disabled={pending || previewLoading || !generateAllowed}
             onClick={() =>
               groupMatches.length > 0
                 ? setConfirmGenerate(true)
@@ -437,18 +680,38 @@ export function TournamentScheduleBoard({
           {groupMatches.length > 0 ? (
             <button
               type="button"
-              disabled={pending || previewLoading}
-              onClick={() => setConfirmClear(true)}
+              disabled={pending || previewLoading || !scheduleEditingEnabledNow}
+              aria-describedby={
+                scheduleEditingEnabledNow ? undefined : "preview-only-schedule-lock"
+              }
+              onClick={requestClearSchedule}
               className={adminSecondaryButtonClass}
             >
               Spielplan löschen
             </button>
           ) : null}
         </div>
-        <p className="mt-3 text-[13px] text-muted">
-          Round-Robin innerhalb jeder Gruppe, ohne Hin- und Rückrunde. Uhrzeiten in deutscher Ortszeit.
-          Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
-        </p>
+        {scheduleEditingEnabledNow ? null : (
+          <p id="preview-only-schedule-lock" className="mt-3 text-[13px] leading-relaxed text-muted" role="status">
+            {PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE}
+          </p>
+        )}
+        {competitionMode === "champions-league" ? (
+          <p className="mt-3 text-[13px] leading-relaxed text-muted">
+            Die Champions-League-Vorschau ist nur lokal. „Direkt generieren“ bleibt
+            deaktiviert, solange dieser Modus gewählt ist.
+          </p>
+        ) : competitionMode === savedMode ? (
+          <p className="mt-3 text-[13px] text-muted">
+            Round-Robin innerhalb jeder Gruppe, ohne Hin- und Rückrunde. Uhrzeiten in deutscher Ortszeit.
+            Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
+          </p>
+        ) : (
+          <p className="mt-3 text-[13px] leading-relaxed text-muted">
+            Gespeichert ist {ADMIN_COMPETITION_MODE_LABELS[savedMode]}. Diese andere
+            Auswahl wird nicht erzeugt und nicht gespeichert.
+          </p>
+        )}
         <p className="mt-1.5 text-[13px] text-muted">
           Erstellt und speichert den Spielplan direkt ohne Vorschau.
         </p>
@@ -463,7 +726,7 @@ export function TournamentScheduleBoard({
             <button
               type="button"
               onClick={closePreview}
-              disabled={pending}
+              disabled={pending || previewLoading}
               className={`${adminSecondaryButtonClass} mt-4`}
             >
               Vorschau schließen
@@ -499,9 +762,9 @@ export function TournamentScheduleBoard({
                 memberIdsByGroupId={memberIdsByGroupId}
                 teamLabels={teamLabels}
                 pending={pending}
-                locked={groupResultsLocked}
-                onSave={(input) => run(() => saveTournamentMatchAction(tournament.id, input))}
-                onDelete={() => setDeleteMatchId(match.id)}
+                locked={groupResultsLocked || !scheduleEditingEnabledNow}
+                onSave={saveExistingMatch}
+                onDelete={() => requestDeleteMatch(match.id)}
               />
             ))}
           </div>
@@ -516,8 +779,8 @@ export function TournamentScheduleBoard({
         memberIdsByGroupId={memberIdsByGroupId}
         teamLabels={teamLabels}
         pending={pending}
-        locked={groupResultsLocked}
-        onSave={(input) => run(() => saveTournamentMatchAction(tournament.id, input))}
+        locked={groupResultsLocked || !scheduleEditingEnabledNow}
+        onSave={addMatch}
       />
 
       <ConfirmModal
@@ -528,6 +791,9 @@ export function TournamentScheduleBoard({
         onCancel={() => setConfirmGenerate(false)}
         onConfirm={() => {
           setConfirmGenerate(false);
+          if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+            return;
+          }
           void executeGenerate(true);
         }}
       >
@@ -544,6 +810,9 @@ export function TournamentScheduleBoard({
         onCancel={() => setConfirmApplyReplace(false)}
         onConfirm={() => {
           setConfirmApplyReplace(false);
+          if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+            return;
+          }
           void executeApply(true);
         }}
       >
@@ -558,23 +827,14 @@ export function TournamentScheduleBoard({
         title="Gesamten Gruppenspielplan löschen?"
         confirmLabel="Löschen"
         onCancel={() => setConfirmClear(false)}
-        onConfirm={() => {
-          setConfirmClear(false);
-          void run(() => deleteTournamentScheduleAction(tournament.id));
-        }}
+        onConfirm={executeClearSchedule}
       />
       <ConfirmModal
         open={Boolean(deleteMatchId)}
         title="Dieses Spiel wirklich löschen?"
         confirmLabel="Löschen"
         onCancel={() => setDeleteMatchId(null)}
-        onConfirm={() => {
-          const id = deleteMatchId;
-          setDeleteMatchId(null);
-          if (id) {
-            void run(() => deleteTournamentMatchAction(tournament.id, id));
-          }
-        }}
+        onConfirm={executeDeleteMatch}
       />
     </div>
   );

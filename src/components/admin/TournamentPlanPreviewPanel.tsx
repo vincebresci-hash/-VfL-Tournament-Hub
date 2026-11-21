@@ -83,6 +83,7 @@ export function TournamentPlanPreviewPanel({
   statusMessage,
   onApply,
 }: TournamentPlanPreviewPanelProps) {
+  const championsLeague = preview.mode === "champions-league";
   const summaryItems = [
     { label: "Teilnehmer", value: String(preview.summary.participantCount) },
     { label: "Gruppen", value: String(preview.summary.groupCount) },
@@ -98,9 +99,39 @@ export function TournamentPlanPreviewPanel({
       value: formatBerlinClock(preview.summary.estimatedEnd),
     },
   ];
+  if (championsLeague) {
+    summaryItems.push(
+      {
+        label: "Spiele pro Team",
+        value:
+          preview.summary.matchesPerParticipant == null
+            ? "—"
+            : String(preview.summary.matchesPerParticipant),
+      },
+      {
+        label: "Erwartete Ligabegegnungen",
+        value:
+          preview.summary.expectedLeagueMatchCount == null
+            ? "—"
+            : String(preview.summary.expectedLeagueMatchCount),
+      },
+      {
+        label: "Eingeplante Ligabegegnungen",
+        value: String(preview.summary.scheduledLeagueMatchCount ?? 0),
+      },
+      {
+        label: "K.-o.-Plätze",
+        value:
+          preview.summary.knockoutCutoff == null
+            ? "—"
+            : `Top ${preview.summary.knockoutCutoff}`,
+      },
+    );
+  }
 
-  const showApply = canApply && !applyLocked;
+  const showApply = canApply && !applyLocked && !championsLeague;
   const hasNoFieldsWarning = preview.warnings.some((warning) => warning.code === "NO_FIELDS");
+  const unscheduledCount = preview.matches.filter((match) => !match.scheduledAt).length;
 
   return (
     <AdminCard title="Spielplan-Vorschau">
@@ -114,7 +145,15 @@ export function TournamentPlanPreviewPanel({
         <p className="text-[13px] text-muted">
           Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
         </p>
+        {championsLeague ? (
+          <p className={`${adminCardShellClass} border-[#e2c48a] bg-[#fff8e8] px-4 py-3.5 text-[14px] leading-relaxed text-[#7a5a1e]`} role="status">
+            Diese Champions-League-Vorschau ist nicht gespeichert. Übernehmen und
+            direktes Generieren sind deaktiviert, damit kein anderer Spielmodus
+            geschrieben wird.
+          </p>
+        ) : null}
 
+        {championsLeague ? null : (
         <div
           className={`${adminCardShellClass} px-4 py-3.5 text-[14px] ${policyTone(policy)}`}
           role="status"
@@ -134,6 +173,7 @@ export function TournamentPlanPreviewPanel({
             </p>
           ) : null}
         </div>
+        )}
 
         {statusMessage ? (
           <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
@@ -274,9 +314,13 @@ export function TournamentPlanPreviewPanel({
                     return (
                       <tr key={match.key} className="border-b border-line/70 last:border-b-0">
                         <td className="px-3 py-2.5 whitespace-nowrap text-ink">
-                          {formatBerlinClock(match.scheduledAt)}
+                          {match.scheduledAt
+                            ? formatBerlinClock(match.scheduledAt)
+                            : "Nicht eingeplant"}
                         </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap text-ink">{fieldName}</td>
+                        <td className="px-3 py-2.5 whitespace-nowrap text-ink">
+                          {match.scheduledAt ? fieldName : "Nicht eingeplant"}
+                        </td>
                         <td className="px-3 py-2.5 text-ink">
                           {participantLabel(
                             match.home.applicationId,
@@ -302,6 +346,13 @@ export function TournamentPlanPreviewPanel({
               </table>
             </div>
           )}
+          {unscheduledCount > 0 ? (
+            <p className="mt-3 text-[13px] leading-relaxed text-muted">
+              {unscheduledCount}{" "}
+              {unscheduledCount === 1 ? "Begegnung ist" : "Begegnungen sind"} nicht
+              eingeplant und bleiben in der Vorschau sichtbar.
+            </p>
+          ) : null}
         </section>
 
         <div className="flex flex-wrap gap-3">
@@ -315,6 +366,12 @@ export function TournamentPlanPreviewPanel({
             >
               {applyPending ? "Spielplan wird übernommen…" : "Spielplan übernehmen"}
             </button>
+          ) : null}
+          {championsLeague ? (
+            <p className="text-[13px] leading-relaxed text-muted">
+              „Spielplan übernehmen“ ist für Champions League deaktiviert. Diese
+              Vorschau kann nicht veröffentlicht werden.
+            </p>
           ) : null}
           <button
             type="button"
