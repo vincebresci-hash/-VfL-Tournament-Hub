@@ -23,6 +23,7 @@ import { runLeaguePhaseChecks } from "./league-phase-checks";
 import { runChampionsLeaguePreviewChecks } from "./league-preview-checks";
 import { runLeagueAdminPreviewChecks } from "./league-admin-preview-checks";
 import { runCompetitionConfigChecks } from "./competition-config-checks";
+import { runCompetitionConfigSaveChecks } from "./competition-config-save-checks";
 import { runPlanPreviewChecks } from "./plan-preview-checks";
 import { runPlanApplyChecks } from "./plan-apply-checks";
 import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
@@ -115,12 +116,14 @@ import {
   runMeinTurnierplanTransactionRollbackCheck,
 } from "@/lib/mein-turnierplan-sync-rpc-checks";
 
+void (async () => {
 try {
   const schedule = runScheduleSelfChecks();
   const leaguePhaseChecks = runLeaguePhaseChecks();
   const championsLeaguePreviewChecks = runChampionsLeaguePreviewChecks();
   const leagueAdminPreviewChecks = runLeagueAdminPreviewChecks();
   const competitionConfigChecks = runCompetitionConfigChecks();
+  const competitionConfigSaveChecks = await runCompetitionConfigSaveChecks();
   const planPreviewChecks = runPlanPreviewChecks();
   const planApplyChecks = runPlanApplyChecks();
   const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
@@ -235,6 +238,7 @@ try {
   console.log(`champions-league-preview-checks: ${championsLeaguePreviewChecks}`);
   console.log(`league-admin-preview-checks: ${leagueAdminPreviewChecks}`);
   console.log(`competition-config-checks: ${competitionConfigChecks}`);
+  console.log(`competition-config-save-checks: ${competitionConfigSaveChecks}`);
   console.log(`plan-preview-checks: ${planPreviewChecks}`);
   console.log(`plan-apply-checks: ${planApplyChecks}`);
   console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
@@ -353,3 +357,4 @@ try {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }
+})();

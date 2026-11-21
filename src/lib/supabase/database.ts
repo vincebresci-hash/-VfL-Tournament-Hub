@@ -151,6 +151,13 @@ export type TournamentRow = {
   lunch_break_start?: string | null;
   lunch_break_end?: string | null;
   play_format?: string | null;
+  /**
+   * Absent until 20261121121000 is applied. Optional so a missing column
+   * fails the save instead of being treated as a stored mode.
+   */
+  competition_format?: string | null;
+  league_matches_per_team?: number | null;
+  knockout_cutoff?: number | null;
   playing_time?: string | null;
   pitch_format?: string | null;
   entry_fee?: string | null;
