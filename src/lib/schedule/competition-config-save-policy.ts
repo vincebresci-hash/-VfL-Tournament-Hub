@@ -2,11 +2,9 @@
  * Pure eligibility for a competition-configuration save.
  * Snapshots are server-authoritative. This module does not read or write a database.
  *
- * A Champions League write stays inactive. prepareTournamentPlanFromDb still
- * chooses the mode from the group count, so a league tournament with zero
- * groups would be generated as round robin. Do not set
- * CHAMPIONS_LEAGUE_CONFIGURATION_SAVE_ACTIVATED until generate and apply read
- * competition_format and refuse champions-league before any match delete.
+ * prepareTournamentPlanFromDb refuses a stored champions-league format before
+ * preview generation and before group-schedule persistence. Configuration
+ * saves stay inactive until a later activation stage.
  */
 
 import {
@@ -21,7 +19,7 @@ import type { TournamentLifecycleState } from "@/lib/schedule/tournament-lifecyc
 export const CHAMPIONS_LEAGUE_CONFIGURATION_SAVE_ACTIVATED = false;
 
 export const CHAMPIONS_LEAGUE_SAVE_BLOCKED_UNTIL =
-  "prepareTournamentPlanFromDb must read competition_format and refuse champions-league before persistPreparedGroupSchedule deletes matches";
+  "Champions League configuration saves stay inactive until a later activation stage reviews participant reads and concurrency.";
 
 export type ConfigurationMatchSnapshot = {
   phase: string | null;

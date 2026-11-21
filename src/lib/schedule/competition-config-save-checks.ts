@@ -409,8 +409,10 @@ export function runCompetitionConfigSaveChecks() {
       assert(!board.includes("saveCompetitionConfigurationAction"), "the schedule board does not call the save");
       assert(admin.includes("play_format: parseOptionalText(input.playFormat)") && admin.includes(".update(parsed.value)"), "tournament edit still writes its own payload");
       assert(!admin.includes("competition_format") && !admin.includes("saveCompetitionConfigurationAction"), "tournament edit does not write competition columns");
-      assert(prepare.includes('mode: groups.length > 0 ? "groups-knockout" : "round-robin"'), "generation still infers the mode from groups");
-      assert(!prepare.includes("competition_format") && !prepare.includes("competition-config"), "generation does not read the new columns");
+      assert(prepare.includes("resolveGenerationMode") && prepare.includes("readStoredCompetitionFormat"), "generation reads the stored competition mode before preview");
+      const loaderEnd = prepare.indexOf("export async function prepareTournamentPlanFromDb");
+      const loader = prepare.slice(prepare.indexOf("async function loadTournamentForPlanPreview"), loaderEnd);
+      assert(!loader.includes("competition_format"), "the legacy tournament read does not require the new column");
       assert(!apply.includes("competition-config-actions") && !schedule.includes("competition-config-actions"), "generate and apply do not call the save");
       assert(persist.includes("group_id: match.groupKey") && !persist.includes("competition-config-actions"), "match persistence is unchanged");
 

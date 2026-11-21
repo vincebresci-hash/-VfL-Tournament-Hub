@@ -296,19 +296,17 @@ export function runCompetitionConfigChecks() {
   const scheduleActions = read("src/lib/db/schedule-actions.ts");
   const adminActions = read("src/lib/db/admin-actions.ts");
   assert(
-    prepare.includes('mode: groups.length > 0 ? "groups-knockout" : "round-robin"') &&
-      !prepare.includes("champions-league") &&
-      !prepare.includes("competition_format") &&
-      !prepare.includes("competition-config"),
-    "saved preview inference is unchanged",
+    prepare.includes("resolveGenerationMode") &&
+      prepare.includes("readStoredCompetitionFormat") &&
+      prepare.indexOf("resolveGenerationMode") < prepare.indexOf("buildTournamentPlanPreview") &&
+      !prepare.includes('mode: "champions-league"'),
+    "saved preview resolves the stored mode and does not build a champions league preview",
   );
   assert(
     persist.includes("group_id: match.groupKey") &&
-      !persist.includes("champions-league") &&
-      !persist.includes("competition-config") &&
-      !persist.includes('groupKey === "league"') &&
-      !persist.includes("groupKey !== \"league\""),
-    "existing persist still copies groupKey and does not know a virtual league key",
+      persist.includes("decidePersistenceGuard") &&
+      persist.indexOf("decidePersistenceGuard") < persist.indexOf(".delete("),
+    "existing persist guards the stored mode and group keys before delete",
   );
   assert(
     apply.includes("persistPreparedGroupSchedule") &&

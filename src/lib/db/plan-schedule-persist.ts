@@ -5,11 +5,13 @@
  * Callers must supply server-authoritative prepared structures only.
  * Browser-provided schedule rows/policy/fields are never accepted.
  *
- * Known limits (deferred): residual TOCTOU after validation; non-transactional DELETE+INSERT.
+ * Known limits (deferred): the format and group reads are not in one transaction
+ * with DELETE+INSERT. A later concurrent change can still race the replacement.
  */
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { readStoredCompetitionFormat } from "@/lib/db/competition-format-read";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import type { AdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
@@ -17,6 +19,7 @@ import {
   matchSideDbColumns,
   resolveScheduleParticipantRef,
 } from "@/lib/schedule/admin";
+import { decidePersistenceGuard } from "@/lib/schedule/competition-format-guard";
 import {
   previewParticipantKey,
   type RegenerationPolicyResult,
@@ -99,9 +102,10 @@ function constraintMessage(error: { code?: string; message?: string } | null, fa
  * 4. zero saved fields → validation_error (no auto-create)
  * 5. empty preview.matches → validation_error
  * 6. participant resolution + complete row construction
- * 7. DELETE phase=group
- * 8. INSERT rows
- * 9. revalidate
+ * 7. stored competition format, preview mode, and group-key guard
+ * 8. DELETE phase=group
+ * 9. INSERT rows
+ * 10. revalidate
  */
 export async function persistPreparedGroupSchedule(
   input: PersistPreparedGroupScheduleInput,
@@ -212,8 +216,29 @@ export async function persistPreparedGroupSchedule(
   }
 
   const supabase = await createClient();
+  const [formatRead, groupRows] = await Promise.all([
+    readStoredCompetitionFormat(tournamentId),
+    supabase.from("tournament_groups").select("id").eq("tournament_id", tournamentId),
+  ]);
+  if (groupRows.error || !groupRows.data) {
+    return result(
+      "blocked",
+      toUserFacingDbError("Die Gruppen konnten nicht gelesen werden.", groupRows.error),
+      { policy, fingerprint },
+    );
+  }
+  const persistenceGuard = decidePersistenceGuard({
+    previewMode: preview.mode,
+    groupKeys: preview.matches.map((match) => match.groupKey),
+    formatRead,
+    groupCount: groupRows.data.length,
+    knownGroupIds: groupRows.data.map((group) => group.id),
+  });
+  if (!persistenceGuard.allowDelete) {
+    return result("blocked", persistenceGuard.message, { policy, fingerprint });
+  }
 
-  // Strict group-phase scope only. Residual TOCTOU after earlier policy read is deferred.
+  // Strict group-phase scope only. The guard above is not a transaction with this DELETE.
   const { error: deleteError } = await supabase
     .from("tournament_matches")
     .delete()

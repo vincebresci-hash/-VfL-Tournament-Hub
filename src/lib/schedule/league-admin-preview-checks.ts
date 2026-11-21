@@ -292,9 +292,10 @@ export function runLeagueAdminPreviewChecks() {
     "tournament form does not submit Champions League configuration",
   );
   assert(
-    prepare.includes('mode: groups.length > 0 ? "groups-knockout" : "round-robin"') &&
-      !prepare.includes("champions-league"),
-    "saved preview inference stays unchanged",
+    prepare.includes("resolveGenerationMode") &&
+      prepare.indexOf("resolveGenerationMode") < prepare.indexOf("buildTournamentPlanPreview") &&
+      !prepare.includes('mode: "champions-league"'),
+    "saved preview resolves the stored mode and does not build a champions league preview",
   );
   assert(!apply.includes("champions-league") && !apply.includes("buildChampionsLeagueAdminPreview"), "apply action stays unchanged");
   assert(

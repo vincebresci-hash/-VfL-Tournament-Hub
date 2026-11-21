@@ -129,10 +129,10 @@ export function runChampionsLeaguePreviewChecks() {
   const apply = read("src/lib/db/plan-apply-actions.ts");
   const cli = read("src/lib/schedule/run-checks-cli.ts");
   assert(
-    prepare.includes('mode: groups.length > 0 ? "groups-knockout" : "round-robin"') &&
-      !prepare.includes("champions-league") &&
-      !prepare.includes("championsLeague"),
-    "database preview preparation does not activate Champions League",
+    prepare.includes("resolveGenerationMode") &&
+      prepare.indexOf("resolveGenerationMode") < prepare.indexOf("buildTournamentPlanPreview") &&
+      !prepare.includes('mode: "champions-league"'),
+    "database preview preparation blocks Champions League before building a preview",
   );
   assert(!apply.includes("champions-league") && !apply.includes("buildLeagueFixtures"), "apply path stays unchanged");
   assert(cli.includes("runChampionsLeaguePreviewChecks"), "preview checks wired into run-checks-cli");
