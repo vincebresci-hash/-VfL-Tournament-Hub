@@ -39,8 +39,9 @@ export type ConfirmedParticipantReadResult =
   | ConfirmedParticipantReadSuccess
   | ConfirmedParticipantReadFailure;
 
+/** Matches SQL `external_active IS TRUE`. Null and false are not confirmed. */
 export function confirmedExternalTeamIsActive(externalActive: boolean | null | undefined) {
-  return externalActive !== false;
+  return externalActive === true;
 }
 
 const READ_FAILED = "Die bestätigten Teilnehmer konnten nicht vollständig gelesen werden.";
@@ -67,7 +68,7 @@ export function assembleConfirmedParticipantIdentities(input: {
       continue;
     }
     identities.push({
-      applicationId,
+      applicationId: null,
       externalTeamId: String(team.id),
     });
   }

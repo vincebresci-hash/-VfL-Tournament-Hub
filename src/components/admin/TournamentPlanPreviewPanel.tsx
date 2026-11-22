@@ -129,7 +129,7 @@ export function TournamentPlanPreviewPanel({
     );
   }
 
-  const showApply = canApply && !applyLocked && !championsLeague;
+  const showApply = canApply && !applyLocked;
   const hasNoFieldsWarning = preview.warnings.some((warning) => warning.code === "NO_FIELDS");
   const unscheduledCount = preview.matches.filter((match) => !match.scheduledAt).length;
 
@@ -147,13 +147,12 @@ export function TournamentPlanPreviewPanel({
         </p>
         {championsLeague ? (
           <p className={`${adminCardShellClass} border-[#e2c48a] bg-[#fff8e8] px-4 py-3.5 text-[14px] leading-relaxed text-[#7a5a1e]`} role="status">
-            Diese Champions-League-Vorschau ist nicht gespeichert. Übernehmen und
-            direktes Generieren sind deaktiviert, damit kein anderer Spielmodus
-            geschrieben wird.
+            Diese Champions-League-Vorschau ist nicht gespeichert. Die Übernahme legt
+            eine Ligagruppe an und speichert die Ligabegegnungen. Der bisherige
+            Champions-League-Konfigurationsspeicher bleibt geschlossen.
           </p>
         ) : null}
 
-        {championsLeague ? null : (
         <div
           className={`${adminCardShellClass} px-4 py-3.5 text-[14px] ${policyTone(policy)}`}
           role="status"
@@ -173,7 +172,6 @@ export function TournamentPlanPreviewPanel({
             </p>
           ) : null}
         </div>
-        )}
 
         {statusMessage ? (
           <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-[#9a2b2b]`} role="alert">
@@ -367,10 +365,10 @@ export function TournamentPlanPreviewPanel({
               {applyPending ? "Spielplan wird übernommen…" : "Spielplan übernehmen"}
             </button>
           ) : null}
-          {championsLeague ? (
+          {championsLeague && !showApply ? (
             <p className="text-[13px] leading-relaxed text-muted">
-              „Spielplan übernehmen“ ist für Champions League deaktiviert. Diese
-              Vorschau kann nicht veröffentlicht werden.
+              „Spielplan übernehmen“ ist für diese Champions-League-Vorschau noch nicht
+              möglich. Alle Ligabegegnungen müssen eingeplant sein.
             </p>
           ) : null}
           <button

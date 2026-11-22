@@ -1292,6 +1292,17 @@ export type Database = {
         Args: { p_permission: string; p_club_id?: string | null; p_team_id?: string | null };
         Returns: boolean;
       };
+      apply_champions_league_league_phase: {
+        Args: {
+          p_tournament_id: string;
+          p_expected_updated_at: string;
+          p_league_matches_per_team: number;
+          p_knockout_cutoff: number;
+          p_confirm_replace: boolean;
+          p_matches: Json;
+        };
+        Returns: Json;
+      };
       get_application_hard_delete_dependency_counts: {
         Args: { p_application_id: string };
         Returns: Json;

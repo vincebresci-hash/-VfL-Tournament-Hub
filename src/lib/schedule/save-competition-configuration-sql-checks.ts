@@ -1,6 +1,6 @@
 /**
- * Static checks for the unapplied configuration-save migration.
- * These checks do not open a database connection and are not concurrency tests.
+ * Static checks for the unapplied configuration-save migration and the
+ * disposable PostgreSQL runner. This file does not open a database connection.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -85,30 +85,63 @@ export function runSaveCompetitionConfigurationSqlChecks() {
   assert(!prepare.includes("save_competition_configuration"), "preview generation does not call the RPC");
   assert(!persist.includes("save_competition_configuration"), "schedule persistence does not call the RPC");
   assert(tests.includes("app.disposable_competition_test"), "database tests refuse a normal session");
-  for (const scenario of [
+  assert(tests.includes("RAISE EXCEPTION"), "database tests fail closed");
+  assert(tests.includes("INSERT INTO public.test_results"), "database tests record executable results");
+  const contractNames = [
+    "RPC installation and grants",
     "Authorization",
     "Missing permissions",
+    "Both required permissions",
     "Archived tournaments",
     "Invalid configuration",
     "Legacy compatibility",
+    "No-op and stale versions",
+    "No unintended group or match mutation",
     "Champions League database kill switch",
     "Accepted applications",
     "Confirmed external teams",
     "Linked non-accepted applications",
     "Duplicate identities",
     "Existing matches and results",
-    "No-op and stale versions",
-    "Concurrent configuration saves",
-    "Concurrent application decisions",
-    "Concurrent external-team updates",
-    "Concurrent group and membership edits",
-    "Concurrent match inserts",
-    "Concurrent result updates",
-    "Deadlock behavior",
-    "No unintended group or match mutation",
-  ]) {
-    assert(tests.includes(scenario), `database test script lists ${scenario}`);
+  ];
+  for (const scenario of contractNames) {
+    assert(tests.includes(`public.test_pass('${scenario}'`), `contract test executes ${scenario}`);
   }
+  const runner = read("scripts/competition-postgres/concurrency.mjs");
+  const cluster = read("scripts/competition-postgres/cluster.mjs");
+  const apply = read("scripts/competition-postgres/apply.mjs");
+  for (const scenario of [
+    "Two simultaneous configuration saves",
+    "Application acceptance",
+    "Application acceptance revocation",
+    "External-team confirmation",
+    "External-team deactivation",
+    "External-team application linking",
+    "Group creation",
+    "Group deletion",
+    "Group membership changes",
+    "Match insertion",
+    "Match deletion",
+    "Result update including 0:0",
+    "Tournament archive",
+    "Tournament slug update",
+    "Schedule replacement",
+    "Tournament deletion",
+    "Multi-row match update",
+    "Cross-tournament match move",
+    "Opposite-order cross-tournament deadlock",
+    "Lock timeout and safe retry",
+  ]) {
+    assert(runner.includes(scenario), `concurrency runner executes ${scenario}`);
+  }
+  assert(runner.includes("40P01"), "deadlock test expects SQLSTATE 40P01");
+  assert(runner.includes("55P03"), "lock-timeout test expects SQLSTATE 55P03");
+  assert(runner.includes("pg_sleep"), "concurrency tests hold locks with pg_sleep");
+  assert(runner.includes("client.query"), "concurrency tests use database queries");
+  assert(cluster.includes("127.0.0.1"), "the disposable server listens on localhost");
+  assert(cluster.includes("data_directory"), "isolation checks the data directory");
+  assert(apply.includes("DROP FUNCTION public.tournament_public_roster(text);"), "roster replay drop is explicit");
+  assert(apply.includes("FUNCTION_RETURN_COMPAT_MIGRATIONS"), "roster replay drop is fingerprint-pinned");
 
   return "ok";
 }

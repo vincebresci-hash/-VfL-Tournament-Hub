@@ -11,6 +11,8 @@ import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
+import { readConfirmedParticipantIdentities } from "@/lib/db/confirmed-participant-read";
+import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
@@ -62,10 +64,12 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
     notFound();
   }
 
-  const [stage, participants, lifecycle] = await Promise.all([
+  const [stage, participants, lifecycle, leagueConfig, confirmed] = await Promise.all([
     getAdminTournamentStage(tournament.id),
     getTournamentParticipants(tournament.id),
     getAdminLifecyclePanelModel(tournament.id),
+    readStoredLeagueScheduleConfig(tournament.id),
+    readConfirmedParticipantIdentities(tournament.id),
   ]);
 
   return (
@@ -87,11 +91,21 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
           matches={stage.matches}
           memberIdsByGroupId={stage.memberIdsByGroupId}
           teamLabels={teamLabelsFromParticipants(participants)}
-          participants={participants.map((participant) => ({
-            applicationId: participant.applicationId,
-            externalTeamId: participant.externalTeamId,
-          }))}
+          participants={
+            confirmed.ok
+              ? confirmed.participants.map((participant) => ({
+                  applicationId: participant.applicationId,
+                  externalTeamId: participant.externalTeamId,
+                }))
+              : []
+          }
+          confirmedRosterError={confirmed.ok ? null : confirmed.message}
           canScheduleManage={await canScheduleManage()}
+          storedFormat={leagueConfig.status === "ok" ? leagueConfig.competitionFormat : null}
+          storedLeagueMatchesPerTeam={
+            leagueConfig.status === "ok" ? leagueConfig.leagueMatchesPerTeam : null
+          }
+          storedKnockoutCutoff={leagueConfig.status === "ok" ? leagueConfig.knockoutCutoff : null}
         />
       )}
     </TournamentAdminChrome>

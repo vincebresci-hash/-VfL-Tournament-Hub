@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireResultsManage } from "@/lib/rbac/action-access";
 import { toUserFacingDbError } from "@/lib/db/errors";
+import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import {
@@ -22,6 +23,7 @@ import {
   type KnockoutFormat,
   type KnockoutOptions,
 } from "@/lib/schedule/knockout";
+import { buildLeagueQualificationPreview } from "@/lib/schedule/league-knockout-preview";
 import { buildKnockoutQualificationPreview } from "@/lib/schedule/knockout-preview";
 import { buildTimetable } from "@/lib/schedule/timetable";
 import {
@@ -108,28 +110,76 @@ export async function generateKnockoutAction(
   }
 
   const stage = await getAdminTournamentStage(tournamentId);
-  const expectedGroups = input.format === 4 ? 2 : 4;
-  if (stage.groups.length !== expectedGroups) {
-    return {
-      error: `Für ${input.format} Teams werden genau ${expectedGroups} Gruppen benötigt.`,
-      notice: null,
-    };
-  }
-
   const options: KnockoutOptions = {
     format: input.format,
     includeThirdPlace: input.includeThirdPlace,
     includePlacement5: input.format === 8 && input.includePlacement5,
     includePlacement7: input.format === 8 && input.includePlacement7,
   };
-  // C6-G D1: shared pure completeness → standings → qualify → plan composition.
-  const preview = buildKnockoutQualificationPreview({
-    groups: stage.groups,
-    memberIdsByGroupId: stage.memberIdsByGroupId,
-    matches: stage.matches,
-    options,
-  });
-  const progress = preview.progress;
+  const leagueConfig = await readStoredLeagueScheduleConfig(tournamentId);
+  if (leagueConfig.status === "error") {
+    return { error: leagueConfig.message, notice: null };
+  }
+  const championsLeague =
+    leagueConfig.status === "ok" && leagueConfig.competitionFormat === "champions-league";
+
+  let progress: { complete: boolean; expected: number; completed: number };
+  let plan: { matches: ReturnType<typeof buildKnockoutQualificationPreview>["plan"]["matches"]; error: string | null };
+
+  if (championsLeague) {
+    if (input.forceIncomplete) {
+      return {
+        error: "Eine vorläufige Ligatabelle wird nicht als K.-o.-Ergebnis übernommen.",
+        notice: null,
+      };
+    }
+    if (leagueConfig.knockoutCutoff !== input.format || leagueConfig.leagueMatchesPerTeam == null) {
+      return {
+        error: "Das K.-o.-Format muss der gespeicherten Ligaqualifikation entsprechen.",
+        notice: null,
+      };
+    }
+    if (stage.groups.length !== 1) {
+      return {
+        error: "Champions League braucht genau eine Ligagruppe.",
+        notice: null,
+      };
+    }
+    const leagueGroup = stage.groups[0]!;
+    const leaguePreview = buildLeagueQualificationPreview({
+      groupId: leagueGroup.id,
+      memberIds: stage.memberIdsByGroupId[leagueGroup.id] ?? [],
+      matches: stage.matches,
+      matchesPerTeam: leagueConfig.leagueMatchesPerTeam,
+      knockoutCutoff: leagueConfig.knockoutCutoff,
+      options,
+    });
+    if (leaguePreview.provisional || !leaguePreview.progress.complete) {
+      return {
+        error: "Die Ligaphase ist noch nicht vollständig abgeschlossen.",
+        notice: null,
+      };
+    }
+    progress = leaguePreview.progress;
+    plan = leaguePreview.plan;
+  } else {
+    const expectedGroups = input.format === 4 ? 2 : 4;
+    if (stage.groups.length !== expectedGroups) {
+      return {
+        error: `Für ${input.format} Teams werden genau ${expectedGroups} Gruppen benötigt.`,
+        notice: null,
+      };
+    }
+    // C6-G D1: shared pure completeness → standings → qualify → plan composition.
+    const preview = buildKnockoutQualificationPreview({
+      groups: stage.groups,
+      memberIdsByGroupId: stage.memberIdsByGroupId,
+      matches: stage.matches,
+      options,
+    });
+    progress = preview.progress;
+    plan = preview.plan;
+  }
   if (!progress.complete && !input.forceIncomplete) {
     return {
       error: "Die Gruppenphase ist noch nicht vollständig abgeschlossen.",
@@ -137,7 +187,6 @@ export async function generateKnockoutAction(
     };
   }
 
-  const plan = preview.plan;
   if (plan.error) {
     return { error: plan.error, notice: null };
   }

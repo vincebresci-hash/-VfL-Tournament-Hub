@@ -10,6 +10,7 @@ import { readFileSync } from "node:fs";
 import { ROLE_PERMISSIONS } from "@/lib/rbac/permissions";
 import { executeCompetitionConfigurationSave } from "@/lib/schedule/competition-config-save-executor";
 import { CHAMPIONS_LEAGUE_CONFIGURATION_SAVE_ACTIVATED } from "@/lib/schedule/competition-config-save-policy";
+import { buildChampionsLeagueAdminPreview } from "@/lib/schedule/league-admin-preview";
 import {
   assembleConfirmedParticipantIdentities,
   confirmedExternalTeamIsActive,
@@ -115,11 +116,28 @@ export function runConfirmedParticipantIdentityChecks() {
     );
   }
 
-  const ambiguous = assembleConfirmedParticipantIdentities({
-    acceptedApplicationIds: [],
-    externalTeams: [external({ id: "ext-1", applicationId: "app-missing" })],
+  const linkedPending = assembleConfirmedParticipantIdentities({
+    acceptedApplicationIds: ["app-a"],
+    externalTeams: [external({ id: "ext-pending", applicationId: "app-missing" })],
   });
-  assert(!ambiguous.ok && ambiguous.code === "INVALID_PARTICIPANT_IDENTITY", "both identities on one row are rejected");
+  assert(linkedPending.ok, "confirmed external team linked to a non-accepted application stays");
+  if (linkedPending.ok) {
+    const externalIdentity = linkedPending.participants.find((participant) => participant.externalTeamId === "ext-pending");
+    assert(externalIdentity?.applicationId == null, "linked pending application is not a second identity");
+    assert.deepEqual(
+      linkedPending.participants.map((participant) => participant.applicationId ?? participant.externalTeamId),
+      ["app-a", "ext-pending"],
+    );
+  }
+
+  const duplicateCanonical = assembleConfirmedParticipantIdentities({
+    acceptedApplicationIds: ["same-id"],
+    externalTeams: [external({ id: "same-id" })],
+  });
+  assert(
+    !duplicateCanonical.ok && duplicateCanonical.code === "DUPLICATE_PARTICIPANT",
+    "an external id that repeats an accepted application id is rejected",
+  );
 
   const inactive = proved({
     rosterRows: [{ applicationId: "app-a" }],
@@ -129,8 +147,9 @@ export function runConfirmedParticipantIdentityChecks() {
     ],
   });
   assert(inactive.ok && inactive.participants.length === 1, "inactive or unconfirmed external teams are excluded");
-  assert.equal(confirmedExternalTeamIsActive(null), true, "null external activity matches the existing eligibility rule");
+  assert.equal(confirmedExternalTeamIsActive(null), false, "null external activity is not confirmed");
   assert.equal(confirmedExternalTeamIsActive(false), false);
+  assert.equal(confirmedExternalTeamIsActive(true), true);
 
   const ordered = proved({
     rosterRows: [{ applicationId: "m-2" }],
@@ -163,6 +182,84 @@ export function runConfirmedParticipantIdentityChecks() {
   assert(CHAMPIONS_LEAGUE_CONFIGURATION_SAVE_ACTIVATED === false, "configuration saving stays inactive");
   assert(!board.includes("saveCompetitionConfigurationAction"), "the save action stays unwired");
   assert(!board.includes("readConfirmedParticipantIdentities"), "the identity reader stays unwired");
+  assert(board.includes("confirmedRosterError"), "an unproved roster blocks the Champions League preview");
+
+  const leagueAction = read("src/lib/db/league-schedule-actions.ts");
+  const schedulePage = read("src/app/admin/turniere/[id]/spielplan/page.tsx");
+  assert(leagueAction.includes("readConfirmedParticipantIdentities"), "league apply uses the confirmed roster");
+  assert(!leagueAction.includes("getTournamentParticipants"), "league apply does not use the club-scoped roster");
+  assert(
+    leagueAction.indexOf("const confirmed = await readConfirmedParticipantIdentities") <
+      leagueAction.indexOf("if (!confirmed.ok)") &&
+      leagueAction.indexOf("if (!confirmed.ok)") <
+        leagueAction.indexOf('supabase.rpc("apply_champions_league_league_phase"'),
+    "an unproved roster returns before the league write",
+  );
+  assert(leagueAction.includes("sideIsCanonical"), "each persisted fixture side is one canonical id");
+  assert(schedulePage.includes("readConfirmedParticipantIdentities"), "schedule preview loads the confirmed roster");
+  assert(
+    schedulePage.includes("confirmed.participants") && schedulePage.includes("confirmedRosterError"),
+    "schedule preview does not fall back to a partial roster",
+  );
+
+  const canonical = assembleConfirmedParticipantIdentities({
+    acceptedApplicationIds: ["app-1", "app-2"],
+    externalTeams: [
+      external({ id: "ext-3" }),
+      external({ id: "ext-4", applicationId: "pending-app" }),
+      external({ id: "ext-linked", applicationId: "app-1" }),
+      external({ id: "ext-null", externalActive: false }),
+    ],
+  });
+  assert(canonical.ok, "canonical roster matches the SQL identity rules");
+  if (canonical.ok) {
+    assert.deepEqual(
+      canonical.participants.map((participant) => participant.applicationId ?? participant.externalTeamId),
+      ["app-1", "app-2", "ext-3", "ext-4"],
+    );
+    assert(
+      canonical.participants.every(
+        (participant) => Boolean(participant.applicationId) !== Boolean(participant.externalTeamId),
+      ),
+      "canonical roster never carries both ids",
+    );
+    const timing = {
+      startIso: "2026-12-27T08:00:00.000Z",
+      durationMinutes: 12,
+      breakMinutes: 3,
+      minimumRestMinutes: 15,
+      lunchStartIso: null,
+      lunchEndIso: null,
+    };
+    const persistedPreview = buildChampionsLeagueAdminPreview({
+      participants: canonical.participants,
+      matchesPerTeam: 1,
+      knockoutCutoff: 4,
+      fields: [{ id: "field-1", name: "Platz 1" }],
+      timing,
+    });
+    const sameRoster = buildChampionsLeagueAdminPreview({
+      participants: [...canonical.participants].reverse(),
+      matchesPerTeam: 1,
+      knockoutCutoff: 4,
+      fields: [{ id: "field-1", name: "Platz 1" }],
+      timing,
+    });
+    assert.equal(persistedPreview.matches.length, 2, "preview schedules the confirmed roster");
+    assert.equal(
+      persistedPreview.inputFingerprint,
+      sameRoster.inputFingerprint,
+      "preview fingerprint follows the confirmed roster, not input order",
+    );
+    assert(
+      persistedPreview.matches.every(
+        (match) =>
+          Boolean(match.home.applicationId) !== Boolean(match.home.externalTeamId) &&
+          Boolean(match.away.applicationId) !== Boolean(match.away.externalTeamId),
+      ),
+      "every preview fixture side has exactly one canonical id",
+    );
+  }
 
   return "ok";
 }

@@ -12,6 +12,7 @@ import {
 import { ChampionsLeagueScheduleFields } from "@/components/admin/ChampionsLeagueScheduleFields";
 import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
+import { applyChampionsLeagueScheduleAction } from "@/lib/db/league-schedule-actions";
 import { applyTournamentPlanAction } from "@/lib/db/plan-apply-actions";
 import { previewTournamentPlanAction } from "@/lib/db/plan-preview-actions";
 import {
@@ -37,33 +38,65 @@ import {
   type LeagueKnockoutCutoff,
 } from "@/lib/schedule/league-admin-preview";
 import {
+  canRegenerateGroupSchedule,
+  type RegenerationPolicyResult,
+  type TournamentPlanPreview,
+} from "@/lib/schedule/plan-preview";
+import {
   GROUP_RESULT_LOCKED_MESSAGE,
   canMutateGroupResults,
 } from "@/lib/schedule/group-result-lock";
 import { GROUP_RESULT_LOCK_CORRECTION_MESSAGE } from "@/lib/schedule/group-result-lock-ux";
 import { fieldDisplayName } from "@/lib/schedule/names";
 import { matchSideParticipantId } from "@/lib/schedule/admin";
-import type {
-  RegenerationPolicyResult,
-  TournamentPlanPreview,
-} from "@/lib/schedule/plan-preview";
 import { MATCH_STATUSES, type MatchStatus, type TournamentFieldRecord, type TournamentGroupRecord, type TournamentMatchRecord } from "@/types/schedule";
 import type { AdminTournamentRecord } from "@/types/admin";
 
-function previewIsApplicable(preview: TournamentPlanPreview, policy: RegenerationPolicyResult) {
-  if (preview.mode === "champions-league") {
-    return false;
-  }
+function previewIsApplicable(
+  preview: TournamentPlanPreview,
+  policy: RegenerationPolicyResult,
+  allowChampionsLeague: boolean,
+) {
   if (policy.decision !== "allowed" && policy.decision !== "allowedWithConfirmation") {
     return false;
   }
   if (preview.summary.fieldCount <= 0 || preview.matches.length <= 0) {
     return false;
   }
-  if (preview.warnings.some((warning) => warning.code === "NO_FIELDS")) {
+  if (
+    preview.warnings.some(
+      (warning) =>
+        warning.code === "NO_FIELDS" ||
+        warning.code === "TIMETABLE_INCOMPLETE" ||
+        warning.code === "LEAGUE_CONFIG_INVALID",
+    )
+  ) {
     return false;
   }
+  if (preview.mode === "champions-league") {
+    const expected = preview.summary.expectedLeagueMatchCount;
+    return (
+      allowChampionsLeague &&
+      expected != null &&
+      preview.summary.scheduledLeagueMatchCount === expected &&
+      preview.matches.every((match) => Boolean(match.scheduledAt) && Boolean(match.fieldId))
+    );
+  }
   return true;
+}
+
+function initialCompetitionMode(
+  storedFormat: "round-robin" | "groups-knockout" | "champions-league" | null,
+  groupCount: number,
+): AdminCompetitionMode {
+  if (
+    storedFormat === "round-robin" ||
+    storedFormat === "groups-knockout" ||
+    storedFormat === "champions-league"
+  ) {
+    return storedFormat;
+  }
+  return savedCompetitionMode(groupCount);
 }
 
 const statusLabel: Record<MatchStatus, string> = {
@@ -82,6 +115,10 @@ type TournamentScheduleBoardProps = {
   teamLabels: Record<string, string>;
   participants: LeagueAdminParticipant[];
   canScheduleManage: boolean;
+  storedFormat: "round-robin" | "groups-knockout" | "champions-league" | null;
+  storedLeagueMatchesPerTeam: number | null;
+  storedKnockoutCutoff: 4 | 8 | null;
+  confirmedRosterError?: string | null;
 };
 
 export function TournamentScheduleBoard({
@@ -93,6 +130,10 @@ export function TournamentScheduleBoard({
   teamLabels,
   participants,
   canScheduleManage,
+  storedFormat,
+  storedLeagueMatchesPerTeam,
+  storedKnockoutCutoff,
+  confirmedRosterError = null,
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
   const groupMatches = matches.filter((match) => match.phase !== "knockout");
@@ -120,11 +161,13 @@ export function TournamentScheduleBoard({
   const [previewPolicy, setPreviewPolicy] = useState<RegenerationPolicyResult | null>(null);
   const [previewApplyLocked, setPreviewApplyLocked] = useState(false);
   const [previewStatusMessage, setPreviewStatusMessage] = useState<string | null>(null);
-  const savedMode = savedCompetitionMode(groups.length);
+  const savedMode = initialCompetitionMode(storedFormat, groups.length);
   const [competitionMode, setCompetitionMode] = useState<AdminCompetitionMode>(savedMode);
-  const [leagueMatchesPerTeam, setLeagueMatchesPerTeam] = useState("3");
+  const [leagueMatchesPerTeam, setLeagueMatchesPerTeam] = useState(
+    storedLeagueMatchesPerTeam != null ? String(storedLeagueMatchesPerTeam) : "3",
+  );
   const [leagueCutoff, setLeagueCutoff] = useState<LeagueKnockoutCutoff>(
-    participants.length >= 8 ? 8 : 4,
+    storedKnockoutCutoff ?? (participants.length >= 8 ? 8 : 4),
   );
   const leagueParticipantIds = championsLeagueParticipantIds(participants);
   const leagueDescription = describeChampionsLeagueConfig({
@@ -133,8 +176,12 @@ export function TournamentScheduleBoard({
     knockoutCutoff: leagueCutoff,
   });
   const scheduleEditingEnabledNow = scheduleEditingEnabled(competitionMode, savedMode);
-  const generateAllowed = scheduleEditingEnabledNow;
+  const generateAllowed = scheduleEditingEnabledNow && competitionMode !== "champions-league";
   const previewAllowed = competitionMode === "champions-league" || scheduleEditingEnabledNow;
+  const championsLeagueApplyAllowed =
+    competitionMode === "champions-league" &&
+    ((storedFormat == null && groups.length === 0 && groupMatches.length === 0) ||
+      (storedFormat === "champions-league" && groups.length <= 1));
 
   function clearPreviewState() {
     setPreviewOpen(false);
@@ -282,6 +329,13 @@ export function TournamentScheduleBoard({
       setPreviewOpen(true);
       return;
     }
+    if (confirmedRosterError) {
+      setPreview(null);
+      setPreviewPolicy(null);
+      setPreviewError(confirmedRosterError);
+      setPreviewOpen(true);
+      return;
+    }
     const nextPreview = buildChampionsLeagueAdminPreview({
       participants,
       matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
@@ -290,11 +344,18 @@ export function TournamentScheduleBoard({
       timing: savedTournamentPlanTiming(tournament),
     });
     setPreview(nextPreview);
-    setPreviewPolicy({
-      state: "EMPTY",
-      decision: "blocked",
-      reason: "Champions League wird in diesem Schritt nicht gespeichert.",
-    });
+    setPreviewPolicy(
+      canRegenerateGroupSchedule({
+        tournamentStatus: tournament.status,
+        groupCount: groups.length,
+        matches: matches.map((match) => ({
+          phase: match.phase,
+          status: match.status,
+          homeScore: match.homeScore,
+          awayScore: match.awayScore,
+        })),
+      }),
+    );
     setPreviewOpen(true);
   }
 
@@ -324,22 +385,31 @@ export function TournamentScheduleBoard({
   }
 
   async function executeApply(confirmReplace: boolean) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!preview) {
       return;
     }
-    if (!preview || preview.mode === "champions-league") {
+    if (preview.mode === "champions-league" && !championsLeagueApplyAllowed) {
+      return;
+    }
+    if (preview.mode !== "champions-league" && !scheduleEditingEnabled(competitionMode, savedMode)) {
       return;
     }
     const fingerprint = preview.inputFingerprint;
+    const matchesPerTeam = parseMatchesPerTeam(leagueMatchesPerTeam);
     setPending(true);
     setError(null);
     setNotice(null);
     setPreviewStatusMessage(null);
-    const result = await applyTournamentPlanAction(
-      tournament.id,
-      fingerprint,
-      confirmReplace,
-    );
+    const result =
+      preview.mode === "champions-league"
+        ? await applyChampionsLeagueScheduleAction({
+            tournamentId: tournament.id,
+            previewFingerprint: fingerprint,
+            matchesPerTeam: matchesPerTeam ?? Number.NaN,
+            knockoutCutoff: leagueCutoff,
+            confirmReplace,
+          })
+        : await applyTournamentPlanAction(tournament.id, fingerprint, confirmReplace);
     setPending(false);
 
     if (result.status === "success") {
@@ -438,7 +508,7 @@ export function TournamentScheduleBoard({
     if (!preview || !previewPolicy || previewApplyLocked || pending) {
       return;
     }
-    if (!previewIsApplicable(preview, previewPolicy)) {
+    if (!previewIsApplicable(preview, previewPolicy, championsLeagueApplyAllowed)) {
       return;
     }
     if (previewPolicy.decision === "allowedWithConfirmation") {
@@ -690,6 +760,9 @@ export function TournamentScheduleBoard({
               Spielplan löschen
             </button>
           ) : null}
+          <a href={`/admin/turniere/${tournament.id}/spielplan/pdf`} className={adminSecondaryButtonClass}>
+            Spielplan als PDF
+          </a>
         </div>
         {scheduleEditingEnabledNow ? null : (
           <p id="preview-only-schedule-lock" className="mt-3 text-[13px] leading-relaxed text-muted" role="status">
@@ -698,8 +771,8 @@ export function TournamentScheduleBoard({
         )}
         {competitionMode === "champions-league" ? (
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
-            Die Champions-League-Vorschau ist nur lokal. „Direkt generieren“ bleibt
-            deaktiviert, solange dieser Modus gewählt ist.
+            Champions League verwendet eine gemeinsame Ligatabelle. „Direkt generieren“
+            bleibt deaktiviert. Die geprüfte Vorschau kann übernommen werden.
           </p>
         ) : competitionMode === savedMode ? (
           <p className="mt-3 text-[13px] text-muted">
@@ -739,7 +812,7 @@ export function TournamentScheduleBoard({
             teamLabels={teamLabels}
             fieldLabels={Object.fromEntries(fields.map((field) => [field.id, field.name]))}
             onClose={closePreview}
-            canApply={previewIsApplicable(preview, previewPolicy)}
+            canApply={previewIsApplicable(preview, previewPolicy, championsLeagueApplyAllowed)}
             applyPending={pending}
             applyLocked={previewApplyLocked}
             statusMessage={previewStatusMessage}
@@ -810,7 +883,10 @@ export function TournamentScheduleBoard({
         onCancel={() => setConfirmApplyReplace(false)}
         onConfirm={() => {
           setConfirmApplyReplace(false);
-          if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+          if (
+            competitionMode !== "champions-league" &&
+            !scheduleEditingEnabled(competitionMode, savedMode)
+          ) {
             return;
           }
           void executeApply(true);

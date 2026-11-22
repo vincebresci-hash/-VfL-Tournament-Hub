@@ -301,14 +301,17 @@ export function runLeagueAdminPreviewChecks() {
   assert(
     scheduleBoard.includes("buildChampionsLeagueAdminPreview") &&
       scheduleBoard.includes('preview.mode === "champions-league"') &&
+      scheduleBoard.includes("applyChampionsLeagueScheduleAction") &&
       scheduleBoard.includes("canScheduleManage") &&
       scheduleBoard.includes("Keine Berechtigung für diese Aktion.") &&
       scheduleBoard.includes("generateAllowed") &&
       scheduleBoard.includes("Direkt generieren") &&
       scheduleBoard.includes("previewTournamentPlanAction") &&
+      scheduleBoard.includes("Spielplan als PDF") &&
       !scheduleBoard.includes("updateTournamentAction") &&
-      !scheduleBoard.includes("league-phase"),
-    "schedule board previews Champions League locally and blocks its persistence",
+      !scheduleBoard.includes("league-phase") &&
+      !scheduleBoard.includes("competition_format"),
+    "schedule board persists Champions League only through the league schedule action",
   );
   assert(
     previewPanel.includes("Diese Champions-League-Vorschau ist nicht gespeichert") &&
@@ -317,7 +320,7 @@ export function runLeagueAdminPreviewChecks() {
       previewPanel.includes("Spielplan übernehmen") &&
       previewPanel.includes("overflow-x-auto") &&
       !previewPanel.includes("applyTournamentPlanAction"),
-    "preview panel keeps Champions League read-only",
+    "preview panel applies Champions League without the legacy apply action",
   );
   assert(
     scheduleFields.includes("ADMIN_COMPETITION_MODE_LABELS") &&
