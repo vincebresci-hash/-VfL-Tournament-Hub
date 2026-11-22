@@ -115,5 +115,66 @@ export function runLeagueKnockoutPreviewChecks() {
   );
   assert(tied[0]?.applicationId === "a-team" && tied[0]?.points === tied[1]?.points, "equal points keep a stable id order");
 
+  const sixteen = Array.from({ length: 16 }, (_, index) => `t${String(index + 1).padStart(2, "0")}`);
+  const sixteenFixtures = buildLeagueFixtures({
+    teamIds: sixteen,
+    matchesPerTeam: 4,
+    knockoutCutoff: 8,
+  });
+  assert(sixteenFixtures.error == null && sixteenFixtures.fixtures.length === 32, "sixteen teams and four rounds make 32 matches");
+  const opponentCount = new Map<string, number>();
+  const seenPairs = new Set<string>();
+  for (const fixture of sixteenFixtures.fixtures) {
+    const pair = [fixture.homeId, fixture.awayId].sort().join(":");
+    assert(!seenPairs.has(pair), "sixteen-team fixtures do not repeat an opponent");
+    seenPairs.add(pair);
+    opponentCount.set(fixture.homeId, (opponentCount.get(fixture.homeId) ?? 0) + 1);
+    opponentCount.set(fixture.awayId, (opponentCount.get(fixture.awayId) ?? 0) + 1);
+  }
+  assert(
+    sixteen.every((teamId) => opponentCount.get(teamId) === 4),
+    "each of the sixteen teams has four distinct opponents",
+  );
+  const sixteenOptions = {
+    format: 8 as const,
+    includeThirdPlace: false,
+    includePlacement5: false,
+    includePlacement7: false,
+  };
+  const incompleteSixteen = buildLeagueQualificationPreview({
+    groupId: "group-1",
+    memberIds: sixteen,
+    matches: sixteenFixtures.fixtures.slice(0, -1).map((fixture) =>
+      completedMatch(fixture.homeId, fixture.awayId, 1, 0),
+    ),
+    matchesPerTeam: 4,
+    knockoutCutoff: 8,
+    options: sixteenOptions,
+  });
+  assert(incompleteSixteen.provisional, "a sixteen-team league with one match missing stays provisional");
+  const completeSixteenMatches = sixteenFixtures.fixtures.map((fixture) =>
+    completedMatch(fixture.homeId, fixture.awayId, 1, 0),
+  );
+  const completeSixteen = buildLeagueQualificationPreview({
+    groupId: "group-1",
+    memberIds: sixteen,
+    matches: completeSixteenMatches,
+    matchesPerTeam: 4,
+    knockoutCutoff: 8,
+    options: sixteenOptions,
+  });
+  assert(!completeSixteen.provisional && completeSixteen.progress.complete, "a complete sixteen-team league is final");
+  const sixteenRanks = Object.fromEntries(
+    computeGroupStandings(sixteen, completeSixteenMatches).map((row) => [row.rank, row.applicationId]),
+  );
+  const sixteenPairs = completeSixteen.firstRoundMatches.map((match) => [match.homeId, match.awayId]);
+  assert(
+    sixteenPairs.some((pair) => pair[0] === sixteenRanks[1] && pair[1] === sixteenRanks[8]) &&
+      sixteenPairs.some((pair) => pair[0] === sixteenRanks[4] && pair[1] === sixteenRanks[5]) &&
+      sixteenPairs.some((pair) => pair[0] === sixteenRanks[2] && pair[1] === sixteenRanks[7]) &&
+      sixteenPairs.some((pair) => pair[0] === sixteenRanks[3] && pair[1] === sixteenRanks[6]),
+    "complete sixteen-team top 8 pairs 1-8, 4-5, 2-7 and 3-6",
+  );
+
   return "ok";
 }

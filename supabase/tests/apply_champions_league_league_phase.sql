@@ -684,3 +684,142 @@ BEGIN
   PERFORM public.test_pass_league('Confirmed replacement of unplayed fixtures', 'old match ids removed, two new scheduled matches kept');
 END
 $$;
+
+SELECT set_config('app.test_id', public.test_new_tournament('contract-league-sixteen')::text, false);
+
+DO $$
+DECLARE
+  v_id uuid := current_setting('app.test_id')::uuid;
+  v_apps uuid[] := ARRAY[]::uuid[];
+  v_circle uuid[];
+  v_app uuid;
+  v_field uuid;
+  v_left uuid;
+  v_right uuid;
+  v_home uuid;
+  v_away uuid;
+  v_ts timestamptz;
+  v_result jsonb;
+  v_rows jsonb := '[]'::jsonb;
+  v_group uuid;
+  v_match uuid;
+  v_manager uuid := '11111111-1111-4111-8111-111111111111';
+  v_round integer;
+  v_index integer;
+  v_sort integer := 0;
+BEGIN
+  FOR v_index IN 1..16 LOOP
+    INSERT INTO public.applications (tournament_id, status)
+    VALUES (v_id, 'accepted')
+    RETURNING id INTO v_app;
+    v_apps := array_append(v_apps, v_app);
+  END LOOP;
+  INSERT INTO public.tournament_fields (tournament_id, name)
+  VALUES (v_id, 'Platz 1')
+  RETURNING id INTO v_field;
+
+  v_circle := v_apps;
+  FOR v_round IN 0..3 LOOP
+    FOR v_index IN 0..7 LOOP
+      v_left := v_circle[v_index + 1];
+      v_right := v_circle[16 - v_index];
+      IF v_round % 2 = 0 THEN
+        v_home := v_left;
+        v_away := v_right;
+      ELSE
+        v_home := v_right;
+        v_away := v_left;
+      END IF;
+      v_rows := v_rows || jsonb_build_array(jsonb_build_object(
+        'homeApplicationId', v_home,
+        'homeExternalTeamId', NULL,
+        'awayApplicationId', v_away,
+        'awayExternalTeamId', NULL,
+        'fieldId', v_field,
+        'scheduledAt', to_char(
+          TIMESTAMPTZ '2026-11-22 09:00:00+01' + (v_sort * INTERVAL '15 minutes'),
+          'YYYY-MM-DD"T"HH24:MI:SSOF'
+        ),
+        'durationMinutes', 12,
+        'sortOrder', v_sort
+      ));
+      v_sort := v_sort + 1;
+    END LOOP;
+    IF v_round < 3 THEN
+      v_circle := ARRAY[v_circle[1], v_circle[16]] || v_circle[2:15];
+    END IF;
+  END LOOP;
+
+  IF jsonb_array_length(v_rows) <> 32 THEN
+    RAISE EXCEPTION 'FAIL sixteen-team circle schedule length %', jsonb_array_length(v_rows);
+  END IF;
+
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 4, 8, false, v_rows);
+  v_group := NULLIF(v_result->>'groupId', '')::uuid;
+  IF v_result->>'status' IS DISTINCT FROM 'success'
+    OR v_group IS NULL
+    OR (SELECT name FROM public.tournament_groups WHERE id = v_group) IS DISTINCT FROM 'Liga'
+    OR (SELECT count(*) FROM public.tournament_groups WHERE tournament_id = v_id) <> 1
+    OR (SELECT count(*) FROM public.tournament_group_members WHERE group_id = v_group AND application_id = ANY (v_apps) AND external_team_id IS NULL) <> 16
+    OR (SELECT count(*) FROM public.tournament_matches WHERE tournament_id = v_id AND group_id = v_group AND phase = 'group') <> 32
+    OR (SELECT league_matches_per_team FROM public.tournaments WHERE id = v_id) IS DISTINCT FROM 4
+    OR (SELECT knockout_cutoff FROM public.tournaments WHERE id = v_id) IS DISTINCT FROM 8
+    OR EXISTS (
+      SELECT 1
+      FROM (
+        SELECT side, count(*) AS games
+        FROM (
+          SELECT home_application_id AS side FROM public.tournament_matches WHERE tournament_id = v_id
+          UNION ALL
+          SELECT away_application_id FROM public.tournament_matches WHERE tournament_id = v_id
+        ) sides
+        GROUP BY side
+      ) degrees
+      WHERE games IS DISTINCT FROM 4
+    )
+    OR (
+      SELECT count(*)
+      FROM (
+        SELECT DISTINCT LEAST(home_application_id, away_application_id), GREATEST(home_application_id, away_application_id)
+        FROM public.tournament_matches
+        WHERE tournament_id = v_id
+      ) pairs
+    ) IS DISTINCT FROM 32
+  THEN
+    RAISE EXCEPTION 'FAIL sixteen-team league shape: %', v_result;
+  END IF;
+
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 4, 8, false, v_rows);
+  IF v_result->>'status' IS DISTINCT FROM 'confirmation_required'
+    OR (SELECT count(*) FROM public.tournament_matches WHERE tournament_id = v_id) <> 32
+  THEN
+    RAISE EXCEPTION 'FAIL sixteen-team replacement guard: %', v_result;
+  END IF;
+
+  SELECT id INTO v_match
+  FROM public.tournament_matches
+  WHERE tournament_id = v_id
+  ORDER BY sort_order, id
+  LIMIT 1;
+  UPDATE public.tournament_matches
+  SET status = 'completed', home_score = 3, away_score = 1
+  WHERE id = v_match;
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 4, 8, true, v_rows);
+  IF v_result->>'code' IS DISTINCT FROM 'RESULTS_EXIST'
+    OR (SELECT home_score FROM public.tournament_matches WHERE id = v_match) IS DISTINCT FROM 3
+    OR (SELECT away_score FROM public.tournament_matches WHERE id = v_match) IS DISTINCT FROM 1
+    OR (SELECT count(*) FROM public.tournament_matches WHERE tournament_id = v_id) <> 32
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS DISTINCT FROM 'champions-league'
+  THEN
+    RAISE EXCEPTION 'FAIL sixteen-team result preservation: %', v_result;
+  END IF;
+
+  PERFORM public.test_pass_league(
+    'Sixteen teams, four opponents',
+    'one Liga group, 16 members, 32 distinct matches, unplayed replace blocked, played 3:1 preserved'
+  );
+END
+$$;
