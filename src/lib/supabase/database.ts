@@ -151,6 +151,15 @@ export type TournamentRow = {
   lunch_break_start?: string | null;
   lunch_break_end?: string | null;
   play_format?: string | null;
+  /**
+   * Absent until 20261121121000 is applied. Optional so a missing column
+   * fails the save instead of being treated as a stored mode.
+   */
+  competition_format?: string | null;
+  league_matches_per_team?: number | null;
+  knockout_cutoff?: number | null;
+  /** Absent until 20261121121000 is applied. Champions League league phase only. */
+  restrict_same_club?: boolean | null;
   playing_time?: string | null;
   pitch_format?: string | null;
   entry_fee?: string | null;
@@ -177,6 +186,7 @@ export type TournamentRow = {
 export type MatchStatusRow = "scheduled" | "live" | "completed" | "cancelled";
 export type MatchPhaseRow = "group" | "knockout";
 export type KnockoutRoundRow =
+  | "round-of-16"
   | "quarterfinal"
   | "semifinal"
   | "third-place"
@@ -1284,6 +1294,18 @@ export type Database = {
       has_rbac_permission: {
         Args: { p_permission: string; p_club_id?: string | null; p_team_id?: string | null };
         Returns: boolean;
+      };
+      apply_champions_league_league_phase: {
+        Args: {
+          p_tournament_id: string;
+          p_expected_updated_at: string;
+          p_league_matches_per_team: number;
+          p_knockout_cutoff: number;
+          p_restrict_same_club: boolean;
+          p_confirm_replace: boolean;
+          p_matches: Json;
+        };
+        Returns: Json;
       };
       get_application_hard_delete_dependency_counts: {
         Args: { p_application_id: string };

@@ -354,7 +354,7 @@ export function TournamentParticipantsPanel({
                     }
                     className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
                   >
-                    Logo bearbeiten
+                    Verein &amp; Logo bearbeiten
                   </button>
                 ) : null}
                 {participant.externalTeamId ? (
@@ -368,7 +368,7 @@ export function TournamentParticipantsPanel({
                     }
                     className="inline-flex h-9 items-center border border-line px-3 text-[12px] font-semibold tracking-[0.08em] text-ink uppercase"
                   >
-                    Logo bearbeiten
+                    Verein &amp; Logo bearbeiten
                   </button>
                 ) : null}
                 {participant.source === "manual" && participant.externalTeamId ? (

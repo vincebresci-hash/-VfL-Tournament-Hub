@@ -19,6 +19,18 @@ import { runTeamLogoDisplayChecks } from "@/lib/tournaments/team-logo-display-ch
 import { runMatchdayUiPolishChecks } from "@/lib/tournaments/matchday-ui-polish-checks";
 import { runLiveHubNativeC5BChecks } from "@/lib/live/live-hub-native-c5b-checks";
 import { runScheduleSelfChecks } from "./run-checks";
+import { runLeagueKnockoutPreviewChecks } from "./league-knockout-preview-checks";
+import { runLeaguePhaseChecks } from "./league-phase-checks";
+import { runChampionsLeaguePreviewChecks } from "./league-preview-checks";
+import { runLeagueAdminPreviewChecks } from "./league-admin-preview-checks";
+import { runCompetitionConfigChecks } from "./competition-config-checks";
+import { runCompetitionConfigSaveChecks } from "./competition-config-save-checks";
+import { runCompetitionFormatGuardChecks } from "./competition-format-guard-checks";
+import {
+  runConfirmedParticipantIdentityChecks,
+  runConfirmedParticipantIdentitySaveChecks,
+} from "./confirmed-participant-identity-checks";
+import { runSaveCompetitionConfigurationSqlChecks } from "./save-competition-configuration-sql-checks";
 import { runPlanPreviewChecks } from "./plan-preview-checks";
 import { runPlanApplyChecks } from "./plan-apply-checks";
 import { runKnockoutDualIdentityChecks } from "./knockout-dual-identity-checks";
@@ -111,8 +123,19 @@ import {
   runMeinTurnierplanTransactionRollbackCheck,
 } from "@/lib/mein-turnierplan-sync-rpc-checks";
 
+void (async () => {
 try {
   const schedule = runScheduleSelfChecks();
+  const leaguePhaseChecks = runLeaguePhaseChecks();
+  const leagueKnockoutPreviewChecks = runLeagueKnockoutPreviewChecks();
+  const championsLeaguePreviewChecks = runChampionsLeaguePreviewChecks();
+  const leagueAdminPreviewChecks = runLeagueAdminPreviewChecks();
+  const competitionConfigChecks = runCompetitionConfigChecks();
+  const competitionConfigSaveChecks = await runCompetitionConfigSaveChecks();
+  const competitionFormatGuardChecks = runCompetitionFormatGuardChecks();
+  const confirmedParticipantIdentityChecks = runConfirmedParticipantIdentityChecks();
+  const confirmedParticipantIdentitySaveChecks = await runConfirmedParticipantIdentitySaveChecks();
+  const saveCompetitionConfigurationSqlChecks = runSaveCompetitionConfigurationSqlChecks();
   const planPreviewChecks = runPlanPreviewChecks();
   const planApplyChecks = runPlanApplyChecks();
   const knockoutDualIdentityChecks = runKnockoutDualIdentityChecks();
@@ -223,6 +246,16 @@ try {
   const matchdayUiPolishChecks = runMatchdayUiPolishChecks();
   const liveHubNativeC5BChecks = runLiveHubNativeC5BChecks();
   console.log(`schedule-checks: ${schedule}`);
+  console.log(`league-phase-checks: ${leaguePhaseChecks}`);
+  console.log(`league-knockout-preview-checks: ${leagueKnockoutPreviewChecks}`);
+  console.log(`champions-league-preview-checks: ${championsLeaguePreviewChecks}`);
+  console.log(`league-admin-preview-checks: ${leagueAdminPreviewChecks}`);
+  console.log(`competition-config-checks: ${competitionConfigChecks}`);
+  console.log(`competition-config-save-checks: ${competitionConfigSaveChecks}`);
+  console.log(`competition-format-guard-checks: ${competitionFormatGuardChecks}`);
+  console.log(`confirmed-participant-identity-checks: ${confirmedParticipantIdentityChecks}`);
+  console.log(`confirmed-participant-identity-save-checks: ${confirmedParticipantIdentitySaveChecks}`);
+  console.log(`save-competition-configuration-sql-checks: ${saveCompetitionConfigurationSqlChecks}`);
   console.log(`plan-preview-checks: ${planPreviewChecks}`);
   console.log(`plan-apply-checks: ${planApplyChecks}`);
   console.log(`knockout-dual-identity-checks: ${knockoutDualIdentityChecks}`);
@@ -341,3 +374,4 @@ try {
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }
+})();

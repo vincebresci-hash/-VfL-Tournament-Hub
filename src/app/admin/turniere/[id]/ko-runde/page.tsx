@@ -6,6 +6,7 @@ import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
+import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
@@ -38,11 +39,22 @@ export default async function AdminTournamentKnockoutPage({ params }: KnockoutPa
     notFound();
   }
 
-  const [stage, participants, lifecycle] = await Promise.all([
+  const [stage, participants, lifecycle, leagueConfig] = await Promise.all([
     getAdminTournamentStage(tournament.id),
     getTournamentParticipants(tournament.id),
     getAdminLifecyclePanelModel(tournament.id),
+    readStoredLeagueScheduleConfig(tournament.id),
   ]);
+  const leagueSchedule =
+    leagueConfig.status === "ok" &&
+    leagueConfig.competitionFormat === "champions-league" &&
+    leagueConfig.leagueMatchesPerTeam != null &&
+    leagueConfig.knockoutCutoff != null
+      ? {
+          matchesPerTeam: leagueConfig.leagueMatchesPerTeam,
+          knockoutCutoff: leagueConfig.knockoutCutoff,
+        }
+      : null;
 
   return (
     <TournamentAdminChrome
@@ -64,6 +76,7 @@ export default async function AdminTournamentKnockoutPage({ params }: KnockoutPa
           memberIdsByGroupId={stage.memberIdsByGroupId}
           participants={participants}
           teamLabels={teamLabelsFromParticipants(participants)}
+          leagueSchedule={leagueSchedule}
         />
       )}
     </TournamentAdminChrome>

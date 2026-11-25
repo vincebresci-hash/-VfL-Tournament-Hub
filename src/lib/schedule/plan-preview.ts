@@ -12,6 +12,11 @@ import {
 } from "@/lib/schedule/round-robin";
 import { buildTimetable, type ScheduleField, type TimetableSettings } from "@/lib/schedule/timetable";
 import {
+  buildLeagueFixtures,
+  validateLeaguePhaseConfig,
+  type LeagueKnockoutCutoff,
+} from "@/lib/schedule/league-phase";
+import {
   defaultFirstRoundSeeds,
   type KnockoutFormat,
   type KnockoutOptions,
@@ -20,7 +25,7 @@ import {
 } from "@/lib/schedule/knockout";
 import type { MatchStatus } from "@/types/schedule";
 
-export const PLAN_PREVIEW_MODES = ["round-robin", "groups-knockout"] as const;
+export const PLAN_PREVIEW_MODES = ["round-robin", "groups-knockout", "champions-league"] as const;
 export type PlanPreviewMode = (typeof PLAN_PREVIEW_MODES)[number];
 
 export const PLAN_PREVIEW_WARNING_CODES = [
@@ -36,6 +41,7 @@ export const PLAN_PREVIEW_WARNING_CODES = [
   "UNSUPPORTED_KO_GROUP_COUNT",
   "UNSUPPORTED_KO_FORMAT",
   "KO_PLAN_UNAVAILABLE",
+  "LEAGUE_CONFIG_INVALID",
 ] as const;
 
 export type PlanPreviewWarningCode = (typeof PLAN_PREVIEW_WARNING_CODES)[number];
@@ -117,6 +123,11 @@ export type PlanPreviewSummary = {
   estimatedLastKickoff: string | null;
   estimatedEnd: string | null;
   warningCount: number;
+  /** Set for an explicit Champions League preview. Existing modes leave these unset. */
+  matchesPerParticipant?: number | null;
+  expectedLeagueMatchCount?: number | null;
+  scheduledLeagueMatchCount?: number | null;
+  knockoutCutoff?: LeagueKnockoutCutoff | null;
 };
 
 export type TournamentPlanPreview = {
@@ -161,6 +172,21 @@ export type PlanPreviewKnockoutInput = {
   includePlacement7?: boolean;
 };
 
+/**
+ * Explicit Champions League preview settings.
+ * Mode is never inferred from group count or from the public play_format text.
+ * participantIds are preview participant keys, in scheduling order.
+ */
+export type ChampionsLeaguePreviewConfig = {
+  participantIds: string[];
+  matchesPerTeam: number;
+  knockoutCutoff: LeagueKnockoutCutoff;
+  /** League-phase only: forbid drawing two teams of the same club. */
+  restrictSameClub?: boolean;
+  /** Stable club identity per participant key (null = no shared club). */
+  clubByParticipantId?: Readonly<Record<string, string | null>>;
+};
+
 export type BuildTournamentPlanPreviewInput = {
   mode: PlanPreviewMode;
   participants: PlanPreviewParticipantInput[];
@@ -172,6 +198,11 @@ export type BuildTournamentPlanPreviewInput = {
   fields: ScheduleField[];
   timing: PlanPreviewTimingInput;
   knockout?: PlanPreviewKnockoutInput | null;
+  /**
+   * Used only when mode is "champions-league".
+   * Ignored for round-robin and groups-knockout.
+   */
+  championsLeague?: ChampionsLeaguePreviewConfig | null;
 };
 
 export const REGENERATION_DECISIONS = [
@@ -329,6 +360,10 @@ function resolveGroups(
   warnings: PlanPreviewWarning[];
 } {
   const warnings: PlanPreviewWarning[] = [];
+
+  if (mode === "champions-league") {
+    return { groups: [], memberships: [], memberIdsByGroupKey: {}, warnings };
+  }
 
   if (mode === "round-robin") {
     const key = groupInputs?.[0]?.key?.trim() || "g1";
@@ -739,6 +774,284 @@ function timingSettings(input: PlanPreviewTimingInput): TimetableSettings | null
   };
 }
 
+const LEAGUE_GROUP_KEY = "league";
+
+function emptyLeagueSummary(
+  fieldCount: number,
+  warningCount: number,
+  extras?: Partial<PlanPreviewSummary>,
+): PlanPreviewSummary {
+  return {
+    participantCount: 0,
+    groupCount: 0,
+    groupMatchCount: 0,
+    koMatchCount: 0,
+    totalMatchCount: 0,
+    fieldCount,
+    firstKickoff: null,
+    estimatedLastKickoff: null,
+    estimatedEnd: null,
+    warningCount,
+    matchesPerParticipant: null,
+    expectedLeagueMatchCount: null,
+    scheduledLeagueMatchCount: 0,
+    knockoutCutoff: null,
+    ...extras,
+  };
+}
+
+function leaguePreviewShell(
+  inputFingerprint: string,
+  warnings: PlanPreviewWarning[],
+  fields: ScheduleField[],
+  extras?: Partial<PlanPreviewSummary>,
+): TournamentPlanPreview {
+  return {
+    mode: "champions-league",
+    groups: [],
+    memberships: [],
+    matches: [],
+    qualifierPlan: { slots: [], firstRoundPairings: [] },
+    koPlan: null,
+    warnings,
+    summary: emptyLeagueSummary(fields.length, warnings.length, extras),
+    inputFingerprint,
+  };
+}
+
+/**
+ * Champions League fixtures are scheduled one match at a time.
+ * Odd-team roundIndex values are Hamilton cycles, so they are not passed to
+ * the timetable as simultaneous kickoff rounds.
+ */
+function buildChampionsLeaguePreview(args: {
+  input: BuildTournamentPlanPreviewInput;
+  inputFingerprint: string;
+  warnings: PlanPreviewWarning[];
+  byKey: Map<string, PlanPreviewParticipantRef>;
+}): TournamentPlanPreview {
+  const { input, inputFingerprint, warnings, byKey } = args;
+  const config = input.championsLeague;
+  if (!config) {
+    warnings.push(
+      warn(
+        "LEAGUE_CONFIG_INVALID",
+        "Die Champions-League-Vorschau braucht eine ausdrückliche Ligakonfiguration.",
+      ),
+    );
+    return leaguePreviewShell(inputFingerprint, warnings, input.fields);
+  }
+
+  const teamIds: string[] = [];
+  let unresolved = false;
+  for (const participantId of config.participantIds) {
+    if (!byKey.has(participantId)) {
+      unresolved = true;
+      warnings.push(
+        warn(
+          "LEAGUE_CONFIG_INVALID",
+          "Ein Ligarteilnehmer fehlt in der Teilnehmermenge oder hat keine gültige Identität.",
+          { participantId },
+        ),
+      );
+      continue;
+    }
+    teamIds.push(participantId);
+  }
+  if (unresolved) {
+    return leaguePreviewShell(inputFingerprint, warnings, input.fields, {
+      matchesPerParticipant: config.matchesPerTeam,
+      knockoutCutoff: config.knockoutCutoff,
+    });
+  }
+
+  const restrictSameClub = config.restrictSameClub === true;
+  const clubByTeamId: Record<string, string | null> = {};
+  if (restrictSameClub) {
+    for (const participantId of teamIds) {
+      clubByTeamId[participantId] = config.clubByParticipantId?.[participantId] ?? null;
+    }
+  }
+  const validated = validateLeaguePhaseConfig({
+    teamIds,
+    matchesPerTeam: config.matchesPerTeam,
+    knockoutCutoff: config.knockoutCutoff,
+    restrictSameClub,
+    clubByTeamId,
+  });
+  if (!validated.ok) {
+    warnings.push(
+      warn("LEAGUE_CONFIG_INVALID", validated.message, { code: validated.code }),
+    );
+    return leaguePreviewShell(inputFingerprint, warnings, input.fields, {
+      participantCount: teamIds.length,
+      matchesPerParticipant: config.matchesPerTeam,
+      knockoutCutoff: config.knockoutCutoff,
+    });
+  }
+
+  const built = buildLeagueFixtures(validated.config);
+  if (built.error || built.fixtures.length === 0) {
+    warnings.push(
+      warn(
+        "LEAGUE_CONFIG_INVALID",
+        built.error ?? "Die Ligapaarungen konnten nicht erzeugt werden.",
+        { code: built.code },
+      ),
+    );
+    return leaguePreviewShell(inputFingerprint, warnings, input.fields, {
+      participantCount: teamIds.length,
+      matchesPerParticipant: validated.config.matchesPerTeam,
+      knockoutCutoff: validated.config.knockoutCutoff,
+    });
+  }
+
+  const memberships: PlanPreviewMembership[] = [];
+  for (const participantId of teamIds) {
+    const participant = byKey.get(participantId);
+    if (!participant) {
+      continue;
+    }
+    memberships.push({ groupKey: LEAGUE_GROUP_KEY, participant });
+  }
+  const groups: PlanPreviewGroup[] = [
+    { key: LEAGUE_GROUP_KEY, name: "Liga", sortOrder: 0 },
+  ];
+
+  const fixtureInputs = built.fixtures.map((fixture) => ({
+    groupId: LEAGUE_GROUP_KEY,
+    homeId: fixture.homeId,
+    awayId: fixture.awayId,
+  }));
+
+  let scheduled: PlanPreviewMatch[] = [];
+  if (input.fields.length === 0) {
+    warnings.push(warn("NO_FIELDS", "Bitte zuerst mindestens ein Spielfeld anlegen."));
+  } else {
+    const settings = timingSettings(input.timing);
+    if (!settings) {
+      warnings.push(warn("TIMETABLE_INCOMPLETE", "Ungültiger Startzeitpunkt für den Spielplan."));
+    } else {
+      const timetable = buildTimetable(fixtureInputs, input.fields, settings);
+      for (const message of timetable.warnings) {
+        if (message.includes("Mindestruhezeit")) {
+          warnings.push(
+            warn("MINIMUM_REST_VIOLATION", message, {
+              minimumRestMinutes: input.timing.minimumRestMinutes,
+            }),
+          );
+        } else if (message.includes("Spielfeld")) {
+          warnings.push(warn("NO_FIELDS", message));
+        } else if (!message.includes("vollständig")) {
+          warnings.push(warn("TIMETABLE_INCOMPLETE", message));
+        }
+      }
+      scheduled = timetable.matches.flatMap((match, index) => {
+        const home = byKey.get(match.homeId);
+        const away = byKey.get(match.awayId);
+        if (!home || !away) {
+          return [];
+        }
+        return [
+          {
+            key: `m${index + 1}`,
+            groupKey: LEAGUE_GROUP_KEY,
+            home,
+            away,
+            fieldId: match.fieldId,
+            scheduledAt: match.scheduledAt.toISOString(),
+            durationMinutes: match.durationMinutes,
+            sortOrder: match.sortOrder,
+            restWarning: match.restWarning,
+          },
+        ];
+      });
+    }
+  }
+
+  const placedKeys = new Set(
+    scheduled.map((match) => {
+      const home = previewParticipantKey(match.home);
+      const away = previewParticipantKey(match.away);
+      return `${home ?? ""}\0${away ?? ""}`;
+    }),
+  );
+  const unscheduled: PlanPreviewMatch[] = [];
+  for (const fixture of built.fixtures) {
+    const key = `${fixture.homeId}\0${fixture.awayId}`;
+    if (placedKeys.has(key)) {
+      continue;
+    }
+    const home = byKey.get(fixture.homeId);
+    const away = byKey.get(fixture.awayId);
+    if (!home || !away) {
+      continue;
+    }
+    unscheduled.push({
+      key: `u${unscheduled.length + 1}`,
+      groupKey: LEAGUE_GROUP_KEY,
+      home,
+      away,
+      fieldId: null,
+      scheduledAt: null,
+      durationMinutes: input.timing.durationMinutes,
+      sortOrder: scheduled.length + unscheduled.length,
+      restWarning: false,
+    });
+  }
+
+  if (scheduled.length !== built.fixtures.length) {
+    warnings.push(
+      warn(
+        "TIMETABLE_INCOMPLETE",
+        "Der Spielplan konnte nicht alle Ligabegegnungen platzieren.",
+        { expected: built.fixtures.length, scheduled: scheduled.length },
+      ),
+    );
+  }
+
+  const matches = [...scheduled, ...unscheduled];
+  const kickoffs = scheduled
+    .map((match) => match.scheduledAt)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+  const firstKickoff = kickoffs[0] ?? null;
+  const lastKickoff = kickoffs[kickoffs.length - 1] ?? null;
+  let estimatedEnd: string | null = null;
+  if (lastKickoff) {
+    const lastMatch = scheduled.find((match) => match.scheduledAt === lastKickoff);
+    const duration = lastMatch?.durationMinutes ?? input.timing.durationMinutes;
+    estimatedEnd = new Date(new Date(lastKickoff).getTime() + duration * 60_000).toISOString();
+  }
+
+  return {
+    mode: "champions-league",
+    groups,
+    memberships,
+    matches,
+    qualifierPlan: { slots: [], firstRoundPairings: [] },
+    koPlan: null,
+    warnings,
+    summary: {
+      participantCount: teamIds.length,
+      groupCount: 1,
+      groupMatchCount: built.fixtures.length,
+      koMatchCount: 0,
+      totalMatchCount: built.fixtures.length,
+      fieldCount: input.fields.length,
+      firstKickoff,
+      estimatedLastKickoff: lastKickoff,
+      estimatedEnd,
+      warningCount: warnings.length,
+      matchesPerParticipant: validated.config.matchesPerTeam,
+      expectedLeagueMatchCount: built.fixtures.length,
+      scheduledLeagueMatchCount: scheduled.length,
+      knockoutCutoff: validated.config.knockoutCutoff,
+    },
+    inputFingerprint,
+  };
+}
+
 export function buildTournamentPlanPreview(
   input: BuildTournamentPlanPreviewInput,
 ): TournamentPlanPreview {
@@ -773,6 +1086,18 @@ export function buildTournamentPlanPreview(
           includePlacement7: Boolean(input.knockout.includePlacement7),
         }
       : null,
+    championsLeague:
+      input.mode === "champions-league" && input.championsLeague
+        ? {
+            participantIds: [...input.championsLeague.participantIds],
+            matchesPerTeam: input.championsLeague.matchesPerTeam,
+            knockoutCutoff: input.championsLeague.knockoutCutoff,
+            restrictSameClub: input.championsLeague.restrictSameClub === true,
+            clubByParticipantId: input.championsLeague.restrictSameClub === true
+              ? input.championsLeague.clubByParticipantId ?? {}
+              : {},
+          }
+        : null,
   };
   const inputFingerprint = fingerprintCanonicalJson(fingerprintSource);
 
@@ -785,10 +1110,19 @@ export function buildTournamentPlanPreview(
 
   if (participants.length === 0) {
     warnings.push(warn("NO_PARTICIPANTS", "Keine gültigen Teilnehmer für die Vorschau."));
-  } else if (participants.length < 2) {
+  } else if (participants.length < 2 && mode !== "champions-league") {
     warnings.push(
       warn("INSUFFICIENT_PARTICIPANTS", "Mindestens zwei Teilnehmer werden benötigt."),
     );
+  }
+
+  if (mode === "champions-league") {
+    return buildChampionsLeaguePreview({
+      input,
+      inputFingerprint,
+      warnings,
+      byKey,
+    });
   }
 
   const {

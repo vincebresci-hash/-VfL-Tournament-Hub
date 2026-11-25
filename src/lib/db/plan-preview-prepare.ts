@@ -5,8 +5,10 @@
  */
 
 import { createClient } from "@/lib/supabase/server";
+import { readStoredCompetitionFormat } from "@/lib/db/competition-format-read";
 import { toUserFacingDbError } from "@/lib/db/errors";
 import { getAdminTournamentStage, type AdminTournamentStage } from "@/lib/db/schedule-queries";
+import { resolveGenerationMode } from "@/lib/schedule/competition-format-guard";
 import {
   berlinWallTimeToIso,
   normalizeClock,
@@ -39,6 +41,8 @@ export type PreparedTournamentPlan = {
   policy: RegenerationPolicyResult | null;
   preview: TournamentPlanPreview | null;
   error: string | null;
+  /** Set when stored mode or topology forbids preview generation. */
+  blockCode?: string | null;
 };
 
 export function buildRegenerationStageSnapshot(
@@ -122,6 +126,32 @@ export async function prepareTournamentPlanFromDb(
     participantIds: stage.memberIdsByGroupId[group.id] ?? [],
   }));
 
+  const formatRead = await readStoredCompetitionFormat(tournamentId);
+  if (formatRead.status === "error") {
+    return {
+      tournament: loaded.tournament,
+      stage,
+      policy,
+      preview: null,
+      error: formatRead.message,
+      blockCode: "COMPETITION_FORMAT_READ_FAILED",
+    };
+  }
+  const generation = resolveGenerationMode({
+    competitionFormat: formatRead.status === "missing_column" ? null : formatRead.competitionFormat,
+    groupCount: groups.length,
+  });
+  if (!generation.ok) {
+    return {
+      tournament: loaded.tournament,
+      stage,
+      policy,
+      preview: null,
+      error: generation.message,
+      blockCode: generation.code,
+    };
+  }
+
   const startTime = normalizeClock(loaded.tournament.start_time, "09:00");
   const startIso = berlinWallTimeToIso(loaded.tournament.date, startTime);
   const lunchStart = wallTimeOnDate(
@@ -135,7 +165,7 @@ export async function prepareTournamentPlanFromDb(
 
   // Same BuildTournamentPlanPreviewInput mapping as C6-C (no member/field reordering).
   const preview = buildTournamentPlanPreview({
-    mode: groups.length > 0 ? "groups-knockout" : "round-robin",
+    mode: generation.mode,
     participants,
     groups: groups.length > 0 ? groups : undefined,
     fields: stage.fields.map((field) => ({ id: field.id, name: field.name })),

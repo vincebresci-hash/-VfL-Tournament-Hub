@@ -11,6 +11,7 @@ export type { DecidedBy, KnockoutRound, KnockoutSlot } from "@/types/schedule";
 export { KNOCKOUT_ROUNDS, KNOCKOUT_SLOTS, DECIDED_BY } from "@/types/schedule";
 
 export const knockoutRoundLabel: Record<KnockoutRound, string> = {
+  "round-of-16": "Achtelfinale",
   quarterfinal: "Viertelfinale",
   semifinal: "Halbfinale",
   "third-place": "Spiel um Platz 3",
@@ -19,7 +20,7 @@ export const knockoutRoundLabel: Record<KnockoutRound, string> = {
   "placement-7": "Spiel um Platz 7/8",
 };
 
-export type KnockoutFormat = 4 | 8;
+export type KnockoutFormat = 4 | 8 | 16;
 
 export type KnockoutOptions = {
   format: KnockoutFormat;
@@ -135,11 +136,28 @@ export function defaultFirstRoundSeeds(format: KnockoutFormat): Array<[string, s
     ];
   }
 
+  if (format === 8) {
+    return [
+      ["A1", "B2"],
+      ["B1", "A2"],
+      ["C1", "D2"],
+      ["D1", "C2"],
+    ];
+  }
+
+  // Top 16 is a Champions League league-phase bracket. The labels are
+  // placeholder seeds in standard single-elimination order so seed 1 and
+  // seed 2 can only meet in the final. The league path overwrites the teams
+  // from the final table; the classic group path never uses this format.
   return [
-    ["A1", "B2"],
-    ["B1", "A2"],
-    ["C1", "D2"],
-    ["D1", "C2"],
+    ["S1", "S16"],
+    ["S8", "S9"],
+    ["S4", "S13"],
+    ["S5", "S12"],
+    ["S2", "S15"],
+    ["S7", "S10"],
+    ["S3", "S14"],
+    ["S6", "S11"],
   ];
 }
 
@@ -147,7 +165,7 @@ export function buildKnockoutPlan(
   options: KnockoutOptions,
   qualified: QualifiedTeam[],
 ): { matches: KnockoutPlanMatch[]; error: string | null } {
-  const neededGroups = options.format === 4 ? 2 : 4;
+  const neededGroups = options.format === 4 ? 2 : options.format === 8 ? 4 : 8;
   const neededTeams = options.format;
   if (qualified.length < neededTeams) {
     return {
@@ -226,7 +244,7 @@ export function buildKnockoutPlan(
         sortOrder: 390,
       });
     }
-  } else {
+  } else if (options.format === 8) {
     matches.push(
       {
         key: "qf1",
@@ -344,6 +362,103 @@ export function buildKnockoutPlan(
         loserNextKey: null,
         loserNextSlot: null,
         sortOrder: 251,
+      });
+    }
+  } else {
+    // Top 16: 8 round-of-16 → 4 quarterfinals → 2 semifinals → final, plus an
+    // optional third-place game. Standard seeding keeps seed 1 and seed 2 apart
+    // until the final. Placement games for places 5–16 are not generated here.
+    const r16Targets: Array<{ qf: string; slot: KnockoutSlot }> = [
+      { qf: "qf1", slot: "home" },
+      { qf: "qf1", slot: "away" },
+      { qf: "qf2", slot: "home" },
+      { qf: "qf2", slot: "away" },
+      { qf: "qf3", slot: "home" },
+      { qf: "qf3", slot: "away" },
+      { qf: "qf4", slot: "home" },
+      { qf: "qf4", slot: "away" },
+    ];
+    for (let index = 0; index < 8; index += 1) {
+      matches.push({
+        key: `r16_${index + 1}`,
+        round: "round-of-16",
+        homeId: firstRound[index]?.homeId ?? null,
+        awayId: firstRound[index]?.awayId ?? null,
+        nextKey: r16Targets[index]!.qf,
+        nextSlot: r16Targets[index]!.slot,
+        loserNextKey: null,
+        loserNextSlot: null,
+        sortOrder: 50 + index,
+      });
+    }
+
+    const qfTargets: Array<{ sf: string; slot: KnockoutSlot }> = [
+      { sf: "sf1", slot: "home" },
+      { sf: "sf1", slot: "away" },
+      { sf: "sf2", slot: "home" },
+      { sf: "sf2", slot: "away" },
+    ];
+    for (let index = 0; index < 4; index += 1) {
+      matches.push({
+        key: `qf${index + 1}`,
+        round: "quarterfinal",
+        homeId: null,
+        awayId: null,
+        nextKey: qfTargets[index]!.sf,
+        nextSlot: qfTargets[index]!.slot,
+        loserNextKey: null,
+        loserNextSlot: null,
+        sortOrder: 100 + index,
+      });
+    }
+
+    matches.push(
+      {
+        key: "sf1",
+        round: "semifinal",
+        homeId: null,
+        awayId: null,
+        nextKey: "final",
+        nextSlot: "home",
+        loserNextKey: options.includeThirdPlace ? "third" : null,
+        loserNextSlot: options.includeThirdPlace ? "home" : null,
+        sortOrder: 200,
+      },
+      {
+        key: "sf2",
+        round: "semifinal",
+        homeId: null,
+        awayId: null,
+        nextKey: "final",
+        nextSlot: "away",
+        loserNextKey: options.includeThirdPlace ? "third" : null,
+        loserNextSlot: options.includeThirdPlace ? "away" : null,
+        sortOrder: 201,
+      },
+      {
+        key: "final",
+        round: "final",
+        homeId: null,
+        awayId: null,
+        nextKey: null,
+        nextSlot: null,
+        loserNextKey: null,
+        loserNextSlot: null,
+        sortOrder: 400,
+      },
+    );
+
+    if (options.includeThirdPlace) {
+      matches.push({
+        key: "third",
+        round: "third-place",
+        homeId: null,
+        awayId: null,
+        nextKey: null,
+        nextSlot: null,
+        loserNextKey: null,
+        loserNextSlot: null,
+        sortOrder: 390,
       });
     }
   }

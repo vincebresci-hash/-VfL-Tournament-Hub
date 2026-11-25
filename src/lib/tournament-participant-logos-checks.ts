@@ -235,6 +235,13 @@ export function runTournamentParticipantLogoManagementChecks() {
     "utf8",
   );
   assert(actionsSource.includes("requireTeamsManage()"), "upload path requires admin");
+  assert(
+    actionsSource.includes("updateApplicationParticipantClubAction") &&
+      actionsSource.includes("requireApplicationsManage()") &&
+      actionsSource.includes("club_id: clubId") &&
+      actionsSource.includes('.eq("status", "accepted")'),
+    "accepted application participants can atomically receive an authorized Hub club identity",
+  );
   assert(actionsSource.includes("getFormDataUploadFile"), "form data file helper used");
   assert(actionsSource.includes("auth.getUser()"), "upload verifies auth session for storage");
   assert(actionsSource.includes('mode: "upload"'), "upload mode present");
@@ -249,6 +256,16 @@ export function runTournamentParticipantLogoManagementChecks() {
   assert(editorSource.includes('name="externalTeamId"'), "externalTeamId in form");
   assert(editorSource.includes("uploadExternalTeamLogoFormAction"), "form uses upload action");
   assert(editorSource.includes("localError"), "errors shown inside logo panel");
+
+  const applicationEditorSource = readFileSync(
+    join(process.cwd(), "src/components/admin/ApplicationParticipantLogoEditor.tsx"),
+    "utf8",
+  );
+  assert(
+    applicationEditorSource.includes("Vereinszuordnung") &&
+      applicationEditorSource.includes("updateApplicationParticipantClubAction"),
+    "application participant editor offers the direct club-assignment action",
+  );
 
   assert(resolveParticipantLogoUrl({ hubClubLogoUrl: null, storedLogoUrl: null }) === null, "placeholder");
 

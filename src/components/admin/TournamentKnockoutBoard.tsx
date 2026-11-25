@@ -27,6 +27,7 @@ import {
   type KnockoutFormat,
   type KnockoutOptions,
 } from "@/lib/schedule/knockout";
+import { buildLeagueQualificationPreview } from "@/lib/schedule/league-knockout-preview";
 import { buildKnockoutQualificationPreview } from "@/lib/schedule/knockout-preview";
 import { formatGoals } from "@/lib/schedule/standings";
 import { teamLabel } from "@/lib/schedule/names";
@@ -53,6 +54,7 @@ type TournamentKnockoutBoardProps = {
   memberIdsByGroupId: Record<string, string[]>;
   participants: TournamentParticipant[];
   teamLabels: Record<string, string>;
+  leagueSchedule: { matchesPerTeam: number; knockoutCutoff: 4 | 8 | 16 } | null;
 };
 
 const bracketColumns: KnockoutRound[][] = [
@@ -71,11 +73,11 @@ export function TournamentKnockoutBoard({
   memberIdsByGroupId,
   participants,
   teamLabels,
+  leagueSchedule,
 }: TournamentKnockoutBoardProps) {
   const router = useRouter();
   const knockout = matches.filter((match) => match.phase === "knockout");
-  const progress = isGroupStageComplete(groups, memberIdsByGroupId, matches);
-  const defaultFormat: KnockoutFormat = groups.length >= 4 ? 8 : 4;
+  const defaultFormat: KnockoutFormat = leagueSchedule?.knockoutCutoff ?? (groups.length >= 4 ? 8 : 4);
   const matchesByRound = new Map<KnockoutRound, TournamentMatchRecord[]>();
   for (const round of [...bracketColumns.flat(), ...placementRounds]) {
     const items = knockout.filter((match) => match.round === round);
@@ -84,6 +86,7 @@ export function TournamentKnockoutBoard({
     }
   }
   const [format, setFormat] = useState<KnockoutFormat>(defaultFormat);
+  const activeFormat: KnockoutFormat = leagueSchedule?.knockoutCutoff ?? format;
   const [includeThirdPlace, setIncludeThirdPlace] = useState(true);
   const [includePlacement5, setIncludePlacement5] = useState(false);
   const [includePlacement7, setIncludePlacement7] = useState(false);
@@ -103,17 +106,30 @@ export function TournamentKnockoutBoard({
 
   // C6-G D2: advisory read-only preview from D1 shared planning core (not authoritative).
   const previewOptions: KnockoutOptions = {
-    format,
+    format: activeFormat,
     includeThirdPlace,
-    includePlacement5: format === 8 && includePlacement5,
-    includePlacement7: format === 8 && includePlacement7,
+    includePlacement5: activeFormat === 8 && includePlacement5,
+    includePlacement7: activeFormat === 8 && includePlacement7,
   };
-  const qualificationPreview = buildKnockoutQualificationPreview({
-    groups,
-    memberIdsByGroupId,
-    matches,
-    options: previewOptions,
-  });
+  const leagueGroup = leagueSchedule ? groups[0] : undefined;
+  const qualificationPreview = leagueSchedule
+    ? buildLeagueQualificationPreview({
+        groupId: leagueGroup?.id ?? null,
+        memberIds: leagueGroup ? (memberIdsByGroupId[leagueGroup.id] ?? []) : [],
+        matches,
+        matchesPerTeam: leagueSchedule.matchesPerTeam,
+        knockoutCutoff: leagueSchedule.knockoutCutoff,
+        options: previewOptions,
+      })
+    : buildKnockoutQualificationPreview({
+        groups,
+        memberIdsByGroupId,
+        matches,
+        options: previewOptions,
+      });
+  const progress = leagueSchedule
+    ? qualificationPreview.progress
+    : isGroupStageComplete(groups, memberIdsByGroupId, matches);
   const seedLabelByParticipantId = Object.fromEntries(
     qualificationPreview.qualifiers.map((qualifier) => [
       qualifier.applicationId,
@@ -141,7 +157,7 @@ export function TournamentKnockoutBoard({
   async function generate(forceIncomplete: boolean) {
     await run(() =>
       generateKnockoutAction(tournament.id, {
-        format,
+        format: activeFormat,
         includeThirdPlace,
         includePlacement5,
         includePlacement7,
@@ -163,7 +179,9 @@ export function TournamentKnockoutBoard({
       ) : null}
       {!progress.complete ? (
         <p className={`${adminCardShellClass} px-4 py-3.5 text-[14px] text-muted`}>
-          Die Gruppenphase ist noch nicht vollständig abgeschlossen.
+          {leagueSchedule
+            ? "Die Ligaphase ist noch nicht vollständig abgeschlossen. Die Vorschau ist vorläufig und kein Endergebnis."
+            : "Die Gruppenphase ist noch nicht vollständig abgeschlossen."}
         </p>
       ) : null}
 
@@ -173,6 +191,12 @@ export function TournamentKnockoutBoard({
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             if (!progress.complete) {
+              if (leagueSchedule) {
+                setError(
+                  "Die Ligaphase ist noch nicht abgeschlossen. Eine vorläufige Tabelle wird nicht als K.-o.-Ergebnis übernommen.",
+                );
+                return;
+              }
               setForceOpen(true);
               return;
             }
@@ -187,7 +211,8 @@ export function TournamentKnockoutBoard({
             <Field id="ko-format" label="Format">
               <SelectInput
                 id="ko-format"
-                value={String(format)}
+                value={String(activeFormat)}
+                disabled={Boolean(leagueSchedule)}
                 onChange={(event) => setFormat(Number(event.target.value) as KnockoutFormat)}
               >
                 <option value="4">4 Teams · Halbfinale</option>
@@ -211,7 +236,7 @@ export function TournamentKnockoutBoard({
             />
             Spiel um Platz 3
           </label>
-          {format === 8 ? (
+          {activeFormat === 8 ? (
             <>
               <label className="flex items-center gap-2 text-[14px] text-ink">
                 <input
@@ -238,6 +263,7 @@ export function TournamentKnockoutBoard({
             knockoutExists={knockout.length > 0}
             preview={qualificationPreview}
             seedLabelByParticipantId={seedLabelByParticipantId}
+            provisionalLeague={Boolean(leagueSchedule) && !qualificationPreview.progress.complete}
           />
 
           <button
@@ -451,12 +477,14 @@ function KnockoutQualificationPreviewPanel({
   knockoutExists,
   preview,
   seedLabelByParticipantId,
+  provisionalLeague = false,
 }: {
   groups: TournamentGroupRecord[];
   teamLabels: Record<string, string>;
   knockoutExists: boolean;
   preview: ReturnType<typeof buildKnockoutQualificationPreview>;
   seedLabelByParticipantId: Record<string, string>;
+  provisionalLeague?: boolean;
 }) {
   const groupNameById = Object.fromEntries(groups.map((group) => [group.id, group.name]));
 
@@ -485,8 +513,9 @@ function KnockoutQualificationPreviewPanel({
         >
           <p className="text-[13px] font-semibold text-ink">Vorläufige Vorschau</p>
           <p className="mt-1 text-[13px] leading-relaxed text-muted">
-            Die Gruppenphase ist noch nicht vollständig abgeschlossen. Platzierungen und
-            K.-o.-Paarungen können sich noch ändern.
+            {provisionalLeague
+              ? "Die Ligaphase ist noch nicht vollständig abgeschlossen. Platzierungen und K.-o.-Paarungen sind vorläufig und kein Endergebnis."
+              : "Die Gruppenphase ist noch nicht vollständig abgeschlossen. Platzierungen und K.-o.-Paarungen können sich noch ändern."}
           </p>
         </div>
       ) : null}
@@ -527,7 +556,7 @@ function KnockoutQualificationPreviewPanel({
 
           <div className="grid gap-3">
             <h4 className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-              Qualifizierte Teams
+              {provisionalLeague ? "Vorläufige Platzierungen" : "Qualifizierte Teams"}
             </h4>
             {preview.qualifiers.length === 0 ? (
               <p className="text-[14px] text-muted">Noch keine Qualifikationsplätze ableitbar.</p>

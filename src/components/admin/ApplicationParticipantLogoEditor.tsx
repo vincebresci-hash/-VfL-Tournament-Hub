@@ -10,6 +10,7 @@ import {
 } from "@/components/admin/AdminPanel";
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import {
+  updateApplicationParticipantClubAction,
   updateApplicationParticipantLogoAction,
   uploadApplicationParticipantLogoFormAction,
 } from "@/lib/db/tournament-participants-actions";
@@ -38,6 +39,7 @@ export function ApplicationParticipantLogoEditor({
   onCancel,
 }: ApplicationParticipantLogoEditorProps) {
   const [pending, startTransition] = useTransition();
+  const [clubId, setClubId] = useState(participant.clubId ?? "");
   const [logoUrl, setLogoUrl] = useState(participant.customLogoUrl ?? "");
   const [fileName, setFileName] = useState<string | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
@@ -65,7 +67,7 @@ export function ApplicationParticipantLogoEditor({
     });
   }
 
-  const linkedClub = clubs.find((club) => club.id === (participant.clubId || ""));
+  const linkedClub = clubs.find((club) => club.id === clubId);
   const clubLogoUrl = linkedClub?.logoUrl ?? null;
   const overrideCandidate =
     previewOverrideUrl ||
@@ -140,6 +142,46 @@ export function ApplicationParticipantLogoEditor({
           ) : null}
         </div>
       </div>
+
+      <section className={`mt-5 ${adminCardShellClass} p-4`}>
+        <h3 className={adminSectionTitleClass}>Vereinszuordnung</h3>
+        <p className="mt-2 text-[13px] leading-6 text-muted">
+          Diese eindeutige Zuordnung wird für den Same-Club-Ausschluss verwendet. Ist der Verein
+          noch nicht vorhanden, lege ihn zuerst unter „Vereine“ an.
+        </p>
+        <label className="mt-3 grid gap-1 text-[13px] text-ink">
+          <span className="sr-only">Hub-Verein</span>
+          <select
+            value={clubId}
+            onChange={(event) => setClubId(event.target.value)}
+            className={adminFilterControlClass}
+            disabled={pending}
+          >
+            <option value="">Kein Hub-Verein</option>
+            {clubs.map((club) => (
+              <option key={club.id} value={club.id}>
+                {club.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          disabled={pending || clubId === (participant.clubId ?? "")}
+          onClick={() =>
+            run(() =>
+              updateApplicationParticipantClubAction({
+                tournamentId,
+                applicationId: participant.applicationId!,
+                clubId: clubId || null,
+              }),
+            )
+          }
+          className={`mt-3 ${adminCompactSecondaryButtonClass}`}
+        >
+          Vereinszuordnung speichern
+        </button>
+      </section>
 
       <section className={`mt-5 ${adminCardShellClass} p-4`}>
         <h3 className={adminSectionTitleClass}>Eigenes Bewerbungs-Logo</h3>

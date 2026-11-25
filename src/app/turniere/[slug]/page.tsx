@@ -13,6 +13,7 @@ import { TournamentExtraInfo } from "@/components/tournaments/TournamentExtraInf
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
 import { formatDateDe, formatDateTimeDe, formatTimeDe } from "@/lib/format";
 import { getPublicTournamentStage } from "@/lib/db/schedule-queries";
+import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getPublicTournamentBySlug } from "@/lib/db/tournament-queries";
 import {
   getPublicApplicationState,
@@ -73,11 +74,20 @@ export default async function TournamentDetailPage({
     notFound();
   }
 
-  const [settings, stage, tournamentPartners] = await Promise.all([
+  const [settings, stage, tournamentPartners, leagueConfig] = await Promise.all([
     getAppSettings(),
     getPublicTournamentStage(tournament.slug, tournament.id),
     listPublicActivePartnersForTournament(tournament.id),
+    readStoredLeagueScheduleConfig(tournament.id),
   ]);
+  const publicLeagueConfig =
+    leagueConfig.status === "ok"
+      ? leagueConfig
+      : {
+          competitionFormat: null,
+          leagueMatchesPerTeam: null,
+          knockoutCutoff: null,
+        };
   const applicationGate = {
     status: tournament.status,
     applicationsEnabled: settings.applicationsEnabled,
@@ -228,6 +238,9 @@ export default async function TournamentDetailPage({
             meinTurnierplanActive={showMeinTurnierplan}
             showLiveTab={showLiveTab}
             publicScheduleNote={tournament.publicScheduleNote}
+            competitionFormat={publicLeagueConfig.competitionFormat}
+            leagueMatchesPerTeam={publicLeagueConfig.leagueMatchesPerTeam}
+            knockoutCutoff={publicLeagueConfig.knockoutCutoff}
             livePresentation={
               showLiveTab
                 ? {

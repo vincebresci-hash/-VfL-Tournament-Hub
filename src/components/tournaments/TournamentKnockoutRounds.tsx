@@ -41,6 +41,21 @@ export type KnockoutPlacementView = {
 type TournamentKnockoutRoundsProps = {
   rounds: KnockoutRoundView[];
   placements: KnockoutPlacementView[];
+  heading?: string;
+  description?: string | null;
+  notice?: string | null;
+  emptyState?: string | null;
+  showStatus?: boolean;
+  logoFallback?: "initial" | "none";
+  layout?: "stack" | "bracket";
+  className?: string;
+};
+
+const statusLabels: Record<string, string> = {
+  scheduled: "Geplant",
+  live: "Live",
+  completed: "Beendet",
+  cancelled: "Abgesagt",
 };
 
 /**
@@ -51,17 +66,25 @@ type TournamentKnockoutRoundsProps = {
 export function TournamentKnockoutRounds({
   rounds,
   placements,
+  heading = "KO-Runde",
+  description = null,
+  notice = null,
+  emptyState = null,
+  showStatus = false,
+  logoFallback = "none",
+  layout = "stack",
+  className,
 }: TournamentKnockoutRoundsProps) {
   const matchCount = rounds.reduce((sum, round) => sum + round.matches.length, 0);
 
   return (
-    <section className="mt-8 min-w-0 max-w-full" aria-labelledby="ko-runde-heading">
+    <section className={cn("mt-8 min-w-0 max-w-full", className)} aria-labelledby="ko-runde-heading">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2
           id="ko-runde-heading"
           className="font-display text-2xl font-bold tracking-wide text-ink uppercase"
         >
-          KO-Runde
+          {heading}
         </h2>
         {rounds.length > 0 ? (
           <p className="text-[13px] font-medium tracking-wide text-muted">
@@ -72,8 +95,18 @@ export function TournamentKnockoutRounds({
         ) : null}
       </div>
 
+      {description ? <p className="mt-2 max-w-3xl text-[14px] leading-6 text-muted">{description}</p> : null}
+      {notice ? (
+        <p className="mt-4 rounded-[8px] border border-brand-blue/20 bg-[#f2f7ff] px-3.5 py-3 text-[13px] leading-5 text-ink">
+          {notice}
+        </p>
+      ) : null}
+
       {rounds.length > 0 ? (
-        <div className="mt-4 grid gap-3">
+        <div className={cn(
+          "mt-4 grid gap-3",
+          layout === "bracket" && "lg:flex lg:items-start lg:gap-3 lg:overflow-x-auto lg:pb-2",
+        )}>
           {rounds.map((round) => {
             const headingId = `ko-round-${round.id}`;
             const isFinal = round.id === "final";
@@ -83,6 +116,7 @@ export function TournamentKnockoutRounds({
                 aria-labelledby={headingId}
                 className={cn(
                   "min-w-0 rounded-[10px] border bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)]",
+                  layout === "bracket" && "lg:min-w-[15rem] lg:flex-1",
                   isFinal ? "border-navy/35 ring-1 ring-inset ring-brand-yellow/50" : "border-line",
                 )}
               >
@@ -107,11 +141,13 @@ export function TournamentKnockoutRounds({
                 </div>
 
                 <ul
-                  className={
-                    round.matches.length === 1
-                      ? "mt-2.5 grid grid-cols-1 gap-2"
-                      : "mt-2.5 grid grid-cols-1 gap-2 md:grid-cols-2"
-                  }
+                  className={cn(
+                    "mt-2.5 grid grid-cols-1 gap-2",
+                    // Bracket columns keep one match per row so cards stay wide
+                    // enough for full team names (no mid-word wrapping). The
+                    // stacked layout may use two columns on wider screens.
+                    layout !== "bracket" && round.matches.length > 1 && "md:grid-cols-2",
+                  )}
                 >
                   {round.matches.map((match) => {
                     const completed =
@@ -131,18 +167,26 @@ export function TournamentKnockoutRounds({
                         key={match.id}
                         className="min-w-0 rounded-[8px] border border-line bg-surface px-3 py-2.5"
                       >
-                        <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
-                          {match.meta}
-                        </p>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
+                            {match.meta}
+                          </p>
+                          {showStatus && match.status ? (
+                            <span className={match.status === "live" ? "rounded-full bg-brand-yellow px-2 py-1 text-[9px] font-bold tracking-[0.08em] text-navy uppercase" : "text-[9px] font-semibold tracking-[0.08em] text-muted uppercase"}>
+                              {statusLabels[match.status] ?? match.status}
+                            </span>
+                          ) : null}
+                        </div>
                         <div className="mt-2">
                           <MatchSidesScoreBlock
                             home={match.home}
                             away={match.away}
-                            completed={completed}
+                            completed={(completed || match.status === "live") && match.homeScore != null && match.awayScore != null}
                             homeScore={match.homeScore}
                             awayScore={match.awayScore}
                             scoreNote={scoreNote}
                             logoSize="xs"
+                            logoFallback={logoFallback}
                           />
                         </div>
                         {match.winnerLabel ? (
@@ -160,6 +204,10 @@ export function TournamentKnockoutRounds({
             );
           })}
         </div>
+      ) : emptyState ? (
+        <p className="mt-4 rounded-[10px] border border-dashed border-line bg-white px-4 py-8 text-center text-[15px] leading-6 text-muted">
+          {emptyState}
+        </p>
       ) : null}
 
       {placements.length > 0 ? (
