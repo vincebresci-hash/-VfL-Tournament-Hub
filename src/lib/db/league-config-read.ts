@@ -17,7 +17,8 @@ export type StoredLeagueScheduleConfig =
       updatedAt: string;
       competitionFormat: CompetitionFormat | null;
       leagueMatchesPerTeam: number | null;
-      knockoutCutoff: 4 | 8 | null;
+      knockoutCutoff: 4 | 8 | 16 | null;
+      restrictSameClub: boolean;
     };
 
 function missingCompetitionColumn(error: { code?: string; message?: string } | null) {
@@ -26,7 +27,9 @@ function missingCompetitionColumn(error: { code?: string; message?: string } | n
   }
   const message = (error?.message ?? "").toLowerCase();
   const mentionsColumn =
-    message.includes("league_matches_per_team") || message.includes("knockout_cutoff");
+    message.includes("league_matches_per_team") ||
+    message.includes("knockout_cutoff") ||
+    message.includes("restrict_same_club");
   if (!mentionsColumn) {
     return false;
   }
@@ -46,7 +49,9 @@ export async function readStoredLeagueScheduleConfig(
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("tournaments")
-    .select("updated_at, competition_format, league_matches_per_team, knockout_cutoff")
+    .select(
+      "updated_at, competition_format, league_matches_per_team, knockout_cutoff, restrict_same_club",
+    )
     .eq("id", tournamentId)
     .maybeSingle();
 
@@ -79,6 +84,7 @@ export async function readStoredLeagueScheduleConfig(
     updatedAt: data.updated_at,
     competitionFormat: format,
     leagueMatchesPerTeam: data.league_matches_per_team ?? null,
-    knockoutCutoff: cutoff === 4 || cutoff === 8 ? cutoff : null,
+    knockoutCutoff: cutoff === 4 || cutoff === 8 || cutoff === 16 ? cutoff : null,
+    restrictSameClub: data.restrict_same_club === true,
   };
 }

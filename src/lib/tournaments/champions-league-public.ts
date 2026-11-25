@@ -26,7 +26,7 @@ export type ChampionsLeagueKnockoutMatch = {
 
 export function championsLeagueQualificationBand(
   rank: number,
-  knockoutCutoff: 4 | 8,
+  knockoutCutoff: 4 | 8 | 16,
 ): ChampionsLeagueQualificationBand {
   return rank <= knockoutCutoff ? "knockout" : "outside";
 }
@@ -64,7 +64,7 @@ export function isChampionsLeaguePhaseComplete(input: {
 export function championsLeagueFinalQualifierIds(input: {
   complete: boolean;
   standings: readonly ChampionsLeagueStanding[];
-  knockoutCutoff: 4 | 8;
+  knockoutCutoff: 4 | 8 | 16;
 }) {
   if (!input.complete || input.standings.length < input.knockoutCutoff) {
     return [];
@@ -95,7 +95,7 @@ function knockoutParticipantId(
 export function isChampionsLeagueKnockoutQualificationConsistent(input: {
   complete: boolean;
   standings: readonly ChampionsLeagueStanding[];
-  knockoutCutoff: 4 | 8;
+  knockoutCutoff: 4 | 8 | 16;
   matches: readonly ChampionsLeagueKnockoutMatch[];
 }) {
   const qualifiers = championsLeagueFinalQualifierIds(input);
@@ -103,7 +103,12 @@ export function isChampionsLeagueKnockoutQualificationConsistent(input: {
     return false;
   }
 
-  const firstRound = input.knockoutCutoff === 4 ? "semifinal" : "quarterfinal";
+  const firstRound =
+    input.knockoutCutoff === 4
+      ? "semifinal"
+      : input.knockoutCutoff === 8
+        ? "quarterfinal"
+        : "round-of-16";
   const firstRoundMatches = input.matches.filter(
     (match) => match.phase === "knockout" && match.round === firstRound,
   );
@@ -145,7 +150,7 @@ export function standingRowIsConsistent(row: {
 
 export function championsLeagueQualificationLabel(input: {
   complete: boolean;
-  knockoutCutoff: 4 | 8;
+  knockoutCutoff: 4 | 8 | 16;
 }) {
   return input.complete
     ? `Platz 1–${input.knockoutCutoff}: für die K.-o.-Runde qualifiziert`

@@ -117,7 +117,10 @@ type TournamentScheduleBoardProps = {
   canScheduleManage: boolean;
   storedFormat: "round-robin" | "groups-knockout" | "champions-league" | null;
   storedLeagueMatchesPerTeam: number | null;
-  storedKnockoutCutoff: 4 | 8 | null;
+  storedKnockoutCutoff: 4 | 8 | 16 | null;
+  storedRestrictSameClub?: boolean;
+  /** Stable club identity per participant key (null = no shared club). */
+  clubByParticipantId?: Record<string, string | null>;
   confirmedRosterError?: string | null;
 };
 
@@ -133,6 +136,8 @@ export function TournamentScheduleBoard({
   storedFormat,
   storedLeagueMatchesPerTeam,
   storedKnockoutCutoff,
+  storedRestrictSameClub = false,
+  clubByParticipantId = {},
   confirmedRosterError = null,
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
@@ -167,8 +172,9 @@ export function TournamentScheduleBoard({
     storedLeagueMatchesPerTeam != null ? String(storedLeagueMatchesPerTeam) : "3",
   );
   const [leagueCutoff, setLeagueCutoff] = useState<LeagueKnockoutCutoff>(
-    storedKnockoutCutoff ?? (participants.length >= 8 ? 8 : 4),
+    storedKnockoutCutoff ?? (participants.length >= 16 ? 16 : participants.length >= 8 ? 8 : 4),
   );
+  const [restrictSameClub, setRestrictSameClub] = useState<boolean>(storedRestrictSameClub);
   const leagueParticipantIds = championsLeagueParticipantIds(participants);
   const leagueDescription = describeChampionsLeagueConfig({
     participantIds: leagueParticipantIds,
@@ -342,6 +348,8 @@ export function TournamentScheduleBoard({
       knockoutCutoff: leagueCutoff,
       fields,
       timing: savedTournamentPlanTiming(tournament),
+      restrictSameClub,
+      clubByParticipantId,
     });
     setPreview(nextPreview);
     setPreviewPolicy(
@@ -407,6 +415,7 @@ export function TournamentScheduleBoard({
             previewFingerprint: fingerprint,
             matchesPerTeam: matchesPerTeam ?? Number.NaN,
             knockoutCutoff: leagueCutoff,
+            restrictSameClub,
             confirmReplace,
           })
         : await applyTournamentPlanAction(tournament.id, fingerprint, confirmReplace);
@@ -710,6 +719,7 @@ export function TournamentScheduleBoard({
           participantNames={leagueParticipantIds.map((id) => teamLabels[id] ?? "Team")}
           matchesPerTeam={leagueMatchesPerTeam}
           knockoutCutoff={leagueCutoff}
+          restrictSameClub={restrictSameClub}
           description={leagueDescription}
           onModeChange={selectCompetitionMode}
           onMatchesPerTeamChange={(value) => {
@@ -718,6 +728,10 @@ export function TournamentScheduleBoard({
           }}
           onCutoffChange={(cutoff) => {
             setLeagueCutoff(cutoff);
+            clearPreviewState();
+          }}
+          onRestrictSameClubChange={(next) => {
+            setRestrictSameClub(next);
             clearPreviewState();
           }}
         />

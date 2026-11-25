@@ -73,7 +73,7 @@ export type ResolvedCompetitionTopology = {
 export type StoredCompetitionColumns = {
   competitionFormat: CompetitionFormat | null;
   leagueMatchesPerTeam: number | null;
-  knockoutCutoff: 4 | 8 | null;
+  knockoutCutoff: 4 | 8 | 16 | null;
 };
 
 export type ChampionsLeagueConfiguration = {
@@ -91,8 +91,8 @@ function isCompetitionFormat(value: string): value is CompetitionFormat {
   return (COMPETITION_FORMATS as readonly string[]).includes(value);
 }
 
-function isStoredCutoff(value: number): value is 4 | 8 {
-  return value === 4 || value === 8;
+function isStoredCutoff(value: number): value is 4 | 8 | 16 {
+  return value === 4 || value === 8 || value === 16;
 }
 
 /** NULL stays legacy. Public display text is not a format. */
@@ -222,7 +222,7 @@ export function validateStoredCompetitionColumns(input: {
   if (cutoff != null && !isStoredCutoff(cutoff)) {
     return failure(
       "INVALID_KNOCKOUT_CUTOFF",
-      "Die K.-o.-Qualifikation unterstützt nur die ersten 4 oder die ersten 8 Teams.",
+      "Die K.-o.-Qualifikation unterstützt nur die ersten 4, 8 oder 16 Teams.",
     );
   }
 
@@ -302,7 +302,7 @@ export function validateChampionsLeagueConfiguration(input: {
   if (!isStoredCutoff(input.knockoutCutoff)) {
     return failure(
       "INVALID_KNOCKOUT_CUTOFF",
-      "Die K.-o.-Qualifikation unterstützt nur die ersten 4 oder die ersten 8 Teams.",
+      "Die K.-o.-Qualifikation unterstützt nur die ersten 4, 8 oder 16 Teams.",
     );
   }
 

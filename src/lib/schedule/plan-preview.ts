@@ -181,6 +181,10 @@ export type ChampionsLeaguePreviewConfig = {
   participantIds: string[];
   matchesPerTeam: number;
   knockoutCutoff: LeagueKnockoutCutoff;
+  /** League-phase only: forbid drawing two teams of the same club. */
+  restrictSameClub?: boolean;
+  /** Stable club identity per participant key (null = no shared club). */
+  clubByParticipantId?: Readonly<Record<string, string | null>>;
 };
 
 export type BuildTournamentPlanPreviewInput = {
@@ -861,10 +865,19 @@ function buildChampionsLeaguePreview(args: {
     });
   }
 
+  const restrictSameClub = config.restrictSameClub === true;
+  const clubByTeamId: Record<string, string | null> = {};
+  if (restrictSameClub) {
+    for (const participantId of teamIds) {
+      clubByTeamId[participantId] = config.clubByParticipantId?.[participantId] ?? null;
+    }
+  }
   const validated = validateLeaguePhaseConfig({
     teamIds,
     matchesPerTeam: config.matchesPerTeam,
     knockoutCutoff: config.knockoutCutoff,
+    restrictSameClub,
+    clubByTeamId,
   });
   if (!validated.ok) {
     warnings.push(
@@ -1079,6 +1092,10 @@ export function buildTournamentPlanPreview(
             participantIds: [...input.championsLeague.participantIds],
             matchesPerTeam: input.championsLeague.matchesPerTeam,
             knockoutCutoff: input.championsLeague.knockoutCutoff,
+            restrictSameClub: input.championsLeague.restrictSameClub === true,
+            clubByParticipantId: input.championsLeague.restrictSameClub === true
+              ? input.championsLeague.clubByParticipantId ?? {}
+              : {},
           }
         : null,
   };

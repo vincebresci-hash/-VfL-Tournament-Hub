@@ -19,7 +19,7 @@ import {
   type QualifiedTeam,
 } from "@/lib/schedule/knockout";
 
-export const LEAGUE_KNOCKOUT_CUTOFFS = [4, 8] as const;
+export const LEAGUE_KNOCKOUT_CUTOFFS = [4, 8, 16] as const;
 
 export type LeagueKnockoutCutoff = (typeof LEAGUE_KNOCKOUT_CUTOFFS)[number];
 
@@ -33,6 +33,8 @@ export const LEAGUE_PHASE_ISSUE_CODES = [
   "UNEVEN_MATCH_TOTAL",
   "CUTOFF_EXCEEDS_TEAMS",
   "FIXTURE_INVARIANT",
+  "SAME_CLUB_TOO_FEW_OPPONENTS",
+  "SAME_CLUB_DRAW_IMPOSSIBLE",
 ] as const;
 
 export type LeaguePhaseIssueCode = (typeof LEAGUE_PHASE_ISSUE_CODES)[number];
@@ -41,12 +43,25 @@ export type LeaguePhaseInput = {
   teamIds: readonly string[];
   matchesPerTeam: number;
   knockoutCutoff: number;
+  /**
+   * When true, two teams that share the same non-null club identity must not be
+   * drawn against each other in the league phase. The restriction is never
+   * silently relaxed: an impossible draw fails with an explicit error.
+   */
+  restrictSameClub?: boolean;
+  /**
+   * Stable club identity per team id. A null/absent value means the team has no
+   * shared club identity and can meet anyone. Only used when restrictSameClub.
+   */
+  clubByTeamId?: Readonly<Record<string, string | null>>;
 };
 
 export type ValidLeaguePhaseConfig = {
   teamIds: string[];
   matchesPerTeam: number;
   knockoutCutoff: LeagueKnockoutCutoff;
+  restrictSameClub: boolean;
+  clubByTeamId: Readonly<Record<string, string | null>>;
 };
 
 export type LeaguePhaseValidation =
@@ -95,6 +110,19 @@ const FIRST_ROUND_RANKS: Record<LeagueKnockoutCutoff, ReadonlyArray<readonly [nu
     [2, 7],
     [3, 6],
   ],
+  // Standard single-elimination seeding for 16 qualifiers, in bracket order.
+  // Top-half matches first (seed 1), bottom-half last (seed 2), so seeds 1 and
+  // 2 can only meet in the final.
+  16: [
+    [1, 16],
+    [8, 9],
+    [4, 13],
+    [5, 12],
+    [2, 15],
+    [7, 10],
+    [3, 14],
+    [6, 11],
+  ],
 };
 
 function fail(code: LeaguePhaseIssueCode, message: string): LeaguePhaseValidation {
@@ -102,7 +130,7 @@ function fail(code: LeaguePhaseIssueCode, message: string): LeaguePhaseValidatio
 }
 
 function isKnockoutCutoff(value: number): value is LeagueKnockoutCutoff {
-  return value === 4 || value === 8;
+  return value === 4 || value === 8 || value === 16;
 }
 
 export function leagueFirstRoundRanks(
@@ -128,7 +156,7 @@ export function validateLeaguePhaseConfig(input: LeaguePhaseInput): LeaguePhaseV
   if (!isKnockoutCutoff(input.knockoutCutoff)) {
     return fail(
       "INVALID_CUTOFF",
-      "Die K.-o.-Qualifikation unterstützt die ersten 4 oder die ersten 8 Teams.",
+      "Die K.-o.-Qualifikation unterstützt die ersten 4, 8 oder 16 Teams.",
     );
   }
 
@@ -181,12 +209,42 @@ export function validateLeaguePhaseConfig(input: LeaguePhaseInput): LeaguePhaseV
     );
   }
 
+  const restrictSameClub = input.restrictSameClub === true;
+  const clubByTeamId: Record<string, string | null> = {};
+  for (const teamId of teamIds) {
+    const club = input.clubByTeamId?.[teamId];
+    clubByTeamId[teamId] = typeof club === "string" && club.trim() !== "" ? club : null;
+  }
+
+  if (restrictSameClub) {
+    const clubSizes = new Map<string, number>();
+    for (const teamId of teamIds) {
+      const club = clubByTeamId[teamId];
+      if (club != null) {
+        clubSizes.set(club, (clubSizes.get(club) ?? 0) + 1);
+      }
+    }
+    for (const teamId of teamIds) {
+      const club = clubByTeamId[teamId];
+      const sameClubCount = club != null ? (clubSizes.get(club) ?? 1) : 1;
+      const allowedOpponents = teamIds.length - sameClubCount;
+      if (allowedOpponents < input.matchesPerTeam) {
+        return fail(
+          "SAME_CLUB_TOO_FEW_OPPONENTS",
+          "Mit dem Ausschluss vereinsinterner Begegnungen hat mindestens ein Team zu wenige mögliche Gegner für die gewünschte Spielezahl.",
+        );
+      }
+    }
+  }
+
   return {
     ok: true,
     config: {
       teamIds,
       matchesPerTeam: input.matchesPerTeam,
       knockoutCutoff: input.knockoutCutoff,
+      restrictSameClub,
+      clubByTeamId,
     },
   };
 }
@@ -382,6 +440,13 @@ function findFixtureIssue(config: ValidLeaguePhaseConfig, fixtures: readonly Lea
     if (pairs.has(pair)) {
       return "Zwei Teams treffen mehr als einmal aufeinander.";
     }
+    if (config.restrictSameClub) {
+      const homeClub = config.clubByTeamId[fixture.homeId];
+      const awayClub = config.clubByTeamId[fixture.awayId];
+      if (homeClub != null && awayClub != null && homeClub === awayClub) {
+        return "Zwei Mannschaften desselben Vereins treffen in der Ligaphase aufeinander.";
+      }
+    }
     pairs.add(pair);
     played.set(fixture.homeId, (played.get(fixture.homeId) ?? 0) + 1);
     played.set(fixture.awayId, (played.get(fixture.awayId) ?? 0) + 1);
@@ -394,6 +459,22 @@ function findFixtureIssue(config: ValidLeaguePhaseConfig, fixtures: readonly Lea
     if (played.get(teamId) !== config.matchesPerTeam) {
       return "Nicht jedes Team hat die gleiche Anzahl Spiele.";
     }
+  }
+
+  if (config.restrictSameClub) {
+    // Constrained draws are coloured into rounds that are plain matchings: each
+    // team plays at most once per round so the round maps to one time block.
+    for (const [, round] of byRound) {
+      const roundTeams = new Set<string>();
+      for (const fixture of round) {
+        if (roundTeams.has(fixture.homeId) || roundTeams.has(fixture.awayId)) {
+          return "Eine Ligarunde setzt ein Team doppelt ein.";
+        }
+        roundTeams.add(fixture.homeId);
+        roundTeams.add(fixture.awayId);
+      }
+    }
+    return null;
   }
 
   const odd = config.teamIds.length % 2 === 1;
@@ -420,6 +501,157 @@ function findFixtureIssue(config: ValidLeaguePhaseConfig, fixtures: readonly Lea
   return null;
 }
 
+/** Deterministic PRNG so a given set of teams always yields the same draw. */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seedFromTeamIds(teamIds: readonly string[], salt: number): number {
+  let hash = 2166136261 ^ salt;
+  for (const teamId of teamIds) {
+    for (let index = 0; index < teamId.length; index += 1) {
+      hash ^= teamId.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+  }
+  return hash >>> 0;
+}
+
+function shuffleInPlace<T>(items: T[], rng: () => number): T[] {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(rng() * (index + 1));
+    [items[index], items[swap]] = [items[swap]!, items[index]!];
+  }
+  return items;
+}
+
+function sameClubForbidden(
+  clubByTeamId: Readonly<Record<string, string | null>>,
+  left: string,
+  right: string,
+): boolean {
+  const leftClub = clubByTeamId[left];
+  const rightClub = clubByTeamId[right];
+  return leftClub != null && rightClub != null && leftClub === rightClub;
+}
+
+/**
+ * Havel–Hakimi style construction of an M-regular simple graph that skips
+ * forbidden (same-club) edges. Returns unordered edges or null when this random
+ * attempt gets stuck. Caller retries with fresh randomness before giving up.
+ */
+function tryBuildRegularGraph(
+  teamIds: readonly string[],
+  matchesPerTeam: number,
+  clubByTeamId: Readonly<Record<string, string | null>>,
+  rng: () => number,
+): Array<[string, string]> | null {
+  const need = new Map<string, number>(teamIds.map((teamId) => [teamId, matchesPerTeam]));
+  const adjacency = new Map<string, Set<string>>(teamIds.map((teamId) => [teamId, new Set()]));
+  const edges: Array<[string, string]> = [];
+
+  for (;;) {
+    const active = teamIds.filter((teamId) => (need.get(teamId) ?? 0) > 0);
+    if (active.length === 0) {
+      return edges;
+    }
+    shuffleInPlace(active, rng);
+    active.sort((left, right) => (need.get(right) ?? 0) - (need.get(left) ?? 0));
+    const vertex = active[0]!;
+    const vertexNeed = need.get(vertex) ?? 0;
+
+    const candidates = teamIds.filter(
+      (teamId) =>
+        teamId !== vertex &&
+        (need.get(teamId) ?? 0) > 0 &&
+        !adjacency.get(vertex)!.has(teamId) &&
+        !sameClubForbidden(clubByTeamId, vertex, teamId),
+    );
+    if (candidates.length < vertexNeed) {
+      return null;
+    }
+    shuffleInPlace(candidates, rng);
+    candidates.sort((left, right) => (need.get(right) ?? 0) - (need.get(left) ?? 0));
+
+    for (let index = 0; index < vertexNeed; index += 1) {
+      const partner = candidates[index]!;
+      adjacency.get(vertex)!.add(partner);
+      adjacency.get(partner)!.add(vertex);
+      need.set(vertex, (need.get(vertex) ?? 0) - 1);
+      need.set(partner, (need.get(partner) ?? 0) - 1);
+      edges.push([vertex, partner]);
+    }
+  }
+}
+
+/** Greedy edge colouring: each colour is a round (a matching, one time block). */
+function colourEdgesIntoRounds(
+  edges: ReadonlyArray<readonly [string, string]>,
+  rng: () => number,
+): LeagueFixture[] {
+  const ordered = shuffleInPlace([...edges], rng);
+  const usedRounds = new Map<string, Set<number>>();
+  const homeCount = new Map<string, number>();
+  const fixtures: LeagueFixture[] = [];
+
+  const roundsOf = (teamId: string) => {
+    let rounds = usedRounds.get(teamId);
+    if (!rounds) {
+      rounds = new Set();
+      usedRounds.set(teamId, rounds);
+    }
+    return rounds;
+  };
+
+  for (const [left, right] of ordered) {
+    const leftRounds = roundsOf(left);
+    const rightRounds = roundsOf(right);
+    let roundIndex = 0;
+    while (leftRounds.has(roundIndex) || rightRounds.has(roundIndex)) {
+      roundIndex += 1;
+    }
+    leftRounds.add(roundIndex);
+    rightRounds.add(roundIndex);
+    // Light home/away balancing keeps the schedule fair without affecting pairings.
+    const leftHomes = homeCount.get(left) ?? 0;
+    const rightHomes = homeCount.get(right) ?? 0;
+    const homeId = leftHomes <= rightHomes ? left : right;
+    const awayId = homeId === left ? right : left;
+    homeCount.set(homeId, (homeCount.get(homeId) ?? 0) + 1);
+    fixtures.push({ homeId, awayId, roundIndex });
+  }
+
+  return fixtures;
+}
+
+function buildSameClubFixtures(config: ValidLeaguePhaseConfig): LeagueFixture[] | null {
+  const attempts = 400;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const rng = mulberry32(seedFromTeamIds(config.teamIds, attempt + 1));
+    const edges = tryBuildRegularGraph(
+      config.teamIds,
+      config.matchesPerTeam,
+      config.clubByTeamId,
+      rng,
+    );
+    if (!edges) {
+      continue;
+    }
+    const fixtures = colourEdgesIntoRounds(edges, rng);
+    if (findFixtureIssue(config, fixtures) == null) {
+      return fixtures;
+    }
+  }
+  return null;
+}
+
 export function buildLeagueFixtures(input: LeaguePhaseInput): LeagueFixtureBuild {
   const validated = validateLeaguePhaseConfig(input);
   if (!validated.ok) {
@@ -427,6 +659,20 @@ export function buildLeagueFixtures(input: LeaguePhaseInput): LeagueFixtureBuild
   }
 
   const { config } = validated;
+
+  if (config.restrictSameClub) {
+    const fixtures = buildSameClubFixtures(config);
+    if (!fixtures) {
+      return {
+        fixtures: [],
+        error:
+          "Mit dem Ausschluss vereinsinterner Begegnungen ist keine gültige Auslosung möglich. Bitte reduziere die Spiele pro Team oder die Zahl gleicher Vereine.",
+        code: "SAME_CLUB_DRAW_IMPOSSIBLE",
+      };
+    }
+    return { fixtures, error: null, code: null };
+  }
+
   const fixtures =
     config.teamIds.length % 2 === 0
       ? circleMethodRounds(config.teamIds, config.matchesPerTeam)
@@ -459,7 +705,7 @@ export function selectLeagueQualifiers(
   if (!isKnockoutCutoff(cutoff)) {
     return {
       qualifiers: [],
-      error: "Die K.-o.-Qualifikation unterstützt die ersten 4 oder die ersten 8 Teams.",
+      error: "Die K.-o.-Qualifikation unterstützt die ersten 4, 8 oder 16 Teams.",
     };
   }
 
@@ -514,7 +760,7 @@ export function buildLeagueKnockoutPlan(
   if (!isKnockoutCutoff(options.format)) {
     return {
       matches: [],
-      error: "Die K.-o.-Qualifikation unterstützt die ersten 4 oder die ersten 8 Teams.",
+      error: "Die K.-o.-Qualifikation unterstützt die ersten 4, 8 oder 16 Teams.",
     };
   }
 

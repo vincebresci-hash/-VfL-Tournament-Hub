@@ -47,11 +47,13 @@ function knockoutMatch(round, homeApplicationId, awayApplicationId) {
   };
 }
 
-test("marks exactly the configured top four or top eight qualification places", () => {
+test("marks exactly the configured top four, top eight or top sixteen qualification places", () => {
   assert.equal(championsLeagueQualificationBand(4, 4), "knockout");
   assert.equal(championsLeagueQualificationBand(5, 4), "outside");
   assert.equal(championsLeagueQualificationBand(8, 8), "knockout");
   assert.equal(championsLeagueQualificationBand(9, 8), "outside");
+  assert.equal(championsLeagueQualificationBand(16, 16), "knockout");
+  assert.equal(championsLeagueQualificationBand(17, 16), "outside");
 });
 
 test("keeps qualification provisional until every configured league match is complete", () => {
@@ -198,13 +200,13 @@ test("covers league to top-eight knockout tree and final without inventing parti
   assert.equal(tree.filter((match) => match.round === "semifinal").every((match) => match.homeApplicationId == null && match.awayApplicationId == null), true);
 });
 
-test("documents the safe extension boundaries for top 16 and same-club avoidance", () => {
+test("top 16 and same-club avoidance are implemented in the league phase", () => {
   const league = read("src/lib/schedule/league-phase.ts");
   const scheduleTypes = read("src/types/schedule.ts");
 
-  assert.match(league, /LEAGUE_KNOCKOUT_CUTOFFS = \[4, 8\]/);
-  assert.doesNotMatch(scheduleTypes, /round-of-16/);
-  assert.doesNotMatch(league, /clubId|clubName|sameClub/);
+  assert.match(league, /LEAGUE_KNOCKOUT_CUTOFFS = \[4, 8, 16\]/);
+  assert.match(scheduleTypes, /round-of-16/);
+  assert.match(league, /restrictSameClub/);
 });
 
 test("public route detects stored CL mode with the safe missing-column fallback", () => {

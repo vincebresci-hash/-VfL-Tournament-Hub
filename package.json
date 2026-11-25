@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:cl-public": "node --no-warnings --experimental-strip-types --test scripts/tests/champions-league-public.test.mjs",
+    "test:cl-public": "node --no-warnings --experimental-strip-types --import ./scripts/tests/register-alias.mjs --test scripts/tests/champions-league-public.test.mjs",
+    "test:cl-advanced": "node --no-warnings --experimental-strip-types --import ./scripts/tests/register-alias.mjs --test scripts/tests/champions-league-advanced.test.mjs",
     "test:inbox-sql": "node scripts/ci/inbox-sql/run.mjs",
     "test:competition-postgres": "node scripts/competition-postgres/run.mjs"
   },

@@ -15,11 +15,18 @@
 -- Played, live, and knockout matches are never deleted.
 -- =============================================================================
 
+-- Drop the earlier six-argument signature (without the same-club flag) so the
+-- new signature does not coexist with it as an overload.
+DROP FUNCTION IF EXISTS public.apply_champions_league_league_phase(
+  uuid, timestamptz, integer, integer, boolean, jsonb
+);
+
 CREATE OR REPLACE FUNCTION public.apply_champions_league_league_phase(
   p_tournament_id uuid,
   p_expected_updated_at timestamptz,
   p_league_matches_per_team integer,
   p_knockout_cutoff integer,
+  p_restrict_same_club boolean,
   p_confirm_replace boolean,
   p_matches jsonb
 )
@@ -63,6 +70,10 @@ DECLARE
   v_written_format text;
   v_written_matches integer;
   v_written_cutoff integer;
+  v_written_restrict boolean;
+  v_club_by_id jsonb := '{}'::jsonb;
+  v_home_club text;
+  v_away_club text;
   v_inserted integer := 0;
   v_text text;
 BEGIN
@@ -140,11 +151,11 @@ BEGIN
     );
   END IF;
 
-  IF p_knockout_cutoff IS NULL OR p_knockout_cutoff NOT IN (4, 8) THEN
+  IF p_knockout_cutoff IS NULL OR p_knockout_cutoff NOT IN (4, 8, 16) THEN
     RETURN jsonb_build_object(
       'status', 'validation_error',
       'code', 'INVALID_KNOCKOUT_CUTOFF',
-      'error', 'Die K.-o.-Qualifikation unterstützt nur die ersten 4 oder die ersten 8 Teams.',
+      'error', 'Die K.-o.-Qualifikation unterstützt nur die ersten 4, 8 oder 16 Teams.',
       'updatedAt', v_updated_at,
       'groupId', NULL,
       'matchCount', 0
@@ -316,6 +327,29 @@ BEGIN
     v_ids := array_append(v_ids, v_ext.id);
   END LOOP;
 
+  -- Authoritative club identity per participant id (null club = no restriction).
+  -- Keyed the same way as v_ids: accepted application ids and confirmed external
+  -- team ids. Only built when the same-club restriction is active.
+  IF p_restrict_same_club THEN
+    SELECT COALESCE(jsonb_object_agg(club_key, club_value), '{}'::jsonb)
+    INTO v_club_by_id
+    FROM (
+      SELECT a.id::text AS club_key, a.club_id::text AS club_value
+      FROM public.applications a
+      WHERE a.tournament_id = p_tournament_id
+        AND a.status = 'accepted'::public.application_status
+        AND a.club_id IS NOT NULL
+      UNION ALL
+      SELECT e.id::text AS club_key, e.club_id::text AS club_value
+      FROM public.tournament_external_teams e
+      WHERE e.tournament_id = p_tournament_id
+        AND e.participation_status = 'confirmed'
+        AND e.external_active IS TRUE
+        AND e.application_id IS NULL
+        AND e.club_id IS NOT NULL
+    ) AS clubs;
+  END IF;
+
   v_team_count := COALESCE(cardinality(v_ids), 0);
   IF v_team_count < 2 THEN
     RETURN jsonb_build_object(
@@ -481,6 +515,23 @@ BEGIN
         'groupId', NULL,
         'matchCount', 0
       );
+    END IF;
+
+    -- Authoritative same-club enforcement. Never silently relaxed: a submitted
+    -- draw that pairs two teams of the same club is rejected outright.
+    IF p_restrict_same_club THEN
+      v_home_club := v_club_by_id->>v_home::text;
+      v_away_club := v_club_by_id->>v_away::text;
+      IF v_home_club IS NOT NULL AND v_away_club IS NOT NULL AND v_home_club = v_away_club THEN
+        RETURN jsonb_build_object(
+          'status', 'validation_error',
+          'code', 'SAME_CLUB_VIOLATION',
+          'error', 'Zwei Mannschaften desselben Vereins dürfen in der Ligaphase nicht gegeneinander spielen.',
+          'updatedAt', v_updated_at,
+          'groupId', NULL,
+          'matchCount', 0
+        );
+      END IF;
     END IF;
 
     v_text := NULLIF(btrim(v_item->>'fieldId'), '');
@@ -674,15 +725,17 @@ BEGIN
   SET
     competition_format = 'champions-league',
     league_matches_per_team = p_league_matches_per_team,
-    knockout_cutoff = p_knockout_cutoff
+    knockout_cutoff = p_knockout_cutoff,
+    restrict_same_club = COALESCE(p_restrict_same_club, false)
   WHERE id = p_tournament_id
-  RETURNING updated_at, competition_format, league_matches_per_team, knockout_cutoff
-  INTO v_new_updated_at, v_written_format, v_written_matches, v_written_cutoff;
+  RETURNING updated_at, competition_format, league_matches_per_team, knockout_cutoff, restrict_same_club
+  INTO v_new_updated_at, v_written_format, v_written_matches, v_written_cutoff, v_written_restrict;
 
   IF v_new_updated_at IS NULL
     OR v_written_format IS DISTINCT FROM 'champions-league'
     OR v_written_matches IS DISTINCT FROM p_league_matches_per_team
     OR v_written_cutoff IS DISTINCT FROM p_knockout_cutoff
+    OR v_written_restrict IS DISTINCT FROM COALESCE(p_restrict_same_club, false)
   THEN
     RAISE EXCEPTION 'league configuration update was not proved';
   END IF;
@@ -698,8 +751,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, jsonb) TO authenticated;
+REVOKE ALL ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, boolean, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, boolean, jsonb) TO authenticated;
 
-COMMENT ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, jsonb) IS
-  'Transactional Champions League league phase. One group, confirmed participants, validated fixtures. Does not lift the champions-league rejection inside save_competition_configuration.';
+COMMENT ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, boolean, jsonb) IS
+  'Transactional Champions League league phase. One group, confirmed participants, validated fixtures. Supports top 4/8/16 and an optional same-club exclusion enforced from authoritative club ids. Does not lift the champions-league rejection inside save_competition_configuration.';

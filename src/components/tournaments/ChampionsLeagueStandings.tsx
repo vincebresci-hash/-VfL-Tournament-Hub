@@ -14,7 +14,7 @@ type ChampionsLeagueStandingsProps = {
   standings: StandingRow[];
   teamLabels: Record<string, string>;
   teamMarks: Record<string, TeamMark>;
-  knockoutCutoff: 4 | 8;
+  knockoutCutoff: 4 | 8 | 16;
   matchesPerTeam: number | null;
   complete: boolean;
 };

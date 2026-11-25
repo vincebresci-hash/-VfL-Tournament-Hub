@@ -31,7 +31,8 @@ CREATE OR REPLACE FUNCTION public.test_apply_league(
   p_matches integer,
   p_cutoff integer,
   p_confirm boolean,
-  p_rows jsonb
+  p_rows jsonb,
+  p_restrict boolean DEFAULT false
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -41,7 +42,7 @@ DECLARE
 BEGIN
   PERFORM set_config('request.jwt.claim.sub', COALESCE(p_user::text, ''), true);
   v_result := public.apply_champions_league_league_phase(
-    p_tournament, p_expected, p_matches, p_cutoff, p_confirm, p_rows
+    p_tournament, p_expected, p_matches, p_cutoff, p_restrict, p_confirm, p_rows
   );
   PERFORM set_config('request.jwt.claim.sub', '', true);
   RETURN v_result;
@@ -50,11 +51,22 @@ $$;
 
 DO $$
 DECLARE
-  v_fn text := 'public.apply_champions_league_league_phase(uuid,timestamptz,integer,integer,boolean,jsonb)';
+  v_fn text := 'public.apply_champions_league_league_phase(uuid,timestamptz,integer,integer,boolean,boolean,jsonb)';
   v_save text := 'public.save_competition_configuration(uuid,timestamptz,text,integer,integer)';
+  v_def text;
 BEGIN
   IF to_regprocedure(v_fn) IS NULL THEN
     RAISE EXCEPTION 'FAIL league apply RPC missing';
+  END IF;
+  v_def := pg_get_functiondef(v_fn::regprocedure);
+  IF position('IN (4, 8, 16)' IN v_def) = 0 THEN
+    RAISE EXCEPTION 'FAIL league apply does not accept the top 16 cutoff';
+  END IF;
+  IF position('SAME_CLUB_VIOLATION' IN v_def) = 0 THEN
+    RAISE EXCEPTION 'FAIL league apply does not enforce the same-club exclusion';
+  END IF;
+  IF position('restrict_same_club' IN v_def) = 0 THEN
+    RAISE EXCEPTION 'FAIL league apply does not persist restrict_same_club';
   END IF;
   IF NOT has_function_privilege('authenticated', v_fn, 'EXECUTE')
     OR has_function_privilege('anon', v_fn, 'EXECUTE')

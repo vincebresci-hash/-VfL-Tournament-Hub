@@ -141,11 +141,13 @@ export function TournamentKnockoutRounds({
                 </div>
 
                 <ul
-                  className={
-                    round.matches.length === 1
-                      ? "mt-2.5 grid grid-cols-1 gap-2"
-                      : "mt-2.5 grid grid-cols-1 gap-2 md:grid-cols-2"
-                  }
+                  className={cn(
+                    "mt-2.5 grid grid-cols-1 gap-2",
+                    // Bracket columns keep one match per row so cards stay wide
+                    // enough for full team names (no mid-word wrapping). The
+                    // stacked layout may use two columns on wider screens.
+                    layout !== "bracket" && round.matches.length > 1 && "md:grid-cols-2",
+                  )}
                 >
                   {round.matches.map((match) => {
                     const completed =

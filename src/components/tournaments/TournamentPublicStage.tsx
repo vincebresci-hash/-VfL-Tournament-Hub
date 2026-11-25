@@ -61,7 +61,7 @@ type TournamentPublicStageProps = {
   publicScheduleNote?: string | null;
   competitionFormat?: CompetitionFormat | null;
   leagueMatchesPerTeam?: number | null;
-  knockoutCutoff?: 4 | 8 | null;
+  knockoutCutoff?: 4 | 8 | 16 | null;
   livePresentation?: {
     tournamentName: string;
     tournamentDate: string;
@@ -104,7 +104,7 @@ export function TournamentPublicStage({
 }: TournamentPublicStageProps) {
   const isChampionsLeague =
     competitionFormat === "champions-league" &&
-    (knockoutCutoff === 4 || knockoutCutoff === 8);
+    (knockoutCutoff === 4 || knockoutCutoff === 8 || knockoutCutoff === 16);
   const knockoutMatches = stage.matches.filter((match) => match.phase === "knockout");
   const groupMatches = stage.matches.filter((match) => match.phase !== "knockout");
   const showTabs =
@@ -176,6 +176,7 @@ export function TournamentPublicStage({
     ? computeKnockoutPlacements(knockoutMatches)
     : [];
   const publicRounds: KnockoutRound[][] = [
+    ["round-of-16"],
     ["quarterfinal"],
     ["semifinal"],
     ["final", "third-place"],
@@ -468,6 +469,10 @@ export function TournamentPublicStage({
         />
       ) : null}
       {current === "live" && isChampionsLeague ? (
+        // Champions League keeps a single, consistent data source: the live
+        // view, league table, schedule and knockout bracket are all derived
+        // from the Hub stage. The MeinTurnierplan widgets (a second source that
+        // could contradict the Hub results) are intentionally not rendered here.
         <div className="mt-8">
           <ChampionsLeagueLiveView
             matches={stage.matches}
@@ -479,19 +484,6 @@ export function TournamentPublicStage({
             revealKnockoutParticipants={revealKnockoutParticipants}
             knockoutEmptyState={knockoutEmptyState}
           />
-          {showLiveTab && livePresentation ? (
-            <MeinTurnierplanLiveSection
-              tournamentName={livePresentation.tournamentName}
-              tournamentDate={livePresentation.tournamentDate}
-              tournamentStatus={livePresentation.tournamentStatus}
-              presentationUrl={livePresentation.presentationUrl}
-              customLabel={livePresentation.customLabel}
-              matchesWidgetUrl={livePresentation.matchesWidgetUrl}
-              tableWidgetUrl={livePresentation.tableWidgetUrl}
-              publicLiveNote={livePresentation.publicLiveNote}
-              meinTurnierplanEmbedUrl={livePresentation.meinTurnierplanEmbedUrl}
-            />
-          ) : null}
         </div>
       ) : current === "live" && showLiveTab && livePresentation ? (
         <MeinTurnierplanLiveSection

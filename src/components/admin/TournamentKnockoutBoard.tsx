@@ -54,7 +54,7 @@ type TournamentKnockoutBoardProps = {
   memberIdsByGroupId: Record<string, string[]>;
   participants: TournamentParticipant[];
   teamLabels: Record<string, string>;
-  leagueSchedule: { matchesPerTeam: number; knockoutCutoff: 4 | 8 } | null;
+  leagueSchedule: { matchesPerTeam: number; knockoutCutoff: 4 | 8 | 16 } | null;
 };
 
 const bracketColumns: KnockoutRound[][] = [

@@ -197,6 +197,9 @@ export function buildChampionsLeagueAdminPreview(input: {
   knockoutCutoff: LeagueKnockoutCutoff;
   fields: Array<{ id: string; name: string }>;
   timing: PlanPreviewTimingInput;
+  restrictSameClub?: boolean;
+  /** Stable club identity per participant key (null = no shared club). */
+  clubByParticipantId?: Readonly<Record<string, string | null>>;
 }): TournamentPlanPreview {
   const participantIds = championsLeagueParticipantIds(input.participants);
   const byId = new Map<string, LeagueAdminParticipant>();
@@ -204,6 +207,14 @@ export function buildChampionsLeagueAdminPreview(input: {
     const id = scheduleParticipantId(participant);
     if (id && !byId.has(id)) {
       byId.set(id, participant);
+    }
+  }
+
+  const restrictSameClub = input.restrictSameClub === true;
+  const clubByParticipantId: Record<string, string | null> = {};
+  if (restrictSameClub) {
+    for (const id of participantIds) {
+      clubByParticipantId[id] = input.clubByParticipantId?.[id] ?? null;
     }
   }
 
@@ -222,6 +233,8 @@ export function buildChampionsLeagueAdminPreview(input: {
       participantIds,
       matchesPerTeam: input.matchesPerTeam ?? Number.NaN,
       knockoutCutoff: input.knockoutCutoff,
+      restrictSameClub,
+      clubByParticipantId,
     },
   });
 }

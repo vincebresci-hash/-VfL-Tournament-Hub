@@ -13,7 +13,8 @@
 ALTER TABLE public.tournaments
   ADD COLUMN IF NOT EXISTS competition_format text,
   ADD COLUMN IF NOT EXISTS league_matches_per_team integer,
-  ADD COLUMN IF NOT EXISTS knockout_cutoff integer;
+  ADD COLUMN IF NOT EXISTS knockout_cutoff integer,
+  ADD COLUMN IF NOT EXISTS restrict_same_club boolean;
 
 DO $$
 BEGIN
@@ -50,7 +51,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.tournaments
       ADD CONSTRAINT tournaments_knockout_cutoff_check
-      CHECK (knockout_cutoff IS NULL OR knockout_cutoff IN (4, 8));
+      CHECK (knockout_cutoff IS NULL OR knockout_cutoff IN (4, 8, 16));
   END IF;
 
   IF NOT EXISTS (
@@ -83,4 +84,7 @@ COMMENT ON COLUMN public.tournaments.league_matches_per_team IS
   'Nur Champions League: Spiele pro Team. Die Zulässigkeit gegen die bestätigten Teilnehmer prüft die Serveraktion.';
 
 COMMENT ON COLUMN public.tournaments.knockout_cutoff IS
-  'Nur Champions League: 4 oder 8. Das spätere K.-o.-Gerüst zählt das Spiel um Platz 3 mit und nicht die optionalen Spiele um Platz 5 und 7.';
+  'Nur Champions League: 4, 8 oder 16. Das spätere K.-o.-Gerüst zählt das Spiel um Platz 3 mit und nicht die optionalen Spiele um Platz 5 und 7. Top 16 erzeugt zusätzlich ein Achtelfinale.';
+
+COMMENT ON COLUMN public.tournaments.restrict_same_club IS
+  'Nur Champions League: true schließt vereinsinterne Begegnungen in der Ligaphase aus. NULL/false lässt sie zu. Die Serveraktion erzeugt dann eine Auslosung ohne gleiche Vereins-IDs oder meldet, dass keine gültige Auslosung möglich ist.';

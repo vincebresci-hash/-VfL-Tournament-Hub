@@ -12,6 +12,7 @@ export const MATCH_PHASES = ["group", "knockout"] as const;
 export type MatchPhase = (typeof MATCH_PHASES)[number];
 
 export const KNOCKOUT_ROUNDS = [
+  "round-of-16",
   "quarterfinal",
   "semifinal",
   "third-place",

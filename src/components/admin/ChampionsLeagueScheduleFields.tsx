@@ -17,10 +17,12 @@ type ChampionsLeagueScheduleFieldsProps = {
   participantNames: string[];
   matchesPerTeam: string;
   knockoutCutoff: LeagueKnockoutCutoff;
+  restrictSameClub: boolean;
   description: ChampionsLeagueAdminDescription;
   onModeChange: (mode: AdminCompetitionMode) => void;
   onMatchesPerTeamChange: (value: string) => void;
   onCutoffChange: (cutoff: LeagueKnockoutCutoff) => void;
+  onRestrictSameClubChange: (next: boolean) => void;
 };
 
 function countText(value: number | null) {
@@ -34,10 +36,12 @@ export function ChampionsLeagueScheduleFields({
   participantNames,
   matchesPerTeam,
   knockoutCutoff,
+  restrictSameClub,
   description,
   onModeChange,
   onMatchesPerTeamChange,
   onCutoffChange,
+  onRestrictSameClubChange,
 }: ChampionsLeagueScheduleFieldsProps) {
   const championsLeague = mode === "champions-league";
 
@@ -88,14 +92,33 @@ export function ChampionsLeagueScheduleFields({
                 id="league-knockout-cutoff"
                 value={String(knockoutCutoff)}
                 onChange={(event) =>
-                  onCutoffChange(event.target.value === "8" ? 8 : 4)
+                  onCutoffChange(
+                    event.target.value === "16" ? 16 : event.target.value === "8" ? 8 : 4,
+                  )
                 }
               >
                 <option value="4">Top 4</option>
                 <option value="8">Top 8</option>
+                <option value="16">Top 16</option>
               </SelectInput>
             </Field>
           </div>
+
+          <label className={`${adminCardShellClass} flex items-start gap-3 px-3.5 py-3`}>
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4"
+              checked={restrictSameClub}
+              onChange={(event) => onRestrictSameClubChange(event.target.checked)}
+            />
+            <span className="text-[13px] leading-relaxed text-ink">
+              Mannschaften desselben Vereins dürfen in der Ligaphase nicht gegeneinander spielen.
+              <span className="mt-0.5 block text-[12px] text-muted">
+                Nutzt die hinterlegte Vereinszuordnung. Lässt sich keine gültige Auslosung finden,
+                erscheint eine Fehlermeldung – die Regel wird nicht stillschweigend gelockert.
+              </span>
+            </span>
+          </label>
 
           <dl className="grid gap-3 sm:grid-cols-2">
             <div className={`${adminCardShellClass} px-3.5 py-3`}>

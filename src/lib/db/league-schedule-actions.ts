@@ -11,6 +11,8 @@ import { revalidatePath } from "next/cache";
 import { readConfirmedParticipantIdentities } from "@/lib/db/confirmed-participant-read";
 import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
+import { scheduleParticipantId } from "@/lib/schedule/admin";
 import { requireScheduleManage, requireTournamentsManage } from "@/lib/rbac/action-access";
 import { buildChampionsLeagueAdminPreview, savedTournamentPlanTiming } from "@/lib/schedule/league-admin-preview";
 import type { LeagueKnockoutCutoff } from "@/lib/schedule/league-phase";
@@ -58,7 +60,7 @@ function result(
 }
 
 function isCutoff(value: number): value is LeagueKnockoutCutoff {
-  return value === 4 || value === 8;
+  return value === 4 || value === 8 || value === 16;
 }
 
 function sideIsCanonical(applicationId: string | null, externalTeamId: string | null) {
@@ -106,6 +108,7 @@ export async function applyChampionsLeagueScheduleAction(input: {
   previewFingerprint: string;
   matchesPerTeam: number;
   knockoutCutoff: number;
+  restrictSameClub?: boolean;
   confirmReplace?: boolean;
 }): Promise<ApplyChampionsLeagueResult> {
   const schedule = await requireScheduleManage();
@@ -195,6 +198,21 @@ export async function applyChampionsLeagueScheduleAction(input: {
     return result("validation_error", confirmed.message, { policy });
   }
 
+  const restrictSameClub = input.restrictSameClub === true;
+  const clubByParticipantId: Record<string, string | null> = {};
+  if (restrictSameClub) {
+    const participants = await getTournamentParticipants(tournamentId);
+    for (const participant of participants) {
+      const key = scheduleParticipantId({
+        applicationId: participant.applicationId,
+        externalTeamId: participant.externalTeamId,
+      });
+      if (key) {
+        clubByParticipantId[key] = participant.clubId ?? null;
+      }
+    }
+  }
+
   const preview = buildChampionsLeagueAdminPreview({
     participants: confirmed.participants.map((participant) => ({
       applicationId: participant.applicationId,
@@ -202,6 +220,8 @@ export async function applyChampionsLeagueScheduleAction(input: {
     })),
     matchesPerTeam: input.matchesPerTeam,
     knockoutCutoff: input.knockoutCutoff,
+    restrictSameClub,
+    clubByParticipantId,
     fields: stage.fields.map((field) => ({ id: field.id, name: field.name })),
     timing: savedTournamentPlanTiming({
       date: loaded.data.date,
@@ -264,6 +284,7 @@ export async function applyChampionsLeagueScheduleAction(input: {
     p_expected_updated_at: stored.updatedAt,
     p_league_matches_per_team: input.matchesPerTeam,
     p_knockout_cutoff: input.knockoutCutoff,
+    p_restrict_same_club: restrictSameClub,
     p_confirm_replace: input.confirmReplace === true,
     p_matches: rows,
   });

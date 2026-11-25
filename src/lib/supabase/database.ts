@@ -158,6 +158,8 @@ export type TournamentRow = {
   competition_format?: string | null;
   league_matches_per_team?: number | null;
   knockout_cutoff?: number | null;
+  /** Absent until 20261121121000 is applied. Champions League league phase only. */
+  restrict_same_club?: boolean | null;
   playing_time?: string | null;
   pitch_format?: string | null;
   entry_fee?: string | null;
@@ -184,6 +186,7 @@ export type TournamentRow = {
 export type MatchStatusRow = "scheduled" | "live" | "completed" | "cancelled";
 export type MatchPhaseRow = "group" | "knockout";
 export type KnockoutRoundRow =
+  | "round-of-16"
   | "quarterfinal"
   | "semifinal"
   | "third-place"
@@ -1298,6 +1301,7 @@ export type Database = {
           p_expected_updated_at: string;
           p_league_matches_per_team: number;
           p_knockout_cutoff: number;
+          p_restrict_same_club: boolean;
           p_confirm_replace: boolean;
           p_matches: Json;
         };
