@@ -18,6 +18,7 @@ type ChampionsLeagueScheduleFieldsProps = {
   matchesPerTeam: string;
   knockoutCutoff: LeagueKnockoutCutoff;
   restrictSameClub: boolean;
+  sameClubUnverifiedCount: number;
   description: ChampionsLeagueAdminDescription;
   onModeChange: (mode: AdminCompetitionMode) => void;
   onMatchesPerTeamChange: (value: string) => void;
@@ -37,6 +38,7 @@ export function ChampionsLeagueScheduleFields({
   matchesPerTeam,
   knockoutCutoff,
   restrictSameClub,
+  sameClubUnverifiedCount,
   description,
   onModeChange,
   onMatchesPerTeamChange,
@@ -119,6 +121,21 @@ export function ChampionsLeagueScheduleFields({
               </span>
             </span>
           </label>
+
+          {restrictSameClub && sameClubUnverifiedCount > 0 ? (
+            <p
+              className={`${adminCardShellClass} border-[#e2c48a] bg-[#fff8e8] px-3.5 py-3 text-[13px] leading-relaxed text-[#7a5a1e]`}
+              role="alert"
+            >
+              {sameClubUnverifiedCount}{" "}
+              {sameClubUnverifiedCount === 1 ? "Team hat" : "Teams haben"} keine hinterlegte
+              Vereinszuordnung. Für {sameClubUnverifiedCount === 1 ? "dieses Team" : "diese Teams"}{" "}
+              kann der Vereinsausschluss nicht garantiert werden – zwei solche Teams desselben
+              Vereins könnten gegeneinander gelost werden. Bitte hinterlege die Vereinszuordnung
+              bei den betroffenen Mannschaften (Teilnehmerverwaltung), damit die Regel sicher
+              greift.
+            </p>
+          ) : null}
 
           <dl className="grid gap-3 sm:grid-cols-2">
             <div className={`${adminCardShellClass} px-3.5 py-3`}>

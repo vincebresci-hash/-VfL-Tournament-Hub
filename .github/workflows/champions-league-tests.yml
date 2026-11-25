@@ -1,0 +1,139 @@
+# Champions League quality gate.
+# Runs the Champions League test suites, type check, lint and production build.
+#
+# FORBIDDEN in this workflow:
+# - remote Supabase project linking / remote migration apply
+# - production DATABASE_URL or Supabase secrets
+# - deploy / merge / production SQL
+#
+# All database work happens in a throwaway local PostgreSQL 17 cluster that the
+# harness creates and deletes. No existing database is touched.
+
+name: Champions League Tests
+
+on:
+  pull_request:
+    paths:
+      - "src/lib/schedule/**"
+      - "src/lib/tournaments/**"
+      - "src/lib/db/league-**"
+      - "src/lib/db/competition-**"
+      - "src/components/admin/TournamentScheduleBoard.tsx"
+      - "src/components/admin/ChampionsLeagueScheduleFields.tsx"
+      - "src/components/tournaments/**"
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - "scripts/tests/**"
+      - "scripts/competition-postgres/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/champions-league-tests.yml"
+  push:
+    branches:
+      - feature/champions-league-mode
+
+concurrency:
+  group: cl-tests-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  cl-static:
+    name: Type check, lint, build and Node CL tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security preflight (no remote / no secrets)
+        run: |
+          set -euo pipefail
+          if [[ -n "${DATABASE_URL:-}" ]]; then
+            echo "DATABASE_URL must not be set for this job" >&2
+            exit 1
+          fi
+          if grep -R -n -E 'db\.[^[:space:]]+\.supabase\.co' scripts/competition-postgres scripts/tests; then
+            echo "Production Supabase host references are forbidden" >&2
+            exit 1
+          fi
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint
+
+      - name: Champions League Advanced tests
+        run: npm run test:cl-advanced
+
+      - name: Champions League Public tests
+        run: npm run test:cl-public
+
+      - name: Champions League Scenario tests
+        run: npm run test:cl-scenarios
+
+      - name: Production build
+        run: npm run build
+
+  cl-postgres:
+    name: Disposable PostgreSQL 17 contract tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install PostgreSQL 17 (PGDG)
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+
+      - name: Assemble a self-contained PostgreSQL 17 root
+        id: pg
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/pg17"
+          mkdir -p "$ROOT"
+          ln -s /usr/lib/postgresql/17/bin "$ROOT/bin"
+          ln -s /usr/share/postgresql/17 "$ROOT/share"
+          test -x "$ROOT/bin/initdb"
+          test -f "$ROOT/share/postgres.bki"
+          echo "root=$ROOT" >> "$GITHUB_OUTPUT"
+
+      - name: Disposable PostgreSQL competition contract tests
+        env:
+          DISPOSABLE_PG17_BIN: ${{ steps.pg.outputs.root }}
+        run: npm run test:competition-postgres

@@ -34,7 +34,7 @@ export const LEAGUE_PHASE_ISSUE_CODES = [
   "CUTOFF_EXCEEDS_TEAMS",
   "FIXTURE_INVARIANT",
   "SAME_CLUB_TOO_FEW_OPPONENTS",
-  "SAME_CLUB_DRAW_IMPOSSIBLE",
+  "SAME_CLUB_DRAW_NOT_FOUND",
 ] as const;
 
 export type LeaguePhaseIssueCode = (typeof LEAGUE_PHASE_ISSUE_CODES)[number];
@@ -231,7 +231,7 @@ export function validateLeaguePhaseConfig(input: LeaguePhaseInput): LeaguePhaseV
       if (allowedOpponents < input.matchesPerTeam) {
         return fail(
           "SAME_CLUB_TOO_FEW_OPPONENTS",
-          "Mit dem Ausschluss vereinsinterner Begegnungen hat mindestens ein Team zu wenige mögliche Gegner für die gewünschte Spielezahl.",
+          "Diese Konfiguration ist nachweislich unmöglich: Mit dem Ausschluss vereinsinterner Begegnungen hat mindestens ein Team weniger mögliche Gegner als die gewünschte Spielezahl. Bitte reduziere die Spiele pro Team oder verteile die Vereine anders.",
         );
       }
     }
@@ -663,11 +663,14 @@ export function buildLeagueFixtures(input: LeaguePhaseInput): LeagueFixtureBuild
   if (config.restrictSameClub) {
     const fixtures = buildSameClubFixtures(config);
     if (!fixtures) {
+      // The per-team precheck already rejects provably impossible setups. Here
+      // the constructive search was exhausted without finding a draw; this is
+      // not a proof of impossibility, so the message says so.
       return {
         fixtures: [],
         error:
-          "Mit dem Ausschluss vereinsinterner Begegnungen ist keine gültige Auslosung möglich. Bitte reduziere die Spiele pro Team oder die Zahl gleicher Vereine.",
-        code: "SAME_CLUB_DRAW_IMPOSSIBLE",
+          "Es konnte keine gültige Auslosung ohne vereinsinterne Begegnungen gefunden werden. Das ist kein Nachweis der Unmöglichkeit – bitte reduziere die Spiele pro Team oder verteile die Vereine anders und versuche es erneut.",
+        code: "SAME_CLUB_DRAW_NOT_FOUND",
       };
     }
     return { fixtures, error: null, code: null };

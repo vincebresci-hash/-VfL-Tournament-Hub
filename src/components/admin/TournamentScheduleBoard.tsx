@@ -176,6 +176,11 @@ export function TournamentScheduleBoard({
   );
   const [restrictSameClub, setRestrictSameClub] = useState<boolean>(storedRestrictSameClub);
   const leagueParticipantIds = championsLeagueParticipantIds(participants);
+  // Teams without a stable club id cannot be covered by the same-club rule, so
+  // surface them instead of silently letting the restriction be bypassed.
+  const sameClubUnverifiedCount = restrictSameClub
+    ? leagueParticipantIds.filter((id) => !clubByParticipantId[id]).length
+    : 0;
   const leagueDescription = describeChampionsLeagueConfig({
     participantIds: leagueParticipantIds,
     matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
@@ -720,6 +725,7 @@ export function TournamentScheduleBoard({
           matchesPerTeam={leagueMatchesPerTeam}
           knockoutCutoff={leagueCutoff}
           restrictSameClub={restrictSameClub}
+          sameClubUnverifiedCount={sameClubUnverifiedCount}
           description={leagueDescription}
           onModeChange={selectCompetitionMode}
           onMatchesPerTeamChange={(value) => {
