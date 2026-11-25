@@ -43,6 +43,37 @@ und die vorbereitete Baseline**, aber weiterhin **NO-GO für produktive
 Ausführung, Merge und Production-Deployment bis zur ausdrücklichen
 Produktionswrite-Freigabe des Nutzers**.
 
+## 0. Durchführungsprotokoll — CL Release 2 (produktive DB-Aktivierung)
+
+**Status: ABGESCHLOSSEN am 2026-11-25 (UTC) auf `ogopebvpojuvheimzged`.** Ausgeführt
+nach ausdrücklicher Produktionswrite-Freigabe des Nutzers inkl. bewusster
+Risikoakzeptanz ohne vollständiges Backup. Kein Merge, kein Production-Deployment.
+
+Ablauf (kontrolliert, transaktional, mit Vorher-/Nachher-Prüfungen):
+
+1. Read-only Preflight: HEAD `41dc418`, CI grün, Projekt `ogopebvpojuvheimzged`
+   (PG 17.6), Historie leer. Alle Reconciliation-Endzustände vorhanden **außer**
+   der ACL-Härtung: 216 Schema-Maintenance-Rechte (TRUNCATE/REFERENCES/TRIGGER/
+   MAINTAIN) für `anon`/`authenticated` auf 38 Tabellen noch vorhanden.
+2. Dry-Run (BEGIN … ROLLBACK) der Härtungsmigration auf Produktion: exakt 216
+   Tabellen-Grants + 1 Default-ACL-Eintrag entfernt; **keine** DML-Rechte, **keine**
+   Funktions-ACL, **keine** Struktur-/Datenänderung. Nichts persistiert.
+3. 66 historische Versionen als `applied` registriert (keine DDL-Ausführung).
+4. Reconciliation-Dateien `20261120120000` (Härtung) und `20261120121000`
+   (Recovery-Vorlage) transaktional ausgeführt und als `applied` registriert.
+   Checkpoint: gefährliche Grants **216 → 0**, DML unverändert (45/25/24/19),
+   Zeilenzahlen unverändert.
+5. Fünf CL-Migrationen via `supabase migration up` angewendet und registriert.
+6. Endverifikation: Historie **73/0**, CL-Spalten 4, save-/apply-RPC vorhanden,
+   5 Lock-Trigger, `round-of-16` und `champions-league`-Format aktiv,
+   gefährliche Grants 0, DML erhalten, Turniere 20 / Bewerbungen 272 / Matches
+   328 / Profile 9 / Vorlagen 12 unverändert.
+
+Offen (bewusst, bis zur Freigabe): Code-Merge nach `main` und das dadurch
+ausgelöste Vercel-Production-Deployment. Die additive CL-Schemaebene beeinflusst
+die laufende Produktionsanwendung nicht (nullable Spalten, neue RPCs, nur
+Nicht-DML-Rechte entfernt).
+
 ## 1. SQL-Dateien, Reihenfolge und Prüfsummen
 
 | # | Datei | SHA-256 | Abhängigkeit / Zweck |
