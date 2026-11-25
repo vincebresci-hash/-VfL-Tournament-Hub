@@ -18,6 +18,10 @@ import { TournamentScheduleCards } from "@/components/tournaments/TournamentSche
 import { TournamentStandingsSection } from "@/components/tournaments/TournamentStandingsSection";
 import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKnockoutRounds";
 import { TournamentPlacementsList } from "@/components/tournaments/TournamentPlacementsList";
+import { ChampionsLeagueStandings } from "@/components/tournaments/ChampionsLeagueStandings";
+import { ChampionsLeagueSchedule } from "@/components/tournaments/ChampionsLeagueSchedule";
+import { isChampionsLeaguePhaseComplete } from "@/lib/tournaments/champions-league-public";
+import type { CompetitionFormat } from "@/lib/schedule/competition-config";
 
 import type { TournamentStatus } from "@/types/tournament";
 
@@ -32,6 +36,12 @@ const baseTabs = [
 
 const liveTab = { id: "live", label: "Live" } as const;
 
+const championsLeagueTabs = [
+  { id: "uebersicht", label: "Ligatabelle" },
+  { id: "spielplan", label: "Spielplan" },
+  { id: "ko-runde", label: "KO-Runde" },
+] as const;
+
 type BaseTab = (typeof baseTabs)[number]["id"];
 type PublicTab = BaseTab | typeof liveTab.id;
 
@@ -44,6 +54,9 @@ type TournamentPublicStageProps = {
   meinTurnierplanActive?: boolean;
   showLiveTab?: boolean;
   publicScheduleNote?: string | null;
+  competitionFormat?: CompetitionFormat | null;
+  leagueMatchesPerTeam?: number | null;
+  knockoutCutoff?: 4 | 8 | null;
   livePresentation?: {
     tournamentName: string;
     tournamentDate: string;
@@ -79,13 +92,23 @@ export function TournamentPublicStage({
   meinTurnierplanActive = false,
   showLiveTab = false,
   publicScheduleNote,
+  competitionFormat = null,
+  leagueMatchesPerTeam = null,
+  knockoutCutoff = null,
   livePresentation = null,
 }: TournamentPublicStageProps) {
+  const isChampionsLeague =
+    competitionFormat === "champions-league" &&
+    (knockoutCutoff === 4 || knockoutCutoff === 8);
   const knockoutMatches = stage.matches.filter((match) => match.phase === "knockout");
   const groupMatches = stage.matches.filter((match) => match.phase !== "knockout");
   const showTabs =
-    stage.groups.length > 0 || stage.matches.length > 0 || showLiveTab;
-  const tabs = showLiveTab ? [...baseTabs, liveTab] : [...baseTabs];
+    stage.groups.length > 0 ||
+    stage.matches.length > 0 ||
+    showLiveTab ||
+    (isChampionsLeague && stage.roster.length > 0);
+  const configuredTabs = isChampionsLeague ? championsLeagueTabs : baseTabs;
+  const tabs = showLiveTab ? [...configuredTabs, liveTab] : [...configuredTabs];
   const visibleTabs = tabs.filter((item) => item.id !== "ko-runde" || knockoutMatches.length > 0);
   const requested = showTabs ? asTab(tab, visibleTabs) : "uebersicht";
   const current =
@@ -174,6 +197,19 @@ export function TournamentPublicStage({
       clubName: mark?.clubName ?? null,
     };
   });
+  const leagueMemberIds = stage.roster.map(
+    (entry) => entry.externalTeamId ?? entry.applicationId,
+  );
+  const leagueStandings = isChampionsLeague
+    ? computeGroupStandings(leagueMemberIds, groupMatches)
+    : [];
+  const leagueComplete = isChampionsLeague
+    ? isChampionsLeaguePhaseComplete({
+        standings: leagueStandings,
+        matches: groupMatches,
+        matchesPerTeam: leagueMatchesPerTeam,
+      })
+    : false;
 
   return (
     <div>
@@ -237,11 +273,22 @@ export function TournamentPublicStage({
         </p>
       ) : null}
 
-      {current === "uebersicht" && overview ? (
+      {current === "uebersicht" && isChampionsLeague && knockoutCutoff != null ? (
+        <div className={showTabs || tournamentStatus === "completed" ? "mt-8" : "mt-10"}>
+          <ChampionsLeagueStandings
+            standings={leagueStandings}
+            teamLabels={teamLabels}
+            teamMarks={teamMarks}
+            knockoutCutoff={knockoutCutoff}
+            matchesPerTeam={leagueMatchesPerTeam}
+            complete={leagueComplete}
+          />
+        </div>
+      ) : current === "uebersicht" && overview ? (
         <div className={showTabs || tournamentStatus === "completed" ? "mt-8" : "mt-10"}>{overview}</div>
       ) : null}
 
-      {current === "uebersicht" && placements.length > 0 ? (
+      {current === "uebersicht" && !isChampionsLeague && placements.length > 0 ? (
         <section className="mt-8">
           <PublicPlacements
             placements={placements}
@@ -289,7 +336,21 @@ export function TournamentPublicStage({
         </section>
       ) : null}
 
-      {current === "spielplan" ? (
+      {current === "spielplan" && isChampionsLeague ? (
+        <section className="mt-8">
+          {publicScheduleNote ? (
+            <p className="mb-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
+              {publicScheduleNote}
+            </p>
+          ) : null}
+          <ChampionsLeagueSchedule
+            matches={groupMatches}
+            fields={stage.fields}
+            teamLabels={teamLabels}
+            teamMarks={teamMarks}
+          />
+        </section>
+      ) : current === "spielplan" ? (
         <section className="mt-8">
           {publicScheduleNote ? (
             <p className="mb-4 max-w-3xl border border-line bg-white px-4 py-3 text-[14px] leading-6 text-muted">
