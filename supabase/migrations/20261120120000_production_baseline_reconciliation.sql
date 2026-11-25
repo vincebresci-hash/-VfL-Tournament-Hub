@@ -1754,15 +1754,30 @@ REVOKE TRUNCATE, REFERENCES, TRIGGER, MAINTAIN
   ON ALL TABLES IN SCHEMA public
   FROM anon, authenticated;
 
+-- ALTER DEFAULT PRIVILEGES can only target a role the executor is a member of.
+-- On production this file is registered as already applied and never executed,
+-- so the operative default-ACL state there is unaffected. On fresh local
+-- databases the executing role may not be a member of postgres/supabase_admin
+-- (e.g. the Supabase local stack), so each statement is best-effort and a lack
+-- of privilege is skipped rather than failing the migration. The direct
+-- REVOKE ... ON ALL TABLES above is the authoritative hardening and still runs.
 DO $default_acl$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public '
-      || 'REVOKE TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON TABLES FROM anon, authenticated';
+    BEGIN
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public '
+        || 'REVOKE TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON TABLES FROM anon, authenticated';
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE 'Skipping ALTER DEFAULT PRIVILEGES FOR ROLE postgres: insufficient privilege for current_user %', current_user;
+    END;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'supabase_admin') THEN
-    EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public '
-      || 'REVOKE TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON TABLES FROM anon, authenticated';
+    BEGIN
+      EXECUTE 'ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public '
+        || 'REVOKE TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON TABLES FROM anon, authenticated';
+    EXCEPTION WHEN insufficient_privilege THEN
+      RAISE NOTICE 'Skipping ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin: insufficient privilege for current_user %', current_user;
+    END;
   END IF;
 END
 $default_acl$;
