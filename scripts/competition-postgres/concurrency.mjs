@@ -170,11 +170,11 @@ async function createFixtures(client) {
   async function acceptedPair(slug) {
     const row = await tournament(client, slug);
     const home = await client.query(
-      `INSERT INTO public.applications (tournament_id, status) VALUES ($1, 'accepted') RETURNING id`,
+      `INSERT INTO public.applications (tournament_id, status, contact_email) VALUES ($1, 'accepted', 'concurrency@example.invalid') RETURNING id`,
       [row.id],
     );
     const away = await client.query(
-      `INSERT INTO public.applications (tournament_id, status) VALUES ($1, 'accepted') RETURNING id`,
+      `INSERT INTO public.applications (tournament_id, status, contact_email) VALUES ($1, 'accepted', 'concurrency@example.invalid') RETURNING id`,
       [row.id],
     );
     return { ...row, home: home.rows[0].id, away: away.rows[0].id };
@@ -183,17 +183,17 @@ async function createFixtures(client) {
   const twoSaves = await tournament(client, "concurrency-two-saves");
   const accept = await tournament(client, "concurrency-accept");
   const accepted = await client.query(
-    `INSERT INTO public.applications (tournament_id, status) VALUES ($1, 'accepted') RETURNING id`,
+    `INSERT INTO public.applications (tournament_id, status, contact_email) VALUES ($1, 'accepted', 'concurrency@example.invalid') RETURNING id`,
     [accept.id],
   );
   const pending = await client.query(
-    `INSERT INTO public.applications (tournament_id, status) VALUES ($1, 'new') RETURNING id`,
+    `INSERT INTO public.applications (tournament_id, status, contact_email) VALUES ($1, 'new', 'concurrency-pending@example.invalid') RETURNING id`,
     [accept.id],
   );
   const revoke = await acceptedPair("concurrency-revoke");
   const confirm = await tournament(client, "concurrency-confirm");
   const confirmApp = await client.query(
-    `INSERT INTO public.applications (tournament_id, status) VALUES ($1, 'accepted') RETURNING id`,
+    `INSERT INTO public.applications (tournament_id, status, contact_email) VALUES ($1, 'accepted', 'concurrency@example.invalid') RETURNING id`,
     [confirm.id],
   );
   const confirmExt = await client.query(
@@ -216,7 +216,7 @@ async function createFixtures(client) {
   );
   const link = await tournament(client, "concurrency-link");
   const linkAccepted = await client.query(
-    `INSERT INTO public.applications (tournament_id, status) VALUES ($1, 'accepted') RETURNING id`,
+    `INSERT INTO public.applications (tournament_id, status, contact_email) VALUES ($1, 'accepted', 'concurrency@example.invalid') RETURNING id`,
     [link.id],
   );
   const linkExt = await client.query(

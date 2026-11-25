@@ -1,13 +1,47 @@
 # Champions League — Migrations- und Rollback-Runbook
 
-Stand: CL Release 1.1 auf `feature/champions-league-mode`, PR #135.
+Stand: CL Release 1.4 auf `feature/champions-league-mode`, Commit
+`ad7f800a04074908fcf10a1d25aa7dae1a7322b1` plus die hier dokumentierte
+Übernahme, PR #135.
 
 Dieses Runbook führt nichts automatisch aus. Produktive Migrationen, Merge und
-Production-Deployment benötigen eine gesonderte Freigabe. Der tatsächliche
-produktive Migrationsstand ist derzeit **ungeklärt**, weil der verbundene
-Supabase-Zugang das Produktionsprojekt nicht lesen kann. Deshalb wurden die vier
-vorhandenen CL-Migrationsdateien nicht verändert; Release 1.1 ergänzt eine fünfte,
-nachgelagerte Remediation-Migration.
+Production-Deployment benötigen eine gesonderte Freigabe. Das Produktionsprojekt
+`ogopebvpojuvheimzged` wurde read-only verifiziert. Alle fünf CL-Migrationen sind
+technisch kompatibel und noch nicht angewendet. Die produktive
+`supabase_migrations.schema_migrations` fehlt weiterhin vollständig.
+
+Der Einzelabgleich der 66 historischen Dateien ist in
+`champions-league-baseline-audit.md` dokumentiert. Kein erwartetes Objekt fehlt,
+es besteht jedoch nicht versionierte Produktionsdrift. Diese Drift ist jetzt in
+zwei versionierten Baseline-Dateien abgebildet (siehe §1.1), sodass die zu
+registrierende Baseline **68** Versionen umfasst (66 historisch + 2
+Reconciliation) und ausschließlich die fünf CL-Dateien offenbleiben.
+
+**Lokaler Verifikationsstand dieser Übernahme (reproduzierbar, isolierte
+Wegwerf-PostgreSQL-17-Cluster, keine produktiven Schreibvorgänge):**
+
+- `npm run test:competition-postgres`: 55/55 PASS (73 Migrationen inkl. beider
+  Reconciliation-Dateien angewendet). Die drei zuvor von Codex gemeldeten
+  Regressionen sind behoben — alte synthetische Gastbewerbungs-Fixtures ohne
+  `contact_email` wurden an die bereits produktiv geltende Constraint angepasst;
+  die Constraint selbst wurde nicht abgeschwächt und die Negativtests bleiben
+  erhalten.
+- `npm run test:cl-baseline`: 5/5 PASS — initiale Reconciliation nach exakt 66
+  historischen Migrationen, idempotenter Reapply erhält Nutzer, Turniere,
+  Bewerbungen, Ergebnisse und angepasste E-Mail-Vorlagen, neun versionierte
+  Funktionskörper entsprechen den geprüften Fingerprints, gefährliche
+  anon/authenticated-Tabellenrechte entfernt.
+- `test:cl-advanced` 11/11, `test:cl-public` 9/9, `test:cl-scenarios` 7/7,
+  Typecheck sauber, Lint 0 Fehler (1 vorbestehende Warnung, nicht CL),
+  Production-Build erfolgreich.
+
+Zum Backup gilt die ausdrückliche Nutzerentscheidung: Ein vollständiges
+Produktionsbackup ist **nicht** erforderlich, das Restrisiko eines nicht
+wiederherstellbaren Datenverlusts wird bewusst akzeptiert, und Backup ist **kein
+Release-Blocker mehr** (§1.2). Es gilt daher **GO für Code, Tests, PR-Vorschau
+und die vorbereitete Baseline**, aber weiterhin **NO-GO für produktive
+Ausführung, Merge und Production-Deployment bis zur ausdrücklichen
+Produktionswrite-Freigabe des Nutzers**.
 
 ## 1. SQL-Dateien, Reihenfolge und Prüfsummen
 
@@ -23,6 +57,143 @@ Die Dateien müssen ausschließlich in Zeitstempelreihenfolge über den bestehen
 Remote-Migrationsworkflow angewendet werden. Keine bereits in
 `supabase_migrations.schema_migrations` registrierte Version manuell erneut
 ausführen und nicht am Migrationsverlauf vorbei im SQL-Editor anwenden.
+
+### 1.1 Historische Baseline vor den CL-Dateien
+
+- Historischer Satz: exakt die 66 Versionen von `20260819170000` bis
+  `20261009150000`.
+- Ergebnis: 53 vollständig vorhanden, 12 teilweise vorhanden, keine fehlend,
+  eine wegen eines Replay-Defekts nicht eindeutig nachweisbar.
+- Produktion enthält darüber hinaus nicht versionierte Recovery-/ACL-Drift.
+  Diese Drift ist jetzt in den zwei Reconciliation-Dateien
+  `20261120120000_production_baseline_reconciliation.sql` und
+  `20261120121000_production_participation_recovery_template.sql` versioniert.
+  Sie sortieren nach den 66 historischen Dateien und vor den fünf CL-Dateien.
+- Die zu registrierende Baseline umfasst damit **68** Versionen (66 historisch +
+  2 Reconciliation). Auf frischen lokalen Datenbanken werden alle 68 Dateien
+  tatsächlich ausgeführt und per `npm run test:cl-baseline` als idempotent und
+  datenerhaltend verifiziert.
+- Keine der 66 historischen SQL-Dateien darf erneut produktiv ausgeführt werden.
+  Das würde unter anderem alte Seed-Turniere wieder anlegen und neuere
+  Funktionskörper überschreiben.
+- Die beiden Reconciliation-Dateien dürfen auf Produktion **nur als bereits
+  angewendet registriert** werden, nachdem ihre Voraussetzungen und
+  beabsichtigten Endzustände (vier Funktionskörper-Abweichungen, fünf
+  Participation-Recovery-Funktionen, Spalte `pending_activation`, zwei
+  Constraints, Index, zwei Enum-Werte, gehärtete Default-ACLs, vorhandene
+  Recovery-Vorlage) read-only nachgewiesen sind. Sie dürfen produktiv **nicht**
+  ausgeführt werden, da die betroffenen Zustände dort bereits ganz oder teilweise
+  existieren.
+- Bewusst nicht in die Baseline übernommen werden die Helfer `rls_auto_enable`
+  und `upsert_status_email_template` sowie die unnötigen öffentlichen
+  Standardberechtigungen; diese Abweichungen sind akzeptiert und dokumentiert.
+- Ein später freigegebenes `migration repair --status applied` markiert nur die
+  Historie; es führt kein SQL aus. Es darf erst nach erneuter Read-only-Nachweis-
+  prüfung und ausdrücklicher Produktionswrite-Freigabe erfolgen. Ein vollständiges
+  Backup ist dafür laut Nutzerentscheidung keine Voraussetzung (§1.2).
+- Nach erfolgreicher Baseline muss `migration list --remote` exakt 68
+  übereinstimmende Local/Remote-Versionen und ausschließlich die fünf Dateien aus
+  §1 als offen zeigen.
+
+### 1.2 Backup- und Restore-Bereitschaft (Risiko bewusst akzeptiert)
+
+**Nutzerentscheidung:** Ein vollständiges Produktionsbackup ist nicht
+erforderlich. Das Restrisiko eines nicht wiederherstellbaren Datenverlusts wird
+bewusst akzeptiert. Backup ist **kein Release-Blocker** und keine Voraussetzung
+für die Baseline-Registrierung oder die CL-Migrationen mehr. Der folgende
+Abschnitt bleibt als optionale Referenz erhalten, falls später doch ein
+Sicherungssatz gewünscht wird; er ist ausdrücklich nicht mehr verpflichtend.
+
+Aktueller Management-API-Status:
+
+- Region `eu-central-1`
+- WAL-G aktiviert
+- PITR deaktiviert
+- keine aufgelisteten Backups
+- keine `physical_backup_data`
+
+Der Organisationstarif wird vom bestehenden CLI-Profil nicht angezeigt. Ein
+leeres Backup-Listing ist kein Wiederherstellungspunkt; dies ist Teil des bewusst
+akzeptierten Risikos.
+
+Ein vollständiger logischer Sicherungssatz muss außerhalb des Repositorys
+verschlüsselt abgelegt werden und mindestens enthalten:
+
+1. Custom-Rollen/Attribute (`--role-only`; Passwörter sind nicht enthalten),
+2. Anwendungsschema einschließlich Funktionen, ACLs, RLS, Trigger, Sequenzen und
+   Constraints,
+3. Datenexport einschließlich `public`, Auth-Daten und Storage-Metadaten,
+4. separat heruntergeladene Storage-Dateien,
+5. Manifest mit Projekt-ID, UTC-Zeit, Tool-Versionen, Dateigrößen,
+   SHA-256-Prüfsummen und anonymisierten Aggregatkontrollen.
+
+Der Default-Schema-Dump der Supabase CLI schließt verwaltete Schemas wie `auth`
+und `storage` aus. Eigene Trigger/Policies dort müssen aus den versionierten
+Migrationen bzw. einem separaten Drift-Capture stammen. Storage-Binärdateien sind
+nie Bestandteil des Datenbank-Backups.
+
+Aktueller Umfang ohne personenbezogene Details: Datenbank ca. 19,8 MB,
+`public` ca. 4,8 MB, `auth` ca. 1,9 MB, `storage`-Metadaten ca. 1,0 MB;
+192 Storage-Objekte mit zusammen ca. 6,7 MB laut Metadaten.
+
+Der lokale synthetische Dump/Restore-Test war vollständig erfolgreich
+(1.420/1.420 Metadatenobjekte, keine Abweichung). Ein produktiver Export und ein
+Restore von Auth/Storage wurden nicht durchgeführt; nach Nutzerentscheidung sind
+sie **kein** Release-Blocker mehr, sondern optional.
+
+Wichtig: `supabase db dump --dry-run` mit dem CLI-v3-Profil initialisiert einen
+temporären Login und gibt dessen temporäres Kennwort im Terminal aus. Dieser Weg
+darf nicht in CI, Chat oder protokollierten Sitzungen benutzt werden. Für den
+echten Export ist entweder die bestehende Datenbankverbindung sicher außerhalb
+von Logs zu übergeben oder eine gesondert freigegebene Exportberechtigung zu
+verwenden. Kein Passwort-Reset ist Teil dieses Runbooks.
+
+### 1.3 Konkretes logisches Backup-Verfahren
+
+Voraussetzungen: vorhandene direkte oder Session-Pooler-Verbindung sicher im
+Prozesskontext, PostgreSQL-17.11-Clients, genügend lokaler Speicher, ein Ziel
+außerhalb des Git-Repositories und ein getrennt verwahrtes Backup-Passwort. Die
+Verbindungszeichenfolge und das Passwort dürfen weder in Skripten noch in der
+Shell-History, Logs oder Manifesten stehen.
+
+1. Außerhalb des Repositorys einen datierten Arbeitsordner anlegen und ACLs auf
+   den ausführenden Windows-Benutzer beschränken.
+2. Mit `pg_dumpall --roles-only` die Rollen ohne Passwortwerte exportieren.
+3. Mit `pg_dump --schema-only` das Anwendungsschema exportieren. Supabase-
+   verwaltete Basisschemata werden im Restore von der Zielinstanz bereitgestellt;
+   eigene `auth`-/`storage`-Trigger und Policies kommen aus Migrationen bzw.
+   Drift-Capture.
+4. Mit `pg_dump --data-only --format=custom` die Daten einschließlich Auth- und
+   Storage-Metadaten exportieren; `storage.buckets_vectors` und
+   `storage.vector_indexes` gemäß Supabase-Dokumentation ausschließen.
+5. Storage-Binärdateien aller Buckets mit einem read-only Storage-Zugang separat
+   herunterladen. Die 192 erwarteten Objekte und die aggregierten Byte-Summen
+   gegen §1.2 prüfen, ohne Objektnamen zu protokollieren.
+6. Rollen-, Schema-, Daten- und Storage-Artefakte zusammen mit einem
+   nicht-sensitiven Manifest archivieren. Mit dem vorhandenen OpenSSL außerhalb
+   des Repositorys interaktiv verschlüsseln, sodass das Passwort nicht als
+   Befehlsargument erscheint, zum Beispiel AES-256-CBC mit PBKDF2 und hoher
+   Iterationszahl. Für einen dauerhaften Prozess ist ein authentifiziertes
+   Format wie `age` oder 7-Zip AES-256 vorzuziehen; diese Werkzeuge sind auf dem
+   geprüften Rechner derzeit nicht installiert.
+7. SHA-256 des verschlüsselten Artefakts berechnen, Entschlüsselung testweise in
+   einen zweiten restriktiven Temp-Ordner durchführen und erst danach Klartext-
+   Zwischenstände entfernen.
+8. In einer isolierten lokalen Supabase-Instanz zuerst Rollen, dann Schema, dann
+   Daten restaurieren. Vor Schema-Restore die dokumentierten Default-Privileges
+   für Tabellen, Funktionen und Sequenzen von `anon`/`authenticated` widerrufen,
+   damit die produktiven ACLs nicht unbemerkt erweitert werden.
+9. Auth-Anmeldung mit synthetischem Testkonto, RLS/ACLs, Funktionen, Sequenzen,
+   Storage-Metadaten und Binärdatei-Checks prüfen. Keine produktiven E-Mails oder
+   externen Integrationen auslösen.
+10. Erst wenn der Restore-Test bestanden ist, Backup-Zeitpunkt, RPO, Prüfsumme,
+    Restore-Dauer und Ergebnis im Freigabeprotokoll dokumentieren.
+
+Zusätzliche Rechte sind erforderlich, falls die vorhandene Verbindung keine
+Rollen, `auth`-/`storage`-Daten oder alle Storage-Dateien lesen darf. Eine neue
+Login-Rolle, S3-Schlüssel, ein Service-Role-Key oder ein CLI-generierter
+temporärer Login sind produktive Zugriffsänderungen bzw. Secrets und benötigen
+eine eigene Freigabe. Der aktuelle Read-only-Auftrag deckt sie nicht ab.
 
 ## 2. Wirkung der Remediation
 
@@ -87,9 +258,22 @@ Für die Migration gilt deshalb:
 
 ## 4. Verpflichtende Read-only-Prüfung vor Freigabe
 
-Zuerst Projekt-ID und Remote-Migrationshistorie über den autorisierten
-Supabase-Zugang verifizieren. Die folgenden Abfragen liefern nur Metadaten oder
-Aggregatwerte und keine Teilnehmerdaten:
+Der produktive Read-only-Preflight (CL Release 1.3/1.4) hat bestätigt:
+
+- exakte Projekt-ID `ogopebvpojuvheimzged`, Datenbankrolle
+  `supabase_read_only_user`, `transaction_read_only=on`, PostgreSQL 17;
+- keine `supabase_migrations.schema_migrations`;
+- keine produktiven CL-Spalten, -Constraints, -Funktionen oder -Trigger;
+- alle Voraussetzungen der fünf CL-Dateien vorhanden;
+- vollständiger 66-Dateien-Audit gemäß
+  `champions-league-baseline-audit.md`;
+- 123 bestehende Advisor-Warnungen gemäß
+  `champions-league-advisor-warnings.md`;
+- kein gelisteter Backup-/PITR-Wiederherstellungspunkt.
+
+Vor jeder späteren Freigabe sind Projekt-ID, Remote-Migrationshistorie und
+Backup-Zeitpunkt erneut zu verifizieren. Die folgenden Abfragen liefern nur
+Metadaten oder Aggregatwerte und keine Teilnehmerdaten:
 
 ```sql
 SELECT version, name
@@ -186,25 +370,72 @@ WHERE t.restrict_same_club IS TRUE
 ```
 
 Zusätzlich RLS-Status, `pg_policies`, Tabellen-/Routine-Grants, aktuelle Locks,
-Tarif, letzten Backup-Zeitpunkt, Aufbewahrungsfenster und PITR-Status prüfen.
+Tarif, letzten Backup-Zeitpunkt, Aufbewahrungsfenster und PITR-Status prüfen. Für
+den historischen Soll/Ist-Abgleich ist ausschließlich das read-only Skript
+`scripts/cl_release_baseline_catalog.sql` vorgesehen.
 
-## 5. Freigegebener Aktivierungsablauf
+## 5. Geplanter Aktivierungsablauf — noch nicht freigegeben
 
 1. Exakte Produktionsprojekt-ID bestätigen.
-2. Vorhandene Versionsnummern aus `schema_migrations` gegen die Tabelle in §1
-   abgleichen. Bereits registrierte Dateien nicht erneut ausführen.
-3. Wiederherstellbaren Backup-/PITR-Punkt und Zeitpunkt dokumentieren.
-4. Anwendungsschreibvorgänge für das Wartungsfenster organisatorisch stoppen.
-5. Supabase-CLI-Version pinnen; bei CLI v3 das Remote-Ziel ausdrücklich wählen.
-6. Alle noch fehlenden Dateien mit einem Operator in Zeitstempelreihenfolge über
-   den bestehenden Migrationsworkflow anwenden.
-7. Migrationshistorie, Spalten, Constraints, Trigger, Funktionssignaturen und ACLs
-   erneut read-only prüfen.
-8. Erst danach den Code-Commit bereitstellen. Ein Merge nach `main` löst im
+2. Bewusste Risikoakzeptanz des Nutzers ohne vollständiges Backup im
+   Freigabeprotokoll festhalten (kein Backup-/Restore-Nachweis erforderlich,
+   §1.2). Ein Backup ist optional, aber nicht mehr Voraussetzung.
+3. Nicht versionierte Produktionsdrift ist durch die beiden Reconciliation-Dateien
+   (§1.1) abgebildet. Vor der Registrierung read-only nachweisen, dass deren
+   beabsichtigte Endzustände produktiv vorhanden sind; keine bestehende Datei
+   nachträglich ändern und die Reconciliation-Dateien produktiv nicht ausführen.
+4. Arbeitsbaum muss sauber sein, HEAD und Prüfsummen müssen dem freigegebenen
+   Audit-Commit entsprechen.
+5. Supabase CLI 3.4.0 oder eine ausdrücklich neu geprüfte Version pinnen und bei
+   jedem Befehl `--remote=ogopebvpojuvheimzged` angeben.
+6. Anwendungsschreibvorgänge für das Wartungsfenster organisatorisch stoppen und
+   aktive Langläufer/Locks read-only prüfen.
+7. Erst nach gesonderter Produktionswrite-Freigabe die exakt auditierten **68**
+   Baseline-Versionen (66 historisch + 2 Reconciliation) in **einem**
+   kontrollierten `migration repair` als `applied` markieren. `migration repair`
+   führt kein Migrations-SQL aus.
+8. Bei Fehler oder Verbindungsabbruch nicht blind wiederholen. Zuerst
+   `migration list --remote` lesen und nur tatsächlich fehlende Versionen nach
+   erneuter Entscheidung reparieren.
+9. Unmittelbar danach verifizieren: 68 historische/Baseline Local/Remote-Paare;
+   ausschließlich die fünf CL-Versionen offen.
+10. Die fünf CL-Dateien mit einem Operator in Zeitstempelreihenfolge über den
+   bestehenden Remote-Migrationsworkflow anwenden.
+11. Migrationshistorie, Spalten, Constraints, Trigger, Funktionssignaturen und
+   ACLs erneut read-only prüfen.
+12. Erst danach den Code-Commit bereitstellen. Ein Merge nach `main` löst im
    bestehenden Vercel-Git-Workflow automatisch ein Production-Deployment aus und
    darf daher nicht vor DB-Verifikation und ausdrücklicher Freigabe erfolgen.
-9. Öffentliches GET-Smoke-Testing durchführen; Admin-Schreibpfade ausschließlich
+13. Öffentliches GET-Smoke-Testing durchführen; Admin-Schreibpfade ausschließlich
    am ausdrücklich vorgesehenen Testturnier testen.
+
+### Baseline-Befehlsschablone
+
+Die folgende Schablone ist Dokumentation, **keine aktuelle Freigabe**. Sie
+ermittelt nur die vor-CL-Dateien, stoppt bei abweichender Anzahl/Grenze und
+markiert nach Bestätigung deren Versionen als angewendet:
+
+```powershell
+$baselineFiles = Get-ChildItem -LiteralPath 'supabase\migrations' -Filter '*.sql' |
+  Sort-Object Name |
+  Where-Object Name -LT '20261121121000_champions_league_competition_config.sql'
+
+# 66 historische + 2 Reconciliation-Dateien (20261120120000, 20261120121000).
+if ($baselineFiles.Count -ne 68) { throw 'Erwartet werden exakt 68 Baseline-Migrationen (66 historisch + 2 Reconciliation).' }
+if ($baselineFiles[0].BaseName -notlike '20260819170000_*') { throw 'Unerwarteter Baseline-Anfang.' }
+if ($baselineFiles[-1].BaseName -notlike '20261120121000_*') { throw 'Unerwartetes Baseline-Ende.' }
+
+$baselineVersions = $baselineFiles.BaseName | ForEach-Object { ($_ -split '_', 2)[0] }
+
+# Erst nach ausdrücklicher Productionwrite-Freigabe:
+npx supabase migration repair @baselineVersions `
+  --status applied `
+  --remote=ogopebvpojuvheimzged `
+  --yes
+```
+
+Werden weitere Baseline-Dateien ergänzt, müssen Anzahl, Endgrenze und
+freigegebener Prüfsummenstand vor Ausführung aktualisiert werden.
 
 ## 6. Funktionsprüfung mit vorgesehenem Testturnier
 

@@ -128,7 +128,7 @@ async function dropRosterAfterShapeCheck(client, filename, content) {
   };
 }
 
-export async function prepareDatabase(cluster) {
+export async function prepareDatabase(cluster, options = {}) {
   const admin = openClient(cluster, cluster.maintenanceDatabase);
   await admin.connect();
   try {
@@ -174,7 +174,13 @@ export async function prepareDatabase(cluster) {
       throw new Error("Disposable marker was not set on the new database");
     }
     await marked.query(BOOTSTRAP);
-    const files = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql")).sort();
+    const allFiles = readdirSync(migrationsDir).filter((name) => name.endsWith(".sql")).sort();
+    const files = options.throughFilename
+      ? allFiles.filter((name) => name <= options.throughFilename)
+      : allFiles;
+    if (options.throughFilename && !files.includes(options.throughFilename)) {
+      throw new Error(`Requested terminal migration does not exist: ${options.throughFilename}`);
+    }
     for (const filename of files) {
       const content = readFileSync(path.join(migrationsDir, filename), "utf8");
       if (FUNCTION_RETURN_COMPAT_MIGRATIONS[filename]) {

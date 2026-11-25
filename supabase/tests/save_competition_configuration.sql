@@ -388,8 +388,8 @@ DECLARE
   v_manager uuid := '11111111-1111-4111-8111-111111111111';
 BEGIN
   FOR v_i IN 1..4 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'save-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
@@ -405,7 +405,7 @@ BEGIN
   PERFORM public.test_pass('Champions League database kill switch', v_result::text);
 
   UPDATE public.applications SET status = 'new' WHERE id = v_apps[4];
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'new') RETURNING id INTO v_pending;
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'new', 'save-pending@example.invalid') RETURNING id INTO v_pending;
   INSERT INTO public.tournament_external_teams (
     tournament_id, external_id, name, participation_status, external_active, application_id
   ) VALUES (
@@ -459,8 +459,8 @@ DECLARE
   v_ts timestamptz;
   v_result jsonb;
 BEGIN
-  INSERT INTO public.applications (tournament_id, status)
-  VALUES (v_id, 'accepted')
+  INSERT INTO public.applications (tournament_id, status, contact_email)
+  VALUES (v_id, 'accepted', 'save-test@example.invalid')
   RETURNING id INTO v_app;
   INSERT INTO public.tournament_external_teams (
     id, tournament_id, external_id, name, participation_status, external_active
@@ -490,8 +490,8 @@ DECLARE
   v_result jsonb;
   v_manager uuid := '11111111-1111-4111-8111-111111111111';
 BEGIN
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted') RETURNING id INTO v_home;
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted') RETURNING id INTO v_away;
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'save-test@example.invalid') RETURNING id INTO v_home;
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'save-test@example.invalid') RETURNING id INTO v_away;
   INSERT INTO public.tournament_matches (tournament_id, phase, home_application_id, away_application_id)
   VALUES (v_id, 'group', v_home, v_away)
   RETURNING id INTO v_match;

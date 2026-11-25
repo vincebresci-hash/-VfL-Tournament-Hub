@@ -105,8 +105,8 @@ DECLARE
   v_result jsonb;
 BEGIN
   v_id := public.test_new_tournament('contract-club-missing-guest-application');
-  INSERT INTO public.applications (tournament_id, status, club_id)
-  VALUES (v_id, 'accepted', NULL);
+  INSERT INTO public.applications (tournament_id, status, club_id, contact_email)
+  VALUES (v_id, 'accepted', NULL, 'missing-club@example.invalid');
   SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
   v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, '[]'::jsonb, true);
   IF v_result->>'code' IS DISTINCT FROM 'MISSING_CLUB_IDENTITY'
@@ -166,8 +166,8 @@ BEGIN
   );
 
   v_id := public.test_new_tournament('contract-club-missing-linked-pending');
-  INSERT INTO public.applications (tournament_id, status, club_id)
-  VALUES (v_id, 'new', NULL)
+  INSERT INTO public.applications (tournament_id, status, club_id, contact_email)
+  VALUES (v_id, 'new', NULL, 'linked-pending@example.invalid')
   RETURNING id INTO v_linked_application;
   INSERT INTO public.tournament_external_teams (
     tournament_id, external_source, external_id, name, application_id,
@@ -265,7 +265,7 @@ DECLARE
   v_i integer;
 BEGIN
   FOR v_i IN 1..4 LOOP
-    INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted');
+    INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid');
   END LOOP;
   SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
   v_result := public.test_save(
@@ -296,8 +296,8 @@ DECLARE
   v_i integer;
 BEGIN
   FOR v_i IN 1..4 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
@@ -391,10 +391,10 @@ DECLARE
   v_result jsonb;
   v_rows jsonb;
 BEGIN
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted') RETURNING id INTO v_home;
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted') RETURNING id INTO v_away;
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted');
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted');
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid') RETURNING id INTO v_home;
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid') RETURNING id INTO v_away;
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid');
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid');
   INSERT INTO public.tournament_fields (tournament_id, name) VALUES (v_id, 'Platz 1') RETURNING id INTO v_field;
   INSERT INTO public.tournament_matches (
     tournament_id, phase, status, home_application_id, away_application_id, home_score, away_score, field_id
@@ -461,7 +461,7 @@ DECLARE
   v_i integer;
 BEGIN
   FOR v_i IN 1..3 LOOP
-    INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'accepted');
+    INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid');
   END LOOP;
   SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
   v_result := public.test_apply_league(
@@ -549,8 +549,8 @@ DECLARE
   v_i integer;
 BEGIN
   FOR v_i IN 1..4 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
@@ -611,12 +611,12 @@ DECLARE
   v_i integer;
 BEGIN
   FOR v_i IN 1..3 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
-  INSERT INTO public.applications (tournament_id, status) VALUES (v_id, 'new') RETURNING id INTO v_pending;
+  INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'new', 'league-pending@example.invalid') RETURNING id INTO v_pending;
   INSERT INTO public.tournament_external_teams (
     tournament_id, external_id, name, participation_status, external_active, application_id
   ) VALUES (
@@ -704,8 +704,8 @@ DECLARE
 BEGIN
   ALTER TABLE public.tournament_external_teams ALTER COLUMN external_active DROP NOT NULL;
   FOR v_i IN 1..4 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
@@ -764,8 +764,8 @@ DECLARE
   v_ts timestamptz;
   v_result jsonb;
 BEGIN
-  INSERT INTO public.applications (tournament_id, status)
-  VALUES (v_id, 'accepted')
+  INSERT INTO public.applications (tournament_id, status, contact_email)
+  VALUES (v_id, 'accepted', 'league-test@example.invalid')
   RETURNING id INTO v_app;
   INSERT INTO public.tournament_external_teams (
     id, tournament_id, external_id, name, participation_status, external_active
@@ -803,8 +803,8 @@ DECLARE
   v_i integer;
 BEGIN
   FOR v_i IN 1..4 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
@@ -895,8 +895,8 @@ DECLARE
   v_sort integer := 0;
 BEGIN
   FOR v_index IN 1..16 LOOP
-    INSERT INTO public.applications (tournament_id, status)
-    VALUES (v_id, 'accepted')
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
     RETURNING id INTO v_app;
     v_apps := array_append(v_apps, v_app);
   END LOOP;
