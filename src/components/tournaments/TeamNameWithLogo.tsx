@@ -16,6 +16,7 @@ type TeamNameWithLogoProps = {
   size?: LiveLogoSize;
   className?: string;
   nameClassName?: string;
+  logoFallback?: "initial" | "none";
 };
 
 /** Fixed logo slot classes — match ParticipantClubLogo size boxes for alignment. */
@@ -29,7 +30,8 @@ function logoSlotClass(size: LiveLogoSize) {
 /**
  * Presentation-only team identity: optional logo + mandatory textual name.
  * Always reserves a fixed logo slot so names align with or without a logo.
- * Missing/broken logo → empty invisible slot + text (no letter tile / crest).
+ * Missing/broken logos use the caller-selected fallback. Classic views keep
+ * the empty slot while Champions-League views opt into one initial tile.
  */
 export function TeamNameWithLogo({
   label,
@@ -38,6 +40,7 @@ export function TeamNameWithLogo({
   size = "xs",
   className,
   nameClassName,
+  logoFallback = "none",
 }: TeamNameWithLogoProps) {
   const markName = clubName?.trim() || label;
 
@@ -54,7 +57,7 @@ export function TeamNameWithLogo({
           logoUrl={logoUrl}
           clubName={markName}
           size={size}
-          fallback="none"
+          fallback={logoFallback}
         />
       </span>
       <span className={cn("min-w-0 leading-snug font-medium break-words text-ink", nameClassName)}>

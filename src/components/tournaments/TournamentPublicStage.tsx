@@ -20,7 +20,11 @@ import { TournamentKnockoutRounds } from "@/components/tournaments/TournamentKno
 import { TournamentPlacementsList } from "@/components/tournaments/TournamentPlacementsList";
 import { ChampionsLeagueStandings } from "@/components/tournaments/ChampionsLeagueStandings";
 import { ChampionsLeagueSchedule } from "@/components/tournaments/ChampionsLeagueSchedule";
-import { isChampionsLeaguePhaseComplete } from "@/lib/tournaments/champions-league-public";
+import { ChampionsLeagueLiveView } from "@/components/tournaments/ChampionsLeagueLiveView";
+import {
+  isChampionsLeagueKnockoutQualificationConsistent,
+  isChampionsLeaguePhaseComplete,
+} from "@/lib/tournaments/champions-league-public";
 import type { CompetitionFormat } from "@/lib/schedule/competition-config";
 
 import type { TournamentStatus } from "@/types/tournament";
@@ -40,6 +44,7 @@ const championsLeagueTabs = [
   { id: "uebersicht", label: "Ligatabelle" },
   { id: "spielplan", label: "Spielplan" },
   { id: "ko-runde", label: "KO-Runde" },
+  { id: "live", label: "Live" },
 ] as const;
 
 type BaseTab = (typeof baseTabs)[number]["id"];
@@ -108,11 +113,19 @@ export function TournamentPublicStage({
     showLiveTab ||
     (isChampionsLeague && stage.roster.length > 0);
   const configuredTabs = isChampionsLeague ? championsLeagueTabs : baseTabs;
-  const tabs = showLiveTab ? [...configuredTabs, liveTab] : [...configuredTabs];
-  const visibleTabs = tabs.filter((item) => item.id !== "ko-runde" || knockoutMatches.length > 0);
+  const tabs = isChampionsLeague
+    ? [...configuredTabs]
+    : showLiveTab
+      ? [...configuredTabs, liveTab]
+      : [...configuredTabs];
+  const visibleTabs = tabs.filter(
+    (item) => item.id !== "ko-runde" || isChampionsLeague || knockoutMatches.length > 0,
+  );
   const requested = showTabs ? asTab(tab, visibleTabs) : "uebersicht";
   const current =
-    requested === "ko-runde" && knockoutMatches.length === 0 ? "uebersicht" : requested;
+    requested === "ko-runde" && knockoutMatches.length === 0 && !isChampionsLeague
+      ? "uebersicht"
+      : requested;
   const teamLabels = Object.fromEntries(
     stage.roster.map((entry) => [
       entry.applicationId,
@@ -136,7 +149,32 @@ export function TournamentPublicStage({
     stage.fields.find((field) => field.id === id)?.name ?? "Feld";
   const groupName = (id: string | null) =>
     stage.groups.find((group) => group.id === id)?.name ?? "Gruppe";
-  const placements = computeKnockoutPlacements(knockoutMatches);
+  const leagueMemberIds = stage.roster.map(
+    (entry) => entry.externalTeamId ?? entry.applicationId,
+  );
+  const leagueStandings = isChampionsLeague
+    ? computeGroupStandings(leagueMemberIds, groupMatches)
+    : [];
+  const leagueComplete = isChampionsLeague
+    ? isChampionsLeaguePhaseComplete({
+        standings: leagueStandings,
+        matches: groupMatches,
+        matchesPerTeam: leagueMatchesPerTeam,
+      })
+    : false;
+  const knockoutQualificationConsistent =
+    isChampionsLeague && knockoutCutoff != null
+      ? isChampionsLeagueKnockoutQualificationConsistent({
+          complete: leagueComplete,
+          standings: leagueStandings,
+          knockoutCutoff,
+          matches: knockoutMatches,
+        })
+      : true;
+  const revealKnockoutParticipants = !isChampionsLeague || knockoutQualificationConsistent;
+  const placements = revealKnockoutParticipants
+    ? computeKnockoutPlacements(knockoutMatches)
+    : [];
   const publicRounds: KnockoutRound[][] = [
     ["quarterfinal"],
     ["semifinal"],
@@ -144,6 +182,13 @@ export function TournamentPublicStage({
   ];
   const publicPlacements: KnockoutRound[] = ["placement-5", "placement-7"];
   const knockoutTeamSide = (participantId: string | null) => {
+    if (!revealKnockoutParticipants) {
+      return {
+        label: "steht noch nicht fest",
+        logoUrl: null,
+        clubName: "Team",
+      };
+    }
     const mark = participantId ? teamMarks[participantId] : undefined;
     return {
       label: teamLabel(teamLabels, participantId),
@@ -172,16 +217,16 @@ export function TournamentPublicStage({
             away: knockoutTeamSide(
               matchTeamId(match.awayApplicationId, match.awayExternalTeamId),
             ),
-            resultText: knockoutResultText(match),
-            winnerLabel: outcome.winnerId
+            resultText: revealKnockoutParticipants ? knockoutResultText(match) : "Ergebnis folgt",
+            winnerLabel: revealKnockoutParticipants && outcome.winnerId
               ? `Gewinner ${teamLabel(teamLabels, outcome.winnerId)}`
               : null,
-            homeScore: match.homeScore,
-            awayScore: match.awayScore,
-            status: match.status,
-            decidedBy: match.decidedBy,
-            homePenalties: match.homePenalties,
-            awayPenalties: match.awayPenalties,
+            homeScore: revealKnockoutParticipants ? match.homeScore : null,
+            awayScore: revealKnockoutParticipants ? match.awayScore : null,
+            status: revealKnockoutParticipants ? match.status : "scheduled",
+            decidedBy: revealKnockoutParticipants ? match.decidedBy : null,
+            homePenalties: revealKnockoutParticipants ? match.homePenalties : null,
+            awayPenalties: revealKnockoutParticipants ? match.awayPenalties : null,
           };
         }),
       },
@@ -197,19 +242,11 @@ export function TournamentPublicStage({
       clubName: mark?.clubName ?? null,
     };
   });
-  const leagueMemberIds = stage.roster.map(
-    (entry) => entry.externalTeamId ?? entry.applicationId,
-  );
-  const leagueStandings = isChampionsLeague
-    ? computeGroupStandings(leagueMemberIds, groupMatches)
-    : [];
-  const leagueComplete = isChampionsLeague
-    ? isChampionsLeaguePhaseComplete({
-        standings: leagueStandings,
-        matches: groupMatches,
-        matchesPerTeam: leagueMatchesPerTeam,
-      })
-    : false;
+  const knockoutEmptyState = !leagueComplete
+    ? "Die K.-o.-Teilnehmer stehen erst nach der vollständigen Ligaphase fest."
+    : knockoutMatches.length === 0
+      ? "Die qualifizierten Teams stehen fest. Der K.-o.-Baum wird noch veröffentlicht."
+      : "Der gespeicherte K.-o.-Baum wird mit der finalen Tabelle abgeglichen.";
 
   return (
     <div>
@@ -414,11 +451,49 @@ export function TournamentPublicStage({
 
       {current === "ko-runde" ? (
         <TournamentKnockoutRounds
+          heading={isChampionsLeague ? "K.-o.-Baum" : "KO-Runde"}
+          description={isChampionsLeague ? "Der Weg vom ersten K.-o.-Spiel bis zum Finale." : null}
+          notice={
+            isChampionsLeague && knockoutMatches.length > 0 && !revealKnockoutParticipants
+              ? knockoutEmptyState
+              : null
+          }
+          emptyState={isChampionsLeague ? knockoutEmptyState : null}
           rounds={knockoutRoundViews}
           placements={knockoutPlacementViews}
+          showStatus={isChampionsLeague}
+          logoFallback={isChampionsLeague ? "initial" : "none"}
+          layout={isChampionsLeague ? "bracket" : "stack"}
+          className={isChampionsLeague ? "pb-20 sm:pb-24 lg:pb-0" : undefined}
         />
       ) : null}
-      {current === "live" && showLiveTab && livePresentation ? (
+      {current === "live" && isChampionsLeague ? (
+        <div className="mt-8">
+          <ChampionsLeagueLiveView
+            matches={stage.matches}
+            fields={stage.fields}
+            teamLabels={teamLabels}
+            teamMarks={teamMarks}
+            knockoutRounds={knockoutRoundViews}
+            knockoutPlacements={knockoutPlacementViews}
+            revealKnockoutParticipants={revealKnockoutParticipants}
+            knockoutEmptyState={knockoutEmptyState}
+          />
+          {showLiveTab && livePresentation ? (
+            <MeinTurnierplanLiveSection
+              tournamentName={livePresentation.tournamentName}
+              tournamentDate={livePresentation.tournamentDate}
+              tournamentStatus={livePresentation.tournamentStatus}
+              presentationUrl={livePresentation.presentationUrl}
+              customLabel={livePresentation.customLabel}
+              matchesWidgetUrl={livePresentation.matchesWidgetUrl}
+              tableWidgetUrl={livePresentation.tableWidgetUrl}
+              publicLiveNote={livePresentation.publicLiveNote}
+              meinTurnierplanEmbedUrl={livePresentation.meinTurnierplanEmbedUrl}
+            />
+          ) : null}
+        </div>
+      ) : current === "live" && showLiveTab && livePresentation ? (
         <MeinTurnierplanLiveSection
           tournamentName={livePresentation.tournamentName}
           tournamentDate={livePresentation.tournamentDate}

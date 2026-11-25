@@ -17,6 +17,7 @@ type MatchSidesScoreBlockProps = {
   /** Optional restrained secondary line (e.g. penalties). */
   scoreNote?: string | null;
   logoSize?: "xs" | "sm";
+  logoFallback?: "initial" | "none";
   className?: string;
 };
 
@@ -32,6 +33,7 @@ export function MatchSidesScoreBlock({
   awayScore = null,
   scoreNote = null,
   logoSize = "xs",
+  logoFallback = "none",
   className,
 }: MatchSidesScoreBlockProps) {
   if (completed && homeScore != null && awayScore != null) {
@@ -42,12 +44,14 @@ export function MatchSidesScoreBlock({
             side={home}
             value={String(homeScore)}
             logoSize={logoSize}
+            logoFallback={logoFallback}
             valueClassName="font-display text-xl font-bold leading-none tabular-nums text-ink sm:text-2xl"
           />
           <SideScoreRow
             side={away}
             value={String(awayScore)}
             logoSize={logoSize}
+            logoFallback={logoFallback}
             valueClassName="font-display text-xl font-bold leading-none tabular-nums text-ink sm:text-2xl"
           />
         </div>
@@ -69,6 +73,7 @@ export function MatchSidesScoreBlock({
           logoUrl={home.logoUrl}
           clubName={home.clubName}
           size={logoSize}
+          logoFallback={logoFallback}
           nameClassName="text-[14px]"
         />
         <TeamNameWithLogo
@@ -76,6 +81,7 @@ export function MatchSidesScoreBlock({
           logoUrl={away.logoUrl}
           clubName={away.clubName}
           size={logoSize}
+          logoFallback={logoFallback}
           nameClassName="text-[14px]"
         />
       </div>
@@ -95,11 +101,13 @@ function SideScoreRow({
   value,
   logoSize,
   valueClassName,
+  logoFallback,
 }: {
   side: MatchSideDisplay;
   value: string;
   logoSize: "xs" | "sm";
   valueClassName: string;
+  logoFallback: "initial" | "none";
 }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-3">
@@ -108,6 +116,7 @@ function SideScoreRow({
         logoUrl={side.logoUrl}
         clubName={side.clubName}
         size={logoSize}
+        logoFallback={logoFallback}
         className="min-w-0 flex-1"
         nameClassName="text-[14px]"
       />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { MatchSidesScoreBlock } from "@/components/tournaments/MatchSidesScoreBlock";
 import type { TeamMark } from "@/components/tournaments/TeamNameWithLogo";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
@@ -18,7 +18,7 @@ type ChampionsLeagueScheduleProps = {
 
 const berlinDate = new Intl.DateTimeFormat("de-DE", {
   timeZone: "Europe/Berlin",
-  weekday: "long",
+  weekday: "short",
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
@@ -35,6 +35,16 @@ function participantId(applicationId: string | null, externalTeamId?: string | n
   return applicationId ?? externalTeamId ?? null;
 }
 
+function matchSort(left: TournamentMatchRecord, right: TournamentMatchRecord) {
+  const leftTime = left.scheduledAt ?? "9999";
+  const rightTime = right.scheduledAt ?? "9999";
+  return leftTime.localeCompare(rightTime) || left.sortOrder - right.sortOrder;
+}
+
+function timeBlockId(match: TournamentMatchRecord) {
+  return match.scheduledAt ?? "unscheduled";
+}
+
 export function ChampionsLeagueSchedule({
   matches,
   fields,
@@ -44,39 +54,56 @@ export function ChampionsLeagueSchedule({
   const [team, setTeam] = useState("all");
   const [field, setField] = useState("all");
   const [status, setStatus] = useState<MatchStatusFilter>("all");
+  const [timeBlock, setTimeBlock] = useState("all");
 
+  const sortedMatches = useMemo(() => [...matches].sort(matchSort), [matches]);
   const fieldLabels = useMemo(
     () => new Map(fields.map((entry) => [entry.id, entry.name])),
     [fields],
   );
-  const teamOptions = useMemo(
-    () => {
-      const scheduledParticipantIds = new Set<string>();
-      for (const match of matches) {
-        const homeId = participantId(match.homeApplicationId, match.homeExternalTeamId);
-        const awayId = participantId(match.awayApplicationId, match.awayExternalTeamId);
-        if (homeId) scheduledParticipantIds.add(homeId);
-        if (awayId) scheduledParticipantIds.add(awayId);
-      }
-      return Object.entries(teamLabels)
-        .filter(([id]) => scheduledParticipantIds.has(id))
-        .sort((left, right) => left[1].localeCompare(right[1], "de"));
-    },
-    [matches, teamLabels],
-  );
+  const teamOptions = useMemo(() => {
+    const scheduledParticipantIds = new Set<string>();
+    for (const match of matches) {
+      const homeId = participantId(match.homeApplicationId, match.homeExternalTeamId);
+      const awayId = participantId(match.awayApplicationId, match.awayExternalTeamId);
+      if (homeId) scheduledParticipantIds.add(homeId);
+      if (awayId) scheduledParticipantIds.add(awayId);
+    }
+    return Object.entries(teamLabels)
+      .filter(([id]) => scheduledParticipantIds.has(id))
+      .sort((left, right) => left[1].localeCompare(right[1], "de"));
+  }, [matches, teamLabels]);
+  const timeBlocks = useMemo(() => {
+    const seen = new Set<string>();
+    return sortedMatches.flatMap((match) => {
+      const id = timeBlockId(match);
+      if (seen.has(id)) return [];
+      seen.add(id);
+      return [{ id, scheduledAt: match.scheduledAt }];
+    });
+  }, [sortedMatches]);
   const visibleMatches = useMemo(
     () =>
-      matches.filter((match) => {
+      sortedMatches.filter((match) => {
         const homeId = participantId(match.homeApplicationId, match.homeExternalTeamId);
         const awayId = participantId(match.awayApplicationId, match.awayExternalTeamId);
         return (
           (team === "all" || homeId === team || awayId === team) &&
           (field === "all" || match.fieldId === field) &&
-          (status === "all" || match.status === status)
+          (status === "all" || match.status === status) &&
+          (timeBlock === "all" || timeBlockId(match) === timeBlock)
         );
       }),
-    [field, matches, status, team],
+    [field, sortedMatches, status, team, timeBlock],
   );
+  const visibleBlocks = useMemo(() => {
+    const groups = new Map<string, TournamentMatchRecord[]>();
+    for (const match of visibleMatches) {
+      const id = timeBlockId(match);
+      groups.set(id, [...(groups.get(id) ?? []), match]);
+    }
+    return [...groups.entries()];
+  }, [visibleMatches]);
 
   function side(applicationId: string | null, externalTeamId?: string | null) {
     const id = participantId(applicationId, externalTeamId);
@@ -89,20 +116,21 @@ export function ChampionsLeagueSchedule({
   }
 
   return (
-    <section aria-labelledby="league-schedule-heading">
+    <section aria-labelledby="league-schedule-heading" className="pb-20 sm:pb-24 lg:pb-0">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.14em] text-brand-blue uppercase">Ligaphase</p>
           <h2 id="league-schedule-heading" className="mt-1 font-display text-2xl font-bold tracking-wide text-ink uppercase sm:text-3xl">
             Spielplan
           </h2>
+          <p className="mt-1 text-[13px] text-muted">Chronologisch nach Anstoßzeit.</p>
         </div>
         <p className="text-[13px] font-medium text-muted" aria-live="polite">
           {visibleMatches.length} von {matches.length} {matches.length === 1 ? "Spiel" : "Spielen"}
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 rounded-[10px] border border-line bg-white p-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)] sm:grid-cols-3 sm:p-4">
+      <div className="mt-4 grid gap-3 rounded-[10px] border border-line bg-white p-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)] sm:grid-cols-2 sm:p-4 xl:grid-cols-4">
         <FilterSelect label="Mannschaft" value={team} onChange={setTeam}>
           <option value="all">Alle Mannschaften</option>
           {teamOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
@@ -118,6 +146,14 @@ export function ChampionsLeagueSchedule({
           <option value="completed">Beendet</option>
           <option value="cancelled">Abgesagt</option>
         </FilterSelect>
+        <FilterSelect label="Zeitblock" value={timeBlock} onChange={setTimeBlock}>
+          <option value="all">Alle Zeitblöcke</option>
+          {timeBlocks.map((block, index) => (
+            <option key={block.id} value={block.id}>
+              {block.scheduledAt ? `${index + 1}. ${formatBerlinClock(block.scheduledAt)}` : "Termin offen"}
+            </option>
+          ))}
+        </FilterSelect>
       </div>
 
       {matches.length === 0 ? (
@@ -129,51 +165,58 @@ export function ChampionsLeagueSchedule({
           Für diese Filter gibt es keine Spiele.
         </p>
       ) : (
-        <ul className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {visibleMatches.map((match) => {
-            const completed = match.status === "completed" && match.homeScore != null && match.awayScore != null;
-            const live = match.status === "live";
-            const showScore =
-              (completed || live) && match.homeScore != null && match.awayScore != null;
-            const date = match.scheduledAt
-              ? berlinDate.format(new Date(match.scheduledAt))
-              : "Termin folgt";
-            const scoreNote =
-              completed && match.decidedBy === "penalties" && match.homePenalties != null && match.awayPenalties != null
-                ? `n.E. ${match.homePenalties}:${match.awayPenalties}`
-                : null;
-
+        <div className="mt-5 grid gap-6">
+          {visibleBlocks.map(([blockId, blockMatches], blockIndex) => {
+            const scheduledAt = blockId === "unscheduled" ? null : blockId;
             return (
-              <li key={match.id} className="min-w-0 overflow-hidden rounded-[10px] border border-line bg-white shadow-[0_4px_14px_rgba(16,20,28,0.05)]">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface/65 px-3.5 py-2.5">
-                  <p className="text-[11px] font-semibold tracking-[0.07em] text-muted uppercase">
-                    <span className="text-ink">{date}</span>
-                    <span className="mx-1.5 text-line" aria-hidden="true">·</span>
-                    {fieldLabels.get(match.fieldId ?? "") ?? "Feld folgt"}
+              <section key={blockId} aria-labelledby={`league-time-block-${blockIndex}`}>
+                <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-navy/15 pb-2">
+                  <h3 id={`league-time-block-${blockIndex}`} className="font-display text-base font-bold tracking-wide text-ink uppercase sm:text-lg">
+                    <span className="mr-2 inline-block h-3 w-1 bg-brand-yellow" aria-hidden="true" />
+                    {scheduledAt ? `Zeitblock ${blockIndex + 1} · ${formatBerlinClock(scheduledAt)}` : "Termin offen"}
+                  </h3>
+                  <p className="text-[11px] font-medium tracking-wide text-muted uppercase">
+                    {scheduledAt ? berlinDate.format(new Date(scheduledAt)) : "Zeit folgt"}
                   </p>
-                  <span className={live ? "rounded-full bg-brand-yellow px-2 py-1 text-[10px] font-bold tracking-[0.08em] text-navy uppercase" : "text-[10px] font-semibold tracking-[0.08em] text-muted uppercase"}>
-                    {statusLabels[match.status]}
-                  </span>
                 </div>
-                <div className="px-3.5 py-3.5">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <span className="font-display text-lg font-bold tabular-nums text-ink">{formatBerlinClock(match.scheduledAt)}</span>
-                    <span className="text-[10px] font-semibold tracking-[0.12em] text-brand-blue uppercase">Ligaphase</span>
-                  </div>
-                  <MatchSidesScoreBlock
-                    home={side(match.homeApplicationId, match.homeExternalTeamId)}
-                    away={side(match.awayApplicationId, match.awayExternalTeamId)}
-                    completed={showScore}
-                    homeScore={match.homeScore}
-                    awayScore={match.awayScore}
-                    scoreNote={scoreNote}
-                    logoSize="sm"
-                  />
-                </div>
-              </li>
+                <ul className="mt-3 grid grid-cols-1 gap-2.5 lg:grid-cols-2">
+                  {blockMatches.map((match) => {
+                    const completed = match.status === "completed" && match.homeScore != null && match.awayScore != null;
+                    const live = match.status === "live";
+                    const showScore = (completed || live) && match.homeScore != null && match.awayScore != null;
+                    const scoreNote = completed && match.decidedBy === "penalties" && match.homePenalties != null && match.awayPenalties != null
+                      ? `n.E. ${match.homePenalties}:${match.awayPenalties}`
+                      : null;
+                    return (
+                      <li key={match.id} className="min-w-0 overflow-hidden rounded-[9px] border border-line bg-white shadow-[0_3px_10px_rgba(16,20,28,0.045)]">
+                        <div className="flex items-center justify-between gap-2 border-b border-line bg-surface/65 px-3 py-2">
+                          <p className="truncate text-[10px] font-semibold tracking-[0.08em] text-muted uppercase">
+                            {fieldLabels.get(match.fieldId ?? "") ?? "Feld folgt"}
+                          </p>
+                          <span className={live ? "rounded-full bg-brand-yellow px-2 py-1 text-[10px] font-bold tracking-[0.08em] text-navy uppercase" : "text-[10px] font-semibold tracking-[0.08em] text-muted uppercase"}>
+                            {statusLabels[match.status]}
+                          </span>
+                        </div>
+                        <div className="px-3 py-2.5">
+                          <MatchSidesScoreBlock
+                            home={side(match.homeApplicationId, match.homeExternalTeamId)}
+                            away={side(match.awayApplicationId, match.awayExternalTeamId)}
+                            completed={showScore}
+                            homeScore={match.homeScore}
+                            awayScore={match.awayScore}
+                            scoreNote={scoreNote}
+                            logoSize="xs"
+                            logoFallback="initial"
+                          />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             );
           })}
-        </ul>
+        </div>
       )}
     </section>
   );
@@ -188,7 +231,7 @@ function FilterSelect({
   label: string;
   value: string;
   onChange: (value: string) => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <label className="grid gap-1.5 text-[10px] font-semibold tracking-[0.1em] text-muted uppercase">

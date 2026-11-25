@@ -11,5 +11,5 @@ export function TurnierhubHelpWidgetGate() {
     return null;
   }
 
-  return <TurnierhubHelpWidget />;
+  return <TurnierhubHelpWidget compactMobile={pathname.startsWith("/turniere/")} />;
 }
