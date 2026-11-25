@@ -723,6 +723,72 @@ async function requireParticipantLogoAccess() {
   return teamsAccess;
 }
 
+export async function updateApplicationParticipantClubAction(input: {
+  tournamentId: string;
+  applicationId: string;
+  clubId: string | null;
+}): Promise<{ error: string | null; notice: string | null }> {
+  const access = await requireParticipantLogoAccess();
+  if (access.error) {
+    return { error: access.error, notice: null };
+  }
+
+  const loaded = await loadTournamentMeta(input.tournamentId);
+  if (!loaded.tournament) {
+    return { error: loaded.error, notice: null };
+  }
+
+  const supabase = await createClient();
+  const clubId = input.clubId?.trim() || null;
+  if (clubId) {
+    const club = await supabase.from("clubs").select("id").eq("id", clubId).maybeSingle();
+    if (club.error || !club.data) {
+      return { error: "Der gewählte Hub-Verein wurde nicht gefunden.", notice: null };
+    }
+  }
+
+  const application = await supabase
+    .from("applications")
+    .select("id, status")
+    .eq("id", input.applicationId)
+    .eq("tournament_id", input.tournamentId)
+    .maybeSingle();
+  if (application.error || !application.data) {
+    return { error: "Die Bewerbung wurde nicht gefunden.", notice: null };
+  }
+  if (String(application.data.status) !== "accepted") {
+    return {
+      error: "Eine Vereinszuordnung kann hier nur für angenommene Bewerbungen gesetzt werden.",
+      notice: null,
+    };
+  }
+
+  const updated = await supabase
+    .from("applications")
+    .update({ club_id: clubId, updated_at: new Date().toISOString() })
+    .eq("id", input.applicationId)
+    .eq("tournament_id", input.tournamentId)
+    .eq("status", "accepted")
+    .select("id")
+    .maybeSingle();
+  if (updated.error) {
+    return { error: "Die Vereinszuordnung konnte nicht gespeichert werden.", notice: null };
+  }
+  if (!updated.data) {
+    return {
+      error:
+        "Die Bewerbung ist nicht mehr angenommen. Die Vereinszuordnung wurde nicht verändert.",
+      notice: null,
+    };
+  }
+
+  revalidateTournamentPaths(loaded.tournament.slug, loaded.tournament.id);
+  return {
+    error: null,
+    notice: clubId ? "Vereinszuordnung gespeichert." : "Vereinszuordnung entfernt.",
+  };
+}
+
 export async function updateApplicationParticipantLogoAction(input: {
   tournamentId: string;
   applicationId: string;

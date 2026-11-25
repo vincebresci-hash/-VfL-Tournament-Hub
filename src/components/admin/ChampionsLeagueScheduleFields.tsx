@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import { adminCardShellClass } from "@/components/admin/AdminPanel";
 import {
@@ -19,6 +20,8 @@ type ChampionsLeagueScheduleFieldsProps = {
   knockoutCutoff: LeagueKnockoutCutoff;
   restrictSameClub: boolean;
   sameClubUnverifiedCount: number;
+  sameClubUnverifiedNames: string[];
+  participantManagementHref: string;
   description: ChampionsLeagueAdminDescription;
   onModeChange: (mode: AdminCompetitionMode) => void;
   onMatchesPerTeamChange: (value: string) => void;
@@ -39,6 +42,8 @@ export function ChampionsLeagueScheduleFields({
   knockoutCutoff,
   restrictSameClub,
   sameClubUnverifiedCount,
+  sameClubUnverifiedNames,
+  participantManagementHref,
   description,
   onModeChange,
   onMatchesPerTeamChange,
@@ -123,18 +128,29 @@ export function ChampionsLeagueScheduleFields({
           </label>
 
           {restrictSameClub && sameClubUnverifiedCount > 0 ? (
-            <p
+            <div
+              id="same-club-identity-block"
               className={`${adminCardShellClass} border-[#e2c48a] bg-[#fff8e8] px-3.5 py-3 text-[13px] leading-relaxed text-[#7a5a1e]`}
               role="alert"
             >
-              {sameClubUnverifiedCount}{" "}
-              {sameClubUnverifiedCount === 1 ? "Team hat" : "Teams haben"} keine hinterlegte
-              Vereinszuordnung. Für {sameClubUnverifiedCount === 1 ? "dieses Team" : "diese Teams"}{" "}
-              kann der Vereinsausschluss nicht garantiert werden – zwei solche Teams desselben
-              Vereins könnten gegeneinander gelost werden. Bitte hinterlege die Vereinszuordnung
-              bei den betroffenen Mannschaften (Teilnehmerverwaltung), damit die Regel sicher
-              greift.
-            </p>
+              <p>
+                {sameClubUnverifiedCount}{" "}
+                {sameClubUnverifiedCount === 1 ? "Team hat" : "Teams haben"} keine eindeutige
+                Vereinszuordnung. Vorschau und Übernahme bleiben gesperrt, bis alle bestätigten
+                Mannschaften zugeordnet sind.
+              </p>
+              {sameClubUnverifiedNames.length > 0 ? (
+                <p className="mt-1 font-semibold text-ink">
+                  {sameClubUnverifiedNames.join(" · ")}
+                </p>
+              ) : null}
+              <Link
+                href={participantManagementHref}
+                className="mt-2 inline-flex font-semibold text-ink underline decoration-[#d7a31a] underline-offset-4 hover:text-brand-blue"
+              >
+                Vereinszuordnung in der Teilnehmerverwaltung ergänzen →
+              </Link>
+            </div>
           ) : null}
 
           <dl className="grid gap-3 sm:grid-cols-2">

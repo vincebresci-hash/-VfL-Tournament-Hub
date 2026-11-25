@@ -16,7 +16,7 @@ import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
-import { scheduleParticipantId, teamLabelsFromParticipants } from "@/lib/schedule/admin";
+import { teamLabelsFromParticipants } from "@/lib/schedule/admin";
 import type { Permission } from "@/types/rbac";
 
 type SchedulePageProps = {
@@ -109,15 +109,7 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
           storedRestrictSameClub={
             leagueConfig.status === "ok" ? leagueConfig.restrictSameClub : false
           }
-          clubByParticipantId={Object.fromEntries(
-            participants.flatMap((participant) => {
-              const key = scheduleParticipantId({
-                applicationId: participant.applicationId,
-                externalTeamId: participant.externalTeamId,
-              });
-              return key ? [[key, participant.clubId ?? null]] : [];
-            }),
-          )}
+          clubByParticipantId={confirmed.ok ? confirmed.clubByParticipantId : {}}
         />
       )}
     </TournamentAdminChrome>

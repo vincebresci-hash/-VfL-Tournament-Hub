@@ -26,13 +26,14 @@ function external(row: Partial<ConfirmedExternalIdentityRow> & Pick<ConfirmedExt
   return {
     id: row.id,
     applicationId: row.applicationId ?? null,
+    clubId: row.clubId ?? null,
     participationStatus: row.participationStatus ?? "confirmed",
     externalActive: row.externalActive ?? true,
   };
 }
 
 function proved(input: {
-  rosterRows?: { applicationId: string }[] | null;
+  rosterRows?: { applicationId: string; clubId: string | null }[] | null;
   externalRows?: ConfirmedExternalIdentityRow[] | null;
   rosterError?: boolean;
   externalError?: boolean;
@@ -51,9 +52,12 @@ function proved(input: {
 
 export function runConfirmedParticipantIdentityChecks() {
   const complete = proved({
-    rosterRows: [{ applicationId: "app-b" }, { applicationId: "app-a" }],
+    rosterRows: [
+      { applicationId: "app-b", clubId: "club-b" },
+      { applicationId: "app-a", clubId: "club-a" },
+    ],
     externalRows: [
-      external({ id: "ext-c" }),
+      external({ id: "ext-c", clubId: "club-c" }),
       external({ id: "ext-linked", applicationId: "app-a" }),
     ],
   });
@@ -64,6 +68,11 @@ export function runConfirmedParticipantIdentityChecks() {
       ["app-a", "app-b", "ext-c"],
     );
     assert.deepEqual(Object.keys(complete.participants[0] ?? {}).sort(), ["applicationId", "externalTeamId"]);
+    assert.deepEqual(complete.clubByParticipantId, {
+      "app-a": "club-a",
+      "app-b": "club-b",
+      "ext-c": "club-c",
+    });
   }
 
   const empty = proved({});
@@ -77,7 +86,7 @@ export function runConfirmedParticipantIdentityChecks() {
   assert(!applicationError.ok && applicationError.code === "PARTICIPANT_READ_FAILED", "application query error fails closed");
 
   const externalError = proved({
-    rosterRows: [{ applicationId: "app-a" }],
+    rosterRows: [{ applicationId: "app-a", clubId: null }],
     externalError: true,
     externalRows: null,
   });
@@ -85,7 +94,7 @@ export function runConfirmedParticipantIdentityChecks() {
 
   const partial = proved({
     archived: true,
-    rosterRows: [{ applicationId: "only-my-club" }],
+    rosterRows: [{ applicationId: "only-my-club", clubId: null }],
     externalRows: [external({ id: "ext-c" })],
   });
   assert(
@@ -105,7 +114,7 @@ export function runConfirmedParticipantIdentityChecks() {
   assert(!duplicate.ok && duplicate.code === "DUPLICATE_PARTICIPANT", "duplicate identities are rejected");
 
   const mixed = proved({
-    rosterRows: [{ applicationId: "app-2" }],
+    rosterRows: [{ applicationId: "app-2", clubId: null }],
     externalRows: [external({ id: "ext-1" })],
   });
   assert(mixed.ok, "mixed application and external-team identities succeed");
@@ -140,7 +149,7 @@ export function runConfirmedParticipantIdentityChecks() {
   );
 
   const inactive = proved({
-    rosterRows: [{ applicationId: "app-a" }],
+    rosterRows: [{ applicationId: "app-a", clubId: null }],
     externalRows: [
       external({ id: "ext-off", externalActive: false }),
       external({ id: "ext-new", participationStatus: "detected" }),
@@ -152,7 +161,7 @@ export function runConfirmedParticipantIdentityChecks() {
   assert.equal(confirmedExternalTeamIsActive(true), true);
 
   const ordered = proved({
-    rosterRows: [{ applicationId: "m-2" }],
+    rosterRows: [{ applicationId: "m-2", clubId: null }],
     externalRows: [external({ id: "m-1" })],
   });
   assert(
@@ -167,8 +176,8 @@ export function runConfirmedParticipantIdentityChecks() {
   assert(reader.includes('rpc("tournament_public_roster"'), "reader uses the public roster for accepted applications");
   assert(!reader.includes('.from("applications")'), "reader does not use the RLS-filtered applications table");
   assert(
-    reader.includes('.select("id, application_id, participation_status, external_active")'),
-    "external identity read selects only eligibility columns",
+    reader.includes('.select("id, application_id, club_id, participation_status, external_active")'),
+    "external identity read selects only eligibility and club-identity columns",
   );
   assert(!/email|phone|payment|contact_name|iban|service-role|serviceRole/i.test(reader), "reader exposes no private application fields and no service role");
   assert(action.includes("readConfirmedParticipantIdentities"), "inactive save uses the dedicated reader");
@@ -189,16 +198,23 @@ export function runConfirmedParticipantIdentityChecks() {
   assert(leagueAction.includes("readConfirmedParticipantIdentities"), "league apply uses the confirmed roster");
   assert(!leagueAction.includes("getTournamentParticipants"), "league apply does not use the club-scoped roster");
   assert(
+    leagueAction.includes("confirmed.clubByParticipantId") &&
+      leagueAction.includes("jede bestätigte Mannschaft eine Vereinszuordnung"),
+    "league apply fails closed before preview rebuild when a club identity is missing",
+  );
+  assert(
     leagueAction.indexOf("const confirmed = await readConfirmedParticipantIdentities") <
       leagueAction.indexOf("if (!confirmed.ok)") &&
       leagueAction.indexOf("if (!confirmed.ok)") <
-        leagueAction.indexOf('supabase.rpc("apply_champions_league_league_phase"'),
+        leagueAction.lastIndexOf("applyLeaguePhaseWithBoundedRetry(supabase"),
     "an unproved roster returns before the league write",
   );
   assert(leagueAction.includes("sideIsCanonical"), "each persisted fixture side is one canonical id");
   assert(schedulePage.includes("readConfirmedParticipantIdentities"), "schedule preview loads the confirmed roster");
   assert(
-    schedulePage.includes("confirmed.participants") && schedulePage.includes("confirmedRosterError"),
+    schedulePage.includes("confirmed.participants") &&
+      schedulePage.includes("confirmed.clubByParticipantId") &&
+      schedulePage.includes("confirmedRosterError"),
     "schedule preview does not fall back to a partial roster",
   );
 

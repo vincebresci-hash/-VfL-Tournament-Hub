@@ -11,7 +11,6 @@ import { revalidatePath } from "next/cache";
 import { readConfirmedParticipantIdentities } from "@/lib/db/confirmed-participant-read";
 import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
-import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import { scheduleParticipantId } from "@/lib/schedule/admin";
 import { requireScheduleManage, requireTournamentsManage } from "@/lib/rbac/action-access";
 import { buildChampionsLeagueAdminPreview, savedTournamentPlanTiming } from "@/lib/schedule/league-admin-preview";
@@ -19,7 +18,10 @@ import type { LeagueKnockoutCutoff } from "@/lib/schedule/league-phase";
 import { canRegenerateGroupSchedule } from "@/lib/schedule/plan-preview";
 import type { RegenerationPolicyResult } from "@/lib/schedule/plan-preview";
 import { createClient } from "@/lib/supabase/server";
-import type { Json } from "@/lib/supabase/database";
+import type { Database, Json } from "@/lib/supabase/database";
+
+type ApplyLeaguePhaseArgs =
+  Database["public"]["Functions"]["apply_champions_league_league_phase"]["Args"];
 
 export type ApplyChampionsLeagueStatus =
   | "success"
@@ -40,6 +42,8 @@ export type ApplyChampionsLeagueResult = {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const RETRYABLE_TRANSACTION_CODES = new Set(["40P01", "55P03"]);
+const MAX_TRANSACTION_ATTEMPTS = 2;
 
 function result(
   status: ApplyChampionsLeagueStatus,
@@ -67,6 +71,25 @@ function sideIsCanonical(applicationId: string | null, externalTeamId: string | 
   const hasApplication = Boolean(applicationId);
   const hasExternal = Boolean(externalTeamId);
   return hasApplication !== hasExternal;
+}
+
+async function applyLeaguePhaseWithBoundedRetry(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  args: ApplyLeaguePhaseArgs,
+) {
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt += 1) {
+    const applied = await supabase.rpc("apply_champions_league_league_phase", args);
+    if (!applied.error || !RETRYABLE_TRANSACTION_CODES.has(applied.error.code ?? "")) {
+      return applied;
+    }
+    if (attempt === MAX_TRANSACTION_ATTEMPTS) {
+      return applied;
+    }
+    // PostgreSQL reports 40P01/55P03 only after aborting the RPC transaction.
+    // Retry exactly once in a fresh request; never retry network/unknown errors.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+  }
+  throw new Error("unreachable transaction retry state");
 }
 
 function readRpcPayload(value: Json) {
@@ -199,18 +222,19 @@ export async function applyChampionsLeagueScheduleAction(input: {
   }
 
   const restrictSameClub = input.restrictSameClub === true;
-  const clubByParticipantId: Record<string, string | null> = {};
-  if (restrictSameClub) {
-    const participants = await getTournamentParticipants(tournamentId);
-    for (const participant of participants) {
-      const key = scheduleParticipantId({
-        applicationId: participant.applicationId,
-        externalTeamId: participant.externalTeamId,
-      });
-      if (key) {
-        clubByParticipantId[key] = participant.clubId ?? null;
-      }
-    }
+  const clubByParticipantId = confirmed.clubByParticipantId;
+  if (
+    restrictSameClub &&
+    confirmed.participants.some((participant) => {
+      const key = scheduleParticipantId(participant);
+      return !key || !clubByParticipantId[key];
+    })
+  ) {
+    return result(
+      "validation_error",
+      "Der Vereinsausschluss benötigt für jede bestätigte Mannschaft eine Vereinszuordnung. Bitte ordne die markierten Teams zuerst in der Teilnehmerverwaltung zu.",
+      { policy },
+    );
   }
 
   const preview = buildChampionsLeagueAdminPreview({
@@ -279,7 +303,7 @@ export async function applyChampionsLeagueScheduleAction(input: {
     sortOrder: match.sortOrder,
   }));
 
-  const applied = await supabase.rpc("apply_champions_league_league_phase", {
+  const applied = await applyLeaguePhaseWithBoundedRetry(supabase, {
     p_tournament_id: tournamentId,
     p_expected_updated_at: stored.updatedAt,
     p_league_matches_per_team: input.matchesPerTeam,
@@ -343,6 +367,14 @@ export async function applyChampionsLeagueScheduleAction(input: {
       policy,
       fingerprint,
     });
+  }
+  if (payload.code === "MISSING_CLUB_IDENTITY") {
+    return result(
+      "validation_error",
+      payload.error ??
+        "Der Vereinsausschluss benötigt für jede bestätigte Mannschaft eine Vereinszuordnung.",
+      { policy, fingerprint },
+    );
   }
   if (payload.status === "config_locked" || payload.status === "blocked") {
     return result("blocked", payload.error ?? "Der Ligaspielplan darf nicht gespeichert werden.", {

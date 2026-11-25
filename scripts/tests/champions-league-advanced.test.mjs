@@ -6,6 +6,10 @@ import {
   buildLeagueKnockoutPlan,
   expectedLeagueMatchCount,
 } from "../../src/lib/schedule/league-phase.ts";
+import { assembleConfirmedParticipantIdentities } from "../../src/lib/schedule/confirmed-participant-identities.ts";
+import { runConfirmedParticipantIdentityChecks } from "../../src/lib/schedule/confirmed-participant-identity-checks.ts";
+import { runSaveCompetitionConfigurationSqlChecks } from "../../src/lib/schedule/save-competition-configuration-sql-checks.ts";
+import { runTournamentParticipantLogoManagementChecks } from "../../src/lib/tournament-participant-logos-checks.ts";
 
 const LEAGUE_COUNT_OPTIONS = {
   includeThirdPlace: true,
@@ -177,4 +181,52 @@ test("classic league generation is unchanged when same-club is off", () => {
   assert.equal(build.error, null);
   assert.equal(build.fixtures.length, 64);
   assertValidLeague(build.fixtures, ids, 8);
+});
+
+test("canonical club identities fail closed across applications and linked external teams", () => {
+  const roster = assembleConfirmedParticipantIdentities({
+    acceptedApplicationIds: ["registered", "guest"],
+    clubByApplicationId: { registered: "club-a", guest: null },
+    externalTeams: [
+      {
+        id: "linked-accepted",
+        applicationId: "registered",
+        clubId: null,
+        participationStatus: "confirmed",
+        externalActive: true,
+      },
+      {
+        id: "linked-pending",
+        applicationId: "pending-application",
+        clubId: null,
+        participationStatus: "confirmed",
+        externalActive: true,
+      },
+      {
+        id: "manual-team",
+        applicationId: null,
+        clubId: "club-manual",
+        participationStatus: "confirmed",
+        externalActive: true,
+      },
+    ],
+  });
+
+  assert.equal(roster.ok, true);
+  if (!roster.ok) return;
+  assert.deepEqual(
+    roster.participants.map((participant) => participant.applicationId ?? participant.externalTeamId),
+    ["guest", "linked-pending", "manual-team", "registered"],
+  );
+  assert.equal(roster.clubByParticipantId.registered, "club-a");
+  assert.equal(roster.clubByParticipantId.guest, null);
+  assert.equal(roster.clubByParticipantId["linked-pending"], null);
+  assert.equal(roster.clubByParticipantId["manual-team"], "club-manual");
+  assert.equal("linked-accepted" in roster.clubByParticipantId, false);
+});
+
+test("release blocker source contracts stay wired into the admin and SQL paths", () => {
+  runConfirmedParticipantIdentityChecks();
+  runSaveCompetitionConfigurationSqlChecks();
+  runTournamentParticipantLogoManagementChecks();
 });

@@ -15,6 +15,7 @@ import {
 export type ConfirmedExternalIdentityRow = {
   id: string;
   applicationId: string | null;
+  clubId: string | null;
   participationStatus: string;
   externalActive: boolean;
 };
@@ -22,6 +23,7 @@ export type ConfirmedExternalIdentityRow = {
 export type ConfirmedParticipantReadSuccess = {
   ok: true;
   participants: ConfirmedParticipantIdentity[];
+  clubByParticipantId: Record<string, string | null>;
 };
 
 export type ConfirmedParticipantReadFailure = {
@@ -50,6 +52,7 @@ const VISIBILITY_UNPROVED =
 
 export function assembleConfirmedParticipantIdentities(input: {
   acceptedApplicationIds: readonly string[];
+  clubByApplicationId?: Readonly<Record<string, string | null>>;
   externalTeams: readonly ConfirmedExternalIdentityRow[];
 }): ConfirmedParticipantReadResult {
   const acceptedApplicationIds = input.acceptedApplicationIds.map((id) => String(id));
@@ -85,7 +88,9 @@ export function assembleConfirmedParticipantIdentities(input: {
   const byId = new Map(
     identities.map((identity) => [scheduleParticipantId(identity) ?? "", identity]),
   );
+  const externalById = new Map(input.externalTeams.map((team) => [String(team.id), team]));
   const participants: ConfirmedParticipantIdentity[] = [];
+  const clubByParticipantId: Record<string, string | null> = {};
   for (const id of validated.participantIds) {
     const identity = byId.get(id);
     if (!identity) {
@@ -96,10 +101,14 @@ export function assembleConfirmedParticipantIdentities(input: {
       };
     }
     participants.push(identity);
+    clubByParticipantId[id] = identity.applicationId
+      ? input.clubByApplicationId?.[identity.applicationId] ?? null
+      : externalById.get(identity.externalTeamId ?? "")?.clubId ?? null;
   }
   return {
     ok: true,
     participants,
+    clubByParticipantId,
   };
 }
 
@@ -112,7 +121,7 @@ export function interpretConfirmedParticipantRead(input: {
   tournamentFound: boolean;
   archived: boolean;
   rosterError: boolean;
-  rosterRows: readonly { applicationId: string }[] | null;
+  rosterRows: readonly { applicationId: string; clubId: string | null }[] | null;
   externalError: boolean;
   externalRows: readonly ConfirmedExternalIdentityRow[] | null;
 }): ConfirmedParticipantReadResult {
@@ -140,6 +149,9 @@ export function interpretConfirmedParticipantRead(input: {
 
   return assembleConfirmedParticipantIdentities({
     acceptedApplicationIds: input.rosterRows.map((row) => row.applicationId),
+    clubByApplicationId: Object.fromEntries(
+      input.rosterRows.map((row) => [row.applicationId, row.clubId]),
+    ),
     externalTeams: input.externalRows,
   });
 }

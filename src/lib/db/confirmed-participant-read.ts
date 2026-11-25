@@ -83,7 +83,7 @@ export async function readConfirmedParticipantIdentities(
     supabase.rpc("tournament_public_roster", { p_slug: tournament.data.slug }),
     supabase
       .from("tournament_external_teams")
-      .select("id, application_id, participation_status, external_active")
+      .select("id, application_id, club_id, participation_status, external_active")
       .eq("tournament_id", tournamentId),
   ]);
 
@@ -91,6 +91,7 @@ export async function readConfirmedParticipantIdentities(
     ? external.data.map((row) => ({
         id: String(row.id),
         applicationId: row.application_id ? String(row.application_id) : null,
+        clubId: row.club_id ? String(row.club_id) : null,
         participationStatus: String(row.participation_status ?? "detected"),
         externalActive: confirmedExternalTeamIsActive(row.external_active),
       }))
@@ -101,7 +102,10 @@ export async function readConfirmedParticipantIdentities(
     archived: false,
     rosterError: Boolean(roster.error),
     rosterRows: roster.data
-      ? roster.data.map((row) => ({ applicationId: String(row.application_id ?? "") }))
+      ? roster.data.map((row) => ({
+          applicationId: String(row.application_id ?? ""),
+          clubId: row.club_id ? String(row.club_id) : null,
+        }))
       : null,
     externalError: Boolean(external.error),
     externalRows,

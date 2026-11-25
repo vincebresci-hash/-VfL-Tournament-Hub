@@ -1,128 +1,254 @@
-# Champions League — Migrations- & Rollback-Runbook
+# Champions League — Migrations- und Rollback-Runbook
 
-Stand: Branch `feature/champions-league-mode`, PR #135. Dieses Runbook wird
-**nicht automatisch ausgeführt**. Produktive Migrationen, Merge und Deployment
-erfolgen ausschließlich nach ausdrücklicher Freigabe.
+Stand: CL Release 1.1 auf `feature/champions-league-mode`, PR #135.
 
-## 1. Erforderliche produktive Migrationen (in Ausführungsreihenfolge)
+Dieses Runbook führt nichts automatisch aus. Produktive Migrationen, Merge und
+Production-Deployment benötigen eine gesonderte Freigabe. Der tatsächliche
+produktive Migrationsstand ist derzeit **ungeklärt**, weil der verbundene
+Supabase-Zugang das Produktionsprojekt nicht lesen kann. Deshalb wurden die vier
+vorhandenen CL-Migrationsdateien nicht verändert; Release 1.1 ergänzt eine fünfte,
+nachgelagerte Remediation-Migration.
 
-Supabase wendet Migrationen in der Reihenfolge der Dateinamen-Zeitstempel an.
-Für den Champions-League-Modus sind genau diese vier erforderlich, keine weiteren:
+## 1. SQL-Dateien, Reihenfolge und Prüfsummen
 
-| # | Datei | Inhalt | Abhängigkeit |
-|---|-------|--------|--------------|
-| 1 | `20261121121000_champions_league_competition_config.sql` | Nullbare Spalten `competition_format`, `league_matches_per_team`, `knockout_cutoff`, `restrict_same_club` + CHECK-Constraints (`knockout_cutoff IN (4,8,16)`) | — |
-| 2 | `20261121124500_save_competition_configuration.sql` | `save_competition_configuration` (für CL **inaktiv**: `CHAMPIONS_LEAGUE_SAVE_NOT_ACTIVATED`) + fünf BEFORE-ROW-Lock-Trigger | #1 (prüft Spalten) |
-| 3 | `20261122180000_apply_champions_league_league_phase.sql` | `apply_champions_league_league_phase` (Top 4/8/16, Same-Club-Durchsetzung, schreibt die vier Spalten + Liga-Gruppe + Memberships + Ligaspiele transaktional) | #1 (Spalten), #2 (Lock-Trigger-Disziplin) |
-| 4 | `20261125120000_champions_league_round_of_16.sql` | Ersetzt CHECK `tournament_matches_round_check` um `round-of-16` | Basis-KO-Migration `20260820200000` (bereits produktiv) |
+| # | Datei | SHA-256 | Abhängigkeit / Zweck |
+|---:|---|---|---|
+| 1 | `20261121121000_champions_league_competition_config.sql` | `e37c898009fd88dfc9192f6afe728c8f3ff9e262c4df09ea79556e7e6ac7fa20` | Vier nullable CL-Spalten und CHECK-Constraints |
+| 2 | `20261121124500_save_competition_configuration.sql` | `5f2479df42072c65152c1967e5b738b2c0f9854127d855419f3d9c320bfb59f2` | Abhängig von #1; Save-RPC und fünf Parent-Row-Lock-Trigger |
+| 3 | `20261122180000_apply_champions_league_league_phase.sql` | `2f0e319cd8b68a3616d1728421d8d987c7ee076fd1f52ce97ee87eddc7c21f3c` | Abhängig von #1/#2 sowie RBAC-, Teilnehmer-, Gruppen-, Feld- und Match-Schema |
+| 4 | `20261125120000_champions_league_round_of_16.sql` | `2753d29d486cac506abd0817022b1c7d1fe64c5bf47a28d6b9838f95598e93da` | Abhängig von Basis-K.-o.-Migration; erweitert den Round-CHECK um `round-of-16` |
+| 5 | `20261125190218_champions_league_release_blocker_remediation.sql` | `7fe2f71d891c74b93c1621ad8525f5f9d704272f5743e214b36e9490287566a8` | Abhängig von #1–#3; Schema-/ACL-Härtung und autoritatives Same-Club-Fail-safe |
 
-**Eigenschaften:** Alle vier sind **additiv** und **nullbar**. Es werden keine
-Bestandsdaten verändert, keine Gruppen/Spiele gelöscht, kein Backfill. Turniere
-mit `competition_format = NULL` verhalten sich unverändert (Legacy-Ableitung aus
-der Gruppenzahl).
+Die Dateien müssen ausschließlich in Zeitstempelreihenfolge über den bestehenden
+Remote-Migrationsworkflow angewendet werden. Keine bereits in
+`supabase_migrations.schema_migrations` registrierte Version manuell erneut
+ausführen und nicht am Migrationsverlauf vorbei im SQL-Editor anwenden.
 
-## 2. Sicherheits- und Kompatibilitätsbefund (read-only geprüft)
+## 2. Wirkung der Remediation
 
-- **Keine bereits angewandte Migration wurde verändert.** Die vier CL-Dateien
-  existieren **nicht** auf `main` → sie sind in Produktion nicht angewandt. Die
-  produktiv vorhandene Basis-KO-Migration `20260820200000_knockout_stage.sql`
-  ist gegenüber `main` **unverändert**; `round-of-16` kommt als **neue** Datei.
-- **RLS/Grants:** `apply_champions_league_league_phase` und
-  `save_competition_configuration` sind `SECURITY DEFINER`, `REVOKE ALL … FROM
-  PUBLIC`, `GRANT EXECUTE … TO authenticated`. Beide verlangen `auth.uid()` und
-  die RBAC-Rechte `tournaments.manage` **und** `schedule.manage`. `anon` und
-  `service_role` werden abgelehnt (per Contract-Test verifiziert). Die
-  Lock-Helfer-Funktionen sind vollständig `REVOKE … FROM PUBLIC`.
-- **Transaktion/Nebenläufigkeit:** Fünf BEFORE-ROW-Lock-Trigger (applications,
-  external_teams, groups, group_members, matches) sperren stets zuerst die
-  Eltern-`tournaments`-Zeile (in UUID-Reihenfolge). Save, Apply, Spielplan-
-  ersetzung und manuelle Kind-Schreibvorgänge nehmen damit immer zuerst den
-  Eltern-Lock. Optimistisches Locking über `expected_updated_at` → bei paralleler
-  Änderung `STALE_CONFIGURATION`. Deadlock/Lock-Timeout-Verhalten per
-  Nebenläufigkeitstests abgedeckt.
-- **Schutz bestehender Turniere:** Apply lehnt ab bei gespeichertem Bestands-
-  format (`LEGACY_FORMAT`), vorhandenen Gruppen/Spielen ohne CL-Format
-  (`UNSAFE_LEGACY_CONVERSION`), gespielten/Live-/K.-o.-Spielen (`RESULTS_EXIST`,
-  `LIVE_MATCH`, `KNOCKOUT_MATCHES`) und abgeschlossenen Turnieren
-  (`LIFECYCLE_COMPLETED`). Gespielte, laufende und K.-o.-Spiele werden nie
-  gelöscht.
-- **Inaktiver Save:** `save_competition_configuration` gibt für einen
-  CL-Spaltenschreibvorgang weiterhin `CHAMPIONS_LEAGUE_SAVE_NOT_ACTIVATED`
-  zurück; der vollständige CL-Schreibpfad läuft ausschließlich über
-  `apply_champions_league_league_phase`.
-- **Same-Club:** Der Apply-RPC leitet die Vereinsidentität autoritativ aus
-  `applications.club_id` bzw. `tournament_external_teams.club_id` ab und lehnt
-  jede eingereichte Paarung mit gleicher Vereins-ID ab (`SAME_CLUB_VIOLATION`).
-  Teams ohne `club_id` können die Regel nicht abdecken — der Adminbereich warnt
-  vor nicht hinterlegten Vereinszuordnungen (kein stilles Umgehen).
+- Prüft die vier vorhandenen Spalten auf exakten Typ, Nullable-Status und fehlenden
+  Default. Eine abweichende Vorbelegung stoppt die Migration.
+- Prüft Constraint-Namen zusammen mit
+  `conrelid = 'public.tournaments'::regclass`; gleichnamige Constraints anderer
+  Tabellen können die Anlage nicht mehr überspringen.
+- Validiert alle vier CL-Constraints. Das kann die Tabelle scannen und benötigt
+  ein geprüftes Wartungsfenster.
+- Erweitert die Bewerbungs- und External-Team-Lock-Trigger um `club_id`-Änderungen.
+  Damit bleibt die Vereinsidentität zwischen RPC-Validierung und Persistierung
+  stabil.
+- Benennt die bisherige Apply-Funktion in einen nicht direkt aufrufbaren privaten
+  Core um und legt unter der öffentlichen Signatur einen neuen Wrapper an.
+- Der Wrapper sperrt zuerst die Turnierzeile und bricht bei aktiviertem
+  Same-Club-Ausschluss vor jeder Mutation mit `MISSING_CLUB_IDENTITY` ab, sobald
+  eine kanonische bestätigte Mannschaft keine Vereins-ID besitzt.
+- Bestätigte externe Mannschaften, die mit einer akzeptierten Bewerbung verknüpft
+  sind, werden über die Bewerbung dedupliziert. Bei jeder anderen
+  Bewerbungsphase bleibt das externe Team kanonisch und benötigt seine eigene
+  `tournament_external_teams.club_id`.
+- Die Admin-Vorschau und Übernahme bleiben bei fehlenden Identitäten gesperrt.
+  Der Hinweis führt direkt zur Teilnehmerverwaltung; angenommene Bewerbungen
+  können dort atomar einem Hub-Verein zugeordnet werden. Ein gleichzeitiger
+  Statuswechsel verhindert die Zuordnung ohne Teiländerung.
+- Der Wrapper validiert Same-Club-Paarungen nochmals selbst und liefert
+  `SAME_CLUB_VIOLATION` bei einer unzulässigen Begegnung.
+- Entfernt auch möglicherweise erhaltene ACLs aller Nicht-Eigentümer. Nur
+  `authenticated` erhält `EXECUTE` auf Save- und öffentlichen Apply-RPC. Core,
+  Lock-Helfer und Triggerfunktionen bleiben ohne direkten API-Grant.
+- Begrenzt DDL- und RPC-Lock-Wartezeit auf fünf Sekunden. Der Server wiederholt
+  ausschließlich explizit abgebrochene RPC-Transaktionen mit SQLSTATE `40P01`
+  oder `55P03` genau einmal. Netzwerkfehler und unklare Zustände werden nicht
+  wiederholt.
 
-## 3. Read-only-Verifikation gegen die Produktionsdatenbank (vor der Freigabe)
+Bei deaktiviertem Same-Club-Ausschluss bleibt der bisherige Teilnehmer- und
+Spielplanpfad unverändert.
 
-Diese Abfragen **lesen nur** und dürfen vor dem Apply gegen Produktion laufen,
-um den Ausgangszustand zu bestätigen (erwartet: alles „nicht vorhanden"):
+## 3. Auswirkung der fünf Lock-Trigger
+
+Die Trigger auf `applications`, `tournament_external_teams`,
+`tournament_groups`, `tournament_group_members` und `tournament_matches`
+serialisieren relevante Änderungen über die Elternzeile in `tournaments`.
+
+Das schützt die atomare Sicht auf Teilnehmer, Gruppen, Begegnungen und Ergebnisse,
+kann aber gleichzeitige Bewerbungsannahmen, Teilnehmeränderungen, Live-Ergebnisse
+oder Spielplanersetzungen desselben Turniers kurz blockieren. Bewegungen zwischen
+zwei Turnieren sperren die beiden UUIDs sortiert. Transaktionen, die mehrere
+Turniere in gegensätzlicher Reihenfolge bearbeiten, können weiterhin von
+PostgreSQL mit `40P01` abgebrochen werden; der abgebrochene Vorgang darf nur in
+einer neuen Transaktion begrenzt wiederholt werden.
+
+Für die Migration gilt deshalb:
+
+1. Wartungsfenster ohne laufende Spiele, Ergebnispflege, Bewerbungsentscheidungen
+   oder Teilnehmer-Synchronisation wählen.
+2. Nur einen Migrations-Operator verwenden.
+3. Vorher aktive Langläufer und Locks read-only prüfen.
+4. Bei `55P03`/`40P01` nicht im selben unklaren Clientzustand fortfahren. Status
+   der Migrationshistorie neu lesen und erst danach entscheiden.
+
+## 4. Verpflichtende Read-only-Prüfung vor Freigabe
+
+Zuerst Projekt-ID und Remote-Migrationshistorie über den autorisierten
+Supabase-Zugang verifizieren. Die folgenden Abfragen liefern nur Metadaten oder
+Aggregatwerte und keine Teilnehmerdaten:
 
 ```sql
--- Spalten noch nicht vorhanden (erwartet: 0 Zeilen)
-SELECT column_name FROM information_schema.columns
-WHERE table_schema='public' AND table_name='tournaments'
-  AND column_name IN ('competition_format','league_matches_per_team','knockout_cutoff','restrict_same_club');
+SELECT version, name
+FROM supabase_migrations.schema_migrations
+ORDER BY version;
 
--- RPCs noch nicht vorhanden (erwartet: beide NULL)
-SELECT to_regprocedure('public.apply_champions_league_league_phase(uuid,timestamptz,integer,integer,boolean,boolean,jsonb)') AS apply_fn,
-       to_regprocedure('public.save_competition_configuration(uuid,timestamptz,text,integer,integer)') AS save_fn;
+SELECT
+  a.attname,
+  a.atttypid::regtype AS data_type,
+  a.attnotnull,
+  pg_get_expr(d.adbin, d.adrelid) AS column_default
+FROM pg_attribute a
+LEFT JOIN pg_attrdef d
+  ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+WHERE a.attrelid = 'public.tournaments'::regclass
+  AND a.attname IN (
+    'competition_format', 'league_matches_per_team',
+    'knockout_cutoff', 'restrict_same_club'
+  )
+  AND NOT a.attisdropped;
 
--- Round-Check noch ohne round-of-16 (erwartet: round-of-16 NICHT enthalten)
-SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='tournament_matches_round_check';
+SELECT
+  c.conrelid::regclass AS relation,
+  c.conname,
+  c.convalidated,
+  pg_get_constraintdef(c.oid) AS definition
+FROM pg_constraint c
+WHERE c.conrelid IN (
+  'public.tournaments'::regclass,
+  'public.tournament_matches'::regclass
+)
+AND c.conname IN (
+  'tournaments_competition_format_check',
+  'tournaments_league_matches_per_team_check',
+  'tournaments_knockout_cutoff_check',
+  'tournaments_competition_format_params_check',
+  'tournament_matches_round_check'
+)
+ORDER BY relation::text, c.conname;
+
+SELECT
+  p.oid::regprocedure AS function_signature,
+  p.prosecdef,
+  p.proconfig,
+  p.proacl
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN (
+    'save_competition_configuration',
+    'apply_champions_league_league_phase',
+    'apply_champions_league_league_phase_validated_core_v1',
+    'competition_config_lock_tournaments',
+    'competition_config_lock_application',
+    'competition_config_lock_external_team',
+    'competition_config_lock_group',
+    'competition_config_lock_group_member',
+    'competition_config_lock_match'
+  )
+ORDER BY function_signature::text;
+
+SELECT
+  tgrelid::regclass AS relation,
+  tgname,
+  pg_get_triggerdef(oid) AS definition
+FROM pg_trigger
+WHERE NOT tgisinternal
+  AND tgname LIKE 'competition_config_lock_%'
+ORDER BY relation::text, tgname;
+
+-- Nur Aggregatzahlen: bei Same-Club=true muss das Ergebnis 0 sein.
+WITH accepted AS (
+  SELECT a.tournament_id, a.id, a.club_id
+  FROM public.applications a
+  WHERE a.status = 'accepted'
+), canonical AS (
+  SELECT tournament_id, id, club_id FROM accepted
+  UNION ALL
+  SELECT e.tournament_id, e.id, e.club_id
+  FROM public.tournament_external_teams e
+  WHERE e.participation_status = 'confirmed'
+    AND e.external_active IS TRUE
+    AND NOT EXISTS (
+      SELECT 1 FROM accepted a
+      WHERE a.tournament_id = e.tournament_id
+        AND a.id = e.application_id
+    )
+)
+SELECT count(*) AS missing_club_identities
+FROM canonical c
+JOIN public.tournaments t ON t.id = c.tournament_id
+WHERE t.restrict_same_club IS TRUE
+  AND c.club_id IS NULL;
 ```
 
-## 4. Aktivierungsablauf (nach Freigabe)
+Zusätzlich RLS-Status, `pg_policies`, Tabellen-/Routine-Grants, aktuelle Locks,
+Tarif, letzten Backup-Zeitpunkt, Aufbewahrungsfenster und PITR-Status prüfen.
 
-1. **Backup:** Vollständiges Supabase-Backup/PITR-Punkt setzen und Zeitstempel notieren.
-2. **Snapshot:** DDL des aktuellen Zustands sichern (Abfragen aus §3 ausführen und Ergebnisse speichern).
-3. **Apply:** Die vier Migrationen in Reihenfolge anwenden (Supabase-Migrations-Pipeline des bestehenden Workflows). **Nicht** einzeln aus der Hand gegen Produktion ausführen.
-4. **Post-Verifikation (read-only):**
-   - Spalten & CHECKs vorhanden: `knockout_cutoff IN (4,8,16)`, Spalte `restrict_same_club` vorhanden.
-   - `tournament_matches_round_check` enthält `round-of-16`.
-   - Beide RPCs vorhanden, `authenticated` darf `EXECUTE`, `anon`/`public` nicht.
-   - Stichprobe: ein bestehendes Bestandsturnier öffnet sich unverändert (öffentliche Seite + Admin), `competition_format` ist dort `NULL`.
-5. **Smoke-Test (ohne Produktionsdatenänderung an Bestandsturnieren):** Optional ein neues Testturnier anlegen, CL-Modus + Felder + Zeiten setzen, Spielplan generieren und übernehmen, Ergebnisse/Tabelle/K.-o. prüfen, danach das Testturnier wieder löschen.
+## 5. Freigegebener Aktivierungsablauf
 
-## 5. Rückfallstrategie (Rollback)
+1. Exakte Produktionsprojekt-ID bestätigen.
+2. Vorhandene Versionsnummern aus `schema_migrations` gegen die Tabelle in §1
+   abgleichen. Bereits registrierte Dateien nicht erneut ausführen.
+3. Wiederherstellbaren Backup-/PITR-Punkt und Zeitpunkt dokumentieren.
+4. Anwendungsschreibvorgänge für das Wartungsfenster organisatorisch stoppen.
+5. Supabase-CLI-Version pinnen; bei CLI v3 das Remote-Ziel ausdrücklich wählen.
+6. Alle noch fehlenden Dateien mit einem Operator in Zeitstempelreihenfolge über
+   den bestehenden Migrationsworkflow anwenden.
+7. Migrationshistorie, Spalten, Constraints, Trigger, Funktionssignaturen und ACLs
+   erneut read-only prüfen.
+8. Erst danach den Code-Commit bereitstellen. Ein Merge nach `main` löst im
+   bestehenden Vercel-Git-Workflow automatisch ein Production-Deployment aus und
+   darf daher nicht vor DB-Verifikation und ausdrücklicher Freigabe erfolgen.
+9. Öffentliches GET-Smoke-Testing durchführen; Admin-Schreibpfade ausschließlich
+   am ausdrücklich vorgesehenen Testturnier testen.
 
-Reihenfolge umgekehrt zur Anwendung. Da alles additiv/nullbar ist, ist der
-Rollback unkritisch, solange noch **kein** Turnier `competition-league` nutzt.
+## 6. Funktionsprüfung mit vorgesehenem Testturnier
+
+- Keine realen Kontakt- oder personenbezogenen Teilnehmerdaten verwenden.
+- 18 eindeutig zugeordnete Testmannschaften, Top 16, Same-Club aktiviert,
+  mehrere Vereine und mindestens ein Verein mit mehreren Teams.
+- Eine manuelle, eine MeinTurnierplan- und eine mit nicht akzeptierter Bewerbung
+  verknüpfte externe Mannschaft einbeziehen.
+- Vor Zuordnung einer Testmannschaft nachweisen, dass Vorschau und RPC mit
+  `MISSING_CLUB_IDENTITY` ohne Gruppen-/Match-/Konfigurationsänderung abbrechen.
+- Danach Ligaphase, berechnete Tabelle, Top-16-Qualifikation, Achtel-, Viertel-,
+  Halbfinale, Spiel um Platz 3 und Finale prüfen.
+- Ein bestehendes klassisches Gruppenturnier vorher/nachher ausschließlich lesen
+  und auf unveränderte Darstellung vergleichen.
+- Archivierung oder Löschung des Testturniers nur nach eigener Freigabe.
+
+## 7. Rückfallstrategie
+
+Bevorzugt zuerst den Anwendungscode auf den vorherigen Commit zurückrollen. Die
+nullable Spalten und zusätzlichen Sicherheitsprüfungen können in der Datenbank
+verbleiben; das ist risikoärmer als ein DDL-Rückbau.
+
+Ein vollständiger Datenbankrückbau ist nur zulässig, wenn:
 
 ```sql
--- 1. Round-of-16 zurücknehmen (Basis-Constraint wiederherstellen)
-ALTER TABLE public.tournament_matches DROP CONSTRAINT IF EXISTS tournament_matches_round_check;
-ALTER TABLE public.tournament_matches ADD CONSTRAINT tournament_matches_round_check
-  CHECK (round IS NULL OR round IN ('quarterfinal','semifinal','third-place','final','placement-5','placement-7'));
-
--- 2. Apply-RPC entfernen
-DROP FUNCTION IF EXISTS public.apply_champions_league_league_phase(uuid,timestamptz,integer,integer,boolean,boolean,jsonb);
-
--- 3. Save-RPC + Lock-Trigger entfernen (nur wenn gewünscht; Trigger sind für Bestandsformate harmlos)
---    (Trigger: competition_config_lock_application/_external_team/_group/_group_member/_match)
---    DROP TRIGGER … ON … ; DROP FUNCTION public.save_competition_configuration(…), public.competition_config_* ;
-
--- 4. Spalten entfernen (NUR wenn kein Turnier sie nutzt)
-ALTER TABLE public.tournaments
-  DROP COLUMN IF EXISTS restrict_same_club,
-  DROP COLUMN IF EXISTS knockout_cutoff,
-  DROP COLUMN IF EXISTS league_matches_per_team,
-  DROP COLUMN IF EXISTS competition_format;
+SELECT count(*)
+FROM public.tournaments
+WHERE competition_format = 'champions-league';
 ```
 
-**Wichtig:** Sobald ein Turnier aktiv `champions-league` nutzt, Rollback nur mit
-PITR auf den Backup-Punkt aus §4.1 (sonst Datenverlust für dieses Turnier). Vor
-jedem Spalten-Drop prüfen:
-`SELECT count(*) FROM public.tournaments WHERE competition_format='champions-league';`
-(muss 0 sein).
+exakt `0` liefert und keine `round-of-16`-Zeilen existieren. Danach – nur mit
+gesonderter SQL-Freigabe – in umgekehrter Reihenfolge:
 
-## 6. Rückfall auf Codeebene
+1. Öffentlichen Apply-Wrapper entfernen und privaten Core wieder auf den alten
+   Namen zurückbenennen; ACL anschließend explizit neu setzen.
+2. Nur bei notwendigem exakten Rückbau die zwei Teilnehmer-Trigger ohne
+   `club_id` neu anlegen. Die übrige ACL-Härtung kann bestehen bleiben.
+3. `tournament_matches_round_check` nur ohne vorhandene `round-of-16`-Zeilen auf
+   die alte Definition zurücksetzen.
+4. Save-/Apply-Funktionen und fünf Trigger nur entfernen, wenn kein Deployment sie
+   mehr aufruft.
+5. Die vier Spalten zuletzt und nur bei nachgewiesener Nichtnutzung entfernen.
 
-Der CL-Code degradiert fail-closed: fehlen die Spalten/RPCs, liefert
-`readStoredLeagueScheduleConfig` den Status `missing_column`, die öffentliche
-Seite zeigt den Legacy-Modus, und der Admin meldet, dass die SQL-Migration noch
-aussteht. Ein Revert des Feature-Branches ist jederzeit ohne DB-Abhängigkeit
-möglich.
+PITR ist der Disaster-Recovery-Pfad, nicht der normale Funktionsrollback: Eine
+Wiederherstellung erzeugt Ausfallzeit und setzt auch unabhängige produktive
+Schreibvorgänge zurück. Vor einem Rückfall Migrationshistorie und Datenzustand
+erneut lesen; nie blind dieselbe fehlgeschlagene Migration wiederholen.

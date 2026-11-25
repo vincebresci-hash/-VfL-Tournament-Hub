@@ -146,13 +146,82 @@ BEGIN
   THEN
     RAISE EXCEPTION 'FAIL RPC installation: lock helper is executable';
   END IF;
-  IF NOT has_function_privilege('anon', 'public.competition_config_lock_match()', 'EXECUTE')
-    OR NOT has_function_privilege('authenticated', 'public.competition_config_lock_application()', 'EXECUTE')
-    OR NOT has_function_privilege('service_role', 'public.competition_config_lock_group()', 'EXECUTE')
+  IF has_function_privilege('anon', 'public.competition_config_lock_match()', 'EXECUTE')
+    OR has_function_privilege('authenticated', 'public.competition_config_lock_application()', 'EXECUTE')
+    OR has_function_privilege('service_role', 'public.competition_config_lock_group()', 'EXECUTE')
   THEN
-    RAISE EXCEPTION 'FAIL RPC installation: trigger EXECUTE grant missing';
+    RAISE EXCEPTION 'FAIL RPC installation: trigger functions remain directly executable';
   END IF;
-  PERFORM public.test_pass('RPC installation and grants', 'authenticated only; lock helper revoked');
+  PERFORM public.test_pass(
+    'RPC installation and grants',
+    'save authenticated-only; lock and trigger helpers have no direct grants'
+  );
+END
+$$;
+
+DO $$
+DECLARE
+  v_columns integer;
+  v_constraints integer;
+  v_application_trigger text;
+  v_external_trigger text;
+BEGIN
+  SELECT count(*)::integer
+  INTO v_columns
+  FROM pg_attribute a
+  LEFT JOIN pg_attrdef d
+    ON d.adrelid = a.attrelid
+   AND d.adnum = a.attnum
+  WHERE a.attrelid = 'public.tournaments'::regclass
+    AND NOT a.attisdropped
+    AND NOT a.attnotnull
+    AND d.oid IS NULL
+    AND (
+      (a.attname = 'competition_format' AND a.atttypid = 'text'::regtype)
+      OR (a.attname IN ('league_matches_per_team', 'knockout_cutoff') AND a.atttypid = 'integer'::regtype)
+      OR (a.attname = 'restrict_same_club' AND a.atttypid = 'boolean'::regtype)
+    );
+  IF v_columns <> 4 THEN
+    RAISE EXCEPTION 'FAIL hardened column contract: expected 4 exact nullable/no-default columns, got %', v_columns;
+  END IF;
+
+  SELECT count(*)::integer
+  INTO v_constraints
+  FROM pg_constraint
+  WHERE conrelid = 'public.tournaments'::regclass
+    AND contype = 'c'
+    AND conname IN (
+      'tournaments_competition_format_check',
+      'tournaments_league_matches_per_team_check',
+      'tournaments_knockout_cutoff_check',
+      'tournaments_competition_format_params_check'
+    );
+  IF v_constraints <> 4 THEN
+    RAISE EXCEPTION 'FAIL table-qualified CL constraints: expected 4, got %', v_constraints;
+  END IF;
+
+  SELECT pg_get_triggerdef(oid)
+  INTO v_application_trigger
+  FROM pg_trigger
+  WHERE tgrelid = 'public.applications'::regclass
+    AND tgname = 'competition_config_lock_application'
+    AND NOT tgisinternal;
+  SELECT pg_get_triggerdef(oid)
+  INTO v_external_trigger
+  FROM pg_trigger
+  WHERE tgrelid = 'public.tournament_external_teams'::regclass
+    AND tgname = 'competition_config_lock_external_team'
+    AND NOT tgisinternal;
+  IF position('club_id' IN COALESCE(v_application_trigger, '')) = 0
+    OR position('club_id' IN COALESCE(v_external_trigger, '')) = 0
+  THEN
+    RAISE EXCEPTION 'FAIL club identity changes are not serialized by the participant lock triggers';
+  END IF;
+
+  PERFORM public.test_pass(
+    'Schema and participant-lock hardening',
+    'exact column shapes; constraints bound to public.tournaments; club_id changes lock the parent tournament'
+  );
 END
 $$;
 

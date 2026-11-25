@@ -52,32 +52,206 @@ $$;
 DO $$
 DECLARE
   v_fn text := 'public.apply_champions_league_league_phase(uuid,timestamptz,integer,integer,boolean,boolean,jsonb)';
+  v_core text := 'public.apply_champions_league_league_phase_validated_core_v1(uuid,timestamptz,integer,integer,boolean,boolean,jsonb)';
   v_save text := 'public.save_competition_configuration(uuid,timestamptz,text,integer,integer)';
   v_def text;
+  v_core_def text;
 BEGIN
-  IF to_regprocedure(v_fn) IS NULL THEN
-    RAISE EXCEPTION 'FAIL league apply RPC missing';
+  IF to_regprocedure(v_fn) IS NULL OR to_regprocedure(v_core) IS NULL THEN
+    RAISE EXCEPTION 'FAIL league apply RPC or private core missing';
   END IF;
   v_def := pg_get_functiondef(v_fn::regprocedure);
-  IF position('IN (4, 8, 16)' IN v_def) = 0 THEN
+  v_core_def := pg_get_functiondef(v_core::regprocedure);
+  IF position('IN (4, 8, 16)' IN v_core_def) = 0 THEN
     RAISE EXCEPTION 'FAIL league apply does not accept the top 16 cutoff';
   END IF;
-  IF position('SAME_CLUB_VIOLATION' IN v_def) = 0 THEN
+  IF position('MISSING_CLUB_IDENTITY' IN v_def) = 0
+    OR position('SAME_CLUB_VIOLATION' IN v_def) = 0
+  THEN
     RAISE EXCEPTION 'FAIL league apply does not enforce the same-club exclusion';
   END IF;
-  IF position('restrict_same_club' IN v_def) = 0 THEN
+  IF position('restrict_same_club' IN v_core_def) = 0 THEN
     RAISE EXCEPTION 'FAIL league apply does not persist restrict_same_club';
   END IF;
   IF NOT has_function_privilege('authenticated', v_fn, 'EXECUTE')
     OR has_function_privilege('anon', v_fn, 'EXECUTE')
+    OR has_function_privilege('service_role', v_fn, 'EXECUTE')
     OR has_function_privilege('public', v_fn, 'EXECUTE')
   THEN
     RAISE EXCEPTION 'FAIL league apply grants';
+  END IF;
+  IF has_function_privilege('authenticated', v_core, 'EXECUTE')
+    OR has_function_privilege('anon', v_core, 'EXECUTE')
+    OR has_function_privilege('service_role', v_core, 'EXECUTE')
+    OR has_function_privilege('public', v_core, 'EXECUTE')
+  THEN
+    RAISE EXCEPTION 'FAIL private league core grants';
   END IF;
   IF position('CHAMPIONS_LEAGUE_SAVE_NOT_ACTIVATED' IN pg_get_functiondef(v_save::regprocedure)) = 0 THEN
     RAISE EXCEPTION 'FAIL column-only champions league save gate was removed';
   END IF;
   PERFORM public.test_pass_league('RPC grants and save gate', 'apply is authenticated-only and the column save still rejects champions league');
+END
+$$;
+
+-- Same-club mode must fail before the private core can create or replace any
+-- schedule object. Each canonical participant source is covered explicitly.
+DO $$
+DECLARE
+  v_manager uuid := '11111111-1111-4111-8111-111111111111';
+  v_id uuid;
+  v_linked_application uuid;
+  v_ts timestamptz;
+  v_result jsonb;
+BEGIN
+  v_id := public.test_new_tournament('contract-club-missing-guest-application');
+  INSERT INTO public.applications (tournament_id, status, club_id)
+  VALUES (v_id, 'accepted', NULL);
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, '[]'::jsonb, true);
+  IF v_result->>'code' IS DISTINCT FROM 'MISSING_CLUB_IDENTITY'
+    OR EXISTS (SELECT 1 FROM public.tournament_groups WHERE tournament_id = v_id)
+    OR EXISTS (SELECT 1 FROM public.tournament_matches WHERE tournament_id = v_id)
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'FAIL missing guest-application club identity: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league(
+    'Missing guest-application club identity',
+    'MISSING_CLUB_IDENTITY and no partial group, match or configuration write'
+  );
+
+  v_id := public.test_new_tournament('contract-club-missing-manual');
+  INSERT INTO public.tournament_external_teams (
+    tournament_id, external_source, external_id, name,
+    participation_status, external_active, club_id
+  ) VALUES (
+    v_id, 'manual', 'manual-missing-club', 'Manual without club',
+    'confirmed', true, NULL
+  );
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, '[]'::jsonb, true);
+  IF v_result->>'code' IS DISTINCT FROM 'MISSING_CLUB_IDENTITY'
+    OR EXISTS (SELECT 1 FROM public.tournament_groups WHERE tournament_id = v_id)
+    OR EXISTS (SELECT 1 FROM public.tournament_matches WHERE tournament_id = v_id)
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'FAIL missing manual club identity: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league(
+    'Missing manual-team club identity',
+    'MISSING_CLUB_IDENTITY and no partial write'
+  );
+
+  v_id := public.test_new_tournament('contract-club-missing-mtp');
+  INSERT INTO public.tournament_external_teams (
+    tournament_id, external_source, external_id, name,
+    participation_status, external_active, club_id
+  ) VALUES (
+    v_id, 'mein-turnierplan', 'mtp-missing-club', 'MTP without club',
+    'confirmed', true, NULL
+  );
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, '[]'::jsonb, true);
+  IF v_result->>'code' IS DISTINCT FROM 'MISSING_CLUB_IDENTITY'
+    OR EXISTS (SELECT 1 FROM public.tournament_groups WHERE tournament_id = v_id)
+    OR EXISTS (SELECT 1 FROM public.tournament_matches WHERE tournament_id = v_id)
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'FAIL missing MTP club identity: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league(
+    'Missing MeinTurnierplan club identity',
+    'MISSING_CLUB_IDENTITY and no partial write'
+  );
+
+  v_id := public.test_new_tournament('contract-club-missing-linked-pending');
+  INSERT INTO public.applications (tournament_id, status, club_id)
+  VALUES (v_id, 'new', NULL)
+  RETURNING id INTO v_linked_application;
+  INSERT INTO public.tournament_external_teams (
+    tournament_id, external_source, external_id, name, application_id,
+    participation_status, external_active, club_id
+  ) VALUES (
+    v_id, 'mein-turnierplan', 'linked-pending-missing-club', 'Linked pending without club',
+    v_linked_application, 'confirmed', true, NULL
+  );
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, '[]'::jsonb, true);
+  IF v_result->>'code' IS DISTINCT FROM 'MISSING_CLUB_IDENTITY'
+    OR EXISTS (SELECT 1 FROM public.tournament_groups WHERE tournament_id = v_id)
+    OR EXISTS (SELECT 1 FROM public.tournament_matches WHERE tournament_id = v_id)
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'FAIL linked non-accepted application club identity: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league(
+    'Linked non-accepted application club identity',
+    'external participant remains canonical, fails closed and writes nothing'
+  );
+END
+$$;
+
+DO $$
+DECLARE
+  v_manager uuid := '11111111-1111-4111-8111-111111111111';
+  v_id uuid := public.test_new_tournament('contract-club-registered-violation');
+  v_club_same uuid;
+  v_club_three uuid;
+  v_club_four uuid;
+  v_apps uuid[] := ARRAY[]::uuid[];
+  v_app uuid;
+  v_field uuid;
+  v_ts timestamptz;
+  v_rows jsonb;
+  v_result jsonb;
+BEGIN
+  INSERT INTO public.clubs (name) VALUES ('Contract same club') RETURNING id INTO v_club_same;
+  INSERT INTO public.clubs (name) VALUES ('Contract club three') RETURNING id INTO v_club_three;
+  INSERT INTO public.clubs (name) VALUES ('Contract club four') RETURNING id INTO v_club_four;
+
+  INSERT INTO public.applications (tournament_id, status, club_id)
+  VALUES (v_id, 'accepted', v_club_same) RETURNING id INTO v_app;
+  v_apps := array_append(v_apps, v_app);
+  INSERT INTO public.applications (tournament_id, status, club_id)
+  VALUES (v_id, 'accepted', v_club_same) RETURNING id INTO v_app;
+  v_apps := array_append(v_apps, v_app);
+  INSERT INTO public.applications (tournament_id, status, club_id)
+  VALUES (v_id, 'accepted', v_club_three) RETURNING id INTO v_app;
+  v_apps := array_append(v_apps, v_app);
+  INSERT INTO public.applications (tournament_id, status, club_id)
+  VALUES (v_id, 'accepted', v_club_four) RETURNING id INTO v_app;
+  v_apps := array_append(v_apps, v_app);
+  INSERT INTO public.tournament_fields (tournament_id, name)
+  VALUES (v_id, 'Platz 1') RETURNING id INTO v_field;
+
+  v_rows := jsonb_build_array(
+    jsonb_build_object(
+      'homeApplicationId', v_apps[1], 'homeExternalTeamId', NULL,
+      'awayApplicationId', v_apps[2], 'awayExternalTeamId', NULL,
+      'fieldId', v_field, 'scheduledAt', '2026-11-25T09:00:00+01',
+      'durationMinutes', 12, 'sortOrder', 0
+    ),
+    jsonb_build_object(
+      'homeApplicationId', v_apps[3], 'homeExternalTeamId', NULL,
+      'awayApplicationId', v_apps[4], 'awayExternalTeamId', NULL,
+      'fieldId', v_field, 'scheduledAt', '2026-11-25T09:20:00+01',
+      'durationMinutes', 12, 'sortOrder', 1
+    )
+  );
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, v_rows, true);
+  IF v_result->>'code' IS DISTINCT FROM 'SAME_CLUB_VIOLATION'
+    OR EXISTS (SELECT 1 FROM public.tournament_groups WHERE tournament_id = v_id)
+    OR EXISTS (SELECT 1 FROM public.tournament_matches WHERE tournament_id = v_id)
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'FAIL registered same-club violation: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league(
+    'Registered-club same-club violation',
+    'SAME_CLUB_VIOLATION is authoritative and leaves no partial schedule'
+  );
 END
 $$;
 

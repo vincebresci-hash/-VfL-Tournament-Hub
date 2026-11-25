@@ -181,6 +181,11 @@ export function TournamentScheduleBoard({
   const sameClubUnverifiedCount = restrictSameClub
     ? leagueParticipantIds.filter((id) => !clubByParticipantId[id]).length
     : 0;
+  const sameClubUnverifiedNames = restrictSameClub
+    ? leagueParticipantIds
+        .filter((id) => !clubByParticipantId[id])
+        .map((id) => teamLabels[id] ?? "Unbenanntes Team")
+    : [];
   const leagueDescription = describeChampionsLeagueConfig({
     participantIds: leagueParticipantIds,
     matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
@@ -188,7 +193,11 @@ export function TournamentScheduleBoard({
   });
   const scheduleEditingEnabledNow = scheduleEditingEnabled(competitionMode, savedMode);
   const generateAllowed = scheduleEditingEnabledNow && competitionMode !== "champions-league";
-  const previewAllowed = competitionMode === "champions-league" || scheduleEditingEnabledNow;
+  const sameClubIdentityBlocked =
+    competitionMode === "champions-league" && restrictSameClub && sameClubUnverifiedCount > 0;
+  const previewAllowed =
+    (competitionMode === "champions-league" || scheduleEditingEnabledNow) &&
+    !sameClubIdentityBlocked;
   const championsLeagueApplyAllowed =
     competitionMode === "champions-league" &&
     ((storedFormat == null && groups.length === 0 && groupMatches.length === 0) ||
@@ -347,6 +356,15 @@ export function TournamentScheduleBoard({
       setPreviewOpen(true);
       return;
     }
+    if (sameClubIdentityBlocked) {
+      setPreview(null);
+      setPreviewPolicy(null);
+      setPreviewError(
+        "Die Vorschau ist gesperrt: Bitte ordne zuerst jeder bestätigten Mannschaft einen Verein zu.",
+      );
+      setPreviewOpen(true);
+      return;
+    }
     const nextPreview = buildChampionsLeagueAdminPreview({
       participants,
       matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
@@ -402,6 +420,14 @@ export function TournamentScheduleBoard({
       return;
     }
     if (preview.mode === "champions-league" && !championsLeagueApplyAllowed) {
+      return;
+    }
+    if (preview.mode === "champions-league" && sameClubIdentityBlocked) {
+      const message =
+        "Die Übernahme ist gesperrt: Bitte ordne zuerst jeder bestätigten Mannschaft einen Verein zu.";
+      setPreviewApplyLocked(true);
+      setPreviewStatusMessage(message);
+      setError(message);
       return;
     }
     if (preview.mode !== "champions-league" && !scheduleEditingEnabled(competitionMode, savedMode)) {
@@ -726,6 +752,8 @@ export function TournamentScheduleBoard({
           knockoutCutoff={leagueCutoff}
           restrictSameClub={restrictSameClub}
           sameClubUnverifiedCount={sameClubUnverifiedCount}
+          sameClubUnverifiedNames={sameClubUnverifiedNames}
+          participantManagementHref={`/admin/turniere/${tournament.id}?bereich=teilnehmer#teilnehmer`}
           description={leagueDescription}
           onModeChange={selectCompetitionMode}
           onMatchesPerTeamChange={(value) => {
@@ -745,6 +773,7 @@ export function TournamentScheduleBoard({
           <button
             type="button"
             disabled={pending || previewLoading || !previewAllowed}
+            aria-describedby={sameClubIdentityBlocked ? "same-club-identity-block" : undefined}
             onClick={() => void handlePreview()}
             className={adminPrimaryButtonClass}
             aria-busy={previewLoading}

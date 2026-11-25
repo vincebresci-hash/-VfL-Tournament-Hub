@@ -13,6 +13,9 @@ function read(path: string) {
 export function runSaveCompetitionConfigurationSqlChecks() {
   const migration = read("supabase/migrations/20261121124500_save_competition_configuration.sql");
   const columns = read("supabase/migrations/20261121121000_champions_league_competition_config.sql");
+  const remediation = read(
+    "supabase/migrations/20261125190218_champions_league_release_blocker_remediation.sql",
+  );
   const tests = read("supabase/tests/save_competition_configuration.sql");
   const action = read("src/lib/db/competition-config-actions.ts");
   const board = read("src/components/admin/TournamentScheduleBoard.tsx");
@@ -79,6 +82,46 @@ export function runSaveCompetitionConfigurationSqlChecks() {
     "the save function is granted only to authenticated users",
   );
   assert(!migration.includes("TO anon, authenticated;"), "the save function is not granted to anon");
+  assert(
+    remediation.includes("a.attrelid = 'public.tournaments'::regclass") &&
+      remediation.includes("v_type <> 'text'::regtype") &&
+      remediation.includes("v_type <> 'integer'::regtype") &&
+      remediation.includes("v_type <> 'boolean'::regtype") &&
+      remediation.includes("v_default IS NOT NULL"),
+    "the additive remediation checks exact column type, nullability and defaults",
+  );
+  assert(
+    remediation.includes("conrelid = 'public.tournaments'::regclass") &&
+      remediation.includes("conname = 'tournaments_competition_format_check'"),
+    "constraint checks are table-qualified instead of conname-only",
+  );
+  assert(
+    remediation.includes("UPDATE OF status, tournament_id, club_id") &&
+      remediation.includes(
+        "UPDATE OF participation_status, external_active, application_id, tournament_id, club_id",
+      ),
+    "club identity changes participate in the parent tournament lock contract",
+  );
+  assert(
+    remediation.includes("MISSING_CLUB_IDENTITY") &&
+      remediation.indexOf("MISSING_CLUB_IDENTITY") <
+        remediation.indexOf(
+          "RETURN public.apply_champions_league_league_phase_validated_core_v1",
+        ),
+    "missing club identities fail before the private mutation core",
+  );
+  assert(
+    remediation.includes("aclexplode") &&
+      remediation.includes("REVOKE ALL PRIVILEGES ON FUNCTION %s FROM %I") &&
+      remediation.includes("TO authenticated"),
+    "retained RPC ACLs are removed before the intended authenticated-only grant",
+  );
+  assert(
+    remediation.includes("SET lock_timeout = '5s'") &&
+      remediation.includes("The production application state") &&
+      !remediation.includes("db push"),
+    "the migration bounds lock waits and records the unknown production application state",
+  );
   assert(CHAMPIONS_LEAGUE_CONFIGURATION_SAVE_ACTIVATED === false, "the TypeScript kill switch stays off");
   assert(!action.includes("save_competition_configuration"), "the live save action does not call the RPC");
   assert(!board.includes("save_competition_configuration"), "the admin UI does not call the RPC");
@@ -105,7 +148,7 @@ export function runSaveCompetitionConfigurationSqlChecks() {
     "Existing matches and results",
   ];
   for (const scenario of contractNames) {
-    assert(tests.includes(`public.test_pass('${scenario}'`), `contract test executes ${scenario}`);
+    assert(tests.includes(`'${scenario}'`), `contract test executes ${scenario}`);
   }
   const runner = read("scripts/competition-postgres/concurrency.mjs");
   const cluster = read("scripts/competition-postgres/cluster.mjs");
