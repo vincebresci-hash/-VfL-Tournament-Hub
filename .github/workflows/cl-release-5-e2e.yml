@@ -11,7 +11,13 @@
 name: CL Release 5 E2E (manual)
 
 on:
+  # Manually dispatchable once the workflow reaches the default branch.
   workflow_dispatch:
+  # Until then, a push to the release branch runs it (the file is read from the
+  # pushed ref, so no default-branch registration is required).
+  push:
+    branches:
+      - fix/cl-release-5-admin-schedule
 
 concurrency:
   group: cl5-e2e-${{ github.ref }}
