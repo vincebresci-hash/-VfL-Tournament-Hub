@@ -1,5 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const parsedBaseUrl = new URL(baseURL);
+if (
+  parsedBaseUrl.protocol !== "http:" ||
+  !["localhost", "127.0.0.1"].includes(parsedBaseUrl.hostname) ||
+  parsedBaseUrl.port !== "3000"
+) {
+  throw new Error(`CL Release 5 E2E refuses non-local base URL: ${baseURL}`);
+}
+
 /**
  * CL Release 5 admin schedule E2E. LOCAL ONLY.
  *
@@ -14,8 +24,9 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
   outputDir: "test-results",
+  expect: { timeout: 10_000 },
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
+    baseURL,
     screenshot: "on",
     trace: "retain-on-failure",
   },

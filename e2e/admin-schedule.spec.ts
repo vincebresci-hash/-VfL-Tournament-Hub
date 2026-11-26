@@ -31,7 +31,9 @@ async function login(page: Page) {
 
 async function openSchedule(page: Page, slug: string) {
   await page.goto(`/admin/turniere/${slug}/spielplan`);
-  await expect(page.getByText("Spielparameter")).toBeVisible({ timeout: 15_000 });
+  // "Spielparameter" appears as the card title and inside the intro copy; anchor
+  // on the competition-mode control, which is unique to the loaded board.
+  await expect(page.getByLabel("Wettbewerbsmodus")).toBeVisible({ timeout: 15_000 });
 }
 
 test.beforeEach(async ({ page }) => {
@@ -55,7 +57,7 @@ test("scenario B: 20 of 20 league matches can be applied", async ({ page }, info
   await page.getByLabel("Spiele pro Team").fill("4");
   await page.getByRole("button", { name: /Vorschau erstellen|Vorschau aktualisieren/i }).click();
 
-  const panel = page.getByText("Ligaphase (bearbeitbar)");
+  const panel = page.getByText("Ligaphase (bearbeitbar)").first();
   await expect(panel).toBeVisible();
   await expect(page.getByText(/20\s*\/\s*20 Ligabegegnungen/)).toBeVisible();
   await shot(page, info, "preview-20-of-20");
@@ -73,7 +75,7 @@ test("scenario B: 20 of 20 league matches can be applied", async ({ page }, info
 
   // Persistence after reload.
   await page.reload();
-  await expect(page.getByText("Spielparameter")).toBeVisible();
+  await expect(page.getByLabel("Wettbewerbsmodus")).toBeVisible({ timeout: 15_000 });
   await shot(page, info, "after-reload");
 });
 
@@ -94,7 +96,7 @@ test("editable preview blocks a field double-booking and allows a valid reorder"
 test("missing club assignments can be set inline", async ({ page }, info) => {
   await openSchedule(page, SLUG_B);
   await page.getByLabel("Wettbewerbsmodus").selectOption("champions-league");
-  const clubCard = page.getByText("Vereinszuordnung");
+  const clubCard = page.getByText("Vereinszuordnung", { exact: true }).first();
   if (await clubCard.isVisible().catch(() => false)) {
     await shot(page, info, "club-assignment");
     const firstSelect = page.getByLabel(/^Verein für /).first();
