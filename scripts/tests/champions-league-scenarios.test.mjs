@@ -114,6 +114,18 @@ function assertScheduleIntegrity(preview, teamCount, matchesPerTeam, minimumRest
   return { restWarnings };
 }
 
+test("CL Release 5: 10 teams, 4 games, 3 fields keep duration, changeover and rest", () => {
+  const preview = buildChampionsLeagueAdminPreview({
+    participants: participants(10),
+    matchesPerTeam: 4,
+    knockoutCutoff: 8,
+    fields: fields(3),
+    timing: timing({ matchDurationMinutes: 8, breakMinutes: 2, minimumRestMinutes: 2 }),
+  });
+  const { restWarnings } = assertScheduleIntegrity(preview, 10, 4, 2);
+  assert.equal(restWarnings, 0, "20/20 matches preserve the configured minimum rest");
+});
+
 test("VfL scenario: 18 teams, 8 league games, 3 fields, 9+1 min, Top 16", () => {
   const preview = buildChampionsLeagueAdminPreview({
     participants: participants(18),
@@ -124,6 +136,7 @@ test("VfL scenario: 18 teams, 8 league games, 3 fields, 9+1 min, Top 16", () => 
   });
   assert.equal(preview.mode, "champions-league");
   const { restWarnings } = assertScheduleIntegrity(preview, 18, 8, 10);
+  assert.equal(restWarnings, 0, "the timetable waits instead of violating minimum rest");
   assert.equal(preview.summary.expectedLeagueMatchCount, 72);
   console.log(`18x8 Top16: 72 league matches scheduled, restWarnings=${restWarnings}`);
 });
@@ -143,6 +156,7 @@ test("VfL scenario: 16 teams, 8 league games, 2 fields, 20 min rest and a lunch 
     }),
   });
   const { restWarnings } = assertScheduleIntegrity(preview, 16, 8, 20);
+  assert.equal(restWarnings, 0, "minimum rest remains strict with two fields and lunch");
   assert.equal(preview.summary.expectedLeagueMatchCount, 64);
   console.log(`16x8 Top8 (2 fields, 20min rest, lunch): 64 matches, restWarnings=${restWarnings}`);
 });

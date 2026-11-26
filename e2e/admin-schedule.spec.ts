@@ -109,13 +109,8 @@ test("Spielzeit, Wechselzeit und Mindestruhezeit bleiben nach Speicherung und Re
   await page.getByLabel("Spielzeit in Minuten").fill(String(MATCH_DURATION));
   await page.getByLabel("Pause zwischen Spielen").fill(String(CHANGEOVER));
   await page.getByLabel("Mindestruhezeit").fill(String(MINIMUM_REST));
-  const responsePromise = page.waitForResponse(
-    (item) => item.request().method() === "POST" && new URL(item.url()).pathname.includes(`/admin/turniere/${slug}/spielplan`),
-  );
   await page.getByRole("button", { name: "Einstellungen speichern" }).click();
-  const response = await responsePromise;
-  await response.finished();
-  await page.waitForLoadState("networkidle");
+  await expect(page.getByText("Die Spielplan-Einstellungen wurden gespeichert.")).toBeVisible();
 
   await page.reload();
   await expect(page.getByLabel("Wettbewerbsmodus")).toBeVisible();
