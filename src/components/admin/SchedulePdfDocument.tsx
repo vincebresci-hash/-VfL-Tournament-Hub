@@ -100,7 +100,11 @@ function ScheduleTable({ rows, showResult }: { rows: PdfMatchRow[]; showResult: 
             <td style={td}>{match.fieldName}</td>
             <td style={{ ...td, fontWeight: 600 }}>{match.homeName}</td>
             <td style={{ ...td, fontWeight: 600 }}>{match.awayName}</td>
-            {showResult ? <td style={td}>{match.result}</td> : null}
+            {showResult ? (
+              <td style={td} data-match-result={match.result}>
+                {match.result}
+              </td>
+            ) : null}
           </tr>
         ))}
       </tbody>

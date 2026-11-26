@@ -214,8 +214,7 @@ test("PDF-Ansicht und echte PDF-Datei werden aus dem gespeicherten CL-Spielplan 
   }
   const leagueHeading = page.getByRole("heading", { name: "Ligaphase – Spielplan", exact: true });
   await expect(leagueHeading).toBeVisible();
-  const leagueSection = leagueHeading.locator("..");
-  await expect(leagueSection.getByRole("table").locator("tbody tr")).toHaveCount(20);
+  await expect(page.locator("[data-match-key]")).toHaveCount(20);
   await shot(page, info, "pdf-view");
   mkdirSync("e2e/screenshots", { recursive: true });
   await page.pdf({

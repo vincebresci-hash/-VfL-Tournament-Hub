@@ -40,11 +40,7 @@ for (const scenario of SCENARIOS) {
       await expect(page.locator("[data-match-result]")).toHaveCount(0);
       await expect(page.getByText(/Gesamttabelle|Tabellen|K\.‑o\.-Runde/)).toHaveCount(0);
     } else {
-      if (scenario.fields === 1) {
-        await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toBeVisible();
-      } else {
-        await expect(page.locator("[data-match-result]")).toHaveCount(scenario.matches);
-      }
+      await expect(page.locator("[data-match-result]")).toHaveCount(scenario.matches);
       await expect(page.getByText(/Gesamttabelle|Tabellen/).first()).toBeVisible();
     }
     if (scenario.kind === "groups") {
@@ -152,7 +148,7 @@ test("public Champions League view exposes league schedule, standings and knocko
   await expect(page.getByText(/Gesamttabelle|Ligatabelle/).first()).toBeVisible();
   await page.getByRole("link", { name: "Spielplan", exact: true }).click();
   await expect(page.getByText(/Ligaphase|Spielplan/).first()).toBeVisible();
-  await page.getByRole("link", { name: /K\.-o\./ }).click();
+  await page.getByRole("link", { name: "KO-Runde", exact: true }).click();
   await expect(page.getByRole("heading", { name: "K.-o.-Baum" })).toBeVisible();
   await expect(page.getByText(/vollständigen Ligaphase|wird noch veröffentlicht/)).toBeVisible();
   await expect(page.locator("body")).not.toContainText("example.test");
