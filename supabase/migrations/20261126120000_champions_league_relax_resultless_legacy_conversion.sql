@@ -5,18 +5,34 @@
 -- FILE ONLY until a reviewed migration run. Do NOT execute against production
 -- from the agent. No production database change without separate approval.
 --
--- CREATE OR REPLACE of apply_champions_league_league_phase (identical 7-arg
--- signature). The ONLY behavioural changes versus 20261122180000 are:
---   1. The UNSAFE_LEGACY_CONVERSION guard is relaxed: a competition_format NULL
---      tournament with <= 1 group and NO results/live/knockout/completed state
---      may be converted to Champions League (still requires p_confirm_replace).
---   2. The pre-insert cleanup also clears resultless scheduled matches whose
---      phase is NULL (legacy rows), not only phase = 'group'.
--- All other validation (RBAC, optimistic concurrency, same-club, fixture
--- invariants, multi-group block, explicit legacy-format block) is byte-identical.
+-- The 2026-11-25 blocker remediation renamed the validation body to
+-- apply_champions_league_league_phase_validated_core_v1 and wrapped it with the
+-- same-club fail-safe + parent-row lock. This migration CREATE OR REPLACEs ONLY
+-- that private core, so the public wrapper, its grants and the same-club fail-safe
+-- are untouched. The private core keeps NO authenticated grant (revoked by the
+-- remediation ACL hardening); CREATE OR REPLACE preserves that.
+--
+-- Behavioural change versus the renamed core:
+--   1. UNSAFE_LEGACY_CONVERSION is relaxed: a competition_format NULL tournament
+--      with <= 1 group and NO results/live/knockout/completed state may be
+--      converted to Champions League (still requires p_confirm_replace).
+--   2. The pre-insert cleanup also clears resultless scheduled matches whose phase
+--      is NULL (legacy rows), not only phase = 'group'.
+-- Every other guard (RBAC, optimistic concurrency, multi-group block, explicit
+-- legacy-format block, fixture invariants) is byte-identical to the renamed core.
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION public.apply_champions_league_league_phase(
+DO $prereq$
+BEGIN
+  IF to_regprocedure(
+    'public.apply_champions_league_league_phase_validated_core_v1(uuid,timestamptz,integer,integer,boolean,boolean,jsonb)'
+  ) IS NULL THEN
+    RAISE EXCEPTION 'CL Release 5 prerequisite failed: validated core is missing (apply the 2026-11-25 remediation first)';
+  END IF;
+END
+$prereq$;
+
+CREATE OR REPLACE FUNCTION public.apply_champions_league_league_phase_validated_core_v1(
   p_tournament_id uuid,
   p_expected_updated_at timestamptz,
   p_league_matches_per_team integer,
@@ -743,9 +759,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, boolean, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, boolean, jsonb) TO authenticated;
-
-COMMENT ON FUNCTION public.apply_champions_league_league_phase(uuid, timestamptz, integer, integer, boolean, boolean, jsonb) IS
-  'Transactional Champions League league phase. One group, confirmed participants, validated fixtures. Supports top 4/8/16 and an optional same-club exclusion enforced from authoritative club ids. Does not lift the champions-league rejection inside save_competition_configuration.';
-
+COMMENT ON FUNCTION public.apply_champions_league_league_phase_validated_core_v1(
+  uuid, timestamptz, integer, integer, boolean, boolean, jsonb
+) IS
+  'Private implementation core. CL Release 5 relaxes the resultless legacy mode switch. Call only through apply_champions_league_league_phase.';

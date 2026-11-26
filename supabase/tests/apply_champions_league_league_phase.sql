@@ -451,6 +451,100 @@ BEGIN
 END
 $$;
 
+-- CL Release 5: a resultless legacy tournament (competition_format NULL) that
+-- already has ONE group schedule must be convertible to Champions League with
+-- the explicit replace confirmation. This is the reported "existing group
+-- tournament / 20 of 20 but blocked" case.
+SELECT set_config('app.test_id', public.test_new_tournament('contract-league-resultless-legacy-switch')::text, false);
+
+DO $$
+DECLARE
+  v_id uuid := current_setting('app.test_id')::uuid;
+  v_apps uuid[] := ARRAY[]::uuid[];
+  v_app uuid;
+  v_field uuid;
+  v_group uuid;
+  v_ts timestamptz;
+  v_result jsonb;
+  v_rows jsonb;
+  v_manager uuid := '11111111-1111-4111-8111-111111111111';
+  v_i integer;
+BEGIN
+  FOR v_i IN 1..4 LOOP
+    INSERT INTO public.applications (tournament_id, status, contact_email)
+    VALUES (v_id, 'accepted', 'league-test@example.invalid')
+    RETURNING id INTO v_app;
+    v_apps := array_append(v_apps, v_app);
+  END LOOP;
+  INSERT INTO public.tournament_fields (tournament_id, name) VALUES (v_id, 'Platz 1') RETURNING id INTO v_field;
+  INSERT INTO public.tournament_groups (tournament_id, name, sort_order) VALUES (v_id, 'Gruppe A', 0) RETURNING id INTO v_group;
+  INSERT INTO public.tournament_group_members (group_id, application_id) VALUES (v_group, v_apps[1]);
+  INSERT INTO public.tournament_group_members (group_id, application_id) VALUES (v_group, v_apps[2]);
+  INSERT INTO public.tournament_matches (
+    tournament_id, group_id, phase, status, home_application_id, away_application_id, field_id, scheduled_at, duration_minutes, sort_order
+  ) VALUES (
+    v_id, v_group, 'group', 'scheduled', v_apps[1], v_apps[2], v_field, '2026-11-22T09:00:00+01', 12, 0
+  );
+
+  v_rows := jsonb_build_array(
+    jsonb_build_object('homeApplicationId', v_apps[1], 'awayApplicationId', v_apps[2], 'fieldId', v_field, 'scheduledAt', '2026-11-22T09:00:00+01', 'durationMinutes', 12, 'sortOrder', 0),
+    jsonb_build_object('homeApplicationId', v_apps[3], 'awayApplicationId', v_apps[4], 'fieldId', v_field, 'scheduledAt', '2026-11-22T09:20:00+01', 'durationMinutes', 12, 'sortOrder', 1)
+  );
+
+  -- The existing resultless schedule forces a confirmation, never a hard block.
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, false, v_rows);
+  IF v_result->>'status' IS DISTINCT FROM 'confirmation_required' THEN
+    RAISE EXCEPTION 'FAIL resultless legacy switch should require confirmation: %', v_result;
+  END IF;
+
+  -- With confirmation the switch succeeds, reusing the single group as the league.
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, true, v_rows);
+  IF v_result->>'status' IS DISTINCT FROM 'success'
+    OR (v_result->>'groupId')::uuid IS DISTINCT FROM v_group
+    OR (SELECT count(*) FROM public.tournament_groups WHERE tournament_id = v_id) <> 1
+    OR (SELECT count(*) FROM public.tournament_group_members WHERE group_id = v_group) <> 4
+    OR (SELECT count(*) FROM public.tournament_matches WHERE tournament_id = v_id) <> 2
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS DISTINCT FROM 'champions-league'
+  THEN
+    RAISE EXCEPTION 'FAIL resultless legacy switch did not convert cleanly: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league('Resultless legacy single-group switch', 'converted to champions-league reusing the group');
+END
+$$;
+
+-- CL Release 5 guard: more than one group must still block the switch so the
+-- relaxation never silently collapses a real multi-group tournament.
+SELECT set_config('app.test_id', public.test_new_tournament('contract-league-multigroup-block')::text, false);
+
+DO $$
+DECLARE
+  v_id uuid := current_setting('app.test_id')::uuid;
+  v_field uuid;
+  v_ts timestamptz;
+  v_result jsonb;
+  v_manager uuid := '11111111-1111-4111-8111-111111111111';
+  v_i integer;
+BEGIN
+  FOR v_i IN 1..4 LOOP
+    INSERT INTO public.applications (tournament_id, status, contact_email) VALUES (v_id, 'accepted', 'league-test@example.invalid');
+  END LOOP;
+  INSERT INTO public.tournament_fields (tournament_id, name) VALUES (v_id, 'Platz 1') RETURNING id INTO v_field;
+  INSERT INTO public.tournament_groups (tournament_id, name, sort_order) VALUES (v_id, 'Gruppe A', 0);
+  INSERT INTO public.tournament_groups (tournament_id, name, sort_order) VALUES (v_id, 'Gruppe B', 1);
+  SELECT updated_at INTO v_ts FROM public.tournaments WHERE id = v_id;
+  v_result := public.test_apply_league(v_manager, v_id, v_ts, 1, 4, true, '[]'::jsonb);
+  IF v_result->>'code' IS DISTINCT FROM 'CHAMPIONS_LEAGUE_MULTIPLE_GROUPS'
+    OR (SELECT count(*) FROM public.tournament_groups WHERE tournament_id = v_id) <> 2
+    OR (SELECT competition_format FROM public.tournaments WHERE id = v_id) IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'FAIL multi-group switch must stay blocked: %', v_result;
+  END IF;
+  PERFORM public.test_pass_league('Multiple groups still block champions league', 'CHAMPIONS_LEAGUE_MULTIPLE_GROUPS');
+END
+$$;
+
 SELECT set_config('app.test_id', public.test_new_tournament('contract-league-uneven')::text, false);
 
 DO $$
