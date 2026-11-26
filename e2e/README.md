@@ -5,13 +5,43 @@ management. **Everything here runs against a throwaway LOCAL Supabase stack.**
 It never touches the hosted project `ogopebvpojuvheimzged` and needs no remote
 secrets.
 
-> Execution status in the delivering session: **not run.** Docker Desktop's
-> Linux engine would not start non-interactively in the delivery environment
-> (WSL2 present, `com.docker.backend` never came up), and no local PostgreSQL 17
-> was available, so `supabase start` could not provision the stack. The logic is
-> covered by the Node suites (`npm run test:cl-*`) and the PostgreSQL 17 contract
-> job in CI. Run the steps below on a machine with Docker to complete the
-> real-browser acceptance.
+> ## Execution status: real-browser E2E NOT run (environment blocker)
+>
+> The local stack could not be started in the delivery environment. Concrete,
+> reproduced errors (2026-11-26):
+>
+> - `npx supabase start` →
+>   `DockerLifecycleInspectError: failed to inspect container health: failed to
+>   connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine ...
+>   The system cannot find the file specified.`
+> - `docker info` / `docker ps` → same `dockerDesktopLinuxEngine` pipe error
+>   (CLI present, context `desktop-linux`, but no engine backend).
+> - Launching `Docker Desktop.exe` left only `wslservice` running;
+>   `com.docker.backend` never started.
+> - `docker desktop start` → `✗ Failed to start Docker Desktop / Docker Desktop
+>   terminated unexpectedly`.
+> - `wsl --status` → "WSL1 wird mit Ihrer aktuellen Computer-Konfiguration nicht
+>   unterstützt", i.e. the WSL2/virtualization backend Docker Desktop needs is not
+>   usable here.
+>
+> No local PostgreSQL 17 binaries are installed either, so the disposable-cluster
+> path could not substitute. **The production database was NOT used as a test
+> environment** (explicitly out of bounds).
+>
+> What IS verified instead: the Node suites (`npm run test:cl-*`, 45 cases) and
+> the **PostgreSQL 17 contract job in CI** (which runs the new migration and the
+> resultless-legacy-switch / multi-group-block assertions on a real PG17). The
+> real-browser click-through below is the remaining **open** acceptance step and
+> must be run on a Docker-capable machine.
+>
+> ### Safe manual acceptance path (no Docker, no prod DB)
+>
+> If no Docker host is available, verify on an **isolated non-production Supabase
+> project** that you own (a free throwaway project — never `ogopebvpojuvheimzged`):
+> point `.env.local` at it, `npx supabase db push` the migrations to THAT project,
+> create the synthetic tournaments via the admin UI, and walk the checklist in
+> §3 by hand, capturing screenshots. Delete the throwaway project afterwards.
+> This keeps the acceptance real and browser-based without touching production.
 
 ## 1. Bring up the local stack
 

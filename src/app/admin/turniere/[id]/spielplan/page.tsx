@@ -10,6 +10,7 @@ import { canManageSystem } from "@/lib/auth/roles";
 import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
+  listClubOptions,
 } from "@/lib/db/admin-queries";
 import { readConfirmedParticipantIdentities } from "@/lib/db/confirmed-participant-read";
 import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
@@ -64,12 +65,13 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
     notFound();
   }
 
-  const [stage, participants, lifecycle, leagueConfig, confirmed] = await Promise.all([
+  const [stage, participants, lifecycle, leagueConfig, confirmed, clubOptions] = await Promise.all([
     getAdminTournamentStage(tournament.id),
     getTournamentParticipants(tournament.id),
     getAdminLifecyclePanelModel(tournament.id),
     readStoredLeagueScheduleConfig(tournament.id),
     readConfirmedParticipantIdentities(tournament.id),
+    listClubOptions(),
   ]);
 
   return (
@@ -110,6 +112,7 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
             leagueConfig.status === "ok" ? leagueConfig.restrictSameClub : false
           }
           clubByParticipantId={confirmed.ok ? confirmed.clubByParticipantId : {}}
+          clubOptions={clubOptions}
         />
       )}
     </TournamentAdminChrome>

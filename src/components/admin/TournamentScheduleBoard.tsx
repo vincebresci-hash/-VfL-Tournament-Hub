@@ -10,7 +10,9 @@ import {
   adminSecondaryButtonClass,
 } from "@/components/admin/AdminPanel";
 import { ChampionsLeagueScheduleFields } from "@/components/admin/ChampionsLeagueScheduleFields";
+import { ClubAssignmentPanel, type ClubAssignmentEntry } from "@/components/admin/ClubAssignmentPanel";
 import { EditableLeaguePreviewPanel } from "@/components/admin/EditableLeaguePreviewPanel";
+import { suggestClubAssignments } from "@/lib/schedule/club-assignment-suggest";
 import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
 import {
   recomputeTimes,
@@ -131,6 +133,8 @@ type TournamentScheduleBoardProps = {
   storedRestrictSameClub?: boolean;
   /** Stable club identity per participant key (null = no shared club). */
   clubByParticipantId?: Record<string, string | null>;
+  /** Hub clubs available for inline assignment. */
+  clubOptions?: Array<{ id: string; name: string }>;
   confirmedRosterError?: string | null;
 };
 
@@ -148,6 +152,7 @@ export function TournamentScheduleBoard({
   storedKnockoutCutoff,
   storedRestrictSameClub = false,
   clubByParticipantId = {},
+  clubOptions = [],
   confirmedRosterError = null,
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
@@ -204,6 +209,30 @@ export function TournamentScheduleBoard({
     matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
     knockoutCutoff: leagueCutoff,
   });
+  // Inline club assignment: participants (by stable key) still missing a club,
+  // with a safe suggestion each. Only accepted-application participants carry an
+  // applicationId and can be assigned inline through the authorized action.
+  const participantApplicationIdByKey = new Map<string, string | null>();
+  for (const participant of participants) {
+    const key = participant.applicationId ?? participant.externalTeamId;
+    if (key) {
+      participantApplicationIdByKey.set(key, participant.applicationId);
+    }
+  }
+  const missingClubParticipantStates = leagueParticipantIds
+    .filter((id) => !clubByParticipantId[id])
+    .map((id) => ({ participantId: id, teamName: teamLabels[id] ?? "Unbenanntes Team", clubId: null }));
+  const clubSuggestionByParticipant = new Map(
+    suggestClubAssignments({ participants: missingClubParticipantStates, clubs: clubOptions }).map(
+      (suggestion) => [suggestion.participantId, suggestion],
+    ),
+  );
+  const clubAssignmentEntries: ClubAssignmentEntry[] = missingClubParticipantStates.map((state) => ({
+    participantId: state.participantId,
+    teamName: state.teamName,
+    applicationId: participantApplicationIdByKey.get(state.participantId) ?? null,
+    suggestion: clubSuggestionByParticipant.get(state.participantId) ?? null,
+  }));
   // Authoritative started/result protection, mirrored from the server policy.
   // Blocks only RESULTS_EXIST / LIVE / KO_STARTED / COMPLETED — never a mode
   // mismatch. A resultless existing schedule is replaceable with confirmation.
@@ -947,6 +976,16 @@ export function TournamentScheduleBoard({
           </p>
         ) : null}
       </AdminCard>
+
+      {competitionMode === "champions-league" && clubAssignmentEntries.length > 0 ? (
+        <ClubAssignmentPanel
+          tournamentId={tournament.id}
+          entries={clubAssignmentEntries}
+          clubs={clubOptions}
+          participantManagementHref={`/admin/turniere/${tournament.id}?bereich=teilnehmer#teilnehmer`}
+          disabled={pending}
+        />
+      ) : null}
 
       {previewOpen ? (
         previewError || !preview || !previewPolicy ? (
