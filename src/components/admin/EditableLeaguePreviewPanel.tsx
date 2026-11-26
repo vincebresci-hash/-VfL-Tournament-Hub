@@ -71,7 +71,7 @@ export function EditableLeaguePreviewPanel({
 
   return (
     <AdminCard title="Spielplan-Vorschau · Ligaphase (bearbeitbar)">
-      <div className="grid gap-5">
+      <div className="grid min-w-0 gap-5">
         <p className="text-[13px] leading-relaxed text-muted">
           Bearbeite die Ligaphase vor der Übernahme: Reihenfolge ändern,
           Anstoßzeit und Spielfeld anpassen oder die Zeiten neu berechnen lassen.
@@ -140,11 +140,11 @@ export function EditableLeaguePreviewPanel({
           </button>
         </div>
 
-        <section aria-labelledby="edit-table-heading">
+        <section aria-labelledby="edit-table-heading" className="min-w-0">
           <h3 id="edit-table-heading" className={adminSectionTitleClass}>
             Geplante Ligabegegnungen
           </h3>
-          <div className="mt-3 overflow-x-auto">
+          <div className="mt-3 max-w-full min-w-0 overflow-x-auto overscroll-x-contain">
             <table className="min-w-full border-collapse text-left text-[13px]">
               <thead>
                 <tr className="border-b border-line bg-surface/70 text-[11px] font-semibold tracking-[0.08em] text-muted uppercase">
