@@ -96,6 +96,12 @@ jobs:
       - name: Team display-name tests
         run: npm run test:team-names
 
+      - name: Champions League knockout-seeding tests
+        run: npm run test:cl-ko-seeding
+
+      - name: PDF layout tests
+        run: npm run test:pdf-layout
+
       - name: Production build
         run: npm run build
 
