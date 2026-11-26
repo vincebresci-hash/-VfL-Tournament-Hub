@@ -29,7 +29,9 @@ permissions:
 jobs:
   e2e:
     name: Isolated local Supabase browser acceptance
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest is now 26.04, which this Playwright's --with-deps does
+    # not recognise. 24.04 has Docker and is supported by Playwright 1.51.x.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       # Refuse remote Supabase CLI auth even if an org secret leaked into the job.
