@@ -35,6 +35,8 @@ jobs:
       # Refuse remote Supabase CLI auth even if an org secret leaked into the job.
       SUPABASE_ACCESS_TOKEN: ""
       SUPABASE_DB_PASSWORD: ""
+      # Required gate for the reused local-only migration applier.
+      INBOX_SQL_CI: "1"
       # Synthetic, non-production test credentials (local stack only).
       E2E_ADMIN_EMAIL: "cl5-admin@example.test"
       E2E_ADMIN_PASSWORD: "cl5-ReleaseFive-test"
