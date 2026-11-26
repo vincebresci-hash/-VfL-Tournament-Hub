@@ -49,3 +49,6 @@ e2e/screenshots/*.pdf
 # Local E2E scratch (artifact downloads)
 .tmp/
 .e2e-last-run
+
+# R6 generated PDFs (CI artifacts)
+e2e/pdf/

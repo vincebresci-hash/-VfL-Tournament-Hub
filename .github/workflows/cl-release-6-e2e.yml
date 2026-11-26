@@ -1,0 +1,127 @@
+# CL Release 6 — real-browser acceptance + REAL PDF rendering on an isolated runner.
+#
+# Runs the Playwright R5 regression suite AND the R6 PDF-render suite against a
+# DISPOSABLE LOCAL Supabase stack (Docker on the GitHub-hosted runner) seeded with
+# synthetic data. Renders real A4 PDFs for the three reference layouts and uploads
+# them with desktop/mobile screenshots. Never links a remote project, never uses
+# production secrets, never touches the production database or real tournaments.
+
+name: CL Release 6 E2E (manual)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/cl-release-6-admin-workflow-pdf
+
+concurrency:
+  group: cl6-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Isolated local Supabase browser + PDF acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+      INBOX_SQL_CI: "1"
+      E2E_ADMIN_EMAIL: "cl6-admin@example.test"
+      E2E_ADMIN_PASSWORD: "cl6-ReleaseSix-test"
+      E2E_SLUG_B: "cl6-scenario-b"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security preflight (no remote / no production secrets)
+        run: |
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then echo "SUPABASE_ACCESS_TOKEN must be empty" >&2; exit 1; fi
+          if [[ -n "${DATABASE_URL:-}" ]]; then echo "DATABASE_URL must not be set" >&2; exit 1; fi
+          if grep -R -n -E 'https?://[^[:space:]]*\.supabase\.co|db\.[^[:space:]]+\.supabase\.co' e2e scripts/ci; then
+            echo "Production Supabase host references are forbidden" >&2; exit 1
+          fi
+          test "$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml | head -n1)" = "vfl-tournament-hub-local"
+          test "$(sed -n 's/^major_version = \([0-9]*\)/\1/p' supabase/config.toml | head -n1)" = "17"
+          test ! -f supabase/.temp/project-ref
+          docker info >/dev/null
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Disable CLI auto migration apply (runner config only)
+        run: node scripts/ci/inbox-sql/disable-auto-migrations.mjs
+
+      - name: Start local Supabase (no project migrations)
+        run: supabase start
+
+      - name: Verify LOCAL endpoints and PostgreSQL 17 before first application write
+        run: node e2e/verify-local-environment.mjs
+
+      - name: Apply migrations (CI-only enum/function-return compat)
+        run: node scripts/ci/inbox-sql/apply-migrations.mjs
+
+      - name: Seed synthetic admin + scenario B (local service role)
+        run: node e2e/seed/ci-seed.mjs
+
+      - name: Seed synthetic PDF scenarios (local service role)
+        run: node e2e/seed/ci-seed-r6-pdf.mjs
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app and wait for readiness
+        run: |
+          set -euo pipefail
+          (npm run start > .next-start.log 2>&1 &)
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/admin/login >/dev/null; then echo "app up"; exit 0; fi
+            sleep 2
+          done
+          echo "app did not start in time" >&2; cat .next-start.log >&2; exit 1
+
+      - name: Install Playwright (Chromium)
+        run: |
+          npm i --no-save @playwright/test@1.51.1
+          npx playwright install --with-deps chromium
+
+      - name: Prepare artifact directories
+        run: mkdir -p e2e/pdf e2e/screenshots
+
+      - name: Render Release 6 PDFs + screenshots (desktop + mobile)
+        run: npx playwright test --config e2e/playwright.config.ts release6-pdf
+
+      - name: Upload PDFs + screenshots + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cl6-e2e-artifacts
+          path: |
+            e2e/pdf/
+            e2e/screenshots/
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase (destroy data)
+        if: always()
+        run: supabase stop --no-backup
