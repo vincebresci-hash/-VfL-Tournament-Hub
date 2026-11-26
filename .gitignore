@@ -48,3 +48,4 @@ e2e/screenshots/*.pdf
 
 # Local E2E scratch (artifact downloads)
 .tmp/
+.e2e-last-run
