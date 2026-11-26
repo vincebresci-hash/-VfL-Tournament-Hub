@@ -41,7 +41,7 @@ for (const { slug, label } of SCENARIOS) {
 
   test(`draft PDF is marked ENTWURF for ${label}`, async ({ page }, info) => {
     await page.goto(`/admin/turniere/${slug}/spielplan/pdf?quelle=entwurf`);
-    await expect(page.getByText("ENTWURF")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("ENTWURF", { exact: true })).toBeVisible({ timeout: 15_000 });
     if (info.project.name === "desktop-chromium" && typeof page.pdf === "function") {
       await page.pdf({ path: `e2e/pdf/${label}-entwurf.pdf`, format: "A4", printBackground: true });
     }
