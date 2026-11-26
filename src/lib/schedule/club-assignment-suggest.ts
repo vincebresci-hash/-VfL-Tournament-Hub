@@ -35,6 +35,17 @@ export type ClubSuggestion = {
 
 const TEAM_VARIANT_SUFFIX = /\s+(?:[0-9]{1,2}|i{1,3}|iv|v|vi{0,3}|[a-d]|u\s?\d{1,2}|[ivx]+)$/i;
 
+/**
+ * Generic German club-type prefixes. These must NEVER be the sole basis for a
+ * match (two unrelated "TSV …" clubs are not the same club). They are excluded
+ * from the distinctive-token overlap used for weak suggestions.
+ */
+const GENERIC_CLUB_TOKENS = new Set<string>([
+  "tsv", "vfl", "vfb", "vfr", "fc", "fsv", "sv", "sg", "sgm", "sgs", "tv", "fv",
+  "spvgg", "tsg", "djk", "ssv", "tus", "mtv", "sc", "bsc", "ksc", "svg", "tsf",
+  "vf", "fcb", "jsg", "sge", "rsv", "post", "fsg", "jfv", "tb",
+]);
+
 /** Lowercased, whitespace-collapsed, diacritics folded. */
 function normalize(value: string): string {
   return value
@@ -60,11 +71,12 @@ function clubBase(value: string): string {
   return base;
 }
 
+/** Distinctive tokens: length >= 3 and NOT a generic club-type prefix. */
 function significantTokens(value: string): Set<string> {
   return new Set(
     normalize(value)
       .split(" ")
-      .filter((token) => token.length >= 3),
+      .filter((token) => token.length >= 3 && !GENERIC_CLUB_TOKENS.has(token)),
   );
 }
 
@@ -163,4 +175,34 @@ export function participantsMissingClub(
   participants: readonly ParticipantClubState[],
 ): ParticipantClubState[] {
   return participants.filter((participant) => !participant.clubId);
+}
+
+/** Canonical key for duplicate detection (variant-stripped, normalized). */
+export function clubCanonicalKey(name: string): string {
+  return clubBase(name);
+}
+
+/**
+ * Existing clubs that would duplicate `name` (same canonical key). Used to warn
+ * BEFORE creating a club. Never merges — the admin decides.
+ */
+export function findDuplicateClubs(
+  name: string,
+  clubs: readonly ClubOption[],
+): ClubOption[] {
+  const key = clubCanonicalKey(name);
+  if (!key) {
+    return [];
+  }
+  return clubs.filter((club) => clubCanonicalKey(club.name) === key);
+}
+
+/** Assignment progress for the panel header, e.g. 8 of 10. */
+export function clubAssignmentProgress(
+  participants: readonly ParticipantClubState[],
+): { assigned: number; total: number } {
+  return {
+    assigned: participants.filter((participant) => Boolean(participant.clubId)).length,
+    total: participants.length,
+  };
 }
