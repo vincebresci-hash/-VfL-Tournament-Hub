@@ -102,6 +102,9 @@ jobs:
       - name: PDF layout tests
         run: npm run test:pdf-layout
 
+      - name: Club service-role security self-check
+        run: npm run test:club-security
+
       - name: Production build
         run: npm run build
 
