@@ -90,6 +90,9 @@ jobs:
       - name: Champions League editable-preview tests
         run: npm run test:cl-edit
 
+      - name: Champions League club-suggestion tests
+        run: npm run test:cl-club
+
       - name: Production build
         run: npm run build
 

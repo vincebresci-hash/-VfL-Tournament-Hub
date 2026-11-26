@@ -10,7 +10,15 @@ import {
   adminSecondaryButtonClass,
 } from "@/components/admin/AdminPanel";
 import { ChampionsLeagueScheduleFields } from "@/components/admin/ChampionsLeagueScheduleFields";
+import { EditableLeaguePreviewPanel } from "@/components/admin/EditableLeaguePreviewPanel";
 import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
+import {
+  recomputeTimes,
+  reorderMatch,
+  toEditableMatches,
+  validateEditedLeaguePlan,
+  type EditablePreviewMatch,
+} from "@/lib/schedule/league-preview-edit";
 import { Field, SelectInput, TextInput } from "@/components/apply/FormControls";
 import { applyChampionsLeagueScheduleAction } from "@/lib/db/league-schedule-actions";
 import { applyTournamentPlanAction } from "@/lib/db/plan-apply-actions";
@@ -166,6 +174,9 @@ export function TournamentScheduleBoard({
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [preview, setPreview] = useState<TournamentPlanPreview | null>(null);
   const [previewPolicy, setPreviewPolicy] = useState<RegenerationPolicyResult | null>(null);
+  // Editable Champions League plan (null unless a CL preview is open).
+  const [leaguePlan, setLeaguePlan] = useState<EditablePreviewMatch[] | null>(null);
+  const [leaguePlanBaseline, setLeaguePlanBaseline] = useState<EditablePreviewMatch[] | null>(null);
   const [previewApplyLocked, setPreviewApplyLocked] = useState(false);
   const [previewStatusMessage, setPreviewStatusMessage] = useState<string | null>(null);
   const savedMode = initialCompetitionMode(storedFormat, groups.length);
@@ -240,6 +251,8 @@ export function TournamentScheduleBoard({
     setPreviewApplyLocked(false);
     setPreviewStatusMessage(null);
     setConfirmApplyReplace(false);
+    setLeaguePlan(null);
+    setLeaguePlanBaseline(null);
   }
 
   function invalidateOpenPreview() {
@@ -251,6 +264,8 @@ export function TournamentScheduleBoard({
     setPreviewStatusMessage(null);
     setConfirmApplyReplace(false);
     setPreviewOpen(false);
+    setLeaguePlan(null);
+    setLeaguePlanBaseline(null);
   }
 
   async function handlePreview() {
@@ -404,6 +419,9 @@ export function TournamentScheduleBoard({
       clubByParticipantId,
     });
     setPreview(nextPreview);
+    const editable = toEditableMatches(nextPreview.matches);
+    setLeaguePlan(editable);
+    setLeaguePlanBaseline(editable);
     setPreviewPolicy(
       canRegenerateGroupSchedule({
         tournamentStatus: tournament.status,
@@ -417,6 +435,47 @@ export function TournamentScheduleBoard({
       }),
     );
     setPreviewOpen(true);
+  }
+
+  const leagueFields = fields.map((field) => ({ id: field.id, name: field.name }));
+  const leagueValidation =
+    competitionMode === "champions-league" && leaguePlan
+      ? validateEditedLeaguePlan({
+          matches: leaguePlan,
+          participantIds: leagueParticipantIds,
+          matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam) ?? Number.NaN,
+          fieldIds: fields.map((field) => field.id),
+          minimumRestMinutes: tournament.minimumRestMinutes,
+          restrictSameClub,
+          clubByParticipantId,
+        })
+      : null;
+  const leaguePlanDirty =
+    leaguePlan != null &&
+    leaguePlanBaseline != null &&
+    JSON.stringify(leaguePlan.map((m) => [m.key, m.sortOrder, m.scheduledAt, m.fieldId])) !==
+      JSON.stringify(leaguePlanBaseline.map((m) => [m.key, m.sortOrder, m.scheduledAt, m.fieldId]));
+
+  function moveLeagueMatch(key: string, direction: "up" | "down") {
+    setLeaguePlan((current) => (current ? reorderMatch(current, key, direction) : current));
+  }
+  function setLeagueField(key: string, fieldId: string) {
+    setLeaguePlan((current) =>
+      current ? current.map((m) => (m.key === key ? { ...m, fieldId: fieldId || null } : m)) : current,
+    );
+  }
+  function setLeagueKickoff(key: string, iso: string | null) {
+    setLeaguePlan((current) =>
+      current ? current.map((m) => (m.key === key ? { ...m, scheduledAt: iso } : m)) : current,
+    );
+  }
+  function recomputeLeagueTimes() {
+    setLeaguePlan((current) =>
+      current ? recomputeTimes(current, savedTournamentPlanTiming(tournament), leagueFields) : current,
+    );
+  }
+  function resetLeaguePlan() {
+    setLeaguePlan(leaguePlanBaseline ? [...leaguePlanBaseline] : null);
   }
 
   function closePreview() {
@@ -477,6 +536,16 @@ export function TournamentScheduleBoard({
             knockoutCutoff: leagueCutoff,
             restrictSameClub,
             confirmReplace,
+            editedMatches: leaguePlan
+              ? leaguePlan.map((match) => ({
+                  home: match.home,
+                  away: match.away,
+                  fieldId: match.fieldId,
+                  scheduledAt: match.scheduledAt,
+                  durationMinutes: match.durationMinutes,
+                  sortOrder: match.sortOrder,
+                }))
+              : undefined,
           })
         : await applyTournamentPlanAction(tournament.id, fingerprint, confirmReplace);
     setPending(false);
@@ -577,7 +646,11 @@ export function TournamentScheduleBoard({
     if (!preview || !previewPolicy || previewApplyLocked || pending) {
       return;
     }
-    if (!previewIsApplicable(preview, previewPolicy, championsLeagueApplyAllowed)) {
+    const applicable =
+      preview.mode === "champions-league"
+        ? championsLeagueApplyAllowed && (leagueValidation?.ok ?? false)
+        : previewIsApplicable(preview, previewPolicy, championsLeagueApplyAllowed);
+    if (!applicable) {
       return;
     }
     if (previewPolicy.decision === "allowedWithConfirmation") {
@@ -890,6 +963,28 @@ export function TournamentScheduleBoard({
               Vorschau schließen
             </button>
           </AdminCard>
+        ) : preview.mode === "champions-league" && leaguePlan && leagueValidation ? (
+          <EditableLeaguePreviewPanel
+            preview={preview}
+            plan={leaguePlan}
+            validation={leagueValidation}
+            teamLabels={teamLabels}
+            fields={leagueFields}
+            policy={previewPolicy}
+            canApply={championsLeagueApplyAllowed && leagueValidation.ok}
+            applyPending={pending}
+            applyLocked={previewApplyLocked}
+            statusMessage={previewStatusMessage}
+            applyBlockReason={championsLeagueApplyBlockReasonText}
+            dirty={leaguePlanDirty}
+            onMove={moveLeagueMatch}
+            onSetField={setLeagueField}
+            onSetKickoff={setLeagueKickoff}
+            onRecomputeTimes={recomputeLeagueTimes}
+            onReset={resetLeaguePlan}
+            onApply={handleApplyRequest}
+            onClose={closePreview}
+          />
         ) : (
           <TournamentPlanPreviewPanel
             preview={preview}

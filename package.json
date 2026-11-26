@@ -11,6 +11,7 @@
     "test:cl-advanced": "node --no-warnings --experimental-strip-types --import ./scripts/tests/register-alias.mjs --test scripts/tests/champions-league-advanced.test.mjs",
     "test:cl-scenarios": "node --no-warnings --experimental-strip-types --import ./scripts/tests/register-alias.mjs --test scripts/tests/champions-league-scenarios.test.mjs",
     "test:cl-edit": "node --no-warnings --experimental-strip-types --import ./scripts/tests/register-alias.mjs --test scripts/tests/champions-league-preview-edit.test.mjs",
+    "test:cl-club": "node --no-warnings --experimental-strip-types --import ./scripts/tests/register-alias.mjs --test scripts/tests/champions-league-club-suggest.test.mjs",
     "test:cl-baseline": "node scripts/baseline-reconciliation/run.mjs",
     "test:inbox-sql": "node scripts/ci/inbox-sql/run.mjs",
     "test:competition-postgres": "node scripts/competition-postgres/run.mjs"
