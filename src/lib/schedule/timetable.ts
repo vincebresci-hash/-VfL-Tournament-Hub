@@ -74,7 +74,6 @@ export function buildTimetable(
   const teamLastEnd = new Map<string, Date>();
   const scheduled: ScheduledMatch[] = [];
   const restMs = settings.minimumRestMinutes * 60_000;
-  let restViolations = 0;
   let guard = 0;
 
   while (remaining.length > 0 && guard < matches.length * 40) {
@@ -92,44 +91,32 @@ export function buildTimetable(
       fieldFree[fieldIndex] = start;
     }
 
-    let pickIndex = remaining.findIndex(
+    const pickIndex = remaining.findIndex(
       (match) =>
         isFree(teamLastEnd, match.homeId, start) &&
         isFree(teamLastEnd, match.awayId, start) &&
         hasRest(teamLastEnd, match.homeId, start, restMs) &&
         hasRest(teamLastEnd, match.awayId, start, restMs),
     );
-    let restWarning = false;
-
     if (pickIndex < 0) {
-      pickIndex = remaining.findIndex(
-        (match) =>
-          isFree(teamLastEnd, match.homeId, start) &&
-          isFree(teamLastEnd, match.awayId, start),
+      // Every remaining pairing is currently blocked by a team's match or
+      // minimum-rest window. Waiting is always possible, so advance this field
+      // to the earliest time at which one complete pairing is ready instead of
+      // knowingly creating an avoidable rest violation.
+      const nextReadyAt = Math.min(
+        ...remaining.map((match) => {
+          const homeEnd = lastEnd(teamLastEnd, match.homeId)?.getTime() ?? start.getTime() - restMs;
+          const awayEnd = lastEnd(teamLastEnd, match.awayId)?.getTime() ?? start.getTime() - restMs;
+          return Math.max(start.getTime(), homeEnd + restMs, awayEnd + restMs);
+        }),
       );
-      restWarning = pickIndex >= 0;
-    }
-
-    if (pickIndex < 0) {
-      const nextEnds = remaining.flatMap((match) => {
-        const home = lastEnd(teamLastEnd, match.homeId);
-        const away = lastEnd(teamLastEnd, match.awayId);
-        return [home, away].filter((value): value is Date => Boolean(value));
-      });
-      const jumpTo = nextEnds.length
-        ? Math.min(...nextEnds.map((value) => value.getTime()))
-        : start.getTime() + 60_000;
-      fieldFree[fieldIndex] = new Date(Math.max(jumpTo, start.getTime() + 60_000));
+      fieldFree[fieldIndex] = new Date(Math.max(nextReadyAt, start.getTime() + 60_000));
       continue;
     }
 
     const match = remaining.splice(pickIndex, 1)[0];
     if (!match) {
       break;
-    }
-
-    if (restWarning) {
-      restViolations += 1;
     }
 
     const end = addMinutes(start, settings.durationMinutes);
@@ -139,7 +126,7 @@ export function buildTimetable(
       scheduledAt: start,
       durationMinutes: settings.durationMinutes,
       sortOrder: scheduled.length,
-      restWarning,
+      restWarning: false,
     });
     fieldFree[fieldIndex] = addMinutes(end, settings.breakMinutes);
     teamLastEnd.set(match.homeId, end);
@@ -147,11 +134,6 @@ export function buildTimetable(
   }
 
   const warnings: string[] = [];
-  if (restViolations > 0) {
-    warnings.push(
-      `Mindestruhezeit von ${settings.minimumRestMinutes} Minuten konnte nicht für alle ${restViolations} betroffenen Spiele eingehalten werden.`,
-    );
-  }
   if (remaining.length > 0) {
     warnings.push("Der Spielplan konnte nicht vollständig erzeugt werden.");
   }

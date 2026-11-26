@@ -140,6 +140,24 @@ function toEmailTemplate(row: EmailTemplateRow): EmailTemplate {
   };
 }
 
+/**
+ * Lightweight {id, name} club list for inline selectors (e.g. schedule-page club
+ * assignment). Avoids the heavy joins in listAdminClubs. Fails soft to [].
+ */
+export async function listClubOptions(): Promise<Array<{ id: string; name: string }>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("clubs")
+    .select("id, name")
+    .order("name", { ascending: true });
+  if (error || !data) {
+    return [];
+  }
+  return data
+    .map((club) => ({ id: String(club.id), name: String(club.name ?? "") }))
+    .filter((club) => club.id && club.name);
+}
+
 export async function listAdminClubs(): Promise<{
   clubs: AdminClubListItem[];
   ready: boolean;

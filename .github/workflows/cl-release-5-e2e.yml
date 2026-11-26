@@ -1,0 +1,130 @@
+# CL Release 5 — real-browser admin acceptance on an isolated runner.
+#
+# Manually triggered only. Runs the Playwright admin-schedule suite against a
+# DISPOSABLE LOCAL Supabase stack (Docker on the GitHub-hosted runner) seeded with
+# synthetic data. Never links a remote project, never uses production secrets,
+# never touches the production database or real tournaments.
+#
+# FORBIDDEN here: remote project linking / migration apply, production
+# DATABASE_URL or Supabase secrets, deploy / merge / production SQL.
+
+name: CL Release 5 E2E (manual)
+
+on:
+  # Manually dispatchable once the workflow reaches the default branch.
+  workflow_dispatch:
+  # Until then, a push to the release branch runs it (the file is read from the
+  # pushed ref, so no default-branch registration is required).
+  push:
+    branches:
+      - fix/cl-release-5-admin-schedule
+
+concurrency:
+  group: cl5-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Isolated local Supabase browser acceptance
+    # Pinned: ubuntu-latest is now 26.04, which this Playwright's --with-deps does
+    # not recognise. 24.04 has Docker and is supported by Playwright 1.51.x.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      # Refuse remote Supabase CLI auth even if an org secret leaked into the job.
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+      # Required gate for the reused local-only migration applier.
+      INBOX_SQL_CI: "1"
+      # Synthetic, non-production test credentials (local stack only).
+      E2E_ADMIN_EMAIL: "cl5-admin@example.test"
+      E2E_ADMIN_PASSWORD: "cl5-ReleaseFive-test"
+      E2E_SLUG_B: "cl5-scenario-b"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security preflight (no remote / no production secrets)
+        run: |
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then echo "SUPABASE_ACCESS_TOKEN must be empty" >&2; exit 1; fi
+          if [[ -n "${DATABASE_URL:-}" ]]; then echo "DATABASE_URL must not be set" >&2; exit 1; fi
+          if grep -R -n -E 'https?://[^[:space:]]*\.supabase\.co|db\.[^[:space:]]+\.supabase\.co' e2e scripts/ci; then
+            echo "Production Supabase host references are forbidden" >&2; exit 1
+          fi
+          test "$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml | head -n1)" = "vfl-tournament-hub-local"
+          test "$(sed -n 's/^major_version = \([0-9]*\)/\1/p' supabase/config.toml | head -n1)" = "17"
+          test ! -f supabase/.temp/project-ref
+          docker info >/dev/null
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Disable CLI auto migration apply (runner config only)
+        run: node scripts/ci/inbox-sql/disable-auto-migrations.mjs
+
+      - name: Start local Supabase (no project migrations)
+        run: supabase start
+
+      - name: Verify LOCAL endpoints and PostgreSQL 17 before first application write
+        run: node e2e/verify-local-environment.mjs
+
+      - name: Apply migrations (CI-only enum/function-return compat)
+        run: node scripts/ci/inbox-sql/apply-migrations.mjs
+
+      - name: Seed synthetic data (local service role)
+        run: node e2e/seed/ci-seed.mjs
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app and wait for readiness
+        run: |
+          set -euo pipefail
+          (npm run start > .next-start.log 2>&1 &)
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/admin/login >/dev/null; then echo "app up"; exit 0; fi
+            sleep 2
+          done
+          echo "app did not start in time" >&2; cat .next-start.log >&2; exit 1
+
+      - name: Install Playwright (Chromium)
+        run: |
+          npm i --no-save @playwright/test@1.51.1
+          npx playwright install --with-deps chromium
+
+      - name: Run admin schedule E2E (desktop + mobile)
+        run: npx playwright test --config e2e/playwright.config.ts
+
+      - name: Upload screenshots + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cl5-e2e-artifacts
+          path: |
+            e2e/screenshots/
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase (destroy data)
+        if: always()
+        run: supabase stop --no-backup

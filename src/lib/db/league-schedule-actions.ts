@@ -13,7 +13,15 @@ import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { scheduleParticipantId } from "@/lib/schedule/admin";
 import { requireScheduleManage, requireTournamentsManage } from "@/lib/rbac/action-access";
-import { buildChampionsLeagueAdminPreview, savedTournamentPlanTiming } from "@/lib/schedule/league-admin-preview";
+import {
+  buildChampionsLeagueAdminPreview,
+  championsLeagueParticipantIds,
+  savedTournamentPlanTiming,
+} from "@/lib/schedule/league-admin-preview";
+import {
+  validateEditedLeaguePlan,
+  type EditablePreviewMatch,
+} from "@/lib/schedule/league-preview-edit";
 import type { LeagueKnockoutCutoff } from "@/lib/schedule/league-phase";
 import { canRegenerateGroupSchedule } from "@/lib/schedule/plan-preview";
 import type { RegenerationPolicyResult } from "@/lib/schedule/plan-preview";
@@ -126,6 +134,15 @@ function revalidateTournament(id: string, slug: string) {
   revalidatePath("/", "layout");
 }
 
+export type EditedLeagueMatchInput = {
+  home: { applicationId: string | null; externalTeamId: string | null };
+  away: { applicationId: string | null; externalTeamId: string | null };
+  fieldId: string | null;
+  scheduledAt: string | null;
+  durationMinutes: number;
+  sortOrder: number;
+};
+
 export async function applyChampionsLeagueScheduleAction(input: {
   tournamentId: string;
   previewFingerprint: string;
@@ -133,6 +150,13 @@ export async function applyChampionsLeagueScheduleAction(input: {
   knockoutCutoff: number;
   restrictSameClub?: boolean;
   confirmReplace?: boolean;
+  /**
+   * Admin-edited plan from the editable preview. When present it replaces the
+   * server's deterministic layout, but only after the input fingerprint proves
+   * the participants/fields/timing/config are unchanged AND the edited plan
+   * passes the full re-validation. The authoritative RPC validates it again.
+   */
+  editedMatches?: EditedLeagueMatchInput[];
 }): Promise<ApplyChampionsLeagueResult> {
   const schedule = await requireScheduleManage();
   if (schedule.error || !schedule.session) {
@@ -272,36 +296,69 @@ export async function applyChampionsLeagueScheduleAction(input: {
     ),
   );
   const expected = preview.summary.expectedLeagueMatchCount;
-  if (
-    preview.mode !== "champions-league" ||
-    blocking ||
-    expected == null ||
-    preview.summary.scheduledLeagueMatchCount !== expected ||
-    preview.matches.length !== expected ||
-    preview.matches.some((match) => !match.scheduledAt || !match.fieldId) ||
-    preview.matches.some(
-      (match) =>
-        !sideIsCanonical(match.home.applicationId, match.home.externalTeamId) ||
-        !sideIsCanonical(match.away.applicationId, match.away.externalTeamId),
-    )
-  ) {
+  if (preview.mode !== "champions-league" || blocking || expected == null) {
     return result(
       "validation_error",
-      "Die Ligabegegnungen sind nicht vollständig eingeplant und werden nicht gespeichert.",
+      "Die Ligakonfiguration ist ungültig und wird nicht gespeichert.",
       { policy, fingerprint },
     );
   }
 
-  const rows = preview.matches.map((match) => ({
-    homeApplicationId: match.home.applicationId,
-    homeExternalTeamId: match.home.externalTeamId,
-    awayApplicationId: match.away.applicationId,
-    awayExternalTeamId: match.away.externalTeamId,
+  // Source of the plan to persist: the admin-edited plan if one was submitted
+  // (fingerprint already proved the inputs are unchanged), otherwise the
+  // server's deterministic layout. Either way it is re-validated below and the
+  // RPC validates it a final, authoritative time.
+  const planSource = input.editedMatches ?? preview.matches;
+  const participantIds = championsLeagueParticipantIds(confirmed.participants);
+  const fieldIds = stage.fields.map((field) => field.id);
+  const editable: EditablePreviewMatch[] = planSource.map((match, index) => ({
+    key: `apply-${index}`,
+    home: { applicationId: match.home.applicationId, externalTeamId: match.home.externalTeamId },
+    away: { applicationId: match.away.applicationId, externalTeamId: match.away.externalTeamId },
     fieldId: match.fieldId,
     scheduledAt: match.scheduledAt,
     durationMinutes: match.durationMinutes,
     sortOrder: match.sortOrder,
+    restWarning: false,
   }));
+  const validation = validateEditedLeaguePlan({
+    matches: editable,
+    participantIds,
+    matchesPerTeam: input.matchesPerTeam,
+    fieldIds,
+    minimumRestMinutes: loaded.data.minimum_rest_minutes ?? 0,
+    restrictSameClub,
+    clubByParticipantId,
+  });
+  const canonicalSides = editable.every(
+    (match) =>
+      sideIsCanonical(match.home.applicationId, match.home.externalTeamId) &&
+      sideIsCanonical(match.away.applicationId, match.away.externalTeamId),
+  );
+  if (!validation.ok || !canonicalSides || editable.length !== expected) {
+    const detail = validation.issues.find((issue) => issue.blocking)?.message;
+    return result(
+      "validation_error",
+      detail
+        ? `Der bearbeitete Spielplan ist ungültig: ${detail}`
+        : "Die Ligabegegnungen sind nicht vollständig eingeplant und werden nicht gespeichert.",
+      { policy, fingerprint },
+    );
+  }
+
+  const rows = editable
+    .slice()
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((match, index) => ({
+      homeApplicationId: match.home.applicationId,
+      homeExternalTeamId: match.home.externalTeamId,
+      awayApplicationId: match.away.applicationId,
+      awayExternalTeamId: match.away.externalTeamId,
+      fieldId: match.fieldId,
+      scheduledAt: match.scheduledAt,
+      durationMinutes: match.durationMinutes,
+      sortOrder: index,
+    }));
 
   const applied = await applyLeaguePhaseWithBoundedRetry(supabase, {
     p_tournament_id: tournamentId,

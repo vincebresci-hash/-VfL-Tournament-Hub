@@ -68,12 +68,68 @@ export function savedCompetitionMode(groupCount: number): Exclude<AdminCompetiti
 export const PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE =
   "Vorschaumodus: Änderungen am gespeicherten Spielplan sind deaktiviert. Wähle den gespeicherten Modus, um Spiele zu bearbeiten oder zu löschen. Spielparameter und Spielfelder sind dabei ebenfalls gesperrt.";
 
-/** Saved schedule mutations stay available only for the mode already stored on the tournament. */
+/** Shown on the parameter card when started/result protection locks configuration. */
+export const SCHEDULE_CONFIG_LOCKED_MESSAGE =
+  "Dieses Turnier ist gesperrt: Es gibt bereits Ergebnisse, laufende oder K.-o.-Spiele oder es ist abgeschlossen. Spielparameter, Spielfelder und der gespeicherte Spielplan können nicht mehr verändert werden.";
+
+/**
+ * Saved-schedule direct mutations (classic match list, direct generate, clear)
+ * stay available only for the legacy mode already stored on the tournament.
+ * Champions League never edits the saved classic schedule through this path.
+ */
 export function scheduleEditingEnabled(
   selected: AdminCompetitionMode,
   saved: AdminCompetitionMode,
 ) {
-  return selected === saved;
+  return selected === saved && selected !== "champions-league";
+}
+
+/**
+ * Tournament-wide schedule parameters (match duration, breaks, rest, lunch,
+ * field names) and the plan preview are a draft the admin configures for ANY
+ * competition mode. They are only frozen by the real started/result protection,
+ * never by a mode mismatch. This decouples the draft mode from the saved mode.
+ */
+export function scheduleParametersEditable(policyBlocked: boolean) {
+  return !policyBlocked;
+}
+
+/** Stored competition format as persisted (null = legacy, mode inferred from groups). */
+export type StoredCompetitionFormat =
+  | "round-robin"
+  | "groups-knockout"
+  | "champions-league"
+  | null;
+
+/**
+ * Concrete reason a Champions League draft cannot be applied yet, or null when
+ * it can. Mirrors the authoritative server guards in
+ * apply_champions_league_league_phase so the admin sees the real blocker instead
+ * of a generic "matches not scheduled" message.
+ *
+ * Started/result protection (RESULTS_EXIST / LIVE / KO / COMPLETED) is reported
+ * via policyBlocked; a resultless existing schedule is applicable with the
+ * explicit replace confirmation and therefore NOT blocked here.
+ */
+export function championsLeagueApplyBlockReason(input: {
+  storedFormat: StoredCompetitionFormat;
+  groupCount: number;
+  policyBlocked: boolean;
+  policyReason?: string | null;
+}): string | null {
+  if (input.storedFormat === "round-robin" || input.storedFormat === "groups-knockout") {
+    return `Dieses Turnier ist fest als „${ADMIN_COMPETITION_MODE_LABELS[input.storedFormat]}“ gespeichert. Ein gespeichertes Bestandsformat kann nicht als Champions League überschrieben werden.`;
+  }
+  if (input.groupCount > 1) {
+    return "Champions League benötigt höchstens eine Gruppe. Bitte entferne zuerst die zusätzlichen Gruppen in der Gruppenverwaltung.";
+  }
+  if (input.policyBlocked) {
+    return (
+      input.policyReason ??
+      "Der gespeicherte Spielplan darf in diesem Zustand nicht ersetzt werden."
+    );
+  }
+  return null;
 }
 
 export function parseMatchesPerTeam(value: string): number | null {

@@ -605,7 +605,7 @@ export async function saveScheduleSettingsAction(
     lunchBreakEnd: string;
     fieldNames: string[];
   },
-): Promise<{ error: string | null }> {
+): Promise<{ error: string | null; notice?: string | null }> {
   const access = await requireScheduleManage();
   if (access.error) {
     return { error: access.error };
@@ -692,7 +692,7 @@ export async function saveScheduleSettingsAction(
   }
 
   revalidateStage(loaded.tournament);
-  return { error: null };
+  return { error: null, notice: "Die Spielplan-Einstellungen wurden gespeichert." };
 }
 
 export type GenerateTournamentScheduleStatus =
