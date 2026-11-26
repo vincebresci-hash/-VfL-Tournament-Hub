@@ -24,12 +24,14 @@ async function login(page: Page) {
   await page.getByLabel(/e-?mail/i).fill(ADMIN_EMAIL);
   await page.getByLabel(/passwort/i).fill(ADMIN_PASSWORD);
   await page.getByRole("button", { name: /anmelden|login/i }).click();
-  await page.waitForURL(/\/admin(\/|$)/);
+  // Wait for the real post-login redirect AWAY from the login page (a loose
+  // /admin match would resolve immediately on /admin/login and skip the wait).
+  await page.waitForURL((url) => !url.pathname.startsWith("/admin/login"), { timeout: 20_000 });
 }
 
 async function openSchedule(page: Page, slug: string) {
   await page.goto(`/admin/turniere/${slug}/spielplan`);
-  await expect(page.getByText("Spielparameter")).toBeVisible();
+  await expect(page.getByText("Spielparameter")).toBeVisible({ timeout: 15_000 });
 }
 
 test.beforeEach(async ({ page }) => {
