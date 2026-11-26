@@ -68,8 +68,10 @@ export function ChampionsLeagueScheduleFields({
         </SelectInput>
       </Field>
       <p className="text-[13px] leading-relaxed text-muted">
-        Gespeichert bleibt {savedModeLabel}. Champions League wird nicht in das Turnier
-        geschrieben und nicht aus dem öffentlichen Spielmodus abgeleitet.
+        Entwurfsmodus: {ADMIN_COMPETITION_MODE_LABELS[mode]}. Aktuell gespeichert ist
+        {" "}
+        {savedModeLabel}. Der gewählte Modus wird erst mit „Spielplan übernehmen“
+        dauerhaft gespeichert und nicht aus dem öffentlichen Spielmodus-Text abgeleitet.
       </p>
 
       {championsLeague ? (

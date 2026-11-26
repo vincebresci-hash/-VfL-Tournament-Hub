@@ -3,13 +3,15 @@ import { join } from "node:path";
 import {
   ADMIN_COMPETITION_MODE_LABELS,
   buildChampionsLeagueAdminPreview,
+  championsLeagueApplyBlockReason,
   championsLeagueParticipantIds,
   describeChampionsLeagueConfig,
   expectedLeagueKnockoutMatchCount,
   parseMatchesPerTeam,
-  PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE,
+  SCHEDULE_CONFIG_LOCKED_MESSAGE,
   savedCompetitionMode,
   scheduleEditingEnabled,
+  scheduleParametersEditable,
 } from "@/lib/schedule/league-admin-preview";
 import { previewParticipantKey, type PlanPreviewMatch } from "@/lib/schedule/plan-preview";
 
@@ -180,108 +182,94 @@ export function runLeagueAdminPreviewChecks() {
   ]);
   assert(identities.join(",") === "a,b,ext-1", "participant ids are explicit, unique and ordered");
 
-  // Behavioral checks call scheduleEditingEnabled. They do not render the page.
-  assert(scheduleEditingEnabled("round-robin", "round-robin"), "saved round robin stays editable");
-  assert(scheduleEditingEnabled("groups-knockout", "groups-knockout"), "saved groups mode stays editable");
-  assert(!scheduleEditingEnabled("champions-league", "round-robin"), "champions league locks settings and matches on a round-robin tournament");
-  assert(!scheduleEditingEnabled("champions-league", "groups-knockout"), "champions league locks settings and matches on a groups tournament");
-  assert(!scheduleEditingEnabled("groups-knockout", "round-robin"), "the other unsaved legacy mode locks a round-robin tournament");
-  assert(!scheduleEditingEnabled("round-robin", "groups-knockout"), "the other unsaved legacy mode locks a groups tournament");
-  assert(scheduleEditingEnabled("groups-knockout", "groups-knockout"), "returning to the saved groups mode restores editing");
-  assert(scheduleEditingEnabled("round-robin", "round-robin"), "returning to the saved round-robin mode restores editing");
+  // Behavioral checks of the draft/saved-mode decoupling (CL Release 5).
+  // scheduleEditingEnabled now gates ONLY classic saved-schedule operations
+  // (direct generate / clear / classic apply) and never Champions League.
+  assert(scheduleEditingEnabled("round-robin", "round-robin"), "saved round robin keeps classic schedule ops");
+  assert(scheduleEditingEnabled("groups-knockout", "groups-knockout"), "saved groups mode keeps classic schedule ops");
+  assert(!scheduleEditingEnabled("champions-league", "champions-league"), "champions league never uses the classic schedule path");
+  assert(!scheduleEditingEnabled("champions-league", "groups-knockout"), "champions league is not a classic schedule op");
+  assert(!scheduleEditingEnabled("groups-knockout", "round-robin"), "the other unsaved legacy mode is not a classic op here");
+  assert(!scheduleEditingEnabled("round-robin", "groups-knockout"), "the other unsaved legacy mode is not a classic op here");
+
+  // Parameters/fields are a draft, editable for ANY mode unless the tournament
+  // is truly locked by the started/result protection.
+  assert(scheduleParametersEditable(false), "parameters editable when not policy-blocked");
+  assert(!scheduleParametersEditable(true), "parameters frozen only by the started/result lock");
+
+  // Concrete Champions League apply block reasons mirror the server guards.
   assert(
-    PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE ===
-      "Vorschaumodus: Änderungen am gespeicherten Spielplan sind deaktiviert. Wähle den gespeicherten Modus, um Spiele zu bearbeiten oder zu löschen. Spielparameter und Spielfelder sind dabei ebenfalls gesperrt.",
-    "lock message covers matches, settings and fields",
+    championsLeagueApplyBlockReason({ storedFormat: null, groupCount: 0, policyBlocked: false }) === null,
+    "null legacy format with no groups is applicable",
+  );
+  assert(
+    championsLeagueApplyBlockReason({ storedFormat: "champions-league", groupCount: 1, policyBlocked: false }) === null,
+    "a saved champions league with its single league group is applicable",
+  );
+  assert(
+    championsLeagueApplyBlockReason({ storedFormat: null, groupCount: 1, policyBlocked: false }) === null,
+    "a legacy single-group resultless tournament is convertible (relaxed UNSAFE_LEGACY_CONVERSION)",
+  );
+  const groupsKnockoutBlock = championsLeagueApplyBlockReason({
+    storedFormat: "groups-knockout",
+    groupCount: 2,
+    policyBlocked: false,
+  });
+  assert(
+    typeof groupsKnockoutBlock === "string" &&
+      groupsKnockoutBlock.includes("Gruppenphase + K.-o.-Runde"),
+    "an explicitly saved legacy format blocks a champions league overwrite with its label",
+  );
+  assert(
+    typeof championsLeagueApplyBlockReason({ storedFormat: "round-robin", groupCount: 0, policyBlocked: false }) === "string",
+    "an explicitly saved round-robin blocks a champions league overwrite",
+  );
+  const multiGroupBlock = championsLeagueApplyBlockReason({
+    storedFormat: null,
+    groupCount: 2,
+    policyBlocked: false,
+  });
+  assert(
+    typeof multiGroupBlock === "string" && multiGroupBlock.includes("höchstens eine Gruppe"),
+    "more than one group blocks champions league with a concrete remedy",
+  );
+  assert(
+    championsLeagueApplyBlockReason({
+      storedFormat: null,
+      groupCount: 0,
+      policyBlocked: true,
+      policyReason: "Es existieren bereits Ergebnisse (inkl. 0:0).",
+    }) === "Es existieren bereits Ergebnisse (inkl. 0:0).",
+    "the started/result lock reason is surfaced verbatim",
+  );
+  assert(
+    SCHEDULE_CONFIG_LOCKED_MESSAGE.includes("Spielparameter") &&
+      SCHEDULE_CONFIG_LOCKED_MESSAGE.includes("gesperrt"),
+    "config lock message explains the real started/result freeze",
   );
 
-  const modeSwitch = scheduleBoard.slice(
-    scheduleBoard.indexOf("function selectCompetitionMode"),
-    scheduleBoard.indexOf("function requestClearSchedule"),
+  // Source invariants: the board decouples draft parameters from the saved mode
+  // and no longer carries the misleading preview-only lock.
+  assert(
+    !scheduleBoard.includes("scheduleEditingEnabledNow") &&
+      !scheduleBoard.includes("PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE"),
+    "source: the preview-only parameter lock is gone",
   );
   assert(
-    modeSwitch.includes("clearPreviewState()") &&
-      modeSwitch.includes("setConfirmGenerate(false)") &&
-      modeSwitch.includes("setConfirmClear(false)") &&
-      modeSwitch.includes("setDeleteMatchId(null)") &&
-      !modeSwitch.includes("deleteTournamentScheduleAction") &&
-      !modeSwitch.includes("deleteTournamentMatchAction") &&
-      !modeSwitch.includes("saveTournamentMatchAction") &&
-      !modeSwitch.includes("saveScheduleSettingsAction") &&
-      !modeSwitch.includes("setFieldNames") &&
-      !modeSwitch.includes("handleSettings") &&
-      !modeSwitch.includes("generateTournamentScheduleAction") &&
-      !modeSwitch.includes("applyTournamentPlanAction"),
-    "source: mode switch clears preview and confirmations without submitting settings",
-  );
-  const settingsSave = scheduleBoard.slice(
-    scheduleBoard.indexOf("async function handleSettings"),
-    scheduleBoard.indexOf('title="Spielparameter"'),
+    scheduleBoard.includes("scheduleParametersEditable(scheduleConfigLocked)") &&
+      scheduleBoard.includes("const parametersEditable") &&
+      scheduleBoard.includes("const classicModeActive") &&
+      scheduleBoard.includes("const savedScheduleEditable") &&
+      scheduleBoard.includes("championsLeagueApplyBlockReason") &&
+      scheduleBoard.includes("disabled={!parametersEditable}") &&
+      scheduleBoard.includes("locked={!savedScheduleEditable}") &&
+      scheduleBoard.includes("SCHEDULE_CONFIG_LOCKED_MESSAGE"),
+    "source: parameters/fields/matches are gated by the real lock, not a mode mismatch",
   );
   assert(
-    settingsSave.indexOf("scheduleEditingEnabled") < settingsSave.indexOf("saveScheduleSettingsAction") &&
-      settingsSave.includes("return;"),
-    "source: handleSettings returns before saveScheduleSettingsAction",
-  );
-  const fieldControls = scheduleBoard.slice(
-    scheduleBoard.indexOf("function removeField"),
-    scheduleBoard.indexOf("function changeScheduleSetting"),
-  );
-  assert(
-    fieldControls.indexOf("function removeField") !== -1 &&
-      fieldControls.indexOf("scheduleEditingEnabled") < fieldControls.indexOf("setFieldNames") &&
-      fieldControls.indexOf("function addField") < fieldControls.lastIndexOf("setFieldNames") &&
-      fieldControls.lastIndexOf("scheduleEditingEnabled") < fieldControls.lastIndexOf("setFieldNames"),
-    "source: field add and remove return before changing the field list",
-  );
-  const applyHandler = scheduleBoard.slice(
-    scheduleBoard.indexOf("async function executeApply"),
-    scheduleBoard.indexOf("async function executeGenerate"),
-  );
-  assert(
-    applyHandler.indexOf("scheduleEditingEnabled") < applyHandler.indexOf("applyTournamentPlanAction") &&
-      applyHandler.includes("return;"),
-    "source: executeApply rechecks the mode before the server action",
-  );
-  const clearSchedule = scheduleBoard.slice(
-    scheduleBoard.indexOf("function executeClearSchedule"),
-    scheduleBoard.indexOf("function requestDeleteMatch"),
-  );
-  assert(
-    clearSchedule.indexOf("scheduleEditingEnabled") < clearSchedule.indexOf("deleteTournamentScheduleAction") &&
-      clearSchedule.includes("return;"),
-    "schedule delete rechecks the mode before the server action",
-  );
-  const deleteMatch = scheduleBoard.slice(
-    scheduleBoard.indexOf("function executeDeleteMatch"),
-    scheduleBoard.indexOf("function saveExistingMatch"),
-  );
-  assert(
-    deleteMatch.indexOf("scheduleEditingEnabled") < deleteMatch.indexOf("deleteTournamentMatchAction"),
-    "match delete rechecks the mode before the server action",
-  );
-  const saveMatch = scheduleBoard.slice(
-    scheduleBoard.indexOf("function saveExistingMatch"),
-    scheduleBoard.indexOf("function addMatch"),
-  );
-  const addMatch = scheduleBoard.slice(
-    scheduleBoard.indexOf("function addMatch"),
-    scheduleBoard.indexOf("function handleChampionsLeaguePreview"),
-  );
-  assert(
-    saveMatch.indexOf("scheduleEditingEnabled") < saveMatch.indexOf("saveTournamentMatchAction") &&
-      addMatch.indexOf("scheduleEditingEnabled") < addMatch.indexOf("saveTournamentMatchAction"),
-    "match save and add recheck the mode before the server action",
-  );
-  assert(
-    scheduleBoard.includes("disabled={pending || previewLoading || !scheduleEditingEnabledNow}") &&
-      scheduleBoard.includes("disabled={pending || !scheduleEditingEnabledNow}") &&
-      scheduleBoard.includes("disabled={!scheduleEditingEnabledNow}") &&
-      scheduleBoard.includes("onClick={() => removeField(index)}") &&
-      scheduleBoard.includes("onClick={addField}") &&
-      scheduleBoard.includes("locked={groupResultsLocked || !scheduleEditingEnabledNow}") &&
-      scheduleBoard.includes("{PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE}"),
-    "source: preview-only mode disables schedule delete, settings save, field controls and match editing",
+    previewPanel.includes("applyBlockReason") &&
+      previewPanel.includes("ist gesperrt:"),
+    "source: the preview panel shows the concrete apply block reason",
   );
 
   assert(

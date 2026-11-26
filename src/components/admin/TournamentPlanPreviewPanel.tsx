@@ -23,6 +23,8 @@ type TournamentPlanPreviewPanelProps = {
   applyPending: boolean;
   applyLocked: boolean;
   statusMessage: string | null;
+  /** Concrete reason the Champions League draft cannot be applied, when known. */
+  applyBlockReason?: string | null;
   onApply: () => void;
 };
 
@@ -81,13 +83,20 @@ export function TournamentPlanPreviewPanel({
   applyPending,
   applyLocked,
   statusMessage,
+  applyBlockReason = null,
   onApply,
 }: TournamentPlanPreviewPanelProps) {
   const championsLeague = preview.mode === "champions-league";
   const summaryItems = [
     { label: "Teilnehmer", value: String(preview.summary.participantCount) },
-    { label: "Gruppen", value: String(preview.summary.groupCount) },
-    { label: "Spiele", value: String(preview.summary.groupMatchCount) },
+    {
+      label: championsLeague ? "Ligaphase" : "Gruppen",
+      value: championsLeague ? "1 (gemeinsame Liga)" : String(preview.summary.groupCount),
+    },
+    {
+      label: championsLeague ? "Ligabegegnungen" : "Spiele",
+      value: String(preview.summary.groupMatchCount),
+    },
     { label: "Felder", value: String(preview.summary.fieldCount) },
     { label: "Erster Anstoß", value: formatBerlinClock(preview.summary.firstKickoff) },
     {
@@ -202,10 +211,12 @@ export function TournamentPlanPreviewPanel({
 
         <section aria-labelledby="preview-groups-heading">
           <h3 id="preview-groups-heading" className={adminSectionTitleClass}>
-            Gruppen
+            {championsLeague ? "Ligaphase" : "Gruppen"}
           </h3>
           {preview.groups.length === 0 ? (
-            <p className="mt-3 text-[14px] text-muted">Keine Gruppen in der Vorschau.</p>
+            <p className="mt-3 text-[14px] text-muted">
+              {championsLeague ? "Keine Ligaphase in der Vorschau." : "Keine Gruppen in der Vorschau."}
+            </p>
           ) : (
             <ul className="mt-3 grid gap-3 sm:grid-cols-2">
               {preview.groups.map((group) => {
@@ -366,10 +377,22 @@ export function TournamentPlanPreviewPanel({
             </button>
           ) : null}
           {championsLeague && !showApply ? (
-            <p className="text-[13px] leading-relaxed text-muted">
-              „Spielplan übernehmen“ ist für diese Champions-League-Vorschau noch nicht
-              möglich. Alle Ligabegegnungen müssen eingeplant sein.
-            </p>
+            applyBlockReason ? (
+              <p
+                className={`${adminCardShellClass} border-[#e2c48a] bg-[#fff8e8] px-4 py-3.5 text-[13px] leading-relaxed text-[#7a5a1e]`}
+                role="status"
+              >
+                „Spielplan übernehmen“ ist gesperrt: {applyBlockReason}
+              </p>
+            ) : (
+              <p className="text-[13px] leading-relaxed text-muted">
+                „Spielplan übernehmen“ ist für diese Champions-League-Vorschau noch nicht
+                möglich:{" "}
+                {unscheduledCount > 0
+                  ? `${unscheduledCount} von ${preview.matches.length} Ligabegegnungen sind noch nicht eingeplant.`
+                  : "Alle Ligabegegnungen müssen auf ein Spielfeld und eine Anstoßzeit eingeplant sein."}
+              </p>
+            )
           ) : null}
           <button
             type="button"

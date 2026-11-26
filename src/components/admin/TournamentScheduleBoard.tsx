@@ -26,13 +26,15 @@ import { isoToDatetimeLocal } from "@/lib/schedule/datetime";
 import {
   ADMIN_COMPETITION_MODE_LABELS,
   buildChampionsLeagueAdminPreview,
+  championsLeagueApplyBlockReason,
   championsLeagueParticipantIds,
   describeChampionsLeagueConfig,
   parseMatchesPerTeam,
-  PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE,
   savedCompetitionMode,
   savedTournamentPlanTiming,
+  SCHEDULE_CONFIG_LOCKED_MESSAGE,
   scheduleEditingEnabled,
+  scheduleParametersEditable,
   type AdminCompetitionMode,
   type LeagueAdminParticipant,
   type LeagueKnockoutCutoff,
@@ -191,17 +193,44 @@ export function TournamentScheduleBoard({
     matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
     knockoutCutoff: leagueCutoff,
   });
-  const scheduleEditingEnabledNow = scheduleEditingEnabled(competitionMode, savedMode);
-  const generateAllowed = scheduleEditingEnabledNow && competitionMode !== "champions-league";
+  // Authoritative started/result protection, mirrored from the server policy.
+  // Blocks only RESULTS_EXIST / LIVE / KO_STARTED / COMPLETED — never a mode
+  // mismatch. A resultless existing schedule is replaceable with confirmation.
+  const regenerationPolicy = canRegenerateGroupSchedule({
+    tournamentStatus: tournament.status,
+    groupCount: groups.length,
+    matches: matches.map((match) => ({
+      phase: match.phase,
+      status: match.status,
+      homeScore: match.homeScore,
+      awayScore: match.awayScore,
+    })),
+  });
+  const scheduleConfigLocked = regenerationPolicy.decision === "blocked";
+  // Tournament-wide draft parameters + fields are editable for ANY mode unless
+  // the tournament is truly locked. This decouples the draft mode (what the
+  // admin is configuring) from the saved mode (what is persisted).
+  const parametersEditable = scheduleParametersEditable(scheduleConfigLocked);
+  // Classic saved-schedule operations (direct generate, clear, classic preview).
+  const classicModeActive = scheduleEditingEnabled(competitionMode, savedMode);
+  // Per-match editing of the already saved schedule (works for a saved CL league too).
+  const savedScheduleEditable = !scheduleConfigLocked && competitionMode === savedMode;
+  const generateAllowed = parametersEditable && classicModeActive;
   const sameClubIdentityBlocked =
     competitionMode === "champions-league" && restrictSameClub && sameClubUnverifiedCount > 0;
   const previewAllowed =
-    (competitionMode === "champions-league" || scheduleEditingEnabledNow) &&
-    !sameClubIdentityBlocked;
+    (competitionMode === "champions-league" || classicModeActive) && !sameClubIdentityBlocked;
+  const championsLeagueApplyBlockReasonText =
+    competitionMode === "champions-league"
+      ? championsLeagueApplyBlockReason({
+          storedFormat,
+          groupCount: groups.length,
+          policyBlocked: scheduleConfigLocked,
+          policyReason: regenerationPolicy.reason,
+        })
+      : null;
   const championsLeagueApplyAllowed =
-    competitionMode === "champions-league" &&
-    ((storedFormat == null && groups.length === 0 && groupMatches.length === 0) ||
-      (storedFormat === "champions-league" && groups.length <= 1));
+    competitionMode === "champions-league" && championsLeagueApplyBlockReasonText === null;
 
   function clearPreviewState() {
     setPreviewOpen(false);
@@ -270,7 +299,7 @@ export function TournamentScheduleBoard({
   }
 
   function requestClearSchedule() {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!classicModeActive || scheduleConfigLocked) {
       setConfirmClear(false);
       return;
     }
@@ -278,7 +307,7 @@ export function TournamentScheduleBoard({
   }
 
   function executeClearSchedule() {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!classicModeActive || scheduleConfigLocked) {
       setConfirmClear(false);
       return;
     }
@@ -287,7 +316,7 @@ export function TournamentScheduleBoard({
   }
 
   function requestDeleteMatch(matchId: string) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!savedScheduleEditable) {
       setDeleteMatchId(null);
       return;
     }
@@ -295,7 +324,7 @@ export function TournamentScheduleBoard({
   }
 
   function executeDeleteMatch() {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!savedScheduleEditable) {
       setDeleteMatchId(null);
       return;
     }
@@ -315,7 +344,7 @@ export function TournamentScheduleBoard({
     scheduledAt: string;
     status: MatchStatus;
   }) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!savedScheduleEditable) {
       return Promise.resolve(false);
     }
     return run(() => saveTournamentMatchAction(tournament.id, input));
@@ -329,7 +358,7 @@ export function TournamentScheduleBoard({
     scheduledAt: string;
     status: MatchStatus;
   }) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!savedScheduleEditable) {
       return Promise.resolve(false);
     }
     return run(() => saveTournamentMatchAction(tournament.id, input));
@@ -430,7 +459,7 @@ export function TournamentScheduleBoard({
       setError(message);
       return;
     }
-    if (preview.mode !== "champions-league" && !scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (preview.mode !== "champions-league" && !classicModeActive) {
       return;
     }
     const fingerprint = preview.inputFingerprint;
@@ -501,7 +530,7 @@ export function TournamentScheduleBoard({
   }
 
   async function executeGenerate(confirmReplace: boolean) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!classicModeActive || scheduleConfigLocked) {
       return;
     }
     setPending(true);
@@ -561,21 +590,21 @@ export function TournamentScheduleBoard({
   }
 
   function removeField(index: number) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!parametersEditable) {
       return;
     }
     setFieldNames((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
   function addField() {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!parametersEditable) {
       return;
     }
     setFieldNames((current) => [...current, fieldDisplayName(current.length)]);
   }
 
   function changeScheduleSetting(apply: () => void) {
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!parametersEditable) {
       return;
     }
     apply();
@@ -583,7 +612,7 @@ export function TournamentScheduleBoard({
 
   async function handleSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+    if (!parametersEditable) {
       return;
     }
     await run(() =>
@@ -624,9 +653,14 @@ export function TournamentScheduleBoard({
 
       <AdminCard title="Spielparameter">
         <form onSubmit={handleSettings} className="grid gap-4">
-          {scheduleEditingEnabledNow ? null : (
-            <p id="preview-only-settings-lock" className="text-[13px] leading-relaxed text-muted" role="status">
-              {PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE}
+          <p className="text-[13px] leading-relaxed text-muted">
+            Diese Spielparameter gelten für jeden Wettbewerbsmodus. Änderungen
+            werden mit „Einstellungen speichern“ übernommen und fließen danach in
+            jede neue Spielplanvorschau ein.
+          </p>
+          {parametersEditable ? null : (
+            <p id="schedule-config-lock" className={`${adminCardShellClass} border-brand-yellow/50 bg-brand-yellow/10 px-4 py-3 text-[13px] leading-relaxed text-ink`} role="status">
+              {SCHEDULE_CONFIG_LOCKED_MESSAGE}
             </p>
           )}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -634,7 +668,7 @@ export function TournamentScheduleBoard({
               <TextInput
                 id="duration"
                 value={duration}
-                disabled={!scheduleEditingEnabledNow}
+                disabled={!parametersEditable}
                 onChange={(event) => changeScheduleSetting(() => setDuration(event.target.value))}
                 className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
@@ -643,7 +677,7 @@ export function TournamentScheduleBoard({
               <TextInput
                 id="break"
                 value={breakMinutes}
-                disabled={!scheduleEditingEnabledNow}
+                disabled={!parametersEditable}
                 onChange={(event) => changeScheduleSetting(() => setBreakMinutes(event.target.value))}
                 className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
@@ -652,7 +686,7 @@ export function TournamentScheduleBoard({
               <TextInput
                 id="rest"
                 value={restMinutes}
-                disabled={!scheduleEditingEnabledNow}
+                disabled={!parametersEditable}
                 onChange={(event) => changeScheduleSetting(() => setRestMinutes(event.target.value))}
                 className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
@@ -662,7 +696,7 @@ export function TournamentScheduleBoard({
                 id="lunch-start"
                 type="time"
                 value={lunchStart}
-                disabled={!scheduleEditingEnabledNow}
+                disabled={!parametersEditable}
                 onChange={(event) => changeScheduleSetting(() => setLunchStart(event.target.value))}
                 className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
@@ -672,7 +706,7 @@ export function TournamentScheduleBoard({
                 id="lunch-end"
                 type="time"
                 value={lunchEnd}
-                disabled={!scheduleEditingEnabledNow}
+                disabled={!parametersEditable}
                 onChange={(event) => changeScheduleSetting(() => setLunchEnd(event.target.value))}
                 className="disabled:cursor-not-allowed disabled:bg-surface disabled:opacity-70"
               />
@@ -691,7 +725,7 @@ export function TournamentScheduleBoard({
               <div key={`field-${index}`} className="flex gap-2">
                 <TextInput
                   value={name}
-                  disabled={!scheduleEditingEnabledNow}
+                  disabled={!parametersEditable}
                   onChange={(event) =>
                     changeScheduleSetting(() =>
                       setFieldNames((current) =>
@@ -705,11 +739,9 @@ export function TournamentScheduleBoard({
                 {fieldNames.length > 1 ? (
                   <button
                     type="button"
-                    disabled={!scheduleEditingEnabledNow}
-                    aria-disabled={!scheduleEditingEnabledNow}
-                    aria-describedby={
-                      scheduleEditingEnabledNow ? undefined : "preview-only-settings-lock"
-                    }
+                    disabled={!parametersEditable}
+                    aria-disabled={!parametersEditable}
+                    aria-describedby={parametersEditable ? undefined : "schedule-config-lock"}
                     className="text-[11px] font-semibold tracking-[0.08em] text-[#9a2b2b] uppercase disabled:cursor-not-allowed disabled:opacity-60"
                     onClick={() => removeField(index)}
                   >
@@ -720,9 +752,9 @@ export function TournamentScheduleBoard({
             ))}
             <button
               type="button"
-              disabled={!scheduleEditingEnabledNow}
-              aria-disabled={!scheduleEditingEnabledNow}
-              aria-describedby={scheduleEditingEnabledNow ? undefined : "preview-only-settings-lock"}
+              disabled={!parametersEditable}
+              aria-disabled={!parametersEditable}
+              aria-describedby={parametersEditable ? undefined : "schedule-config-lock"}
               onClick={addField}
               className="justify-self-start text-[12px] font-semibold tracking-[0.08em] text-ink uppercase hover:text-brand-blue disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -732,9 +764,9 @@ export function TournamentScheduleBoard({
 
           <button
             type="submit"
-            disabled={pending || !scheduleEditingEnabledNow}
-            aria-disabled={pending || !scheduleEditingEnabledNow}
-            aria-describedby={scheduleEditingEnabledNow ? undefined : "preview-only-settings-lock"}
+            disabled={pending || !parametersEditable}
+            aria-disabled={pending || !parametersEditable}
+            aria-describedby={parametersEditable ? undefined : "schedule-config-lock"}
             className={`${adminPrimaryButtonClass} w-fit`}
           >
             Einstellungen speichern
@@ -799,10 +831,7 @@ export function TournamentScheduleBoard({
           {groupMatches.length > 0 ? (
             <button
               type="button"
-              disabled={pending || previewLoading || !scheduleEditingEnabledNow}
-              aria-describedby={
-                scheduleEditingEnabledNow ? undefined : "preview-only-schedule-lock"
-              }
+              disabled={pending || previewLoading || !classicModeActive || scheduleConfigLocked}
               onClick={requestClearSchedule}
               className={adminSecondaryButtonClass}
             >
@@ -813,30 +842,37 @@ export function TournamentScheduleBoard({
             Spielplan als PDF
           </a>
         </div>
-        {scheduleEditingEnabledNow ? null : (
-          <p id="preview-only-schedule-lock" className="mt-3 text-[13px] leading-relaxed text-muted" role="status">
-            {PREVIEW_ONLY_SCHEDULE_LOCK_MESSAGE}
-          </p>
-        )}
         {competitionMode === "champions-league" ? (
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
-            Champions League verwendet eine gemeinsame Ligatabelle. „Direkt generieren“
-            bleibt deaktiviert. Die geprüfte Vorschau kann übernommen werden.
+            Champions League verwendet eine gemeinsame Ligaphase (keine Gruppenphase).
+            „Direkt generieren“ bleibt deaktiviert. Die geprüfte Vorschau wird mit
+            „Spielplan übernehmen“ als Wettbewerbsmodus dauerhaft gespeichert.
           </p>
         ) : competitionMode === savedMode ? (
           <p className="mt-3 text-[13px] text-muted">
             Round-Robin innerhalb jeder Gruppe, ohne Hin- und Rückrunde. Uhrzeiten in deutscher Ortszeit.
-            Die Vorschau basiert auf den aktuell gespeicherten Turniereinstellungen.
+            Die Vorschau basiert auf den aktuell gespeicherten Spielparametern.
           </p>
         ) : (
           <p className="mt-3 text-[13px] leading-relaxed text-muted">
-            Gespeichert ist {ADMIN_COMPETITION_MODE_LABELS[savedMode]}. Diese andere
-            Auswahl wird nicht erzeugt und nicht gespeichert.
+            Gespeichert ist „{ADMIN_COMPETITION_MODE_LABELS[savedMode]}“. Der Wechsel
+            zwischen Gruppenphase und Jeder gegen jeden ändert die Gruppenstruktur –
+            bitte zuerst in der{" "}
+            <a
+              href={`/admin/turniere/${tournament.id}/gruppen`}
+              className="font-semibold text-ink underline decoration-brand-blue/50 underline-offset-4 hover:text-brand-blue"
+            >
+              Gruppenverwaltung
+            </a>{" "}
+            anpassen. Champions League lässt sich dagegen direkt hier als Vorschau
+            erstellen und übernehmen.
           </p>
         )}
-        <p className="mt-1.5 text-[13px] text-muted">
-          Erstellt und speichert den Spielplan direkt ohne Vorschau.
-        </p>
+        {classicModeActive ? (
+          <p className="mt-1.5 text-[13px] text-muted">
+            „Direkt generieren“ erstellt und speichert den Gruppenspielplan ohne Vorschau.
+          </p>
+        ) : null}
       </AdminCard>
 
       {previewOpen ? (
@@ -865,6 +901,7 @@ export function TournamentScheduleBoard({
             applyPending={pending}
             applyLocked={previewApplyLocked}
             statusMessage={previewStatusMessage}
+            applyBlockReason={championsLeagueApplyBlockReasonText}
             onApply={handleApplyRequest}
           />
         )
@@ -884,7 +921,7 @@ export function TournamentScheduleBoard({
                 memberIdsByGroupId={memberIdsByGroupId}
                 teamLabels={teamLabels}
                 pending={pending}
-                locked={groupResultsLocked || !scheduleEditingEnabledNow}
+                locked={!savedScheduleEditable}
                 onSave={saveExistingMatch}
                 onDelete={() => requestDeleteMatch(match.id)}
               />
@@ -901,7 +938,7 @@ export function TournamentScheduleBoard({
         memberIdsByGroupId={memberIdsByGroupId}
         teamLabels={teamLabels}
         pending={pending}
-        locked={groupResultsLocked || !scheduleEditingEnabledNow}
+        locked={!savedScheduleEditable}
         onSave={addMatch}
       />
 
@@ -913,7 +950,7 @@ export function TournamentScheduleBoard({
         onCancel={() => setConfirmGenerate(false)}
         onConfirm={() => {
           setConfirmGenerate(false);
-          if (!scheduleEditingEnabled(competitionMode, savedMode)) {
+          if (!classicModeActive || scheduleConfigLocked) {
             return;
           }
           void executeGenerate(true);
@@ -932,10 +969,7 @@ export function TournamentScheduleBoard({
         onCancel={() => setConfirmApplyReplace(false)}
         onConfirm={() => {
           setConfirmApplyReplace(false);
-          if (
-            competitionMode !== "champions-league" &&
-            !scheduleEditingEnabled(competitionMode, savedMode)
-          ) {
+          if (competitionMode !== "champions-league" && !classicModeActive) {
             return;
           }
           void executeApply(true);

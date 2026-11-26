@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildChampionsLeagueAdminPreview,
+  championsLeagueApplyBlockReason,
   savedTournamentPlanTiming,
+  scheduleEditingEnabled,
+  scheduleParametersEditable,
 } from "../../src/lib/schedule/league-admin-preview.ts";
 import { buildLeagueFixtures } from "../../src/lib/schedule/league-phase.ts";
 
@@ -231,4 +234,54 @@ test("classic group tournament scheduling is unchanged (regression)", () => {
   const build = buildLeagueFixtures({ teamIds: ["a", "b", "c", "d"], matchesPerTeam: 3, knockoutCutoff: 4 });
   assert.equal(build.error, null);
   assert.equal(build.fixtures.length, 6);
+});
+
+// CL Release 5: draft parameters are editable for every mode, and the apply
+// eligibility surfaces the concrete blocker instead of a generic message.
+test("schedule parameters are a draft, frozen only by the started/result lock", () => {
+  assert.equal(scheduleParametersEditable(false), true);
+  assert.equal(scheduleParametersEditable(true), false);
+  // The classic-schedule path is reserved for the saved legacy mode, never CL.
+  assert.equal(scheduleEditingEnabled("groups-knockout", "groups-knockout"), true);
+  assert.equal(scheduleEditingEnabled("round-robin", "round-robin"), true);
+  assert.equal(scheduleEditingEnabled("champions-league", "champions-league"), false);
+  assert.equal(scheduleEditingEnabled("round-robin", "groups-knockout"), false);
+});
+
+test("champions league apply eligibility reports the real blocker", () => {
+  // Clean cases are applicable.
+  assert.equal(
+    championsLeagueApplyBlockReason({ storedFormat: null, groupCount: 0, policyBlocked: false }),
+    null,
+  );
+  assert.equal(
+    championsLeagueApplyBlockReason({ storedFormat: "champions-league", groupCount: 1, policyBlocked: false }),
+    null,
+  );
+  // Scenario B (10 teams, 4 games) that already has a resultless single league
+  // group must be applicable — this is the reported "20/20 but blocked" case.
+  assert.equal(
+    championsLeagueApplyBlockReason({ storedFormat: null, groupCount: 1, policyBlocked: false }),
+    null,
+  );
+  // Explicit legacy format: blocked with its label.
+  assert.match(
+    championsLeagueApplyBlockReason({ storedFormat: "groups-knockout", groupCount: 2, policyBlocked: false }),
+    /Gruppenphase \+ K\.-o\.-Runde/,
+  );
+  // Multiple groups: concrete remedy, not "matches not scheduled".
+  assert.match(
+    championsLeagueApplyBlockReason({ storedFormat: null, groupCount: 2, policyBlocked: false }),
+    /höchstens eine Gruppe/,
+  );
+  // Started/result lock reason is surfaced verbatim.
+  assert.equal(
+    championsLeagueApplyBlockReason({
+      storedFormat: null,
+      groupCount: 0,
+      policyBlocked: true,
+      policyReason: "Es existieren bereits Ergebnisse (inkl. 0:0).",
+    }),
+    "Es existieren bereits Ergebnisse (inkl. 0:0).",
+  );
 });
