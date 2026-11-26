@@ -34,6 +34,29 @@ secrets.
 > real-browser click-through below is the remaining **open** acceptance step and
 > must be run on a Docker-capable machine.
 >
+> ### Why Docker won't start here (diagnosed 2026-11-26, read-only)
+>
+> The WSL engine fails to mount Docker's data disk:
+> `Fehler beim Anfügen des Datenträgers "D:\DockerData\DockerDesktopWSL\main\ext4.vhdx" an WSL2: Zugriff verweigert — Wsl/Service/CreateInstance/MountDisk/HCS/E_ACCESSDENIED`.
+> Facts: WSL2 + virtualization are healthy (hypervisor present, VT enabled); the
+> `docker-desktop` distro exists; the VHDX is on the **D: drive** (custom
+> `CustomWslDistroDir`), ~92 MB, **not locked**, 943 GB free, user has Modify.
+> The session is **not elevated**. This is the typical non-admin HCS mount
+> permission failure for a WSL VHDX on a secondary drive.
+>
+> **Fix (needs YOUR action — elevation or a Docker-data change, intentionally not
+> done automatically):** either
+> 1. Start **Docker Desktop as administrator** once (right-click → *Als
+>    Administrator ausführen*), let it initialize, then `docker info` should show a
+>    Server; or
+> 2. In Docker Desktop → *Settings → Resources → Advanced* (or *WSL*), move the
+>    disk image back to the **default location on C:** (or *Troubleshoot → Clean /
+>    Purge data* if you accept re-initialising Docker's local data — destructive,
+>    your call); or
+> 3. Grant the virtualization service access to `D:\DockerData\DockerDesktopWSL`
+>    and retry.
+> After `docker info` shows a Server, run the steps below.
+>
 > ### Safe manual acceptance path (no Docker, no prod DB)
 >
 > If no Docker host is available, verify on an **isolated non-production Supabase

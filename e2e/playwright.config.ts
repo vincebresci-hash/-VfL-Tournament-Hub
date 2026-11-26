@@ -13,9 +13,10 @@ export default defineConfig({
   timeout: 60_000,
   retries: 0,
   reporter: [["list"], ["html", { outputFolder: "playwright-report", open: "never" }]],
+  outputDir: "test-results",
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
-    screenshot: "only-on-failure",
+    screenshot: "on",
     trace: "retain-on-failure",
   },
   projects: [

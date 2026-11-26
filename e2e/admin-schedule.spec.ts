@@ -1,4 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type TestInfo } from "@playwright/test";
+
+/** Save a named desktop/mobile screenshot for the acceptance record. */
+async function shot(page: Page, info: TestInfo, name: string) {
+  await page.screenshot({ path: `e2e/screenshots/${info.project.name}-${name}.png`, fullPage: true });
+}
 
 /**
  * CL Release 5 admin schedule management — real-browser journeys.
@@ -31,7 +36,7 @@ test.beforeEach(async ({ page }) => {
   await login(page);
 });
 
-test("all schedule parameters stay editable when Champions League is selected", async ({ page }) => {
+test("all schedule parameters stay editable when Champions League is selected", async ({ page }, info) => {
   await openSchedule(page, SLUG_B);
   await page.getByLabel("Wettbewerbsmodus").selectOption("champions-league");
   // The reported bug: these were disabled. They must be editable now.
@@ -39,9 +44,10 @@ test("all schedule parameters stay editable when Champions League is selected", 
   await expect(page.getByLabel("Pause zwischen Spielen")).toBeEnabled();
   await expect(page.getByLabel("Mindestruhezeit")).toBeEnabled();
   await expect(page.getByRole("button", { name: /Einstellungen speichern/i })).toBeEnabled();
+  await shot(page, info, "params-editable-cl");
 });
 
-test("scenario B: 20 of 20 league matches can be applied", async ({ page }) => {
+test("scenario B: 20 of 20 league matches can be applied", async ({ page }, info) => {
   await openSchedule(page, SLUG_B);
   await page.getByLabel("Wettbewerbsmodus").selectOption("champions-league");
   await page.getByLabel("Spiele pro Team").fill("4");
@@ -50,6 +56,7 @@ test("scenario B: 20 of 20 league matches can be applied", async ({ page }) => {
   const panel = page.getByText("Ligaphase (bearbeitbar)");
   await expect(panel).toBeVisible();
   await expect(page.getByText(/20\s*\/\s*20 Ligabegegnungen/)).toBeVisible();
+  await shot(page, info, "preview-20-of-20");
 
   const apply = page.getByRole("button", { name: /Spielplan übernehmen/i });
   await expect(apply).toBeEnabled();
@@ -60,13 +67,15 @@ test("scenario B: 20 of 20 league matches can be applied", async ({ page }) => {
     await confirm.click();
   }
   await expect(page.getByText(/erfolgreich übernommen/i)).toBeVisible();
+  await shot(page, info, "apply-success");
 
   // Persistence after reload.
   await page.reload();
   await expect(page.getByText("Spielparameter")).toBeVisible();
+  await shot(page, info, "after-reload");
 });
 
-test("editable preview blocks a field double-booking and allows a valid reorder", async ({ page }) => {
+test("editable preview blocks a field double-booking and allows a valid reorder", async ({ page }, info) => {
   await openSchedule(page, SLUG_B);
   await page.getByLabel("Wettbewerbsmodus").selectOption("champions-league");
   await page.getByLabel("Spiele pro Team").fill("4");
@@ -77,4 +86,22 @@ test("editable preview blocks a field double-booking and allows a valid reorder"
   await page.getByRole("button", { name: "Nach unten" }).first().click();
   await page.getByRole("button", { name: /Zeiten neu berechnen/i }).click();
   await expect(page.getByRole("button", { name: /Spielplan übernehmen/i })).toBeEnabled();
+  await shot(page, info, "editable-reorder");
+});
+
+test("missing club assignments can be set inline", async ({ page }, info) => {
+  await openSchedule(page, SLUG_B);
+  await page.getByLabel("Wettbewerbsmodus").selectOption("champions-league");
+  const clubCard = page.getByText("Vereinszuordnung");
+  if (await clubCard.isVisible().catch(() => false)) {
+    await shot(page, info, "club-assignment");
+    const firstSelect = page.getByLabel(/^Verein für /).first();
+    if (await firstSelect.isVisible().catch(() => false)) {
+      const option = firstSelect.locator("option").nth(1);
+      await firstSelect.selectOption(await option.getAttribute("value") ?? "");
+      await page.getByRole("button", { name: /^Zuordnen$/ }).first().click();
+      await expect(page.getByText(/Vereinszuordnung gespeichert|gespeichert/i)).toBeVisible();
+      await shot(page, info, "club-assigned");
+    }
+  }
 });
