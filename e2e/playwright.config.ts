@@ -4,8 +4,8 @@ import { defineConfig, devices } from "@playwright/test";
  * CL Release 5 admin schedule E2E. LOCAL ONLY.
  *
  * Expects the app on http://localhost:3000 backed by a local `supabase start`
- * stack seeded with e2e/seed/cl-release-5-synthetic.sql. Never point this at a
- * hosted/production URL.
+ * stack seeded by e2e/seed/ci-seed.mjs (synthetic data). Never point this at a
+ * hosted/production URL. Report + results land under e2e/ (config-relative).
  */
 export default defineConfig({
   testDir: ".",
