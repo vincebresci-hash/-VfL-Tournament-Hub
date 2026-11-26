@@ -134,7 +134,7 @@ type TournamentScheduleBoardProps = {
   /** Stable club identity per participant key (null = no shared club). */
   clubByParticipantId?: Record<string, string | null>;
   /** Hub clubs available for inline assignment. */
-  clubOptions?: Array<{ id: string; name: string }>;
+  clubOptions?: Array<{ id: string; name: string; city?: string | null }>;
   confirmedRosterError?: string | null;
 };
 
@@ -977,11 +977,12 @@ export function TournamentScheduleBoard({
         ) : null}
       </AdminCard>
 
-      {competitionMode === "champions-league" && clubAssignmentEntries.length > 0 ? (
+      {competitionMode === "champions-league" && leagueParticipantIds.length > 0 ? (
         <ClubAssignmentPanel
           tournamentId={tournament.id}
           entries={clubAssignmentEntries}
           clubs={clubOptions}
+          totalParticipants={leagueParticipantIds.length}
           participantManagementHref={`/admin/turniere/${tournament.id}?bereich=teilnehmer#teilnehmer`}
           disabled={pending}
         />

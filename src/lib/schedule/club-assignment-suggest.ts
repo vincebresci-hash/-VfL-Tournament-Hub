@@ -186,10 +186,10 @@ export function clubCanonicalKey(name: string): string {
  * Existing clubs that would duplicate `name` (same canonical key). Used to warn
  * BEFORE creating a club. Never merges — the admin decides.
  */
-export function findDuplicateClubs(
+export function findDuplicateClubs<T extends ClubOption>(
   name: string,
-  clubs: readonly ClubOption[],
-): ClubOption[] {
+  clubs: readonly T[],
+): T[] {
   const key = clubCanonicalKey(name);
   if (!key) {
     return [];
