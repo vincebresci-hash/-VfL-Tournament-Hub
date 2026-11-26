@@ -106,8 +106,28 @@ jobs:
       - name: Prepare artifact directories
         run: mkdir -p e2e/pdf e2e/screenshots
 
-      - name: Render Release 6 PDFs + screenshots (desktop + mobile)
-        run: npx playwright test --config e2e/playwright.config.ts release6-pdf
+      - name: Render Release 6 PDFs + full Release 5 regression (desktop + mobile)
+        run: npx playwright test --config e2e/playwright.config.ts release6-pdf admin-schedule
+
+      - name: Verify five downloadable landscape PDFs and page numbering
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          expected=(
+            champions-league-1-feld
+            champions-league-2-felder
+            champions-league-3-felder
+            klassisches-gruppenturnier
+            bambini-turnier
+          )
+          for name in "${expected[@]}"; do
+            file="e2e/pdf/${name}.pdf"
+            test -s "$file"
+            pdfinfo "$file" | grep -Eq 'Page size:[[:space:]]+84[12].*x 59[45].*pts'
+            pdftotext -layout "$file" - | grep -Eq 'Seite[[:space:]]+[0-9]+'
+          done
+          test -s e2e/pdf/champions-league-echter-entwurf.pdf
 
       - name: Upload PDFs + screenshots + report
         if: always()

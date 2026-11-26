@@ -1,11 +1,7 @@
 /**
  * CL Release 6 PDF E2E seed — DISPOSABLE LOCAL Supabase only.
  *
- * Seeds three already-applied synthetic tournaments so the PDF generator can be
- * rendered deterministically for all three reference layouts:
- *   cl6-pdf-cl-single  — Champions League, 1 field  (Layout A)
- *   cl6-pdf-cl-multi   — Champions League, 3 fields (Layout B)
- *   cl6-pdf-groups     — classic round-robin group  (Layout C)
+ * Seeds the complete Release-6 matrix with synthetic tournaments only.
  * All identities are synthetic. Refuses any non-local Supabase URL.
  */
 import { createClient } from "@supabase/supabase-js";
@@ -40,20 +36,20 @@ function roundRobinRounds(n) {
   return rounds;
 }
 
-async function ensureTournament(slug, name, ageGroup) {
+async function ensureTournament(slug, name, ageGroup, playFormat = null) {
   const existing = await db.from("tournaments").select("id").eq("slug", slug).maybeSingle();
   if (existing.data?.id) return existing.data.id;
   const inserted = await db
     .from("tournaments")
-    .insert({ slug, name, age_group: ageGroup, date: "2026-12-28", location: "Sporthalle Kirchheim/Teck", description: "Synthetisches Testturnier für den PDF-Generator.", start_time: "09:00" })
+    .insert({ slug, name, age_group: ageGroup, date: "2026-12-28", location: "Sporthalle Kirchheim/Teck", description: "Synthetisches Testturnier für den PDF-Generator. Diese vollständige Beschreibung wird dynamisch in das Dokument übernommen.", start_time: "09:00", play_format: playFormat })
     .select("id")
     .single();
   if (inserted.error) fail(`tournament insert failed (${slug}): ${inserted.error.message}`);
   return inserted.data.id;
 }
 
-async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, matchesPerTeam, cutoff, champions }) {
-  const tournamentId = await ensureTournament(slug, name, ageGroup);
+async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, matchesPerTeam, cutoff, champions, groupCount = 1, playFormat = null }) {
+  const tournamentId = await ensureTournament(slug, name, ageGroup, playFormat);
 
   const already = await db.from("tournament_matches").select("id").eq("tournament_id", tournamentId).limit(1);
   if (already.data && already.data.length > 0) return slug; // idempotent
@@ -76,57 +72,69 @@ async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, match
     appIds.push(ins.data.id);
   }
 
-  const groupIns = await db.from("tournament_groups").insert({ tournament_id: tournamentId, name: champions ? "Liga" : "Gruppe A", sort_order: 0 }).select("id").single();
-  if (groupIns.error) fail(`group insert failed: ${groupIns.error.message}`);
-  const groupId = groupIns.data.id;
-  for (const appId of appIds) {
-    const mem = await db.from("tournament_group_members").insert({ group_id: groupId, application_id: appId }).select("id").single();
-    if (mem.error) fail(`member insert failed: ${mem.error.message}`);
-  }
-
-  const rounds = roundRobinRounds(teamCount).slice(0, matchesPerTeam);
   const base = Date.parse("2026-12-28T08:00:00.000Z"); // 09:00 Berlin
   const slotMinutes = 15;
   const rows = [];
   let sort = 0;
   let slot = 0;
-  for (const round of rounds) {
-    round.forEach((pair, indexInRound) => {
-      const fieldIndex = indexInRound % fieldCount;
-      const when = new Date(base + (slot + Math.floor(indexInRound / fieldCount)) * slotMinutes * 60_000).toISOString();
-      rows.push({
-        tournament_id: tournamentId,
-        group_id: groupId,
-        field_id: fieldIds[fieldIndex],
-        home_application_id: appIds[pair[0]],
-        away_application_id: appIds[pair[1]],
-        scheduled_at: when,
-        duration_minutes: 12,
-        status: "scheduled",
-        phase: "group",
-        sort_order: sort,
+  const teamsPerGroup = teamCount / groupCount;
+  if (!Number.isInteger(teamsPerGroup) || teamsPerGroup % 2 !== 0 || matchesPerTeam >= teamsPerGroup) {
+    fail(`invalid group matrix for ${slug}`);
+  }
+  for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+    const groupIns = await db.from("tournament_groups").insert({ tournament_id: tournamentId, name: champions ? "Liga" : `Gruppe ${String.fromCharCode(65 + groupIndex)}`, sort_order: groupIndex }).select("id").single();
+    if (groupIns.error) fail(`group insert failed: ${groupIns.error.message}`);
+    const groupId = groupIns.data.id;
+    const groupApps = appIds.slice(groupIndex * teamsPerGroup, (groupIndex + 1) * teamsPerGroup);
+    for (const appId of groupApps) {
+      const mem = await db.from("tournament_group_members").insert({ group_id: groupId, application_id: appId }).select("id").single();
+      if (mem.error) fail(`member insert failed: ${mem.error.message}`);
+    }
+    const rounds = roundRobinRounds(teamsPerGroup).slice(0, matchesPerTeam);
+    for (const round of rounds) {
+      round.forEach((pair, indexInRound) => {
+        const fieldIndex = indexInRound % fieldCount;
+        const when = new Date(base + (slot + Math.floor(indexInRound / fieldCount)) * slotMinutes * 60_000).toISOString();
+        rows.push({
+          tournament_id: tournamentId,
+          group_id: groupId,
+          field_id: fieldIds[fieldIndex],
+          home_application_id: groupApps[pair[0]],
+          away_application_id: groupApps[pair[1]],
+          scheduled_at: when,
+          duration_minutes: 12,
+          status: "scheduled",
+          phase: "group",
+          sort_order: sort,
+        });
+        sort += 1;
       });
-      sort += 1;
-    });
-    slot += Math.ceil(round.length / fieldCount);
+      slot += Math.ceil(round.length / fieldCount);
+    }
   }
   const matchInsert = await db.from("tournament_matches").insert(rows).select("id");
   if (matchInsert.error) fail(`match insert failed: ${matchInsert.error.message}`);
 
-  if (champions) {
+  {
     const upd = await db
       .from("tournaments")
-      .update({ competition_format: "champions-league", knockout_cutoff: cutoff, league_matches_per_team: matchesPerTeam })
+      .update(champions
+        ? { competition_format: "champions-league", knockout_cutoff: cutoff, league_matches_per_team: matchesPerTeam }
+        : { competition_format: groupCount > 1 ? "groups-knockout" : "round-robin" })
       .eq("id", tournamentId)
       .select("id")
       .single();
     if (upd.error) fail(`tournament config update failed: ${upd.error.message}`);
   }
-  return slug;
+  return { slug, expectedMatches: rows.length };
 }
 
-await seedScenario({ slug: "cl6-pdf-cl-single", name: "B-Jugend Hallenturnier (Champions League, 1 Feld)", ageGroup: "B-Jugend", teamCount: 6, fieldCount: 1, matchesPerTeam: 3, cutoff: 4, champions: true });
-await seedScenario({ slug: "cl6-pdf-cl-multi", name: "U13 Soccer Cup (Champions League, 3 Felder)", ageGroup: "U13", teamCount: 8, fieldCount: 3, matchesPerTeam: 3, cutoff: 8, champions: true });
-await seedScenario({ slug: "cl6-pdf-groups", name: "E-Jugend Gruppenturnier", ageGroup: "E-Jugend", teamCount: 6, fieldCount: 2, matchesPerTeam: 5, cutoff: null, champions: false });
+const seeded = [];
+seeded.push(await seedScenario({ slug: "cl6-pdf-cl-single", name: "CL 10 Teams – ein Feld", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-cl-two", name: "CL 16 Teams – zwei Felder", ageGroup: "U14", teamCount: 16, fieldCount: 2, matchesPerTeam: 8, cutoff: 8, champions: true }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-cl-three", name: "CL 18 Teams – drei Felder", ageGroup: "U15", teamCount: 18, fieldCount: 3, matchesPerTeam: 5, cutoff: 16, champions: true }));
+seeded.push(await seedScenario({ slug: "cl6-matrix-18x8", name: "CL Matrix 18 × 8", ageGroup: "U16", teamCount: 18, fieldCount: 3, matchesPerTeam: 8, cutoff: 16, champions: true }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-groups", name: "Klassisches Turnier mit zwei Gruppen", ageGroup: "F-Jugend", teamCount: 8, fieldCount: 2, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2 }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-bambini", name: "Bambini-Kinderfestival", ageGroup: "Bambini", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, playFormat: "Kinderfestival ohne Ergebnisse und Tabelle" }));
 
-console.log("ci-seed-r6-pdf ok: cl6-pdf-cl-single, cl6-pdf-cl-multi, cl6-pdf-groups applied.");
+console.log(`ci-seed-r6-pdf ok: ${seeded.map((entry) => `${entry.slug}:${entry.expectedMatches}`).join(", ")}`);

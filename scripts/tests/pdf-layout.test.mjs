@@ -16,8 +16,30 @@ test("layout maps from the actual tournament data", () => {
     resolvePdfLayout({ competitionFormat: "round-robin", groupCount: 0, fieldCount: 1, ageGroup: "Bambini" }),
     "bambini",
   );
+  assert.equal(
+    resolvePdfLayout({ competitionFormat: "round-robin", groupCount: 1, fieldCount: 1, ageGroup: "F-Jugend" }),
+    "groups",
+    "F-Jugend is not implicitly Bambini",
+  );
+  assert.equal(
+    resolvePdfLayout({ competitionFormat: "round-robin", groupCount: 1, fieldCount: 1, ageGroup: "F-Jugend", playFormat: "Kinderfestival ohne Ergebnisse" }),
+    "bambini",
+    "an explicit no-results format selects Bambini layout",
+  );
   assert.equal(pdfLayoutShowsStandings("bambini"), false);
   assert.equal(pdfLayoutShowsStandings("cl-multi"), true);
+});
+
+test("multi-field timeline never drops conflicts or missing field assignments", () => {
+  const matches = [
+    { key: "m1", scheduledAt: "2026-12-27T09:00:00Z", fieldId: "f1", sortOrder: 0 },
+    { key: "m2", scheduledAt: "2026-12-27T09:00:00Z", fieldId: "f1", sortOrder: 1 },
+    { key: "m3", scheduledAt: "2026-12-27T09:00:00Z", fieldId: null, sortOrder: 2 },
+    { key: "m4", scheduledAt: null, fieldId: null, sortOrder: 3 },
+  ];
+  const rows = groupMatchesByTimeslot(matches, ["f1", "f2"]);
+  const rendered = rows.flatMap((row) => row.cells.map((cell) => cell.match?.key).filter(Boolean));
+  assert.deepEqual(rendered.sort(), ["m1", "m2", "m3", "m4"]);
 });
 
 test("multi-field timeline groups by kickoff with one cell per field", () => {

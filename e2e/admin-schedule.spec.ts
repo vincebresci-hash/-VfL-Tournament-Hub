@@ -63,9 +63,9 @@ async function readTimingRows(rows: Locator): Promise<TimingRow[]> {
     const value = await row.locator('input[type="datetime-local"]').inputValue();
     result.push({
       kickoff: Date.parse(value),
-      field: await row.locator("select").inputValue(),
-      home: (await row.locator("td").nth(4).textContent())?.trim() ?? "",
-      away: (await row.locator("td").nth(5).textContent())?.trim() ?? "",
+      field: await row.getByLabel(/Spielfeld Spiel/).inputValue(),
+      home: await selectedText(row.getByLabel(/Heimteam Vorschau Spiel/)),
+      away: await selectedText(row.getByLabel(/Auswärtsteam Vorschau Spiel/)),
     });
   }
   return result;
@@ -130,6 +130,12 @@ test("Same-Club blockiert fehlende Identitäten; akzeptierte Teams sind direkt i
   await expect(page.getByRole("link", { name: /Vereinszuordnung in der Teilnehmerverwaltung/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Vereinszuordnung", exact: true })).toBeVisible();
 
+  const newClubName = `R6 E2E Club ${viewportKey(info)}`;
+  await page.getByLabel("Neuer Vereinsname").fill(newClubName);
+  await page.getByLabel("Stadt (optional)").fill("Kirchheim Test");
+  await page.getByRole("button", { name: "Verein anlegen", exact: true }).click();
+  await expect(page.getByText(new RegExp(`${newClubName}.*angelegt`))).toBeVisible();
+
   const selectors = page.getByLabel(/^Verein für /);
   await expect(selectors).toHaveCount(10);
   await selectors.first().selectOption({ label: "Blue Test Club" });
@@ -161,15 +167,15 @@ test("10 Teams × 4 Spiele: 20/20, Reihenfolge, Anstoß und Feld werden vollstä
     expect(crossClub, `${row.home} vs ${row.away} must cross clubs`).toBeTruthy();
   }
 
-  const secondHome = (await rows.nth(1).locator("td").nth(4).textContent())?.trim() ?? "";
-  const secondAway = (await rows.nth(1).locator("td").nth(5).textContent())?.trim() ?? "";
+  const secondHome = await selectedText(rows.nth(1).getByLabel(/Heimteam Vorschau Spiel/));
+  const secondAway = await selectedText(rows.nth(1).getByLabel(/Auswärtsteam Vorschau Spiel/));
   await rows.nth(0).getByRole("button", { name: "Nach unten" }).click();
-  await expect(rows.nth(0).locator("td").nth(4)).toHaveText(secondHome);
-  await expect(rows.nth(0).locator("td").nth(5)).toHaveText(secondAway);
+  await expect(rows.nth(0).getByLabel(/Heimteam Vorschau Spiel/).locator("option:checked")).toHaveText(secondHome);
+  await expect(rows.nth(0).getByLabel(/Auswärtsteam Vorschau Spiel/).locator("option:checked")).toHaveText(secondAway);
 
   const customKickoff = "2026-12-27T23:00";
   await rows.nth(0).locator('input[type="datetime-local"]').fill(customKickoff);
-  const field = rows.nth(0).locator("select");
+  const field = rows.nth(0).getByLabel(/Spielfeld Spiel/);
   const currentField = await field.inputValue();
   const alternativeField = await field.locator("option").evaluateAll(
     (options, current) =>

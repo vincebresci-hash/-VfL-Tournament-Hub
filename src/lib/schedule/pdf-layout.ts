@@ -13,9 +13,11 @@ export type PdfLayoutInput = {
   groupCount: number;
   fieldCount: number;
   ageGroup?: string | null;
+  playFormat?: string | null;
 };
 
-const BAMBINI_AGE = /\bbambini\b|\bg-?jugend\b|\bf-?jugend\b/i;
+const BAMBINI_AGE = /\bbambini\b|\bg-?jugend\b|\bminis?\b/i;
+const BAMBINI_FORMAT = /\bbambini\b|\bkinderfestival\b|\bfunino\b|\bohne\s+(?:ergebnisse?|wertung|tabelle)\b/i;
 
 /**
  * Map a tournament to a reference layout:
@@ -28,7 +30,13 @@ export function resolvePdfLayout(input: PdfLayoutInput): PdfLayout {
   if (input.competitionFormat === "champions-league") {
     return input.fieldCount > 1 ? "cl-multi" : "cl-single";
   }
-  if (input.ageGroup && BAMBINI_AGE.test(input.ageGroup)) {
+  // F-Jugend is intentionally not inferred as Bambini. The schedule-only PDF
+  // is selected only by an explicit Bambini/G-Jugend age group or a configured
+  // no-results play format.
+  if (
+    (input.ageGroup && BAMBINI_AGE.test(input.ageGroup)) ||
+    (input.playFormat && BAMBINI_FORMAT.test(input.playFormat))
+  ) {
     return "bambini";
   }
   return "groups";
@@ -63,49 +71,36 @@ export function groupMatchesByTimeslot<T extends PdfTimelineMatch>(
   fieldIds: readonly string[],
 ): Array<PdfTimelineRow<T>> {
   const fields = [...fieldIds];
-  const byKickoff = new Map<string, Map<string, T>>();
-  const order: string[] = [];
-  const unscheduled: T[] = [];
+  const fallbackFields = fields.length > 0 ? fields : ["unassigned"];
+  const byKickoff = new Map<string, Array<Map<string, T>>>();
 
   for (const match of [...matches].sort((a, b) => a.sortOrder - b.sortOrder)) {
-    if (!match.scheduledAt || !match.fieldId || !fields.includes(match.fieldId)) {
-      unscheduled.push(match);
-      continue;
-    }
-    let slot = byKickoff.get(match.scheduledAt);
+    const kickoff = match.scheduledAt ?? "~unscheduled";
+    const preferredField =
+      match.fieldId && fallbackFields.includes(match.fieldId)
+        ? match.fieldId
+        : fallbackFields[0]!;
+    const rows = byKickoff.get(kickoff) ?? [];
+    let slot = rows.find((candidate) => !candidate.has(preferredField));
     if (!slot) {
       slot = new Map<string, T>();
-      byKickoff.set(match.scheduledAt, slot);
-      order.push(match.scheduledAt);
+      rows.push(slot);
     }
-    // First match wins a field cell; a genuine double-booking would already be
-    // rejected by validation, so this is defensive only.
-    if (!slot.has(match.fieldId)) {
-      slot.set(match.fieldId, match);
-    }
+    slot.set(preferredField, match);
+    byKickoff.set(kickoff, rows);
   }
 
-  const rows: Array<PdfTimelineRow<T>> = order
-    .sort((a, b) => a.localeCompare(b))
-    .map((kickoff) => {
-      const slot = byKickoff.get(kickoff)!;
-      return {
-        scheduledAt: kickoff,
-        cells: fields.map((fieldId) => ({ fieldId, match: slot.get(fieldId) ?? null })),
-      };
-    });
-
-  for (const match of unscheduled) {
-    rows.push({
-      scheduledAt: null,
-      cells: fields.map((fieldId) => ({
-        fieldId,
-        match: match.fieldId === fieldId || (!match.fieldId && fieldId === fields[0]) ? match : null,
+  return [...byKickoff.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .flatMap(([kickoff, slots]) =>
+      slots.map((slot) => ({
+        scheduledAt: kickoff === "~unscheduled" ? null : kickoff,
+        cells: fallbackFields.map((fieldId) => ({
+          fieldId,
+          match: slot.get(fieldId) ?? null,
+        })),
       })),
-    });
-  }
-
-  return rows;
+    );
 }
 
 /** Assign stable 1-based game numbers in schedule order. */

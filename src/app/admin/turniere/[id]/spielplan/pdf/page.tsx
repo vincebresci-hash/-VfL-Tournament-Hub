@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DraftSchedulePdfPage } from "@/components/admin/DraftSchedulePdfPage";
 import { PrintScheduleButton } from "@/components/admin/PrintScheduleButton";
 import {
   SchedulePdfDocument,
@@ -16,6 +17,10 @@ import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import { matchSideParticipantId, scheduleParticipantId, teamLabelsFromParticipants } from "@/lib/schedule/admin";
 import { formatBerlinClock } from "@/lib/schedule/datetime";
+import {
+  buildChampionsLeagueBracketRows,
+  buildClassicBracketRows,
+} from "@/lib/schedule/draft-schedule-pdf";
 import { knockoutRoundLabel } from "@/lib/schedule/knockout";
 import {
   assignGameNumbers,
@@ -29,7 +34,7 @@ import type { TournamentMatchRecord } from "@/types/schedule";
 
 type PdfPageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ quelle?: string }>;
+  searchParams: Promise<{ quelle?: string; entwurf?: string }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -63,11 +68,25 @@ function resultLabel(match: Pick<TournamentMatchRecord, "homeScore" | "awayScore
 
 export default async function SchedulePdfPage({ params, searchParams }: PdfPageProps) {
   const { id } = await params;
-  const { quelle } = await searchParams;
+  const { quelle, entwurf } = await searchParams;
   const draft = quelle === "entwurf";
   const tournament = await loadTournament(id);
   if (!tournament) {
     notFound();
+  }
+
+  if (draft) {
+    return (
+      <main style={{ background: "white", minHeight: "100vh" }}>
+        {entwurf ? (
+          <DraftSchedulePdfPage tournamentId={tournament.id} storageKey={entwurf} />
+        ) : (
+          <p role="alert" style={{ margin: "32px auto", maxWidth: "720px", padding: "20px", color: "#9a2b2b" }}>
+            Für ein echtes Entwurfs-PDF muss der Export direkt aus der geöffneten Spielplanvorschau gestartet werden.
+          </p>
+        )}
+      </main>
+    );
   }
 
   const [stage, participants, leagueConfig] = await Promise.all([
@@ -91,6 +110,7 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
     groupCount: stage.groups.length,
     fieldCount: fields.length,
     ageGroup: tournament.ageGroup,
+    playFormat: tournament.playFormat,
   });
   const isChampionsLeague = layout === "cl-single" || layout === "cl-multi";
 
@@ -185,11 +205,31 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
     }
   }
 
-  const knockout: PdfMatchRow[] = knockoutMatches.map((match) => ({
-    ...toRow(match),
-    roundLabel: match.round ? knockoutRoundLabel[match.round] : "K.-o.-Spiel",
-    isFinal: match.round === "final",
-  }));
+  const bracketTemplate = isChampionsLeague ? buildChampionsLeagueBracketRows(cutoff) : [];
+  const templateIndexByRound = new Map<string, number>();
+  const knockout: PdfMatchRow[] = knockoutMatches.map((match) => {
+    const round = match.round;
+    const roundIndex = round ? (templateIndexByRound.get(round) ?? 0) : 0;
+    if (round) templateIndexByRound.set(round, roundIndex + 1);
+    const placeholder = round
+      ? bracketTemplate.filter((row) => row.round === round)[roundIndex]
+      : null;
+    const row = toRow(match);
+    return {
+      ...row,
+      homeName: matchSideParticipantId(match, "home") ? row.homeName : (placeholder?.homeName ?? "Offen"),
+      awayName: matchSideParticipantId(match, "away") ? row.awayName : (placeholder?.awayName ?? "Offen"),
+      round,
+      nextKey: match.nextMatchId,
+      roundLabel: round ? knockoutRoundLabel[round] : "K.-o.-Spiel",
+      isFinal: round === "final",
+    };
+  });
+  if (isChampionsLeague && knockout.length === 0) {
+    knockout.push(...bracketTemplate);
+  } else if (format === "groups-knockout" && knockout.length === 0) {
+    knockout.push(...buildClassicBracketRows(stage.groups.length));
+  }
 
   const participantNames = participants
     .map((participant) => {
@@ -217,13 +257,13 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
         </Link>
         <PrintScheduleButton />
       </div>
-      <div style={{ maxWidth: "800px", margin: "0 auto", padding: "18px" }}>
+      <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "18px" }}>
         {!stage.ready ? (
           <p>Die Datenbank ist noch nicht eingerichtet.</p>
         ) : (
           <SchedulePdfDocument
             layout={layout}
-            draft={draft}
+            draft={false}
             tournamentName={tournament.name}
             dateLabel={formatTournamentDate(tournament.date)}
             startTimeLabel={tournament.startTime ?? null}

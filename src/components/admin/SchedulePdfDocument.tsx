@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { PdfLayout, PdfTimelineRow } from "@/lib/schedule/pdf-layout";
+import type { KnockoutRound } from "@/types/schedule";
 
 const NAVY = "#0b2a5e";
 const BLUE = "#0b4aa0";
@@ -16,6 +17,8 @@ export type PdfMatchRow = {
   awayName: string;
   result: string;
   roundLabel?: string | null;
+  round?: KnockoutRound | null;
+  nextKey?: string | null;
   isFinal?: boolean;
 };
 
@@ -76,7 +79,7 @@ function SectionHeading({ children }: { children: ReactNode }) {
   );
 }
 
-function ScheduleTable({ rows }: { rows: PdfMatchRow[] }) {
+function ScheduleTable({ rows, showResult }: { rows: PdfMatchRow[]; showResult: boolean }) {
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
@@ -86,18 +89,18 @@ function ScheduleTable({ rows }: { rows: PdfMatchRow[] }) {
           <th style={{ ...th, width: "12%" }}>Feld</th>
           <th style={th}>Team 1</th>
           <th style={th}>Team 2</th>
-          <th style={{ ...th, width: "14%" }}>Ergebnis</th>
+          {showResult ? <th style={{ ...th, width: "14%" }}>Ergebnis</th> : null}
         </tr>
       </thead>
       <tbody>
         {rows.map((match, index) => (
-          <tr key={match.key} style={rowStyle(index)}>
+          <tr key={match.key} style={rowStyle(index)} data-match-key={match.key}>
             <td style={td}>{match.number}</td>
             <td style={td}>{match.time}</td>
             <td style={td}>{match.fieldName}</td>
             <td style={{ ...td, fontWeight: 600 }}>{match.homeName}</td>
             <td style={{ ...td, fontWeight: 600 }}>{match.awayName}</td>
-            <td style={td}>{match.result}</td>
+            {showResult ? <td style={td}>{match.result}</td> : null}
           </tr>
         ))}
       </tbody>
@@ -125,7 +128,7 @@ function TimelineTable({ rows, fieldNames }: { rows: Array<PdfTimelineRow<PdfMat
             {row.cells.map((cell) => (
               <td key={cell.fieldId} style={td}>
                 {cell.match ? (
-                  <span>
+                  <span data-match-key={cell.match.key}>
                     <span style={{ color: BLUE, fontWeight: 700 }}>#{cell.match.number} </span>
                     {cell.match.homeName} – {cell.match.awayName}
                   </span>
@@ -176,10 +179,78 @@ function StandingsTable({ rows }: { rows: PdfStandingRow[] }) {
   );
 }
 
+const BRACKET_ROUNDS: KnockoutRound[] = [
+  "round-of-16",
+  "quarterfinal",
+  "semifinal",
+  "final",
+];
+
+function BracketMatch({ match }: { match: PdfMatchRow }) {
+  return (
+    <article className="pdf-bracket-match">
+      <p className="pdf-bracket-meta">
+        {match.time} · {match.fieldName}
+      </p>
+      <div className="pdf-bracket-team">{match.homeName}</div>
+      <div className="pdf-bracket-team">{match.awayName}</div>
+      {match.result !== "—" ? <strong className="pdf-bracket-result">{match.result}</strong> : null}
+    </article>
+  );
+}
+
+function KnockoutBracket({ matches }: { matches: PdfMatchRow[] }) {
+  const mainRounds = BRACKET_ROUNDS.map((round) => ({
+    round,
+    matches: matches.filter((match) => match.round === round),
+  })).filter((entry) => entry.matches.length > 0);
+  const placementMatches = matches.filter(
+    (match) =>
+      match.round === "third-place" ||
+      match.round === "placement-5" ||
+      match.round === "placement-7",
+  );
+
+  return (
+    <div>
+      <div
+        className="pdf-bracket"
+        style={{ gridTemplateColumns: `repeat(${Math.max(mainRounds.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {mainRounds.map((entry, roundIndex) => (
+          <section className="pdf-bracket-round" key={entry.round}>
+            <h3>{entry.matches[0]?.roundLabel}</h3>
+            <div className="pdf-bracket-stack">
+              {entry.matches.map((match) => (
+                <div
+                  className={roundIndex < mainRounds.length - 1 ? "pdf-bracket-connector" : undefined}
+                  key={match.key}
+                >
+                  <BracketMatch match={match} />
+                </div>
+              ))}
+            </div>
+          </section>
+        ))}
+      </div>
+      {placementMatches.length > 0 ? (
+        <div className="pdf-placement-grid">
+          {placementMatches.map((match) => (
+            <div key={match.key}>
+              <h3>{match.roundLabel}</h3>
+              <BracketMatch match={match} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * Central, reusable schedule PDF document. All content is derived from the
  * tournament data passed in — nothing is hard-coded from the reference designs.
- * Print-optimised A4; the CI render adds page numbers via the browser footer.
+ * Print-optimised A4 landscape with paged-media headers and page counters.
  */
 export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
   return (
@@ -188,12 +259,30 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       style={{ background: "white", color: "#13223d", fontFamily: "'Segoe UI', Arial, sans-serif" }}
     >
       <style>{`
-        @page { size: A4; margin: 14mm 12mm 16mm; }
+        @page {
+          size: A4 landscape;
+          margin: 18mm 12mm 18mm;
+          @top-left { content: "VfL Kirchheim/Teck · Tournament Hub"; color: ${NAVY}; font-size: 9px; font-weight: 700; }
+          @top-right { content: "Offizieller Turnierspielplan"; color: ${BLUE}; font-size: 9px; }
+          @bottom-left { content: "VfL Kirchheim/Teck"; color: #66758d; font-size: 8px; }
+          @bottom-right { content: "Seite " counter(page) " / " counter(pages); color: #66758d; font-size: 8px; }
+        }
         @media print { nav, header.app-chrome, button, .print\\:hidden { display: none !important; } body { background: white; } }
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
         .pdf-root tr, .pdf-root h2, .pdf-root h3 { break-inside: avoid; }
         .pdf-break { break-before: page; }
+        .pdf-bracket { display: grid; gap: 22px; min-height: 148mm; }
+        .pdf-bracket-round { display: flex; min-width: 0; flex-direction: column; }
+        .pdf-bracket-round > h3, .pdf-placement-grid h3 { margin: 0 0 6px; color: ${NAVY}; font-size: 11px; text-transform: uppercase; }
+        .pdf-bracket-stack { display: flex; flex: 1; flex-direction: column; justify-content: space-around; gap: 8px; }
+        .pdf-bracket-connector { position: relative; }
+        .pdf-bracket-connector::after { content: ""; position: absolute; top: 50%; right: -22px; width: 22px; border-top: 2px solid ${BLUE}; }
+        .pdf-bracket-match { position: relative; border: 1px solid ${BORDER}; border-left: 4px solid ${YELLOW}; background: white; padding: 5px 7px; box-shadow: 0 1px 2px rgba(11,42,94,.08); }
+        .pdf-bracket-meta { margin: 0 0 3px; color: #66758d; font-size: 8px; }
+        .pdf-bracket-team { border-top: 1px solid #e5ebf4; padding: 3px 0; color: ${NAVY}; font-size: 9px; font-weight: 600; }
+        .pdf-bracket-result { position: absolute; right: 7px; top: 5px; color: ${BLUE}; font-size: 9px; }
+        .pdf-placement-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 12px; border-top: 2px solid ${YELLOW}; padding-top: 10px; }
       `}</style>
 
       {/* Header */}
@@ -244,7 +333,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         {props.timelineRows && props.timelineRows.length > 0 ? (
           <TimelineTable rows={props.timelineRows} fieldNames={props.fieldNames} />
         ) : props.singleColumnMatches.length > 0 ? (
-          <ScheduleTable rows={props.singleColumnMatches} />
+          <ScheduleTable rows={props.singleColumnMatches} showResult={props.layout !== "bambini"} />
         ) : (
           <p style={{ fontSize: "11px" }}>Noch keine Begegnungen.</p>
         )}
@@ -271,33 +360,10 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       ) : null}
 
       {/* Knockout */}
-      {props.knockout.length > 0 ? (
+      {props.layout !== "bambini" && props.knockout.length > 0 ? (
         <section className="pdf-break" style={{ marginTop: "16px" }}>
           <SectionHeading>{props.knockoutTitle}</SectionHeading>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ ...th, width: "22%" }}>Runde</th>
-                <th style={{ ...th, width: "16%" }}>Anstoß</th>
-                <th style={{ ...th, width: "12%" }}>Feld</th>
-                <th style={th}>Paarung</th>
-                <th style={{ ...th, width: "14%" }}>Ergebnis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {props.knockout.map((match, index) => (
-                <tr key={match.key} style={rowStyle(index, match.isFinal)}>
-                  <td style={{ ...td, fontWeight: 600 }}>{match.roundLabel ?? "K.-o.-Spiel"}</td>
-                  <td style={td}>{match.time}</td>
-                  <td style={td}>{match.fieldName}</td>
-                  <td style={td}>
-                    {match.homeName} <span style={{ color: "#9aa7bd" }}>vs</span> {match.awayName}
-                  </td>
-                  <td style={td}>{match.result}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <KnockoutBracket matches={props.knockout} />
         </section>
       ) : null}
 

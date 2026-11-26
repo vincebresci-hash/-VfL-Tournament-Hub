@@ -12,6 +12,7 @@ import {
 import { ChampionsLeagueScheduleFields } from "@/components/admin/ChampionsLeagueScheduleFields";
 import { ClubAssignmentPanel, type ClubAssignmentEntry } from "@/components/admin/ClubAssignmentPanel";
 import { EditableLeaguePreviewPanel } from "@/components/admin/EditableLeaguePreviewPanel";
+import { DraftSchedulePdfButton } from "@/components/admin/DraftSchedulePdfButton";
 import { suggestClubAssignments } from "@/lib/schedule/club-assignment-suggest";
 import { TournamentPlanPreviewPanel } from "@/components/admin/TournamentPlanPreviewPanel";
 import {
@@ -33,6 +34,7 @@ import {
   saveTournamentMatchAction,
 } from "@/lib/db/schedule-actions";
 import { isoToDatetimeLocal } from "@/lib/schedule/datetime";
+import { buildDraftSchedulePdfDocument } from "@/lib/schedule/draft-schedule-pdf";
 import {
   ADMIN_COMPETITION_MODE_LABELS,
   buildChampionsLeagueAdminPreview,
@@ -482,8 +484,15 @@ export function TournamentScheduleBoard({
   const leaguePlanDirty =
     leaguePlan != null &&
     leaguePlanBaseline != null &&
-    JSON.stringify(leaguePlan.map((m) => [m.key, m.sortOrder, m.scheduledAt, m.fieldId])) !==
-      JSON.stringify(leaguePlanBaseline.map((m) => [m.key, m.sortOrder, m.scheduledAt, m.fieldId]));
+    JSON.stringify(leaguePlan.map((m) => [m.key, m.sortOrder, m.scheduledAt, m.fieldId, m.home, m.away])) !==
+      JSON.stringify(leaguePlanBaseline.map((m) => [m.key, m.sortOrder, m.scheduledAt, m.fieldId, m.home, m.away]));
+
+  const participantRefByKey = new Map(
+    participants.flatMap((participant) => {
+      const key = participant.applicationId ?? participant.externalTeamId;
+      return key ? [[key, participant] as const] : [];
+    }),
+  );
 
   function moveLeagueMatch(key: string, direction: "up" | "down") {
     setLeaguePlan((current) => (current ? reorderMatch(current, key, direction) : current));
@@ -498,6 +507,29 @@ export function TournamentScheduleBoard({
       current ? current.map((m) => (m.key === key ? { ...m, scheduledAt: iso } : m)) : current,
     );
   }
+  function setLeagueParticipant(
+    key: string,
+    side: "home" | "away",
+    participantId: string,
+  ) {
+    const participant = participantRefByKey.get(participantId);
+    if (!participant) return;
+    setLeaguePlan((current) =>
+      current
+        ? current.map((match) =>
+            match.key === key
+              ? {
+                  ...match,
+                  [side]: {
+                    applicationId: participant.applicationId,
+                    externalTeamId: participant.externalTeamId,
+                  },
+                }
+              : match,
+          )
+        : current,
+    );
+  }
   function recomputeLeagueTimes() {
     setLeaguePlan((current) =>
       current ? recomputeTimes(current, savedTournamentPlanTiming(tournament), leagueFields) : current,
@@ -506,6 +538,18 @@ export function TournamentScheduleBoard({
   function resetLeaguePlan() {
     setLeaguePlan(leaguePlanBaseline ? [...leaguePlanBaseline] : null);
   }
+
+  const draftPdfDocument = preview
+    ? buildDraftSchedulePdfDocument({
+        tournament,
+        preview,
+        editedMatches: preview.mode === "champions-league" ? leaguePlan : null,
+        teamLabels,
+        fields: leagueFields,
+        matchesPerTeam: parseMatchesPerTeam(leagueMatchesPerTeam),
+        knockoutCutoff: preview.mode === "champions-league" ? leagueCutoff : null,
+      })
+    : null;
 
   function closePreview() {
     if (pending) {
@@ -1009,6 +1053,7 @@ export function TournamentScheduleBoard({
             plan={leaguePlan}
             validation={leagueValidation}
             teamLabels={teamLabels}
+            participantIds={leagueParticipantIds}
             fields={leagueFields}
             policy={previewPolicy}
             canApply={championsLeagueApplyAllowed && leagueValidation.ok}
@@ -1020,6 +1065,7 @@ export function TournamentScheduleBoard({
             onMove={moveLeagueMatch}
             onSetField={setLeagueField}
             onSetKickoff={setLeagueKickoff}
+            onSetParticipant={setLeagueParticipant}
             onRecomputeTimes={recomputeLeagueTimes}
             onReset={resetLeaguePlan}
             onApply={handleApplyRequest}
@@ -1040,6 +1086,22 @@ export function TournamentScheduleBoard({
             onApply={handleApplyRequest}
           />
         )
+      ) : null}
+
+      {previewOpen && preview && draftPdfDocument ? (
+        <AdminCard title="PDF aus aktueller Vorschau">
+          <p className="text-[13px] leading-relaxed text-muted">
+            Der Export verwendet ausschließlich den aktuell sichtbaren Entwurf – einschließlich
+            geänderter Paarungen, Reihenfolge, Anstoßzeiten und Spielfelder. Der Spielplan muss
+            dafür nicht gespeichert werden.
+          </p>
+          <DraftSchedulePdfButton
+            tournamentId={tournament.id}
+            document={draftPdfDocument}
+            disabled={pending || previewLoading}
+            className={`${adminSecondaryButtonClass} mt-4`}
+          />
+        </AdminCard>
       ) : null}
 
       <AdminCard title="Spiele">
