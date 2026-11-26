@@ -1,4 +1,4 @@
-import { publicTeamLabel } from "@/lib/schedule/names";
+import { deriveTeamDisplayName } from "@/lib/schedule/team-display-name";
 import { standingsParticipantId } from "@/lib/schedule/standings";
 import { resolveTournamentStageStatus } from "@/lib/schedule/status";
 import type { TournamentParticipant } from "@/lib/tournament-participants";
@@ -22,7 +22,7 @@ export function teamLabelsFromApplications(applications: AdminApplication[]) {
   return Object.fromEntries(
     applications.map((application) => [
       application.id,
-      publicTeamLabel(application.clubName, application.teamName),
+      deriveTeamDisplayName({ clubName: application.clubName, teamName: application.teamName }),
     ]),
   );
 }
@@ -45,7 +45,16 @@ export function teamLabelsFromParticipants(participants: TournamentParticipant[]
         return [];
       }
 
-      return [[id, participant.displayName || publicTeamLabel(participant.clubName, participant.teamName)]];
+      return [
+        [
+          id,
+          deriveTeamDisplayName({
+            clubName: participant.clubName,
+            teamName: participant.teamName,
+            override: participant.displayName,
+          }),
+        ],
+      ];
     }),
   );
 }

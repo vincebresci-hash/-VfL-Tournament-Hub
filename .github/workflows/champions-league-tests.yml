@@ -93,6 +93,9 @@ jobs:
       - name: Champions League club-suggestion tests
         run: npm run test:cl-club
 
+      - name: Team display-name tests
+        run: npm run test:team-names
+
       - name: Production build
         run: npm run build
 
