@@ -37,9 +37,14 @@ for (const scenario of SCENARIOS) {
 
     if (scenario.kind === "bambini") {
       await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toHaveCount(0);
+      await expect(page.locator("[data-match-result]")).toHaveCount(0);
       await expect(page.getByText(/Gesamttabelle|Tabellen|K\.‑o\.-Runde/)).toHaveCount(0);
     } else {
-      await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toBeVisible();
+      if (scenario.fields === 1) {
+        await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toBeVisible();
+      } else {
+        await expect(page.locator("[data-match-result]")).toHaveCount(scenario.matches);
+      }
       await expect(page.getByText(/Gesamttabelle|Tabellen/).first()).toBeVisible();
     }
     if (scenario.kind === "groups") {
@@ -130,7 +135,7 @@ test("real draft PDF uses edited pairing, order, kickoff and field without savin
 
 test("quelle=entwurf alone never relabels saved data", async ({ page }) => {
   await page.goto("/admin/turniere/cl6-pdf-cl-single/spielplan/pdf?quelle=entwurf");
-  await expect(page.getByRole("alert")).toContainText("direkt aus der geöffneten Spielplanvorschau");
+  await expect(page.getByText(/Für ein echtes Entwurfs-PDF/)).toContainText("direkt aus der geöffneten Spielplanvorschau");
   await expect(page.locator(".pdf-root")).toHaveCount(0);
 });
 
@@ -145,8 +150,11 @@ test("public Champions League view exposes league schedule, standings and knocko
   await page.goto("/turniere/cl6-pdf-cl-three");
   await expect(page.getByRole("heading", { name: /CL 18 Teams/ })).toBeVisible();
   await expect(page.getByText(/Gesamttabelle|Ligatabelle/).first()).toBeVisible();
+  await page.getByRole("link", { name: "Spielplan", exact: true }).click();
   await expect(page.getByText(/Ligaphase|Spielplan/).first()).toBeVisible();
-  await expect(page.getByText(/Achtelfinale|K\.-o\.-Runde/).first()).toBeVisible();
+  await page.getByRole("link", { name: /K\.-o\./ }).click();
+  await expect(page.getByRole("heading", { name: "K.-o.-Baum" })).toBeVisible();
+  await expect(page.getByText(/vollständigen Ligaphase|wird noch veröffentlicht/)).toBeVisible();
   await expect(page.locator("body")).not.toContainText("example.test");
 });
 

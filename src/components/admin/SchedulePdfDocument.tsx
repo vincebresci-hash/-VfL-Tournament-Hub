@@ -108,7 +108,15 @@ function ScheduleTable({ rows, showResult }: { rows: PdfMatchRow[]; showResult: 
   );
 }
 
-function TimelineTable({ rows, fieldNames }: { rows: Array<PdfTimelineRow<PdfMatchRow>>; fieldNames: string[] }) {
+function TimelineTable({
+  rows,
+  fieldNames,
+  showResult,
+}: {
+  rows: Array<PdfTimelineRow<PdfMatchRow>>;
+  fieldNames: string[];
+  showResult: boolean;
+}) {
   return (
     <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
       <thead>
@@ -131,6 +139,14 @@ function TimelineTable({ rows, fieldNames }: { rows: Array<PdfTimelineRow<PdfMat
                   <span data-match-key={cell.match.key}>
                     <span style={{ color: BLUE, fontWeight: 700 }}>#{cell.match.number} </span>
                     {cell.match.homeName} – {cell.match.awayName}
+                    {showResult ? (
+                      <strong
+                        data-match-result={cell.match.result}
+                        style={{ marginLeft: "6px", color: NAVY, whiteSpace: "nowrap" }}
+                      >
+                        {cell.match.result}
+                      </strong>
+                    ) : null}
                   </span>
                 ) : (
                   <span style={{ color: "#9aa7bd" }}>—</span>
@@ -331,7 +347,11 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       <section style={{ marginTop: "16px" }}>
         <SectionHeading>{props.scheduleTitle}</SectionHeading>
         {props.timelineRows && props.timelineRows.length > 0 ? (
-          <TimelineTable rows={props.timelineRows} fieldNames={props.fieldNames} />
+          <TimelineTable
+            rows={props.timelineRows}
+            fieldNames={props.fieldNames}
+            showResult={props.layout !== "bambini"}
+          />
         ) : props.singleColumnMatches.length > 0 ? (
           <ScheduleTable rows={props.singleColumnMatches} showResult={props.layout !== "bambini"} />
         ) : (

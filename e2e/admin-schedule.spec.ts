@@ -212,8 +212,9 @@ test("PDF-Ansicht und echte PDF-Datei werden aus dem gespeicherten CL-Spielplan 
   if (await page.getByText("Noch keine Begegnungen.").isVisible().catch(() => false)) {
     test.skip(true, "Die 20/20-Übernahme ist in diesem Viewport zuvor fehlgeschlagen.");
   }
-  await expect(page.getByRole("heading", { name: "Ligaphase" })).toBeVisible();
-  const leagueSection = page.getByRole("heading", { name: "Ligaphase" }).locator("..");
+  const leagueHeading = page.getByRole("heading", { name: "Ligaphase – Spielplan", exact: true });
+  await expect(leagueHeading).toBeVisible();
+  const leagueSection = leagueHeading.locator("..");
   await expect(leagueSection.getByRole("table").locator("tbody tr")).toHaveCount(20);
   await shot(page, info, "pdf-view");
   mkdirSync("e2e/screenshots", { recursive: true });
