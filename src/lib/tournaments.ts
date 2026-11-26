@@ -106,6 +106,21 @@ export function asAgeGroup(value: string | null | undefined, fallback: AgeGroup 
   return fallback;
 }
 
+/**
+ * The B-Jugend Hallenturnier was stored as Firmenturnier before B-Jugend
+ * existed as an age group. Keep that one legacy value aligned with the class.
+ */
+export function canonicalTournamentAgeGroup(
+  slug: string | null | undefined,
+  value: string | null | undefined,
+): string {
+  if (slug === "b-jugend-hallenturnier" && value?.trim() === "Firmenturnier") {
+    return "B-Jugend";
+  }
+
+  return value?.trim() ?? "";
+}
+
 export function asTournamentStatus(value: string | null | undefined): TournamentStatus {
   if (value && TOURNAMENT_STATUSES.includes(value as TournamentStatus)) {
     return value as TournamentStatus;
@@ -235,7 +250,7 @@ export function toTournamentFromRow(
     waitlistCount?: number;
   },
 ): Tournament {
-  const ageGroup = asAgeGroup(row.age_group);
+  const ageGroup = asAgeGroup(canonicalTournamentAgeGroup(row.slug, row.age_group));
   const confirmedTeams = occupancy?.confirmedTeams ?? 0;
   const maxTeams = row.max_teams;
   const availableSlots = getAvailableSlots(row.max_teams, confirmedTeams);
@@ -277,7 +292,7 @@ export function toAdminTournamentRecord(row: TournamentRow): AdminTournamentReco
     id: row.id,
     slug: row.slug,
     name: row.name,
-    ageGroup: row.age_group,
+    ageGroup: canonicalTournamentAgeGroup(row.slug, row.age_group),
     date: row.date,
     location: row.location,
     status: asTournamentStatus(row.status),

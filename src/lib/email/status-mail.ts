@@ -15,6 +15,7 @@ import { formatCurrencyEur } from "@/lib/payments/format";
 import { paymentStatusLabel } from "@/lib/payments/labels";
 import { toApplicationPayment } from "@/lib/payments/mappers";
 import { formatDateDe } from "@/lib/format";
+import { canonicalTournamentAgeGroup } from "@/lib/tournaments";
 import type { ApplicationStatus } from "@/types/application";
 import type { EmailLogStatus, EmailTemplateType } from "@/types/admin";
 import type {
@@ -43,8 +44,8 @@ type StatusMailApplication = {
     | Pick<TeamRow, "name" | "age_group">[]
     | null;
   tournaments?:
-    | Pick<TournamentRow, "name" | "date" | "location" | "age_group">
-    | Pick<TournamentRow, "name" | "date" | "location" | "age_group">[]
+    | Pick<TournamentRow, "name" | "slug" | "date" | "location" | "age_group">
+    | Pick<TournamentRow, "name" | "slug" | "date" | "location" | "age_group">[]
     | null;
 };
 
@@ -100,7 +101,10 @@ function applicationVariables(
     club_name: firstText(row.club_name, club?.name),
     team_name: firstText(row.team_name, team?.name),
     tournament_name: firstText(tournament?.name),
-    age_group: firstText(row.age_group, team?.age_group, tournament?.age_group),
+    age_group: canonicalTournamentAgeGroup(
+      tournament?.slug,
+      firstText(row.age_group, team?.age_group, tournament?.age_group),
+    ),
     tournament_date: tournamentDate,
     location: firstText(tournament?.location),
     application_status: applicationStatusLabel[status],
@@ -243,7 +247,7 @@ export async function sendApplicationStatusEmail(input: {
   const { data, error } = await supabase
     .from("applications")
     .select(
-      "id, status, contact_email, contact_first_name, contact_last_name, club_name, club_city, team_name, age_group, payment_status, participation_fee, paid_at, clubs (name), teams (name, age_group), tournaments (name, date, location, age_group)",
+      "id, status, contact_email, contact_first_name, contact_last_name, club_name, club_city, team_name, age_group, payment_status, participation_fee, paid_at, clubs (name), teams (name, age_group), tournaments (name, slug, date, location, age_group)",
     )
     .eq("id", input.applicationId)
     .maybeSingle();

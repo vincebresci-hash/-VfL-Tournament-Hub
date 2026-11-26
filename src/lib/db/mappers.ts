@@ -1,3 +1,4 @@
+import { canonicalTournamentAgeGroup } from "@/lib/tournaments";
 import { AGE_GROUPS } from "@/types/tournament";
 import { APPLICATION_STATUSES, INTERNAL_CATEGORIES, TEAM_STRENGTHS, CLUB_TYPES } from "@/types/application";
 import type {
@@ -117,7 +118,10 @@ function applicationBase(row: ApplicationWithRelations) {
     website: row.website ?? club?.website ?? null,
     teamName: firstText(row.team_name, team?.name) || "Mannschaft",
     ageGroup: asAgeGroup(
-      firstText(row.age_group, team?.age_group, tournament?.age_group) || undefined,
+      canonicalTournamentAgeGroup(
+        tournament?.slug,
+        firstText(row.age_group, team?.age_group, tournament?.age_group) || undefined,
+      ),
     ),
     birthYear: row.birth_year ?? team?.birth_year ?? new Date().getFullYear() - 10,
     league: firstText(row.league, team?.league),

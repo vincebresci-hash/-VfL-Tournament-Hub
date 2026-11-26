@@ -11,6 +11,7 @@ export const ageGroupImageSrc = {
   U13: "/u13.webp",
   U14: "/u14.webp",
   U15: "/u15.webp",
+  "B-Jugend": "/b-jugend.webp",
   Firmenturnier: "/firmenturnier.webp",
 } as const satisfies Record<AgeGroup, string>;
 
