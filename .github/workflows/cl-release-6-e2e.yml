@@ -114,6 +114,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq poppler-utils
+          mkdir -p e2e/pdf-pages
           : > e2e/pdf/pdf-page-counts.txt
           expected=(
             champions-league-1-feld
@@ -134,11 +135,15 @@ jobs:
             pdftotext -layout "$file" - | grep -Eq 'Turnier|Champions League|Bambini'
             pages="$(pdfinfo "$file" | awk '/^Pages:/ {print $2}')"
             printf '%s: %s pages\n' "$name" "$pages" >> e2e/pdf/pdf-page-counts.txt
+            mkdir -p "e2e/pdf-pages/$name"
+            pdftoppm -png -r 120 "$file" "e2e/pdf-pages/$name/page" >/dev/null
           done
           test -s e2e/pdf/champions-league-echter-entwurf.pdf
           pdfinfo e2e/pdf/champions-league-echter-entwurf.pdf | grep -Eq 'Page size:[[:space:]]+84[12].*x 59[45].*pts'
           draft_pages="$(pdfinfo e2e/pdf/champions-league-echter-entwurf.pdf | awk '/^Pages:/ {print $2}')"
           printf '%s: %s pages\n' "champions-league-echter-entwurf" "$draft_pages" >> e2e/pdf/pdf-page-counts.txt
+          mkdir -p e2e/pdf-pages/champions-league-echter-entwurf
+          pdftoppm -png -r 120 e2e/pdf/champions-league-echter-entwurf.pdf e2e/pdf-pages/champions-league-echter-entwurf/page >/dev/null
           # Full end-round schedule and all Top-16 seeds must survive the real
           # Chromium PDF renderer, independent of the final page allocation.
           pdftotext -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/champions-league-3-felder.txt
@@ -153,6 +158,7 @@ jobs:
           name: cl6-e2e-artifacts
           path: |
             e2e/pdf/
+            e2e/pdf-pages/
             e2e/screenshots/
             e2e/playwright-report/
             e2e/test-results/
