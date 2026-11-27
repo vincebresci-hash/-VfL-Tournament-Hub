@@ -16,16 +16,15 @@ import {
 import { addMinutes, datetimeLocalToIso } from "@/lib/schedule/datetime";
 import {
   hasDuplicateTeamInRound,
-  KNOCKOUT_SCHEDULE_WAVES,
   knockoutSideRef,
   propagateKnockoutTeams,
   resolveKnockoutOutcome,
   type KnockoutFormat,
   type KnockoutOptions,
 } from "@/lib/schedule/knockout";
+import { buildKnockoutTimetable } from "@/lib/schedule/knockout-timetable";
 import { buildLeagueQualificationPreview } from "@/lib/schedule/league-knockout-preview";
 import { buildKnockoutQualificationPreview } from "@/lib/schedule/knockout-preview";
-import { buildTimetable } from "@/lib/schedule/timetable";
 import {
   isTournamentCompletionEligible,
   planReopenTournamentLifecycle,
@@ -244,43 +243,26 @@ export async function generateKnockoutAction(
     : new Date();
   const start = input.startAt ? new Date(datetimeLocalToIso(input.startAt) ?? defaultStart) : defaultStart;
 
-  const scheduled = new Map<string, { fieldId: string; scheduledAt: Date }>();
-  let waveStart = start;
-  for (const wave of KNOCKOUT_SCHEDULE_WAVES) {
-    const items = plan.matches.filter((match) => wave.includes(match.round));
-    if (items.length === 0) {
-      continue;
-    }
-    const timetable = buildTimetable(
-      items.map((match) => ({
-        groupId: match.round,
-        homeId: match.homeId ?? `tbd-h-${match.key}`,
-        awayId: match.awayId ?? `tbd-a-${match.key}`,
-      })),
-      fields,
-      {
-        start: waveStart,
-        durationMinutes: duration,
-        breakMinutes,
-        minimumRestMinutes: rest,
-      },
-    );
-    for (const match of items) {
-      const timed = timetable.matches.find(
-        (item) =>
-          item.homeId === (match.homeId ?? `tbd-h-${match.key}`) &&
-          item.awayId === (match.awayId ?? `tbd-a-${match.key}`),
-      );
-      if (timed) {
-        scheduled.set(match.key, { fieldId: timed.fieldId, scheduledAt: timed.scheduledAt });
-      }
-    }
-    const lastTime = timetable.matches.reduce(
-      (max, item) => Math.max(max, item.scheduledAt.getTime()),
-      waveStart.getTime(),
-    );
-    waveStart = addMinutes(new Date(lastTime), duration + rest);
+  const knockoutTimetable = buildKnockoutTimetable(plan.matches, fields, {
+    start,
+    durationMinutes: duration,
+    breakMinutes,
+    minimumRestMinutes: rest,
+  });
+  if (knockoutTimetable.matches.length !== plan.matches.length) {
+    return {
+      error:
+        knockoutTimetable.warnings[0] ??
+        "Die Endrunde konnte nicht vollständig mit Anstoßzeiten und Spielfeldern geplant werden.",
+      notice: null,
+    };
   }
+  const scheduled = new Map(
+    knockoutTimetable.matches.map((match) => [
+      match.key,
+      { fieldId: match.fieldId, scheduledAt: match.scheduledAt },
+    ]),
+  );
 
   const supabase = await createClient();
   const { error: deleteError } = await supabase

@@ -18,8 +18,8 @@ export function runPublicTeamLabelChecks() {
     "case-insensitive same => once (prefer club casing)",
   );
   assert(
-    publicTeamLabel("VfL Kirchheim", "VfL Kirchheim II") === "VfL Kirchheim · VfL Kirchheim II",
-    "distinct team suffix kept",
+    publicTeamLabel("VfL Kirchheim", "VfL Kirchheim II") === "VfL Kirchheim II",
+    "distinct team suffix kept without duplicate club",
   );
   assert(publicTeamLabel(null, "U10") === "U10", "missing club => team");
   assert(publicTeamLabel("SV Fellbach", null) === "SV Fellbach", "missing team => club");
@@ -33,9 +33,7 @@ export function runPublicTeamLabelChecks() {
   const longTeam =
     "TSV Sehr Langer Vereinsname mit vielen Zusätzen und Extra-Bezeichnungen II";
   const longLabel = publicTeamLabel("TSV Kurz", longTeam);
-  assert(longLabel.includes("TSV Kurz"), "long team keeps club");
-  assert(longLabel.includes(longTeam), "long team kept");
-  assert(longLabel.includes(" · "), "long distinct uses separator");
+  assert(longLabel === "TSV Kurz", "lossy unrelated team text falls back to the club identity");
 
   assert(hasDistinctTeamName("VfL Kirchheim", "VfL Kirchheim") === false, "distinct false when same");
   assert(hasDistinctTeamName("VfL Kirchheim", "VfL Kirchheim II") === true, "distinct true when different");
@@ -60,7 +58,7 @@ export function runLiveMatchLayoutChecks() {
   );
 
   const namesSource = readFileSync(join(process.cwd(), "src/lib/schedule/names.ts"), "utf8");
-  assert(namesSource.includes("toLowerCase()"), "label compare is case-insensitive");
+  assert(namesSource.includes("deriveTeamDisplayName"), "public labels use the central normalizer");
   assert(namesSource.includes("publicTeamLabel"), "publicTeamLabel helper present");
 
   const liveQueries = readFileSync(join(process.cwd(), "src/lib/db/live-queries.ts"), "utf8");

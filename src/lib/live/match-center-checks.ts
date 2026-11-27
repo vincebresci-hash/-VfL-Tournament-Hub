@@ -105,7 +105,7 @@ export function runMatchCenterDesignChecks() {
   // F/G labels
   assert(publicTeamLabel("VfL Kirchheim", "VfL Kirchheim") === "VfL Kirchheim", "G: no duplicate label");
   assert(
-    publicTeamLabel("VfL Kirchheim", "VfL Kirchheim II") === "VfL Kirchheim · VfL Kirchheim II",
+    publicTeamLabel("VfL Kirchheim", "VfL Kirchheim II") === "VfL Kirchheim II",
     "F: distinct long-ish names",
   );
 

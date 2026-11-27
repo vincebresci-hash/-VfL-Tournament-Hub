@@ -129,13 +129,14 @@ export function TournamentPublicStage({
   const teamLabels = Object.fromEntries(
     stage.roster.map((entry) => [
       entry.applicationId,
-      publicTeamLabel(entry.clubName, entry.teamName),
+      entry.displayName ?? publicTeamLabel(entry.clubName, entry.teamName),
     ]),
   );
   const teamMarks: Record<string, { logoUrl: string | null; clubName: string }> = {};
   for (const entry of stage.roster) {
     if (entry.externalTeamId) {
-      teamLabels[entry.externalTeamId] = publicTeamLabel(entry.clubName, entry.teamName);
+      teamLabels[entry.externalTeamId] =
+        entry.displayName ?? publicTeamLabel(entry.clubName, entry.teamName);
     }
     const mark = { logoUrl: entry.logoUrl ?? null, clubName: entry.clubName };
     teamMarks[entry.applicationId] = mark;

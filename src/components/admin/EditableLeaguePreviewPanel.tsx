@@ -18,6 +18,7 @@ type EditableLeaguePreviewPanelProps = {
   plan: EditablePreviewMatch[];
   validation: ValidateEditedLeaguePlanResult;
   teamLabels: Record<string, string>;
+  participantIds: string[];
   fields: Array<{ id: string; name: string }>;
   policy: RegenerationPolicyResult;
   canApply: boolean;
@@ -29,22 +30,19 @@ type EditableLeaguePreviewPanelProps = {
   onMove: (key: string, direction: "up" | "down") => void;
   onSetField: (key: string, fieldId: string) => void;
   onSetKickoff: (key: string, iso: string | null) => void;
+  onSetParticipant: (key: string, side: "home" | "away", participantId: string) => void;
   onRecomputeTimes: () => void;
   onReset: () => void;
   onApply: () => void;
   onClose: () => void;
 };
 
-function label(match: EditablePreviewMatch, side: "home" | "away", teamLabels: Record<string, string>) {
-  const key = previewParticipantKey(match[side]);
-  return key ? (teamLabels[key] ?? "Team") : "Unbekannt";
-}
-
 export function EditableLeaguePreviewPanel({
   preview,
   plan,
   validation,
   teamLabels,
+  participantIds,
   fields,
   policy,
   canApply,
@@ -56,6 +54,7 @@ export function EditableLeaguePreviewPanel({
   onMove,
   onSetField,
   onSetKickoff,
+  onSetParticipant,
   onRecomputeTimes,
   onReset,
   onApply,
@@ -222,8 +221,34 @@ export function EditableLeaguePreviewPanel({
                           ))}
                         </SelectInput>
                       </td>
-                      <td className="px-3 py-2.5 text-ink">{label(match, "home", teamLabels)}</td>
-                      <td className="px-3 py-2.5 text-ink">{label(match, "away", teamLabels)}</td>
+                      <td className="px-3 py-2.5 text-ink">
+                        <SelectInput
+                          aria-label={`Heimteam Vorschau Spiel ${index + 1}`}
+                          value={previewParticipantKey(match.home) ?? ""}
+                          disabled={applyPending}
+                          onChange={(event) => onSetParticipant(match.key, "home", event.target.value)}
+                        >
+                          {participantIds.map((participantId) => (
+                            <option key={participantId} value={participantId}>
+                              {teamLabels[participantId] ?? "Unbenannte Mannschaft"}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      </td>
+                      <td className="px-3 py-2.5 text-ink">
+                        <SelectInput
+                          aria-label={`Auswärtsteam Vorschau Spiel ${index + 1}`}
+                          value={previewParticipantKey(match.away) ?? ""}
+                          disabled={applyPending}
+                          onChange={(event) => onSetParticipant(match.key, "away", event.target.value)}
+                        >
+                          {participantIds.map((participantId) => (
+                            <option key={participantId} value={participantId}>
+                              {teamLabels[participantId] ?? "Unbenannte Mannschaft"}
+                            </option>
+                          ))}
+                        </SelectInput>
+                      </td>
                     </tr>
                   );
                 })}

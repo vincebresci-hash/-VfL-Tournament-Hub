@@ -10,8 +10,8 @@ import { canManageSystem } from "@/lib/auth/roles";
 import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
-  listClubOptions,
 } from "@/lib/db/admin-queries";
+import { listAssignableClubOptions } from "@/lib/db/club-assignment-actions";
 import { readConfirmedParticipantIdentities } from "@/lib/db/confirmed-participant-read";
 import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
@@ -71,7 +71,7 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
     getAdminLifecyclePanelModel(tournament.id),
     readStoredLeagueScheduleConfig(tournament.id),
     readConfirmedParticipantIdentities(tournament.id),
-    listClubOptions(),
+    listAssignableClubOptions(),
   ]);
 
   return (
@@ -112,7 +112,8 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
             leagueConfig.status === "ok" ? leagueConfig.restrictSameClub : false
           }
           clubByParticipantId={confirmed.ok ? confirmed.clubByParticipantId : {}}
-          clubOptions={clubOptions}
+          clubOptions={clubOptions.clubs}
+          clubDirectoryError={clubOptions.error}
         />
       )}
     </TournamentAdminChrome>

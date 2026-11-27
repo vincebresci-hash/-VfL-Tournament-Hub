@@ -22,6 +22,7 @@ import type { TournamentLifecycleState } from "@/lib/schedule/tournament-lifecyc
 type TournamentLifecyclePanelProps = {
   tournamentId: string;
   model: AdminLifecyclePanelModel;
+  leaguePhase?: boolean;
 };
 
 function stepVisualState(
@@ -42,6 +43,7 @@ function stepVisualState(
 export function TournamentLifecyclePanel({
   tournamentId,
   model,
+  leaguePhase = false,
 }: TournamentLifecyclePanelProps) {
   const router = useRouter();
   const [reopenOpen, setReopenOpen] = useState(false);
@@ -75,7 +77,7 @@ export function TournamentLifecyclePanel({
           Matchday-Phase
         </h2>
         <p className="text-[13px] font-semibold text-ink" aria-live="polite">
-          Aktuell: {model.label}
+          Aktuell: {leaguePhase && model.effective === "group_stage" ? "Ligaphase" : model.label}
         </p>
       </div>
 
@@ -85,7 +87,10 @@ export function TournamentLifecyclePanel({
       >
         {TOURNAMENT_LIFECYCLE_STEPS.map((step) => {
           const visual = stepVisualState(step, model.effective);
-          const label = TOURNAMENT_LIFECYCLE_LABEL_DE[step];
+          const label =
+            leaguePhase && step === "group_stage"
+              ? "Ligaphase"
+              : TOURNAMENT_LIFECYCLE_LABEL_DE[step];
           const marker =
             visual === "done" ? "✓" : visual === "current" ? "●" : "○";
           const stateClass =

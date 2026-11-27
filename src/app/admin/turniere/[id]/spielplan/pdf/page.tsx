@@ -1,24 +1,43 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DraftSchedulePdfPage } from "@/components/admin/DraftSchedulePdfPage";
 import { PrintScheduleButton } from "@/components/admin/PrintScheduleButton";
-import { TournamentAdminChrome } from "@/components/admin/TournamentAdminChrome";
+import {
+  SchedulePdfDocument,
+  type PdfMatchRow,
+  type PdfStandingRow,
+} from "@/components/admin/SchedulePdfDocument";
 import {
   getAdminTournamentById,
   getAdminTournamentBySlug,
 } from "@/lib/db/admin-queries";
 import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
-import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
-import { formatBerlinClock, isoToBerlinParts } from "@/lib/schedule/datetime";
-import { knockoutRoundLabel } from "@/lib/schedule/knockout";
-import { matchSideParticipantId, teamLabelsFromParticipants } from "@/lib/schedule/admin";
+import { matchSideParticipantId, scheduleParticipantId, teamLabelsFromParticipants } from "@/lib/schedule/admin";
+import { formatBerlinClock } from "@/lib/schedule/datetime";
+import {
+  buildChampionsLeagueBracketRows,
+  buildClassicBracketRows,
+  completePdfKnockoutRows,
+  sortPdfKnockoutSchedule,
+} from "@/lib/schedule/draft-schedule-pdf";
+import { isGroupStageComplete, knockoutRoundLabel } from "@/lib/schedule/knockout";
+import { expectedLeagueMatchCount } from "@/lib/schedule/league-phase";
+import {
+  assignGameNumbers,
+  groupMatchesByTimeslot,
+  pdfLayoutShowsStandings,
+  resolvePdfLayout,
+  type PdfTimelineRow,
+} from "@/lib/schedule/pdf-layout";
 import { computeGroupStandings, formatGoals } from "@/lib/schedule/standings";
 import type { TournamentMatchRecord } from "@/types/schedule";
 
 type PdfPageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ quelle?: string; entwurf?: string }>;
 };
 
 export const dynamic = "force-dynamic";
@@ -35,215 +54,313 @@ export async function generateMetadata({ params }: PdfPageProps): Promise<Metada
 
 function formatTournamentDate(value: string) {
   const [year, month, day] = value.slice(0, 10).split("-");
-  if (!year || !month || !day) {
-    return value;
-  }
-  return `${day}.${month}.${year}`;
+  return year && month && day ? `${day}.${month}.${year}` : value;
 }
 
-function modeLabel(format: string | null, groupCount: number) {
-  if (format === "champions-league") {
-    return "Champions League";
+function modeLabel(input: {
+  format: string | null;
+  groupCount: number;
+  layout: ReturnType<typeof resolvePdfLayout>;
+  playFormat: string | null;
+  hasKnockout: boolean;
+}) {
+  if (input.layout === "bambini") {
+    return input.playFormat?.trim() || "Kinderfestival ohne Ergebniswertung";
   }
-  if (format === "round-robin") {
-    return "Jeder gegen jeden";
-  }
-  if (format === "groups-knockout" || groupCount > 0) {
-    return "Gruppenphase + K.-o.-Runde";
-  }
+  if (input.format === "champions-league") return "Champions League";
+  if (input.format === "round-robin") return "Jeder gegen jeden";
+  if (input.format === "groups-knockout" || input.hasKnockout) return "Gruppenphase + K.-o.-Runde";
+  if (input.groupCount > 0) return "Gruppenphase";
   return "Jeder gegen jeden";
 }
 
-function resultLabel(match: TournamentMatchRecord) {
-  if (match.homeScore == null || match.awayScore == null) {
-    return "—";
-  }
+function resultLabel(match: Pick<TournamentMatchRecord, "homeScore" | "awayScore">) {
+  if (match.homeScore == null || match.awayScore == null) return "—";
   return `${match.homeScore}:${match.awayScore}`;
 }
 
-function kickoffLabel(iso: string | null) {
-  if (!iso) {
-    return "—";
-  }
-  const parts = isoToBerlinParts(iso);
-  return `${parts.date.split("-").reverse().join(".")} ${formatBerlinClock(iso)}`;
-}
-
-export default async function SchedulePdfPage({ params }: PdfPageProps) {
+export default async function SchedulePdfPage({ params, searchParams }: PdfPageProps) {
   const { id } = await params;
+  const { quelle, entwurf } = await searchParams;
+  const draft = quelle === "entwurf";
   const tournament = await loadTournament(id);
   if (!tournament) {
     notFound();
   }
 
-  const [stage, participants, lifecycle, leagueConfig] = await Promise.all([
+  if (draft) {
+    return (
+      <main style={{ background: "white", minHeight: "100vh" }}>
+        {entwurf ? (
+          <DraftSchedulePdfPage tournamentId={tournament.id} storageKey={entwurf} />
+        ) : (
+          <p role="alert" style={{ margin: "32px auto", maxWidth: "720px", padding: "20px", color: "#9a2b2b" }}>
+            Für ein echtes Entwurfs-PDF muss der Export direkt aus der geöffneten Spielplanvorschau gestartet werden.
+          </p>
+        )}
+      </main>
+    );
+  }
+
+  const [stage, participants, leagueConfig] = await Promise.all([
     getAdminTournamentStage(tournament.id),
     getTournamentParticipants(tournament.id),
-    getAdminLifecyclePanelModel(tournament.id),
     readStoredLeagueScheduleConfig(tournament.id),
   ]);
+
   const teamLabels = teamLabelsFromParticipants(participants);
-  const fieldNames = Object.fromEntries(stage.fields.map((field) => [field.id, field.name]));
+  const teamName = (participantId: string | null) =>
+    participantId ? (teamLabels[participantId] ?? "Team") : "offen";
+  const fields = [...stage.fields].sort((a, b) => a.sortOrder - b.sortOrder);
+  const fieldName = (fieldId: string | null) =>
+    fieldId ? (fields.find((field) => field.id === fieldId)?.name ?? "Feld") : "—";
+
   const format = leagueConfig.status === "ok" ? leagueConfig.competitionFormat : null;
-  const leagueMatches = stage.matches
-    .filter((match) => match.phase !== "knockout")
-    .slice()
-    .sort((left, right) => (left.scheduledAt ?? "").localeCompare(right.scheduledAt ?? "") || left.sortOrder - right.sortOrder);
+  const effectiveFormat = format ?? (stage.groups.length > 0 ? "groups-knockout" : "round-robin");
+  const cutoff = leagueConfig.status === "ok" ? leagueConfig.knockoutCutoff : null;
+  const matchesPerTeam = leagueConfig.status === "ok" ? leagueConfig.leagueMatchesPerTeam : null;
+  const layout = resolvePdfLayout({
+    competitionFormat: format,
+    groupCount: stage.groups.length,
+    fieldCount: fields.length,
+    ageGroup: tournament.ageGroup,
+    playFormat: tournament.playFormat,
+  });
+  const isChampionsLeague = layout === "cl-single" || layout === "cl-multi";
+
+  const leagueMatches = stage.matches.filter((match) => match.phase !== "knockout");
   const knockoutMatches = stage.matches
     .filter((match) => match.phase === "knockout")
     .slice()
-    .sort((left, right) => left.sortOrder - right.sortOrder);
+    .sort((a, b) => a.sortOrder - b.sortOrder);
+
+  const numbers = assignGameNumbers(
+    leagueMatches.map((match) => ({
+      key: match.id,
+      scheduledAt: match.scheduledAt,
+      fieldId: match.fieldId,
+      sortOrder: match.sortOrder,
+    })),
+  );
+  const toRow = (match: TournamentMatchRecord): PdfMatchRow => ({
+    key: match.id,
+    number: numbers.get(match.id) ?? 0,
+    time: match.scheduledAt ? formatBerlinClock(match.scheduledAt) : "—",
+    fieldName: fieldName(match.fieldId),
+    homeName: teamName(matchSideParticipantId(match, "home")),
+    awayName: teamName(matchSideParticipantId(match, "away")),
+    result: resultLabel(match),
+  });
+
+  const singleColumnMatches = leagueMatches
+    .slice()
+    .sort(
+      (a, b) =>
+        (a.scheduledAt ?? "~").localeCompare(b.scheduledAt ?? "~") || a.sortOrder - b.sortOrder,
+    )
+    .map(toRow);
+
+  let timelineRows: Array<PdfTimelineRow<PdfMatchRow>> | null = null;
+  if (layout === "cl-multi") {
+    const rowByKey = new Map(singleColumnMatches.map((row) => [row.key, row]));
+    timelineRows = groupMatchesByTimeslot(
+      leagueMatches.map((match) => ({
+        key: match.id,
+        scheduledAt: match.scheduledAt,
+        fieldId: match.fieldId,
+        sortOrder: match.sortOrder,
+      })),
+      fields.map((field) => field.id),
+    ).map((row) => ({
+      scheduledAt: row.scheduledAt,
+      cells: row.cells.map((cell) => ({
+        fieldId: cell.fieldId,
+        match: cell.match ? (rowByKey.get(cell.match.key) ?? null) : null,
+      })),
+    }));
+  }
+
+  const standings: Array<{ title: string; rows: PdfStandingRow[] }> = [];
+  const qualifiedNameBySeed = new Map<string, string>();
+  const leagueGroupId = stage.groups[0]?.id;
+  const leagueMemberCount = leagueGroupId
+    ? (stage.memberIdsByGroupId[leagueGroupId] ?? []).length
+    : 0;
+  const expectedLeagueMatches =
+    isChampionsLeague && matchesPerTeam != null
+      ? expectedLeagueMatchCount(leagueMemberCount, matchesPerTeam)
+      : null;
+  const preliminaryComplete = isChampionsLeague
+    ? expectedLeagueMatches != null &&
+      leagueMatches.length === expectedLeagueMatches &&
+      leagueMatches.every(
+        (match) => match.status === "completed" && match.homeScore != null && match.awayScore != null,
+      )
+    : isGroupStageComplete(stage.groups, stage.memberIdsByGroupId, leagueMatches).complete &&
+      leagueMatches.every(
+        (match) => match.status === "completed" && match.homeScore != null && match.awayScore != null,
+      );
+  if (pdfLayoutShowsStandings(layout)) {
+    const toStandingRows = (
+      memberIds: string[],
+      matches: TournamentMatchRecord[],
+      groupIndex: number,
+    ): PdfStandingRow[] =>
+      computeGroupStandings(memberIds, matches).map((row) => {
+        if (preliminaryComplete) {
+          const seed = isChampionsLeague || stage.groups.length === 1
+            ? `Platz ${row.rank}`
+            : `Platz ${row.rank} Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+          qualifiedNameBySeed.set(seed, teamName(row.applicationId));
+        }
+        return {
+        rank: row.rank,
+        teamName: teamName(row.applicationId),
+        played: row.played,
+        won: row.won,
+        drawn: row.drawn,
+        lost: row.lost,
+        goals: formatGoals(row.goalsFor, row.goalsAgainst),
+        goalDiff: row.goalDiff,
+        points: row.points,
+        qualified: isChampionsLeague && cutoff != null && row.rank <= cutoff,
+        };
+      });
+    if (isChampionsLeague) {
+      const leagueGroup = stage.groups[0];
+      if (leagueGroup) {
+        standings.push({
+          title: "Ligatabelle",
+          rows: toStandingRows(
+            stage.memberIdsByGroupId[leagueGroup.id] ?? [],
+            leagueMatches.filter((match) => match.groupId === leagueGroup.id),
+            0,
+          ),
+        });
+      }
+    } else {
+      for (const [groupIndex, group] of stage.groups.entries()) {
+        standings.push({
+          title: group.name,
+          rows: toStandingRows(
+            stage.memberIdsByGroupId[group.id] ?? [],
+            leagueMatches.filter((match) => match.groupId === group.id),
+            groupIndex,
+          ),
+        });
+      }
+    }
+  }
+
+  const placeholderTemplate = isChampionsLeague
+    ? buildChampionsLeagueBracketRows(cutoff)
+    : effectiveFormat === "groups-knockout"
+      ? buildClassicBracketRows(stage.groups.length)
+      : [];
+  const bracketTemplate = placeholderTemplate
+    .filter(
+      (row) =>
+        row.round !== "third-place" ||
+        knockoutMatches.length === 0 ||
+        knockoutMatches.some((match) => match.round === "third-place"),
+    )
+    .map((row) => ({
+      ...row,
+      homeName: qualifiedNameBySeed.get(row.homeName) ?? row.homeName,
+      awayName: qualifiedNameBySeed.get(row.awayName) ?? row.awayName,
+    }));
+  const templateIndexByRound = new Map<string, number>();
+  const persistedKnockout: PdfMatchRow[] = knockoutMatches.map((match) => {
+    const round = match.round;
+    const roundIndex = round ? (templateIndexByRound.get(round) ?? 0) : 0;
+    if (round) templateIndexByRound.set(round, roundIndex + 1);
+    const placeholder = round
+      ? bracketTemplate.filter((row) => row.round === round)[roundIndex]
+      : null;
+    const row = toRow(match);
+    return {
+      ...row,
+      homeName: matchSideParticipantId(match, "home") ? row.homeName : (placeholder?.homeName ?? "Offen"),
+      awayName: matchSideParticipantId(match, "away") ? row.awayName : (placeholder?.awayName ?? "Offen"),
+      round,
+      nextKey: match.nextMatchId,
+      roundLabel: round ? knockoutRoundLabel[round] : "K.-o.-Spiel",
+      isFinal: round === "final",
+    };
+  });
+  const knockout = completePdfKnockoutRows(
+    bracketTemplate,
+    persistedKnockout,
+    singleColumnMatches.length + 1,
+  );
+
+  const participantNames = participants
+    .map((participant) => {
+      const key = scheduleParticipantId(participant);
+      return key ? (teamLabels[key] ?? "Team") : null;
+    })
+    .filter((name): name is string => Boolean(name));
+  const participantGroups = isChampionsLeague
+    ? null
+    : stage.groups.map((group) => ({
+        title: group.name,
+        names: (stage.memberIdsByGroupId[group.id] ?? []).map((participantId) => teamName(participantId)),
+      }));
+
+  const fieldCount = fields.length;
+  const metaParts = [
+    `${tournament.matchDurationMinutes} Min Spielzeit`,
+    `${tournament.breakMinutes} Min Wechselzeit`,
+    `${fieldCount} ${fieldCount === 1 ? "Feld" : "Felder"}`,
+  ];
+  if (isChampionsLeague) {
+    if (matchesPerTeam != null) metaParts.push(`${matchesPerTeam} Spiele/Team`);
+    if (cutoff != null) metaParts.push(`Top ${cutoff}`);
+  }
 
   return (
-    <TournamentAdminChrome tournament={tournament} lifecycle={lifecycle.model} current="schedule">
-      <style>{`
-        @page { size: A4; margin: 14mm; }
-        @media print {
-          nav, header, button, a { display: none !important; }
-          body { background: white; }
-        }
-        .pdf-sheet h1, .pdf-sheet h2 { break-after: avoid; }
-        .pdf-sheet tr, .pdf-sheet li { break-inside: avoid; }
-        .pdf-break { break-before: page; }
-      `}</style>
-      <article className="pdf-sheet grid gap-6 bg-white text-ink">
-        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <Link href={`/admin/turniere/${tournament.id}/spielplan`} className="text-[13px] text-muted">
-            Zurück zum Spielplan
-          </Link>
-          <PrintScheduleButton />
-        </div>
-        <header className="grid gap-1">
-          <p className="text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">Spielplan</p>
-          <h1 className="text-[28px] font-semibold">{tournament.name}</h1>
-          <p>{formatTournamentDate(tournament.date)}</p>
-          <p>{modeLabel(format, stage.groups.length)}</p>
-          {format === "champions-league" && leagueConfig.status === "ok" ? (
-            <p className="text-[14px] text-muted">
-              {leagueConfig.leagueMatchesPerTeam ?? "—"} Spiele pro Team
-              {leagueConfig.knockoutCutoff ? ` · Top ${leagueConfig.knockoutCutoff}` : ""}
-            </p>
-          ) : null}
-        </header>
-
+    <main style={{ background: "white" }}>
+      <div className="print:hidden" style={{ display: "flex", justifyContent: "space-between", gap: "12px", padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
+        <Link href={`/admin/turniere/${tournament.id}/spielplan`} style={{ fontSize: "13px", color: "#6b7280" }}>
+          ← Zurück zum Spielplan
+        </Link>
+        <PrintScheduleButton />
+      </div>
+      <div className="pdf-preview-shell" style={{ maxWidth: "1120px", margin: "0 auto", padding: "18px" }}>
         {!stage.ready ? (
           <p>Die Datenbank ist noch nicht eingerichtet.</p>
         ) : (
-          <>
-            <section>
-              <h2 className="text-[18px] font-semibold">
-                {format === "champions-league" ? "Ligaphase" : "Spielplan"}
-              </h2>
-              {leagueMatches.length === 0 ? (
-                <p className="mt-2 text-[14px]">Noch keine Begegnungen.</p>
-              ) : (
-                <table className="mt-3 w-full border-collapse text-left text-[12px]">
-                  <thead>
-                    <tr className="border-b border-black">
-                      <th className="py-1 pr-2">Zeit</th>
-                      <th className="py-1 pr-2">Feld</th>
-                      <th className="py-1 pr-2">Heim</th>
-                      <th className="py-1 pr-2">Gast</th>
-                      <th className="py-1">Ergebnis</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leagueMatches.map((match) => {
-                      const homeId = matchSideParticipantId(match, "home");
-                      const awayId = matchSideParticipantId(match, "away");
-                      return (
-                        <tr key={match.id} className="border-b border-neutral-300">
-                          <td className="py-1 pr-2">{kickoffLabel(match.scheduledAt)}</td>
-                          <td className="py-1 pr-2">{match.fieldId ? (fieldNames[match.fieldId] ?? "Feld") : "—"}</td>
-                          <td className="py-1 pr-2">{homeId ? (teamLabels[homeId] ?? "Team") : "—"}</td>
-                          <td className="py-1 pr-2">{awayId ? (teamLabels[awayId] ?? "Team") : "—"}</td>
-                          <td className="py-1">{resultLabel(match)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
-            </section>
-
-            <section className="pdf-break">
-              <h2 className="text-[18px] font-semibold">Tabelle</h2>
-              {stage.groups.length === 0 ? (
-                <p className="mt-2 text-[14px]">Noch keine Tabelle.</p>
-              ) : (
-                stage.groups.map((group) => {
-                  const standings = computeGroupStandings(
-                    stage.memberIdsByGroupId[group.id] ?? [],
-                    leagueMatches.filter((match) => match.groupId === group.id),
-                  );
-                  return (
-                    <div key={group.id} className="mt-4">
-                      <h3 className="text-[14px] font-semibold">{group.name}</h3>
-                      <table className="mt-2 w-full border-collapse text-left text-[12px]">
-                        <thead>
-                          <tr className="border-b border-black">
-                            <th className="py-1 pr-2">Pl</th>
-                            <th className="py-1 pr-2">Team</th>
-                            <th className="py-1 pr-2">Sp</th>
-                            <th className="py-1 pr-2">S</th>
-                            <th className="py-1 pr-2">U</th>
-                            <th className="py-1 pr-2">N</th>
-                            <th className="py-1 pr-2">Tore</th>
-                            <th className="py-1 pr-2">Diff</th>
-                            <th className="py-1">Pkt</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {standings.map((row) => (
-                            <tr key={row.applicationId} className="border-b border-neutral-300">
-                              <td className="py-1 pr-2">{row.rank}</td>
-                              <td className="py-1 pr-2">{teamLabels[row.applicationId] ?? "Team"}</td>
-                              <td className="py-1 pr-2">{row.played}</td>
-                              <td className="py-1 pr-2">{row.won}</td>
-                              <td className="py-1 pr-2">{row.drawn}</td>
-                              <td className="py-1 pr-2">{row.lost}</td>
-                              <td className="py-1 pr-2">{formatGoals(row.goalsFor, row.goalsAgainst)}</td>
-                              <td className="py-1 pr-2">{row.goalDiff}</td>
-                              <td className="py-1">{row.points}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })
-              )}
-            </section>
-
-            {knockoutMatches.length > 0 ? (
-              <section className="pdf-break">
-                <h2 className="text-[18px] font-semibold">K.-o.-Runde</h2>
-                <ul className="mt-3 grid gap-2 text-[12px]">
-                  {knockoutMatches.map((match) => {
-                    const homeId = matchSideParticipantId(match, "home");
-                    const awayId = matchSideParticipantId(match, "away");
-                    return (
-                      <li key={match.id}>
-                        {match.round ? knockoutRoundLabel[match.round] : "K.-o.-Spiel"}
-                        {" · "}
-                        {kickoffLabel(match.scheduledAt)}
-                        {" · "}
-                        {match.fieldId ? (fieldNames[match.fieldId] ?? "Feld") : "—"}
-                        {" · "}
-                        {homeId ? (teamLabels[homeId] ?? "Team") : "offen"}
-                        {" vs "}
-                        {awayId ? (teamLabels[awayId] ?? "Team") : "offen"}
-                        {" · "}
-                        {resultLabel(match)}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ) : null}
-          </>
+          <SchedulePdfDocument
+            layout={layout}
+            draft={false}
+            tournamentName={tournament.name}
+            dateLabel={formatTournamentDate(tournament.date)}
+            startTimeLabel={tournament.startTime ?? null}
+            location={tournament.location}
+            description={tournament.description}
+            modeLabel={modeLabel({
+              format,
+              groupCount: stage.groups.length,
+              layout,
+              playFormat: tournament.playFormat,
+              hasKnockout: knockout.length > 0,
+            })}
+            metaLine={metaParts.join(" · ")}
+            participants={participantNames}
+            participantGroups={participantGroups}
+            scheduleTitle={isChampionsLeague ? "Ligaphase – Spielplan" : "Spielplan"}
+            singleColumnMatches={singleColumnMatches}
+            timelineRows={timelineRows}
+            fieldNames={fields.map((field) => field.name)}
+            standings={standings}
+            showStandings={pdfLayoutShowsStandings(layout)}
+            standingsFinalized={preliminaryComplete}
+            knockoutTitle={isChampionsLeague ? "K.-o.-Runde (Endrunde)" : "K.-o.-Runde"}
+            knockoutSchedule={sortPdfKnockoutSchedule(knockout)}
+            knockout={knockout}
+          />
         )}
-      </article>
-    </TournamentAdminChrome>
+      </div>
+    </main>
   );
 }

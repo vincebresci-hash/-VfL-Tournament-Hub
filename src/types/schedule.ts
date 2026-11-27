@@ -108,6 +108,8 @@ export type TournamentScheduleSettings = {
 
 export type PublicRosterEntry = {
   applicationId: string;
+  /** Presentation-only label; original club/team data remains unchanged. */
+  displayName?: string;
   clubName: string;
   teamName: string;
   ageGroup: string | null;

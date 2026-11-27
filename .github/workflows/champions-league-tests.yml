@@ -20,7 +20,9 @@ on:
       - "src/lib/db/competition-**"
       - "src/components/admin/TournamentScheduleBoard.tsx"
       - "src/components/admin/ChampionsLeagueScheduleFields.tsx"
+      - "src/components/admin/*SchedulePdf*"
       - "src/components/tournaments/**"
+      - "e2e/release6-pdf.spec.ts"
       - "supabase/migrations/**"
       - "supabase/tests/**"
       - "scripts/tests/**"
@@ -92,6 +94,21 @@ jobs:
 
       - name: Champions League club-suggestion tests
         run: npm run test:cl-club
+
+      - name: Team display-name tests
+        run: npm run test:team-names
+
+      - name: Champions League knockout-seeding tests
+        run: npm run test:cl-ko-seeding
+
+      - name: PDF layout tests
+        run: npm run test:pdf-layout
+
+      - name: Draft PDF data-flow and bracket tests
+        run: npm run test:draft-pdf
+
+      - name: Club service-role security self-check
+        run: npm run test:club-security
 
       - name: Production build
         run: npm run build

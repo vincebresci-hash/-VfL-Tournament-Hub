@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  clubAssignmentProgress,
+  clubCanonicalKey,
+  findDuplicateClubs,
   participantsMissingClub,
   suggestClubAssignments,
 } from "../../src/lib/schedule/club-assignment-suggest.ts";
@@ -90,4 +93,53 @@ test("participantsMissingClub returns only unassigned teams", () => {
     { participantId: "p3", teamName: "C", clubId: null },
   ]);
   assert.deepEqual(missing.map((m) => m.participantId), ["p2", "p3"]);
+});
+
+// CL Release 6 §1 — generic club-type prefixes must not justify a match.
+test("a shared generic prefix (TSV/VfL/SGM/FC) alone yields no suggestion", () => {
+  const clubs = [
+    { id: "c-weil", name: "TSV Weilheim" },
+    { id: "c-ot", name: "TSV Ötlingen" },
+  ];
+  const suggestions = suggestClubAssignments({
+    participants: [{ participantId: "p1", teamName: "TSV Nabern", clubId: null }],
+    clubs,
+  });
+  // "TSV" is shared with both clubs but is generic — no distinctive overlap.
+  assert.equal(suggestions[0].suggestedClubId, null);
+  assert.equal(suggestions[0].confidence, "none");
+});
+
+test("a distinctive token still matches despite a shared generic prefix", () => {
+  const clubs = [
+    { id: "c-weil", name: "TSV Weilheim" },
+    { id: "c-ot", name: "TSV Ötlingen" },
+  ];
+  const suggestions = suggestClubAssignments({
+    participants: [{ participantId: "p1", teamName: "TSV Ötlingen B-Jugend", clubId: null }],
+    clubs,
+  });
+  assert.equal(suggestions[0].suggestedClubId, "c-ot");
+});
+
+test("duplicate clubs are detected before create and never auto-merged", () => {
+  const clubs = [
+    { id: "c1", name: "VfL Kirchheim" },
+    { id: "c2", name: "VfL Kirchheim" },
+    { id: "c3", name: "TSV Weilheim" },
+  ];
+  const dupes = findDuplicateClubs("VfL Kirchheim 1", clubs);
+  assert.equal(dupes.length, 2);
+  assert.deepEqual(dupes.map((c) => c.id).sort(), ["c1", "c2"]);
+  assert.equal(clubCanonicalKey("VfL Kirchheim") === clubCanonicalKey("VfL Kirchheim 2"), true);
+  assert.equal(findDuplicateClubs("FC Neuhausen", clubs).length, 0);
+});
+
+test("assignment progress reports assigned of total", () => {
+  const progress = clubAssignmentProgress([
+    { participantId: "p1", teamName: "A", clubId: "c1" },
+    { participantId: "p2", teamName: "B", clubId: "c1" },
+    { participantId: "p3", teamName: "C", clubId: null },
+  ]);
+  assert.deepEqual(progress, { assigned: 2, total: 3 });
 });

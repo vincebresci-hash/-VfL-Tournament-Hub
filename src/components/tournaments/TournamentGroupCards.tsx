@@ -92,7 +92,7 @@ function HubGroupCard({ group }: { group: TournamentGroupCardHub }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[14px] leading-snug font-medium text-ink">
-                  {publicTeamLabel(entry.clubName, entry.teamName)}
+                  {entry.displayName ?? publicTeamLabel(entry.clubName, entry.teamName)}
                 </p>
               </div>
             </li>

@@ -78,6 +78,7 @@ export function AdminTournamentDetailView({
     <TournamentAdminChrome
       tournament={tournament}
       lifecycle={lifecycle}
+      leaguePhase={matchday?.leaguePhase ?? false}
       current={current}
     >
       {matchday ? (

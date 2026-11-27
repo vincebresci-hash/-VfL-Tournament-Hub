@@ -646,6 +646,7 @@ export function computeKnockoutPlacements(matches: KnockoutMatchLike[]): Placeme
 }
 
 export const KNOCKOUT_SCHEDULE_WAVES: KnockoutRound[][] = [
+  ["round-of-16"],
   ["quarterfinal"],
   ["semifinal", "placement-5", "placement-7"],
   ["third-place", "final"],

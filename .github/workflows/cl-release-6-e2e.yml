@@ -1,0 +1,186 @@
+# CL Release 6 — real-browser acceptance + REAL PDF rendering on an isolated runner.
+#
+# Runs the Playwright R5 regression suite AND the R6 PDF-render suite against a
+# DISPOSABLE LOCAL Supabase stack (Docker on the GitHub-hosted runner) seeded with
+# synthetic data. Renders real A4 PDFs for the three reference layouts and uploads
+# them with desktop/mobile screenshots. Never links a remote project, never uses
+# production secrets, never touches the production database or real tournaments.
+
+name: CL Release 6 E2E (manual)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - fix/cl-release-6-admin-workflow-pdf
+
+concurrency:
+  group: cl6-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Isolated local Supabase browser + PDF acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SUPABASE_ACCESS_TOKEN: ""
+      SUPABASE_DB_PASSWORD: ""
+      INBOX_SQL_CI: "1"
+      E2E_ADMIN_EMAIL: "cl6-admin@example.test"
+      E2E_ADMIN_PASSWORD: "cl6-ReleaseSix-test"
+      E2E_SLUG_B: "cl6-scenario-b"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Security preflight (no remote / no production secrets)
+        run: |
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then echo "SUPABASE_ACCESS_TOKEN must be empty" >&2; exit 1; fi
+          if [[ -n "${DATABASE_URL:-}" ]]; then echo "DATABASE_URL must not be set" >&2; exit 1; fi
+          if grep -R -n -E 'https?://[^[:space:]]*\.supabase\.co|db\.[^[:space:]]+\.supabase\.co' e2e scripts/ci; then
+            echo "Production Supabase host references are forbidden" >&2; exit 1
+          fi
+          test "$(sed -n 's/^project_id = "\([^"]*\)"/\1/p' supabase/config.toml | head -n1)" = "vfl-tournament-hub-local"
+          test "$(sed -n 's/^major_version = \([0-9]*\)/\1/p' supabase/config.toml | head -n1)" = "17"
+          test ! -f supabase/.temp/project-ref
+          docker info >/dev/null
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Disable CLI auto migration apply (runner config only)
+        run: node scripts/ci/inbox-sql/disable-auto-migrations.mjs
+
+      - name: Start local Supabase (no project migrations)
+        run: supabase start
+
+      - name: Verify LOCAL endpoints and PostgreSQL 17 before first application write
+        run: node e2e/verify-local-environment.mjs
+
+      - name: Apply migrations (CI-only enum/function-return compat)
+        run: node scripts/ci/inbox-sql/apply-migrations.mjs
+
+      - name: Seed synthetic admin + scenario B (local service role)
+        run: node e2e/seed/ci-seed.mjs
+
+      - name: Seed synthetic PDF scenarios (local service role)
+        run: node e2e/seed/ci-seed-r6-pdf.mjs
+
+      - name: Build app
+        run: npm run build
+
+      - name: Start app and wait for readiness
+        run: |
+          set -euo pipefail
+          (npm run start > .next-start.log 2>&1 &)
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:3000/admin/login >/dev/null; then echo "app up"; exit 0; fi
+            sleep 2
+          done
+          echo "app did not start in time" >&2; cat .next-start.log >&2; exit 1
+
+      - name: Install Playwright (Chromium)
+        run: |
+          npm i --no-save @playwright/test@1.51.1
+          npx playwright install --with-deps chromium
+
+      - name: Prepare artifact directories
+        run: mkdir -p e2e/pdf e2e/screenshots
+
+      - name: Render Release 6 PDFs + full Release 5 regression (desktop + mobile)
+        run: npx playwright test --config e2e/playwright.config.ts release6-pdf admin-schedule
+
+      - name: Verify downloadable A4 PDFs, completeness and page counts
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq poppler-utils
+          mkdir -p e2e/pdf-pages
+          : > e2e/pdf/pdf-page-counts.txt
+          expected=(
+            champions-league-1-feld
+            champions-league-10-top-8
+            champions-league-2-felder
+            champions-league-3-felder
+            champions-league-18-teams-8-spiele
+            klassisches-gruppenturnier
+            bambini-turnier
+          )
+          for name in "${expected[@]}"; do
+            file="e2e/pdf/${name}.pdf"
+            test -s "$file"
+            pdfinfo "$file" | grep -Eq 'Page size:[[:space:]]+(84[12].*x 59[45]|59[45].*x 84[12]).*pts'
+            # Chromium paints CSS margin-box counters, but Poppler does not
+            # expose that generated text in every PDF text layer. The source
+            # contract for page/total-page counters is covered by the Node
+            # PDF-layout test; here we verify that every rendered PDF carries
+            # its dynamic tournament content.
+            pdftotext -layout "$file" - | grep -Eq 'Turnier|Champions League|Bambini'
+            pages="$(pdfinfo "$file" | awk '/^Pages:/ {print $2}')"
+            printf '%s: %s pages\n' "$name" "$pages" >> e2e/pdf/pdf-page-counts.txt
+            mkdir -p "e2e/pdf-pages/$name"
+            pdftoppm -png -r 120 "$file" "e2e/pdf-pages/$name/page" >/dev/null
+          done
+          test -s e2e/pdf/champions-league-echter-entwurf.pdf
+          pdfinfo e2e/pdf/champions-league-echter-entwurf.pdf | grep -Eq 'Page size:[[:space:]]+84[12].*x 59[45].*pts'
+          draft_pages="$(pdfinfo e2e/pdf/champions-league-echter-entwurf.pdf | awk '/^Pages:/ {print $2}')"
+          printf '%s: %s pages\n' "champions-league-echter-entwurf" "$draft_pages" >> e2e/pdf/pdf-page-counts.txt
+          mkdir -p e2e/pdf-pages/champions-league-echter-entwurf
+          pdftoppm -png -r 120 e2e/pdf/champions-league-echter-entwurf.pdf e2e/pdf-pages/champions-league-echter-entwurf/page >/dev/null
+          # Full end-round schedule and all Top-16 seeds must survive the real
+          # Chromium PDF renderer, independent of the final page allocation.
+          pdftotext -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'Endrunden-Spielplan' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'Platz 16' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'Finale' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'FC Nöttingen' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'VfL Kirchheim I' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'VfL Kirchheim II' e2e/pdf/champions-league-3-felder.txt
+          ! grep -Eq 'FC Nöttingen U15' e2e/pdf/champions-league-3-felder.txt
+          ! grep -Eq 'Termin offen|Feld offen' e2e/pdf/champions-league-3-felder.txt
+          test "$(pdfinfo e2e/pdf/bambini-turnier.pdf | awk '/^Pages:/ {print $2}')" -eq 1
+          test "$(pdfinfo e2e/pdf/champions-league-1-feld.pdf | awk '/^Pages:/ {print $2}')" -eq 2
+          test "$(pdfinfo e2e/pdf/champions-league-10-top-8.pdf | awk '/^Pages:/ {print $2}')" -eq 2
+          test "$(pdfinfo e2e/pdf/klassisches-gruppenturnier.pdf | awk '/^Pages:/ {print $2}')" -eq 2
+          top16_pages="$(pdfinfo e2e/pdf/champions-league-3-felder.pdf | awk '/^Pages:/ {print $2}')"
+          pdftotext -f "$top16_pages" -l "$top16_pages" -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/top16-final-page.txt
+          grep -Eq 'Platz 1' e2e/pdf/top16-final-page.txt
+          grep -Eq 'Platz 11' e2e/pdf/top16-final-page.txt
+          grep -Eq 'Sieger HF1' e2e/pdf/top16-final-page.txt
+
+      - name: Upload PDFs + screenshots + report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cl6-e2e-artifacts
+          path: |
+            e2e/pdf/
+            e2e/pdf-pages/
+            e2e/screenshots/
+            e2e/playwright-report/
+            e2e/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase (destroy data)
+        if: always()
+        run: supabase stop --no-backup

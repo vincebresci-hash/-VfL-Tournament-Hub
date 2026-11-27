@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/admin-queries";
 import { listAdminApplications } from "@/lib/db/queries";
 import { getAdminTournamentStage } from "@/lib/db/schedule-queries";
+import { readStoredLeagueScheduleConfig } from "@/lib/db/league-config-read";
 import { getAdminLifecyclePanelModel } from "@/lib/db/tournament-lifecycle-admin";
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import { listExternalTeamsForTournamentAction } from "@/lib/db/mein-turnierplan-participants-actions";
@@ -101,6 +102,7 @@ export default async function AdminTournamentDetailPage({
     clubsResult,
     lifecycle,
     permissions,
+    leagueConfig,
   ] = await Promise.all([
     getAdminTournamentStage(tournament.id),
     listExternalTeamsForTournamentAction(tournament.id),
@@ -108,6 +110,7 @@ export default async function AdminTournamentDetailPage({
     listAdminClubs(),
     getAdminLifecyclePanelModel(tournament.id),
     matchdayPermissionFlags(),
+    readStoredLeagueScheduleConfig(tournament.id),
   ]);
 
   const matchday = lifecycle.model
@@ -117,6 +120,8 @@ export default async function AdminTournamentDetailPage({
         groups: stage.groups,
         memberIdsByGroupId: stage.memberIdsByGroupId,
         matches: stage.matches,
+        competitionFormat:
+          leagueConfig.status === "ok" ? leagueConfig.competitionFormat : null,
         permissions,
       })
     : null;

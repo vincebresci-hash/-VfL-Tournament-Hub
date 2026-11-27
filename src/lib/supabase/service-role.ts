@@ -20,3 +20,18 @@ export function createServiceRoleClient() {
     },
   });
 }
+
+/**
+ * Optional service-role access for non-critical, privileged enhancements.
+ *
+ * Callers must still enforce their own authorization before invoking this
+ * helper. A missing key returns null so a Preview deployment can fail closed
+ * without taking the surrounding page down.
+ */
+export function createServiceRoleClientIfConfigured() {
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return null;
+  }
+
+  return createServiceRoleClient();
+}
