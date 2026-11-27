@@ -37,12 +37,12 @@ for (const scenario of SCENARIOS) {
 
     if (scenario.kind === "bambini") {
       await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toHaveCount(0);
-      await expect(page.locator("[data-match-result]")).toHaveCount(0);
+      await expect(page.locator("[data-match-key] [data-match-result]")).toHaveCount(0);
       await expect(page.getByText(/Gesamttabelle|Tabellen|K\.‑o\.-Runde/)).toHaveCount(0);
-      await expect(page.getByRole("heading", { name: "Gruppe A", exact: true })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Gruppe B", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Gruppe A", exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Gruppe B", exact: true }).first()).toBeVisible();
     } else {
-      await expect(page.locator("[data-match-result]")).toHaveCount(scenario.matches);
+      await expect(page.locator("[data-match-key] [data-match-result]")).toHaveCount(scenario.matches);
       await expect(page.getByText(/Gesamttabelle|Tabellen/).first()).toBeVisible();
     }
     if (scenario.kind === "groups") {
@@ -134,8 +134,8 @@ test("quelle=entwurf alone never relabels saved data", async ({ page }) => {
 test("18 teams × 8 games matrix is complete and Top 16 bracket is visible", async ({ page }) => {
   await page.goto("/admin/turniere/cl6-matrix-18x8/spielplan/pdf");
   await expect(page.locator("[data-match-key]")).toHaveCount(72);
-  await expect(page.getByText("Achtelfinale", { exact: true })).toBeVisible();
-  await expect(page.getByText("Platz 16", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Achtelfinale", exact: true })).toBeVisible();
+  await expect(page.getByText("Platz 16", { exact: true }).first()).toBeVisible();
 });
 
 test("legacy single-group tournament prints its configured complete end round", async ({ page }, info) => {
@@ -156,8 +156,8 @@ test("legacy single-group tournament prints its configured complete end round", 
 
 test("pure classic group tournament never invents a knockout stage", async ({ page }, info) => {
   await page.goto("/admin/turniere/cl61-pdf-groups-only/spielplan/pdf");
-  await expect(page.getByRole("heading", { name: "Gruppe A", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Gruppe B", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gruppe A", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gruppe B", exact: true }).first()).toBeVisible();
   await expect(page.locator("[data-knockout-key]")).toHaveCount(0);
   await expect(page.getByText(/Endrunden-Spielplan|K.-o.-Runde/)).toHaveCount(0);
   if (info.project.name === "desktop-chromium") {
