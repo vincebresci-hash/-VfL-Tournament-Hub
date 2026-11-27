@@ -256,43 +256,41 @@ function KnockoutBracket({ matches }: { matches: PdfMatchRow[] }) {
   );
 
   return (
-    <div>
-      <div
-        className="pdf-bracket"
-        style={{ gridTemplateColumns: `repeat(${Math.max(mainRounds.length, 1)}, minmax(0, 1fr))` }}
-      >
-        {mainRounds.map((entry, roundIndex) => (
-          <section className="pdf-bracket-round" key={entry.round}>
-            <h3>{entry.matches[0]?.roundLabel}</h3>
-            <div className="pdf-bracket-stack">
-              {roundIndex < mainRounds.length - 1
-                ? Array.from(
-                    { length: Math.ceil(entry.matches.length / 2) },
-                    (_, pairIndex) => entry.matches.slice(pairIndex * 2, pairIndex * 2 + 2),
-                  ).map((pair) => (
-                    <div className="pdf-bracket-pair" key={pair.map((match) => match.key).join("-")}>
-                      {pair.map((match) => (
-                        <div className="pdf-bracket-connector" key={match.key}>
-                          <BracketMatch match={match} />
-                        </div>
-                      ))}
+    <div
+      className="pdf-bracket"
+      style={{ gridTemplateColumns: `repeat(${Math.max(mainRounds.length, 1)}, minmax(0, 1fr))` }}
+    >
+      {mainRounds.map((entry, roundIndex) => (
+        <section className="pdf-bracket-round" key={entry.round}>
+          <h3>{entry.matches[0]?.roundLabel}</h3>
+          <div className="pdf-bracket-stack">
+            {roundIndex < mainRounds.length - 1
+              ? Array.from(
+                  { length: Math.ceil(entry.matches.length / 2) },
+                  (_, pairIndex) => entry.matches.slice(pairIndex * 2, pairIndex * 2 + 2),
+                ).map((pair) => (
+                  <div className="pdf-bracket-pair" key={pair.map((match) => match.key).join("-")}>
+                    {pair.map((match) => (
+                      <div className="pdf-bracket-connector" key={match.key}>
+                        <BracketMatch match={match} />
+                      </div>
+                    ))}
+                  </div>
+                ))
+              : (
+                <>
+                  {entry.matches.map((match) => <BracketMatch key={match.key} match={match} />)}
+                  {placementMatches.map((match) => (
+                    <div className="pdf-bracket-placement" key={match.key}>
+                      <h4>{match.roundLabel}</h4>
+                      <BracketMatch match={match} />
                     </div>
-                  ))
-                : entry.matches.map((match) => <BracketMatch key={match.key} match={match} />)}
-            </div>
-          </section>
-        ))}
-      </div>
-      {placementMatches.length > 0 ? (
-        <div className="pdf-placement-grid">
-          {placementMatches.map((match) => (
-            <div key={match.key}>
-              <h3>{match.roundLabel}</h3>
-              <BracketMatch match={match} />
-            </div>
-          ))}
-        </div>
-      ) : null}
+                  ))}
+                </>
+              )}
+          </div>
+        </section>
+      ))}
     </div>
   );
 }
@@ -305,7 +303,7 @@ function KnockoutBracket({ matches }: { matches: PdfMatchRow[] }) {
 export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
   return (
     <div
-      className="pdf-root"
+      className={`pdf-root pdf-layout-${props.layout}`}
       style={{ background: "white", color: "#13223d", fontFamily: "'Segoe UI', Arial, sans-serif" }}
     >
       <style>{`
@@ -321,12 +319,13 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
         .pdf-root tr, .pdf-root h2, .pdf-root h3 { break-inside: avoid; }
+        .pdf-root h2 { break-after: avoid; page-break-after: avoid; }
         .pdf-section { break-before: auto; }
-        .pdf-standings-section, .pdf-knockout-schedule, .pdf-bracket-block { break-inside: avoid; page-break-inside: avoid; }
+        .pdf-knockout-schedule, .pdf-bracket-block { break-inside: avoid; page-break-inside: avoid; }
         .pdf-bracket-block { margin-top: 14px; }
         .pdf-bracket { display: grid; gap: 20px; align-items: stretch; }
         .pdf-bracket-round { display: flex; min-width: 0; flex-direction: column; }
-        .pdf-bracket-round > h3, .pdf-placement-grid h3 { margin: 0 0 6px; color: ${NAVY}; font-size: 11px; text-transform: uppercase; }
+        .pdf-bracket-round > h3 { margin: 0 0 6px; color: ${NAVY}; font-size: 11px; text-transform: uppercase; }
         .pdf-bracket-stack { position: relative; display: flex; flex: 1; flex-direction: column; justify-content: space-evenly; gap: 5px; }
         .pdf-bracket-pair { position: relative; display: flex; flex: 1; flex-direction: column; justify-content: space-evenly; gap: 5px; }
         .pdf-bracket-pair::after { content: ""; position: absolute; z-index: 0; top: 25%; right: -10px; bottom: 25%; border-right: 2px solid ${BLUE}; }
@@ -338,7 +337,10 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-bracket-meta { margin: 0 0 3px; color: #66758d; font-size: 8px; }
         .pdf-bracket-team { border-top: 1px solid #e5ebf4; padding: 3px 0; color: ${NAVY}; font-size: 9px; font-weight: 600; }
         .pdf-bracket-result { position: absolute; right: 7px; top: 5px; color: ${BLUE}; font-size: 9px; }
-        .pdf-placement-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 10px; border-top: 2px solid ${YELLOW}; padding-top: 8px; }
+        .pdf-bracket-placement { break-inside: avoid; page-break-inside: avoid; border-top: 2px solid ${YELLOW}; padding-top: 6px; }
+        .pdf-bracket-placement h4 { margin: 0 0 5px; color: ${NAVY}; font-size: 9px; text-transform: uppercase; }
+        .pdf-layout-bambini th, .pdf-layout-bambini td { padding-top: 2.5px !important; padding-bottom: 2.5px !important; }
+        .pdf-layout-bambini section { margin-top: 10px !important; }
       `}</style>
 
       {/* Header */}
