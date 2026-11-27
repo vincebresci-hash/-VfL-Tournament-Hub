@@ -39,6 +39,8 @@ for (const scenario of SCENARIOS) {
       await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toHaveCount(0);
       await expect(page.locator("[data-match-result]")).toHaveCount(0);
       await expect(page.getByText(/Gesamttabelle|Tabellen|K\.‑o\.-Runde/)).toHaveCount(0);
+      await expect(page.getByRole("heading", { name: "Gruppe A", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Gruppe B", exact: true })).toBeVisible();
     } else {
       await expect(page.locator("[data-match-result]")).toHaveCount(scenario.matches);
       await expect(page.getByText(/Gesamttabelle|Tabellen/).first()).toBeVisible();
@@ -134,6 +136,55 @@ test("18 teams × 8 games matrix is complete and Top 16 bracket is visible", asy
   await expect(page.locator("[data-match-key]")).toHaveCount(72);
   await expect(page.getByText("Achtelfinale", { exact: true })).toBeVisible();
   await expect(page.getByText("Platz 16", { exact: true })).toBeVisible();
+});
+
+test("legacy single-group tournament prints its configured complete end round", async ({ page }, info) => {
+  await page.goto("/admin/turniere/cl61-pdf-legacy-one-group/spielplan/pdf");
+  await expect(page.locator("[data-match-key]")).toHaveCount(12);
+  await expect(page.locator("[data-knockout-key]")).toHaveCount(4);
+  await expect(page.getByText("Halbfinale", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Finale", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("Spiel um Platz 3", { exact: true }).first()).toBeVisible();
+  if (info.project.name === "desktop-chromium") {
+    await page.pdf({
+      path: "e2e/pdf/legacy-ein-gruppe-vollstaendige-endrunde.pdf",
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+  }
+});
+
+test("pure classic group tournament never invents a knockout stage", async ({ page }, info) => {
+  await page.goto("/admin/turniere/cl61-pdf-groups-only/spielplan/pdf");
+  await expect(page.getByRole("heading", { name: "Gruppe A", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Gruppe B", exact: true })).toBeVisible();
+  await expect(page.locator("[data-knockout-key]")).toHaveCount(0);
+  await expect(page.getByText(/Endrunden-Spielplan|K.-o.-Runde/)).toHaveCount(0);
+  if (info.project.name === "desktop-chromium") {
+    await page.pdf({
+      path: "e2e/pdf/klassisch-nur-gruppenphase.pdf",
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+  }
+});
+
+test("qualification names appear only after the league phase is final", async ({ page }, info) => {
+  await page.goto("/admin/turniere/cl61-pdf-partial/spielplan/pdf");
+  await expect(page.locator(".pdf-bracket")).toContainText("Platz 1");
+  await expect(page.locator("[data-knockout-key]")).toHaveCount(4);
+
+  await page.goto("/admin/turniere/cl61-pdf-complete/spielplan/pdf");
+  await expect(page.locator(".pdf-bracket")).not.toContainText("Platz 1");
+  await expect(page.locator(".pdf-bracket")).toContainText("Testverein");
+  await expect(page.locator("[data-knockout-key]")).toHaveCount(4);
+  if (info.project.name === "desktop-chromium") {
+    await page.pdf({
+      path: "e2e/pdf/cl-vollstaendige-ligaphase-mit-qualifikanten.pdf",
+      printBackground: true,
+      preferCSSPageSize: true,
+    });
+  }
 });
 
 test("public Champions League view exposes league schedule, standings and knockout without dirty names", async ({ page }) => {

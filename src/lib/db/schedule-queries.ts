@@ -58,6 +58,7 @@ function asMatchPhase(value: string | null | undefined): MatchPhase {
 
 function asKnockoutRound(value: string | null | undefined): KnockoutRound | null {
   if (
+    value === "round-of-16" ||
     value === "quarterfinal" ||
     value === "semifinal" ||
     value === "third-place" ||

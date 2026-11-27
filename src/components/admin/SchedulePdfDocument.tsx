@@ -46,6 +46,7 @@ export type SchedulePdfDocumentProps = {
   modeLabel: string;
   metaLine: string;
   participants: string[];
+  participantGroups: Array<{ title: string; names: string[] }> | null;
   scheduleTitle: string;
   singleColumnMatches: PdfMatchRow[];
   timelineRows: Array<PdfTimelineRow<PdfMatchRow>> | null;
@@ -53,6 +54,7 @@ export type SchedulePdfDocumentProps = {
   standings: Array<{ title: string; rows: PdfStandingRow[] }>;
   showStandings: boolean;
   knockoutTitle: string;
+  knockoutSchedule: PdfMatchRow[];
   knockout: PdfMatchRow[];
 };
 
@@ -79,7 +81,15 @@ function SectionHeading({ children }: { children: ReactNode }) {
   );
 }
 
-function ScheduleTable({ rows, showResult }: { rows: PdfMatchRow[]; showResult: boolean }) {
+function ScheduleTable({
+  rows,
+  showResult,
+  showRound = false,
+}: {
+  rows: PdfMatchRow[];
+  showResult: boolean;
+  showRound?: boolean;
+}) {
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <thead>
@@ -87,6 +97,7 @@ function ScheduleTable({ rows, showResult }: { rows: PdfMatchRow[]; showResult: 
           <th style={{ ...th, width: "7%" }}>Nr.</th>
           <th style={{ ...th, width: "16%" }}>Anstoß</th>
           <th style={{ ...th, width: "12%" }}>Feld</th>
+          {showRound ? <th style={{ ...th, width: "15%" }}>Runde</th> : null}
           <th style={th}>Team 1</th>
           <th style={th}>Team 2</th>
           {showResult ? <th style={{ ...th, width: "14%" }}>Ergebnis</th> : null}
@@ -94,10 +105,15 @@ function ScheduleTable({ rows, showResult }: { rows: PdfMatchRow[]; showResult: 
       </thead>
       <tbody>
         {rows.map((match, index) => (
-          <tr key={match.key} style={rowStyle(index)} data-match-key={match.key}>
+          <tr
+            key={match.key}
+            style={rowStyle(index)}
+            {...(showRound ? { "data-knockout-key": match.key } : { "data-match-key": match.key })}
+          >
             <td style={td}>{match.number}</td>
             <td style={td}>{match.time}</td>
             <td style={td}>{match.fieldName}</td>
+            {showRound ? <td style={td}>{match.roundLabel ?? "K.-o.-Spiel"}</td> : null}
             <td style={{ ...td, fontWeight: 600 }}>{match.homeName}</td>
             <td style={{ ...td, fontWeight: 600 }}>{match.awayName}</td>
             {showResult ? (
@@ -182,7 +198,15 @@ function StandingsTable({ rows }: { rows: PdfStandingRow[] }) {
       </thead>
       <tbody>
         {rows.map((row, index) => (
-          <tr key={`${row.rank}-${row.teamName}`} style={rowStyle(index, row.qualified)}>
+          <tr
+            key={`${row.rank}-${row.teamName}`}
+            style={{
+              ...rowStyle(index, row.qualified),
+              ...(index > 0 && rows[index - 1]?.qualified && !row.qualified
+                ? { borderTop: `3px solid ${YELLOW}` }
+                : {}),
+            }}
+          >
             <td style={{ ...td, fontWeight: 700, color: row.qualified ? NAVY : undefined }}>{row.rank}</td>
             <td style={{ ...td, fontWeight: 600 }}>{row.teamName}</td>
             <td style={td}>{row.played}</td>
@@ -208,7 +232,7 @@ const BRACKET_ROUNDS: KnockoutRound[] = [
 
 function BracketMatch({ match }: { match: PdfMatchRow }) {
   return (
-    <article className="pdf-bracket-match">
+    <article className={`pdf-bracket-match${match.isFinal ? " pdf-bracket-final" : ""}`}>
       <p className="pdf-bracket-meta">
         {match.time} · {match.fieldName}
       </p>
@@ -241,14 +265,20 @@ function KnockoutBracket({ matches }: { matches: PdfMatchRow[] }) {
           <section className="pdf-bracket-round" key={entry.round}>
             <h3>{entry.matches[0]?.roundLabel}</h3>
             <div className="pdf-bracket-stack">
-              {entry.matches.map((match) => (
-                <div
-                  className={roundIndex < mainRounds.length - 1 ? "pdf-bracket-connector" : undefined}
-                  key={match.key}
-                >
-                  <BracketMatch match={match} />
-                </div>
-              ))}
+              {roundIndex < mainRounds.length - 1
+                ? Array.from(
+                    { length: Math.ceil(entry.matches.length / 2) },
+                    (_, pairIndex) => entry.matches.slice(pairIndex * 2, pairIndex * 2 + 2),
+                  ).map((pair) => (
+                    <div className="pdf-bracket-pair" key={pair.map((match) => match.key).join("-")}>
+                      {pair.map((match) => (
+                        <div className="pdf-bracket-connector" key={match.key}>
+                          <BracketMatch match={match} />
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                : entry.matches.map((match) => <BracketMatch key={match.key} match={match} />)}
             </div>
           </section>
         ))}
@@ -291,18 +321,22 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
         .pdf-root tr, .pdf-root h2, .pdf-root h3 { break-inside: avoid; }
-        .pdf-break { break-before: page; }
-        .pdf-bracket { display: grid; gap: 22px; min-height: 148mm; }
+        .pdf-section { break-before: auto; }
+        .pdf-bracket { display: grid; gap: 20px; align-items: stretch; }
         .pdf-bracket-round { display: flex; min-width: 0; flex-direction: column; }
         .pdf-bracket-round > h3, .pdf-placement-grid h3 { margin: 0 0 6px; color: ${NAVY}; font-size: 11px; text-transform: uppercase; }
-        .pdf-bracket-stack { display: flex; flex: 1; flex-direction: column; justify-content: space-around; gap: 5px; }
+        .pdf-bracket-stack { position: relative; display: flex; flex: 1; flex-direction: column; justify-content: space-evenly; gap: 5px; }
+        .pdf-bracket-pair { position: relative; display: flex; flex: 1; flex-direction: column; justify-content: space-evenly; gap: 5px; }
+        .pdf-bracket-pair::after { content: ""; position: absolute; z-index: 0; top: 25%; right: -10px; bottom: 25%; border-right: 2px solid ${BLUE}; }
         .pdf-bracket-connector { position: relative; break-inside: avoid; page-break-inside: avoid; }
-        .pdf-bracket-connector::after { content: ""; position: absolute; top: 50%; right: -22px; width: 22px; border-top: 2px solid ${BLUE}; }
-        .pdf-bracket-match { position: relative; break-inside: avoid; page-break-inside: avoid; border: 1px solid ${BORDER}; border-left: 4px solid ${YELLOW}; background: white; padding: 5px 7px; box-shadow: 0 1px 2px rgba(11,42,94,.08); }
+        .pdf-bracket-connector::after { content: ""; position: absolute; z-index: 0; top: 50%; right: -10px; width: 10px; border-top: 2px solid ${BLUE}; }
+        .pdf-bracket-round:not(:first-child) .pdf-bracket-match::before { content: ""; position: absolute; top: 50%; left: -11px; width: 10px; border-top: 2px solid ${BLUE}; }
+        .pdf-bracket-match { position: relative; z-index: 1; break-inside: avoid; page-break-inside: avoid; border: 1px solid ${BORDER}; border-left: 4px solid ${YELLOW}; background: white; padding: 4px 6px; box-shadow: 0 1px 2px rgba(11,42,94,.08); }
+        .pdf-bracket-final { border-color: ${BLUE}; background: #f4f8ff; }
         .pdf-bracket-meta { margin: 0 0 3px; color: #66758d; font-size: 8px; }
         .pdf-bracket-team { border-top: 1px solid #e5ebf4; padding: 3px 0; color: ${NAVY}; font-size: 9px; font-weight: 600; }
         .pdf-bracket-result { position: absolute; right: 7px; top: 5px; color: ${BLUE}; font-size: 9px; }
-        .pdf-placement-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 12px; border-top: 2px solid ${YELLOW}; padding-top: 10px; }
+        .pdf-placement-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 10px; border-top: 2px solid ${YELLOW}; padding-top: 8px; }
       `}</style>
 
       {/* Header */}
@@ -337,13 +371,26 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       {props.participants.length > 0 ? (
         <section style={{ marginTop: "14px" }}>
           <SectionHeading>Teilnehmer ({props.participants.length})</SectionHeading>
-          <ol style={{ columnCount: props.participants.length > 8 ? 2 : 1, columnGap: "24px", margin: 0, paddingLeft: "18px", fontSize: "10.5px" }}>
-            {props.participants.map((name, index) => (
-              <li key={`${name}-${index}`} style={{ breakInside: "avoid", padding: "1px 0" }}>
-                {name}
-              </li>
-            ))}
-          </ol>
+          {props.participantGroups && props.participantGroups.length > 0 ? (
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(props.participantGroups.length, 4)}, minmax(0, 1fr))`, gap: "12px" }}>
+              {props.participantGroups.map((group) => (
+                <div key={group.title} style={{ breakInside: "avoid" }}>
+                  <h3 style={{ color: NAVY, fontSize: "10.5px", margin: "0 0 3px" }}>{group.title}</h3>
+                  <ol style={{ margin: 0, paddingLeft: "18px", fontSize: "9.5px" }}>
+                    {group.names.map((name, index) => <li key={`${name}-${index}`}>{name}</li>)}
+                  </ol>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <ol style={{ columnCount: props.participants.length > 16 ? 3 : props.participants.length > 8 ? 2 : 1, columnGap: "24px", margin: 0, paddingLeft: "18px", fontSize: "10px" }}>
+              {props.participants.map((name, index) => (
+                <li key={`${name}-${index}`} style={{ breakInside: "avoid", padding: "1px 0" }}>
+                  {name}
+                </li>
+              ))}
+            </ol>
+          )}
         </section>
       ) : null}
 
@@ -365,7 +412,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
       {/* Standings */}
       {props.showStandings && props.standings.length > 0 ? (
-        <section className="pdf-break" style={{ marginTop: "16px" }}>
+        <section className="pdf-section" style={{ marginTop: "16px" }}>
           <SectionHeading>{props.layout.startsWith("cl") ? "Gesamttabelle (Ligaphase)" : "Tabellen"}</SectionHeading>
           {props.standings.map((table) => (
             <div key={table.title} style={{ marginTop: "10px" }}>
@@ -385,7 +432,10 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
       {/* Knockout */}
       {props.layout !== "bambini" && props.knockout.length > 0 ? (
-        <section className="pdf-break" style={{ marginTop: "16px" }}>
+        <section className="pdf-section" style={{ marginTop: "16px" }}>
+          <SectionHeading>Endrunden-Spielplan</SectionHeading>
+          <ScheduleTable rows={props.knockoutSchedule} showResult showRound />
+          <div style={{ height: "14px" }} />
           <SectionHeading>{props.knockoutTitle}</SectionHeading>
           <KnockoutBracket matches={props.knockout} />
         </section>

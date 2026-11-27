@@ -119,6 +119,61 @@ export function buildChampionsLeagueBracketRows(cutoff: 4 | 8 | 16 | null): PdfM
   return rows;
 }
 
+const knockoutRoundOrder: KnockoutRound[] = [
+  "round-of-16",
+  "quarterfinal",
+  "semifinal",
+  "third-place",
+  "placement-5",
+  "placement-7",
+  "final",
+];
+
+/** Complete a configured bracket while preserving every persisted value. */
+export function completePdfKnockoutRows(
+  template: readonly PdfMatchRow[],
+  persisted: readonly PdfMatchRow[],
+  firstNumber: number,
+): PdfMatchRow[] {
+  const remaining = [...persisted];
+  const completed = template.map((placeholder) => {
+    const persistedIndex = remaining.findIndex((row) => row.round === placeholder.round);
+    const stored = persistedIndex >= 0 ? remaining.splice(persistedIndex, 1)[0] : null;
+    if (!stored) return placeholder;
+    return {
+      ...placeholder,
+      ...stored,
+      homeName:
+        stored.homeName === "Offen" || stored.homeName === "offen"
+          ? placeholder.homeName
+          : stored.homeName,
+      awayName:
+        stored.awayName === "Offen" || stored.awayName === "offen"
+          ? placeholder.awayName
+          : stored.awayName,
+    };
+  });
+
+  return [...completed, ...remaining]
+    .sort((left, right) => {
+      const leftRound = left.round ? knockoutRoundOrder.indexOf(left.round) : knockoutRoundOrder.length;
+      const rightRound = right.round ? knockoutRoundOrder.indexOf(right.round) : knockoutRoundOrder.length;
+      return leftRound - rightRound || left.number - right.number;
+    })
+    .map((row, index) => ({ ...row, number: firstNumber + index }));
+}
+
+export function sortPdfKnockoutSchedule(rows: readonly PdfMatchRow[]): PdfMatchRow[] {
+  const sortableTime = (row: PdfMatchRow) =>
+    /^\d{2}:\d{2}/.test(row.time)
+      ? `0:${row.time}`
+      : `1:${String(row.number).padStart(4, "0")}`;
+  return [...rows].sort(
+    (left, right) =>
+      sortableTime(left).localeCompare(sortableTime(right)) || left.number - right.number,
+  );
+}
+
 function seedName(seed: string | null, round: KnockoutRound, matchIndex: number, side: "home" | "away") {
   if (seed) {
     const leagueSeed = /^S(\d+)$/.exec(seed);
@@ -155,16 +210,18 @@ function classicBracket(plan: readonly PlanPreviewKoMatch[] | null): PdfMatchRow
 }
 
 export function buildClassicBracketRows(groupCount: number): PdfMatchRow[] {
-  if (groupCount !== 2 && groupCount !== 4) return [];
+  if (groupCount !== 1 && groupCount !== 2 && groupCount !== 4) return [];
   const rows: PdfMatchRow[] = [];
   let index = 0;
   if (groupCount === 4) {
     [["Platz 1 Gruppe A", "Platz 2 Gruppe B"], ["Platz 1 Gruppe B", "Platz 2 Gruppe A"], ["Platz 1 Gruppe C", "Platz 2 Gruppe D"], ["Platz 1 Gruppe D", "Platz 2 Gruppe C"]]
       .forEach(([home, away], matchIndex) => rows.push(bracketRow(`vf${matchIndex + 1}`, "quarterfinal", home!, away!, index++, `hf${Math.floor(matchIndex / 2) + 1}`)));
   }
-  const semifinalSeeds = groupCount === 2
-    ? [["Platz 1 Gruppe A", "Platz 2 Gruppe B"], ["Platz 1 Gruppe B", "Platz 2 Gruppe A"]]
-    : [["Sieger VF1", "Sieger VF2"], ["Sieger VF3", "Sieger VF4"]];
+  const semifinalSeeds = groupCount === 1
+    ? [["Platz 1", "Platz 4"], ["Platz 2", "Platz 3"]]
+    : groupCount === 2
+      ? [["Platz 1 Gruppe A", "Platz 2 Gruppe B"], ["Platz 1 Gruppe B", "Platz 2 Gruppe A"]]
+      : [["Sieger VF1", "Sieger VF2"], ["Sieger VF3", "Sieger VF4"]];
   semifinalSeeds.forEach(([home, away], matchIndex) => rows.push(bracketRow(`hf${matchIndex + 1}`, "semifinal", home!, away!, index++, "final")));
   rows.push(bracketRow("final", "final", "Sieger HF1", "Sieger HF2", index++));
   rows.push(bracketRow("third", "third-place", "Verlierer HF1", "Verlierer HF2", index++));
@@ -208,6 +265,14 @@ export function buildDraftSchedulePdfDocument(input: DraftPdfInput): SchedulePdf
     .map((membership) => previewParticipantKey(membership.participant))
     .filter((key): key is string => Boolean(key));
   const participants = participantKeys.map((key) => input.teamLabels[key] ?? "Unbenannte Mannschaft");
+  const participantGroups = input.preview.mode === "champions-league"
+    ? null
+    : input.preview.groups.map((group) => ({
+        title: group.name,
+        names: input.preview.memberships
+          .filter((membership) => membership.groupKey === group.key)
+          .map((membership) => participantName(membership.participant, input.teamLabels)),
+      }));
   const standings = pdfLayoutShowsStandings(layout)
     ? input.preview.groups.map((group) => {
         const names = input.preview.memberships
@@ -230,6 +295,18 @@ export function buildDraftSchedulePdfDocument(input: DraftPdfInput): SchedulePdf
     if (input.knockoutCutoff != null) meta.push(`Top ${input.knockoutCutoff}`);
   }
 
+  const knockoutTemplate = layout === "bambini"
+    ? []
+    : input.preview.mode === "champions-league"
+      ? buildChampionsLeagueBracketRows(input.knockoutCutoff)
+      : input.preview.mode === "groups-knockout"
+        ? (() => {
+            const planned = classicBracket(input.preview.koPlan);
+            return planned.length > 0 ? planned : buildClassicBracketRows(input.preview.groups.length);
+          })()
+        : [];
+  const knockout = completePdfKnockoutRows(knockoutTemplate, [], rows.length + 1);
+
   return {
     layout,
     draft: true,
@@ -241,6 +318,7 @@ export function buildDraftSchedulePdfDocument(input: DraftPdfInput): SchedulePdf
     modeLabel: input.preview.mode === "champions-league" ? "Champions League" : input.preview.mode === "groups-knockout" ? "Gruppenphase + K.-o.-Runde" : "Jeder gegen jeden",
     metaLine: meta.join(" · "),
     participants,
+    participantGroups,
     scheduleTitle: input.preview.mode === "champions-league" ? "Ligaphase – Spielplan" : "Spielplan",
     singleColumnMatches: rows,
     timelineRows,
@@ -248,14 +326,8 @@ export function buildDraftSchedulePdfDocument(input: DraftPdfInput): SchedulePdf
     standings,
     showStandings: pdfLayoutShowsStandings(layout),
     knockoutTitle: input.preview.mode === "champions-league" ? "K.-o.-Runde (Endrunde)" : "K.-o.-Runde",
-    knockout: layout === "bambini"
-      ? []
-      : input.preview.mode === "champions-league"
-        ? buildChampionsLeagueBracketRows(input.knockoutCutoff)
-        : (() => {
-            const planned = classicBracket(input.preview.koPlan);
-            return planned.length > 0 ? planned : buildClassicBracketRows(input.preview.groups.length);
-          })(),
+    knockoutSchedule: sortPdfKnockoutSchedule(knockout),
+    knockout,
   };
 }
 

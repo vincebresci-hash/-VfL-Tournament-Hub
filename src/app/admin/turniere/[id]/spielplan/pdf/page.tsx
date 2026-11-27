@@ -20,8 +20,11 @@ import { formatBerlinClock } from "@/lib/schedule/datetime";
 import {
   buildChampionsLeagueBracketRows,
   buildClassicBracketRows,
+  completePdfKnockoutRows,
+  sortPdfKnockoutSchedule,
 } from "@/lib/schedule/draft-schedule-pdf";
-import { knockoutRoundLabel } from "@/lib/schedule/knockout";
+import { isGroupStageComplete, knockoutRoundLabel } from "@/lib/schedule/knockout";
+import { expectedLeagueMatchCount } from "@/lib/schedule/league-phase";
 import {
   assignGameNumbers,
   groupMatchesByTimeslot,
@@ -103,6 +106,7 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
     fieldId ? (fields.find((field) => field.id === fieldId)?.name ?? "Feld") : "—";
 
   const format = leagueConfig.status === "ok" ? leagueConfig.competitionFormat : null;
+  const effectiveFormat = format ?? (stage.groups.length > 0 ? "groups-knockout" : "round-robin");
   const cutoff = leagueConfig.status === "ok" ? leagueConfig.knockoutCutoff : null;
   const matchesPerTeam = leagueConfig.status === "ok" ? leagueConfig.leagueMatchesPerTeam : null;
   const layout = resolvePdfLayout({
@@ -167,9 +171,39 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
   }
 
   const standings: Array<{ title: string; rows: PdfStandingRow[] }> = [];
+  const qualifiedNameBySeed = new Map<string, string>();
+  const leagueGroupId = stage.groups[0]?.id;
+  const leagueMemberCount = leagueGroupId
+    ? (stage.memberIdsByGroupId[leagueGroupId] ?? []).length
+    : 0;
+  const expectedLeagueMatches =
+    isChampionsLeague && matchesPerTeam != null
+      ? expectedLeagueMatchCount(leagueMemberCount, matchesPerTeam)
+      : null;
+  const preliminaryComplete = isChampionsLeague
+    ? expectedLeagueMatches != null &&
+      leagueMatches.length === expectedLeagueMatches &&
+      leagueMatches.every(
+        (match) => match.status === "completed" && match.homeScore != null && match.awayScore != null,
+      )
+    : isGroupStageComplete(stage.groups, stage.memberIdsByGroupId, leagueMatches).complete &&
+      leagueMatches.every(
+        (match) => match.status === "completed" && match.homeScore != null && match.awayScore != null,
+      );
   if (pdfLayoutShowsStandings(layout)) {
-    const toStandingRows = (memberIds: string[], matches: TournamentMatchRecord[]): PdfStandingRow[] =>
-      computeGroupStandings(memberIds, matches).map((row) => ({
+    const toStandingRows = (
+      memberIds: string[],
+      matches: TournamentMatchRecord[],
+      groupIndex: number,
+    ): PdfStandingRow[] =>
+      computeGroupStandings(memberIds, matches).map((row) => {
+        if (preliminaryComplete) {
+          const seed = isChampionsLeague || stage.groups.length === 1
+            ? `Platz ${row.rank}`
+            : `Platz ${row.rank} Gruppe ${String.fromCharCode(65 + groupIndex)}`;
+          qualifiedNameBySeed.set(seed, teamName(row.applicationId));
+        }
+        return {
         rank: row.rank,
         teamName: teamName(row.applicationId),
         played: row.played,
@@ -180,7 +214,8 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
         goalDiff: row.goalDiff,
         points: row.points,
         qualified: isChampionsLeague && cutoff != null && row.rank <= cutoff,
-      }));
+        };
+      });
     if (isChampionsLeague) {
       const leagueGroup = stage.groups[0];
       if (leagueGroup) {
@@ -189,25 +224,43 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
           rows: toStandingRows(
             stage.memberIdsByGroupId[leagueGroup.id] ?? [],
             leagueMatches.filter((match) => match.groupId === leagueGroup.id),
+            0,
           ),
         });
       }
     } else {
-      for (const group of stage.groups) {
+      for (const [groupIndex, group] of stage.groups.entries()) {
         standings.push({
           title: group.name,
           rows: toStandingRows(
             stage.memberIdsByGroupId[group.id] ?? [],
             leagueMatches.filter((match) => match.groupId === group.id),
+            groupIndex,
           ),
         });
       }
     }
   }
 
-  const bracketTemplate = isChampionsLeague ? buildChampionsLeagueBracketRows(cutoff) : [];
+  const placeholderTemplate = isChampionsLeague
+    ? buildChampionsLeagueBracketRows(cutoff)
+    : effectiveFormat === "groups-knockout"
+      ? buildClassicBracketRows(stage.groups.length)
+      : [];
+  const bracketTemplate = placeholderTemplate
+    .filter(
+      (row) =>
+        row.round !== "third-place" ||
+        knockoutMatches.length === 0 ||
+        knockoutMatches.some((match) => match.round === "third-place"),
+    )
+    .map((row) => ({
+      ...row,
+      homeName: qualifiedNameBySeed.get(row.homeName) ?? row.homeName,
+      awayName: qualifiedNameBySeed.get(row.awayName) ?? row.awayName,
+    }));
   const templateIndexByRound = new Map<string, number>();
-  const knockout: PdfMatchRow[] = knockoutMatches.map((match) => {
+  const persistedKnockout: PdfMatchRow[] = knockoutMatches.map((match) => {
     const round = match.round;
     const roundIndex = round ? (templateIndexByRound.get(round) ?? 0) : 0;
     if (round) templateIndexByRound.set(round, roundIndex + 1);
@@ -225,11 +278,11 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
       isFinal: round === "final",
     };
   });
-  if (isChampionsLeague && knockout.length === 0) {
-    knockout.push(...bracketTemplate);
-  } else if (format === "groups-knockout" && knockout.length === 0) {
-    knockout.push(...buildClassicBracketRows(stage.groups.length));
-  }
+  const knockout = completePdfKnockoutRows(
+    bracketTemplate,
+    persistedKnockout,
+    singleColumnMatches.length + 1,
+  );
 
   const participantNames = participants
     .map((participant) => {
@@ -237,6 +290,12 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
       return key ? (teamLabels[key] ?? "Team") : null;
     })
     .filter((name): name is string => Boolean(name));
+  const participantGroups = isChampionsLeague
+    ? null
+    : stage.groups.map((group) => ({
+        title: group.name,
+        names: (stage.memberIdsByGroupId[group.id] ?? []).map((participantId) => teamName(participantId)),
+      }));
 
   const fieldCount = fields.length;
   const metaParts = [
@@ -272,6 +331,7 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
             modeLabel={modeLabel(format, stage.groups.length)}
             metaLine={metaParts.join(" · ")}
             participants={participantNames}
+            participantGroups={participantGroups}
             scheduleTitle={isChampionsLeague ? "Ligaphase – Spielplan" : "Spielplan"}
             singleColumnMatches={singleColumnMatches}
             timelineRows={timelineRows}
@@ -279,6 +339,7 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
             standings={standings}
             showStandings={pdfLayoutShowsStandings(layout)}
             knockoutTitle={isChampionsLeague ? "K.-o.-Runde (Endrunde)" : "K.-o.-Runde"}
+            knockoutSchedule={sortPdfKnockoutSchedule(knockout)}
             knockout={knockout}
           />
         )}

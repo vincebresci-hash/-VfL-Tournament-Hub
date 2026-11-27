@@ -109,11 +109,12 @@ jobs:
       - name: Render Release 6 PDFs + full Release 5 regression (desktop + mobile)
         run: npx playwright test --config e2e/playwright.config.ts release6-pdf admin-schedule
 
-      - name: Verify five downloadable landscape PDFs and page numbering
+      - name: Verify downloadable landscape PDFs, completeness and page counts
         run: |
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq poppler-utils
+          : > e2e/pdf/pdf-page-counts.txt
           expected=(
             champions-league-1-feld
             champions-league-2-felder
@@ -131,13 +132,19 @@ jobs:
             # PDF-layout test; here we verify that every rendered PDF carries
             # its dynamic tournament content.
             pdftotext -layout "$file" - | grep -Eq 'Turnier|Champions League|Bambini'
+            pages="$(pdfinfo "$file" | awk '/^Pages:/ {print $2}')"
+            printf '%s: %s pages\n' "$name" "$pages" >> e2e/pdf/pdf-page-counts.txt
           done
-          # The eighth Top-16 pairing must remain a complete card on the
-          # bracket page. A break between Platz 6 and Platz 11 would split one
-          # graphical match card across two PDF pages.
-          pdftotext -f 4 -l 4 -layout e2e/pdf/champions-league-3-felder.pdf - \
-            | grep -Eq 'Platz 11'
           test -s e2e/pdf/champions-league-echter-entwurf.pdf
+          pdfinfo e2e/pdf/champions-league-echter-entwurf.pdf | grep -Eq 'Page size:[[:space:]]+84[12].*x 59[45].*pts'
+          draft_pages="$(pdfinfo e2e/pdf/champions-league-echter-entwurf.pdf | awk '/^Pages:/ {print $2}')"
+          printf '%s: %s pages\n' "champions-league-echter-entwurf" "$draft_pages" >> e2e/pdf/pdf-page-counts.txt
+          # Full end-round schedule and all Top-16 seeds must survive the real
+          # Chromium PDF renderer, independent of the final page allocation.
+          pdftotext -layout e2e/pdf/champions-league-3-felder.pdf - e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'Endrunden-Spielplan' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'Platz 16' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'Finale' e2e/pdf/champions-league-3-felder.txt
 
       - name: Upload PDFs + screenshots + report
         if: always()

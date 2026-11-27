@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildChampionsLeagueBracketRows,
+  buildClassicBracketRows,
   buildDraftSchedulePdfDocument,
+  completePdfKnockoutRows,
+  sortPdfKnockoutSchedule,
 } from "../../src/lib/schedule/draft-schedule-pdf.ts";
 
 const tournament = {
@@ -56,6 +59,16 @@ test("draft PDF is built from edited in-memory matches, not persisted matches", 
   assert.equal(document.singleColumnMatches[0].time, "11:17 Uhr");
   assert.equal(document.description, tournament.description);
   assert.ok(document.knockout.some((match) => match.homeName === "Platz 1" && match.awayName === "Platz 4"));
+
+  const groupOnly = buildDraftSchedulePdfDocument({
+    tournament,
+    preview: { ...preview, mode: "round-robin", koPlan: null },
+    teamLabels: { a: "Alpha", b: "Bravo", c: "Charlie", d: "Delta" },
+    fields: [{ id: "f1", name: "Feld 1" }],
+    matchesPerTeam: null,
+    knockoutCutoff: null,
+  });
+  assert.equal(groupOnly.knockout.length, 0, "round-robin drafts must not invent a knockout stage");
 });
 
 test("Top 4, Top 8 and Top 16 brackets include final and third-place placeholders", () => {
@@ -67,4 +80,45 @@ test("Top 4, Top 8 and Top 16 brackets include final and third-place placeholder
       assert.ok(rows.some((row) => row.round === "round-of-16" && row.awayName === "Platz 16"));
     }
   }
+});
+
+test("legacy single-group tournaments receive a complete Top-4 end round", () => {
+  const rows = buildClassicBracketRows(1);
+  assert.deepEqual(
+    rows.map((row) => row.round),
+    ["semifinal", "semifinal", "final", "third-place"],
+  );
+  assert.equal(rows[0].homeName, "Platz 1");
+  assert.equal(rows[0].awayName, "Platz 4");
+});
+
+test("partial persisted knockout data is completed without losing its schedule or result", () => {
+  const template = buildChampionsLeagueBracketRows(8);
+  const persisted = [{
+    ...template.find((row) => row.round === "quarterfinal"),
+    key: "stored-vf-1",
+    number: 0,
+    time: "17:15 Uhr",
+    fieldName: "Hauptfeld",
+    homeName: "Alpha",
+    awayName: "Bravo",
+    result: "2:1",
+  }];
+  const rows = completePdfKnockoutRows(template, persisted, 65);
+  const stored = rows.find((row) => row.key === "stored-vf-1");
+  assert.equal(rows.length, template.length);
+  assert.equal(stored.time, "17:15 Uhr");
+  assert.equal(stored.fieldName, "Hauptfeld");
+  assert.equal(stored.result, "2:1");
+  assert.equal(rows[0].number, 65);
+  assert.ok(rows.some((row) => row.round === "final"));
+});
+
+test("end-round schedule is chronological and keeps open matches last", () => {
+  const rows = sortPdfKnockoutSchedule([
+    { key: "open", number: 23, time: "Termin offen" },
+    { key: "late", number: 22, time: "17:30 Uhr" },
+    { key: "early", number: 21, time: "16:45 Uhr" },
+  ]);
+  assert.deepEqual(rows.map((row) => row.key), ["early", "late", "open"]);
 });

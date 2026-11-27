@@ -82,3 +82,11 @@ test("print stylesheet renders exactly one page counter with total pages", () =>
   assert.match(documentSource, /content:\s*"Seite "\s*counter\(page\)\s*" \/ "\s*counter\(pages\)/);
   assert.doesNotMatch(artifactSource, /displayHeaderFooter|footerTemplate/);
 });
+
+test("stored Top-16 matches retain their round when read from PostgreSQL", () => {
+  const querySource = readFileSync(
+    new URL("../../src/lib/db/schedule-queries.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(querySource, /value === "round-of-16"/);
+});

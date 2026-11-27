@@ -48,7 +48,20 @@ async function ensureTournament(slug, name, ageGroup, playFormat = null) {
   return inserted.data.id;
 }
 
-async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, matchesPerTeam, cutoff, champions, groupCount = 1, playFormat = null }) {
+async function seedScenario({
+  slug,
+  name,
+  ageGroup,
+  teamCount,
+  fieldCount,
+  matchesPerTeam,
+  cutoff,
+  champions,
+  groupCount = 1,
+  playFormat = null,
+  competitionFormat,
+  completedFraction = 0,
+}) {
   const tournamentId = await ensureTournament(slug, name, ageGroup, playFormat);
 
   const already = await db.from("tournament_matches").select("id").eq("tournament_id", tournamentId).limit(1);
@@ -103,6 +116,7 @@ async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, match
       round.forEach((pair, indexInRound) => {
         const fieldIndex = indexInRound % fieldCount;
         const when = new Date(base + (slot + Math.floor(indexInRound / fieldCount)) * slotMinutes * 60_000).toISOString();
+        const completed = rows.length / ((teamCount * matchesPerTeam) / 2) < completedFraction;
         rows.push({
           tournament_id: tournamentId,
           group_id: groupId,
@@ -111,7 +125,9 @@ async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, match
           away_application_id: groupApps[pair[1]],
           scheduled_at: when,
           duration_minutes: 12,
-          status: "scheduled",
+          status: completed ? "completed" : "scheduled",
+          home_score: completed ? (sort % 4) : null,
+          away_score: completed ? ((sort + 1) % 3) : null,
           phase: "group",
           sort_order: sort,
         });
@@ -128,7 +144,7 @@ async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, match
       .from("tournaments")
       .update(champions
         ? { competition_format: "champions-league", knockout_cutoff: cutoff, league_matches_per_team: matchesPerTeam }
-        : { competition_format: groupCount > 1 ? "groups-knockout" : "round-robin" })
+        : { competition_format: competitionFormat === undefined ? (groupCount > 1 ? "groups-knockout" : "round-robin") : competitionFormat })
       .eq("id", tournamentId)
       .select("id")
       .single();
@@ -143,6 +159,10 @@ seeded.push(await seedScenario({ slug: "cl6-pdf-cl-two", name: "CL 16 Teams – 
 seeded.push(await seedScenario({ slug: "cl6-pdf-cl-three", name: "CL 18 Teams – drei Felder", ageGroup: "U15", teamCount: 18, fieldCount: 3, matchesPerTeam: 5, cutoff: 16, champions: true }));
 seeded.push(await seedScenario({ slug: "cl6-matrix-18x8", name: "CL Matrix 18 × 8", ageGroup: "U16", teamCount: 18, fieldCount: 3, matchesPerTeam: 8, cutoff: 16, champions: true }));
 seeded.push(await seedScenario({ slug: "cl6-pdf-groups", name: "Klassisches Turnier mit zwei Gruppen", ageGroup: "F-Jugend", teamCount: 8, fieldCount: 2, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2 }));
-seeded.push(await seedScenario({ slug: "cl6-pdf-bambini", name: "Bambini-Kinderfestival", ageGroup: "Bambini", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, playFormat: "Kinderfestival ohne Ergebnisse und Tabelle" }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-bambini", name: "Bambini-Kinderfestival", ageGroup: "Bambini", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2, playFormat: "Kinderfestival ohne Ergebnisse und Tabelle" }));
+seeded.push(await seedScenario({ slug: "cl61-pdf-groups-only", name: "Klassisches Gruppenturnier ohne Endrunde", ageGroup: "E-Jugend", teamCount: 8, fieldCount: 2, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2, competitionFormat: "round-robin" }));
+seeded.push(await seedScenario({ slug: "cl61-pdf-legacy-one-group", name: "Legacy-Turnier mit Endrunde", ageGroup: "D-Jugend", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, competitionFormat: null }));
+seeded.push(await seedScenario({ slug: "cl61-pdf-partial", name: "CL mit teilweise gespielter Ligaphase", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true, completedFraction: 0.5 }));
+seeded.push(await seedScenario({ slug: "cl61-pdf-complete", name: "CL mit vollstÃ¤ndiger Ligaphase", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true, completedFraction: 1 }));
 
 console.log(`ci-seed-r6-pdf ok: ${seeded.map((entry) => `${entry.slug}:${entry.expectedMatches}`).join(", ")}`);
