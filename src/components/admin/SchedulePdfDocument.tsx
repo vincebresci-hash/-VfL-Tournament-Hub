@@ -365,7 +365,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-root tr, .pdf-root h2, .pdf-root h3 { break-inside: avoid; }
         .pdf-root h2 { break-after: avoid; page-break-after: avoid; }
         .pdf-section { break-before: auto; }
-        .pdf-knockout-schedule, .pdf-bracket-block { break-inside: avoid; page-break-inside: avoid; }
+        .pdf-small-tournament .pdf-knockout-schedule, .pdf-bracket-block { break-inside: avoid; page-break-inside: avoid; }
         .pdf-bracket-block { margin-top: 14px; }
         .pdf-bracket { display: grid; gap: 20px; align-items: stretch; }
         .pdf-bracket-round { display: flex; min-width: 0; flex-direction: column; }

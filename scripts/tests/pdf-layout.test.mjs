@@ -87,7 +87,7 @@ test("print stylesheet renders exactly one page counter with total pages", () =>
   assert.match(documentSource, /\.pdf-small-tournament \.pdf-standings-table \{ break-inside: avoid/);
   assert.match(documentSource, /pdf-timeline-result/);
   assert.match(documentSource, /standingsFinalized/);
-  assert.match(documentSource, /\.pdf-knockout-schedule, \.pdf-bracket-block \{ break-inside: avoid/);
+  assert.match(documentSource, /\.pdf-small-tournament \.pdf-knockout-schedule, \.pdf-bracket-block \{ break-inside: avoid/);
   assert.doesNotMatch(documentSource, /\.pdf-standings-section[^\n]+break-inside: avoid/);
   assert.match(documentSource, /className="pdf-bracket-placement"/);
   assert.match(documentSource, /\.pdf-document-footer \{ display: none !important/);
