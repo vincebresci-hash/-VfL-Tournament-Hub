@@ -1,5 +1,5 @@
 import { ParticipantClubLogo } from "@/components/tournaments/ParticipantClubLogo";
-import { hasDistinctTeamName, publicTeamLabel } from "@/lib/schedule/names";
+import { publicTeamLabel } from "@/lib/schedule/names";
 import type { PublicRosterEntry } from "@/types/schedule";
 
 type TournamentParticipantCardsProps = {
@@ -20,10 +20,8 @@ export function TournamentParticipantCards({
   return (
     <ul className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
       {roster.map((entry) => {
-        const clubDisplay =
-          entry.clubName.trim() ||
-          publicTeamLabel(entry.clubName, entry.teamName);
-        const showTeam = hasDistinctTeamName(entry.clubName, entry.teamName);
+        const displayName =
+          entry.displayName ?? publicTeamLabel(entry.clubName, entry.teamName);
         const ageLabel = entry.ageGroup ?? "Altersklasse";
         const metaParts = [
           ageLabel,
@@ -47,13 +45,8 @@ export function TournamentParticipantCards({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="font-display text-[15px] font-bold leading-snug tracking-wide text-ink uppercase sm:text-base">
-                  {clubDisplay}
+                  {displayName}
                 </p>
-                {showTeam ? (
-                  <p className="mt-0.5 text-[13px] leading-snug text-ink/85">
-                    {entry.teamName}
-                  </p>
-                ) : null}
                 {metaParts.length > 0 ? (
                   <p className="mt-1.5 text-[12px] leading-5 text-muted">
                     {metaParts.join(" · ")}

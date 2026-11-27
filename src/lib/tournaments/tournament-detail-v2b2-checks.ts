@@ -71,7 +71,7 @@ export function runTournamentDetailV2B2Checks() {
     names.includes("export function publicTeamLabel") &&
       names.includes("export function hasDistinctTeamName") &&
       cards.includes("publicTeamLabel(entry.clubName, entry.teamName)") &&
-      cards.includes("hasDistinctTeamName(entry.clubName, entry.teamName)") &&
+      cards.includes("entry.displayName ?? publicTeamLabel(entry.clubName, entry.teamName)") &&
       stage.includes("publicTeamLabel(entry.clubName, entry.teamName)"),
     "publicTeamLabel / hasDistinctTeamName usage retained",
   );

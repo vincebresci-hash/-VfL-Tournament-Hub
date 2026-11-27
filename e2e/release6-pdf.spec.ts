@@ -4,11 +4,11 @@ const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@example.invalid";
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "change-me";
 
 const SCENARIOS = [
-  { slug: "cl6-pdf-cl-single", label: "champions-league-1-feld", matches: 20, fields: 1, kind: "cl" },
-  { slug: "cl6-pdf-cl-two", label: "champions-league-2-felder", matches: 64, fields: 2, kind: "cl" },
-  { slug: "cl6-pdf-cl-three", label: "champions-league-3-felder", matches: 45, fields: 3, kind: "cl" },
-  { slug: "cl6-pdf-groups", label: "klassisches-gruppenturnier", matches: 12, fields: 2, kind: "groups" },
-  { slug: "cl6-pdf-bambini", label: "bambini-turnier", matches: 12, fields: 1, kind: "bambini" },
+  { slug: "cl6-pdf-cl-single", label: "champions-league-1-feld", matches: 20, fields: 1, kind: "cl", expectedTeam: "Testverein 1" },
+  { slug: "cl6-pdf-cl-two", label: "champions-league-2-felder", matches: 64, fields: 2, kind: "cl", expectedTeam: "Testverein 1" },
+  { slug: "cl6-pdf-cl-three", label: "champions-league-3-felder", matches: 45, fields: 3, kind: "cl", expectedTeam: "FC Nöttingen" },
+  { slug: "cl6-pdf-groups", label: "klassisches-gruppenturnier", matches: 12, fields: 2, kind: "groups", expectedTeam: "Testverein 1" },
+  { slug: "cl6-pdf-bambini", label: "bambini-turnier", matches: 12, fields: 1, kind: "bambini", expectedTeam: "Testverein 1" },
 ] as const;
 
 async function login(page: Page) {
@@ -33,7 +33,10 @@ for (const scenario of SCENARIOS) {
     await expect(page.locator("[data-match-key]")).toHaveCount(scenario.matches);
     await expect(page.getByText(new RegExp(`${scenario.fields} Feld(?:er)?`)).first()).toBeVisible();
     await expect(page.getByText("Verein · Mannschaft", { exact: true })).toHaveCount(0);
-    await expect(page.getByText(new RegExp(`Testverein 1.*${scenario.kind === "bambini" ? "Bambini" : scenario.kind === "groups" ? "F-Jugend" : "U1[345]"} Mannschaft 1`)).first()).toBeVisible();
+    await expect(page.getByText(scenario.expectedTeam, { exact: true }).first()).toBeVisible();
+    if (scenario.kind !== "bambini") {
+      await expect(page.locator(".pdf-result-fields").first()).toBeVisible();
+    }
 
     if (scenario.kind === "bambini") {
       await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toHaveCount(0);
@@ -136,6 +139,30 @@ test("18 teams × 8 games matrix is complete and Top 16 bracket is visible", asy
   await expect(page.locator("[data-match-key]")).toHaveCount(72);
   await expect(page.getByRole("heading", { name: "Achtelfinale", exact: true })).toBeVisible();
   await expect(page.getByText("Platz 16", { exact: true }).first()).toBeVisible();
+});
+
+test("legacy club/team repetitions are cleaned consistently and same-club teams stay distinct", async ({ page }) => {
+  await page.goto("/admin/turniere/cl6-pdf-cl-three/spielplan/pdf");
+  await expect(page.locator("[data-knockout-key]")).toHaveCount(16);
+  await expect(page.getByText("Termin offen", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Feld offen", { exact: true })).toHaveCount(0);
+  for (const name of [
+    "FC Nöttingen",
+    "SG Sonnenhof Großaspach",
+    "SV Böblingen",
+    "SSV Reutlingen",
+    "VfL Kirchheim I",
+    "VfL Kirchheim II",
+  ]) {
+    await expect(page.getByText(name, { exact: true }).first()).toBeVisible();
+  }
+  await expect(page.locator("body")).not.toContainText("FC Nöttingen U15");
+  await expect(page.locator("body")).not.toContainText("SSV Reutlingen U15");
+
+  await page.goto("/turniere/cl6-pdf-cl-three");
+  await expect(page.getByText("VfL Kirchheim I", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("VfL Kirchheim II", { exact: true }).first()).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("FC Nöttingen · FC Nöttingen U15");
 });
 
 test("legacy single-group tournament prints its configured complete end round", async ({ page }, info) => {

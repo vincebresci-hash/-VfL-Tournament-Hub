@@ -1,3 +1,5 @@
+import { deriveTeamDisplayName } from "@/lib/schedule/team-display-name";
+
 export function groupDisplayName(index: number) {
   if (index < 26) {
     return `Gruppe ${String.fromCharCode(65 + index)}`;
@@ -12,29 +14,15 @@ export function fieldDisplayName(index: number) {
   return `Feld ${index + 1}`;
 }
 
-function normalizeLabelPart(value: string | null | undefined) {
-  return value?.trim() ?? "";
-}
-
 /**
- * Public club/team display label.
- * Identical club and team names (trim + case-insensitive) are shown once.
+ * Compatibility entry point for all public views. The central presentation
+ * helper removes redundant club/age text without changing stored values.
  */
 export function publicTeamLabel(
   clubName: string | null | undefined,
   teamName: string | null | undefined,
 ) {
-  const club = normalizeLabelPart(clubName);
-  const team = normalizeLabelPart(teamName);
-
-  if (club && team) {
-    if (club.toLowerCase() === team.toLowerCase()) {
-      return club;
-    }
-    return `${club} · ${team}`;
-  }
-
-  return club || team || "Team";
+  return deriveTeamDisplayName({ clubName, teamName });
 }
 
 /** True when club and team should be shown as two distinct lines/parts. */
@@ -42,8 +30,8 @@ export function hasDistinctTeamName(
   clubName: string | null | undefined,
   teamName: string | null | undefined,
 ) {
-  const club = normalizeLabelPart(clubName);
-  const team = normalizeLabelPart(teamName);
+  const club = clubName?.trim() ?? "";
+  const team = teamName?.trim() ?? "";
   if (!club || !team) {
     return Boolean(team);
   }

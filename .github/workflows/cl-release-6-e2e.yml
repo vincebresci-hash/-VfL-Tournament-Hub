@@ -150,6 +150,11 @@ jobs:
           grep -Eq 'Endrunden-Spielplan' e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Platz 16' e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Finale' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'FC Nöttingen' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'VfL Kirchheim I' e2e/pdf/champions-league-3-felder.txt
+          grep -Eq 'VfL Kirchheim II' e2e/pdf/champions-league-3-felder.txt
+          ! grep -Eq 'FC Nöttingen U15' e2e/pdf/champions-league-3-felder.txt
+          ! grep -Eq 'Termin offen|Feld offen' e2e/pdf/champions-league-3-felder.txt
           test "$(pdfinfo e2e/pdf/bambini-turnier.pdf | awk '/^Pages:/ {print $2}')" -eq 1
           top16_pages="$(pdfinfo e2e/pdf/champions-league-3-felder.pdf | awk '/^Pages:/ {print $2}')"
           pdftotext -f "$top16_pages" -l "$top16_pages" -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/top16-final-page.txt

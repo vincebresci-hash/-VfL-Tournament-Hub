@@ -81,6 +81,18 @@ function SectionHeading({ children }: { children: ReactNode }) {
   );
 }
 
+function ResultValue({ result, compact = false }: { result: string; compact?: boolean }) {
+  const empty = !result.trim() || result === "—" || result === "-";
+  if (!empty) return <strong>{result}</strong>;
+  return (
+    <span className={`pdf-result-fields${compact ? " pdf-result-fields-compact" : ""}`} aria-label="Ergebnis zum Eintragen">
+      <span />
+      <b>:</b>
+      <span />
+    </span>
+  );
+}
+
 function ScheduleTable({
   rows,
   showResult,
@@ -118,7 +130,7 @@ function ScheduleTable({
             <td style={{ ...td, fontWeight: 600 }}>{match.awayName}</td>
             {showResult ? (
               <td style={td} data-match-result={match.result}>
-                {match.result}
+                <ResultValue result={match.result} />
               </td>
             ) : null}
           </tr>
@@ -238,7 +250,7 @@ function BracketMatch({ match }: { match: PdfMatchRow }) {
       </p>
       <div className="pdf-bracket-team">{match.homeName}</div>
       <div className="pdf-bracket-team">{match.awayName}</div>
-      {match.result !== "—" ? <strong className="pdf-bracket-result">{match.result}</strong> : null}
+      <span className="pdf-bracket-result"><ResultValue result={match.result} compact /></span>
     </article>
   );
 }
@@ -337,6 +349,11 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-bracket-meta { margin: 0 0 3px; color: #66758d; font-size: 8px; }
         .pdf-bracket-team { border-top: 1px solid #e5ebf4; padding: 3px 0; color: ${NAVY}; font-size: 9px; font-weight: 600; }
         .pdf-bracket-result { position: absolute; right: 7px; top: 5px; color: ${BLUE}; font-size: 9px; }
+        .pdf-result-fields { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+        .pdf-result-fields > span { display: inline-block; width: 20px; height: 15px; border: 1.5px solid ${BLUE}; border-radius: 2px; background: white; }
+        .pdf-result-fields > b { color: ${NAVY}; font-size: 10px; }
+        .pdf-result-fields-compact > span { width: 13px; height: 11px; }
+        .pdf-result-fields-compact > b { font-size: 8px; }
         .pdf-bracket-placement { break-inside: avoid; page-break-inside: avoid; border-top: 2px solid ${YELLOW}; padding-top: 6px; }
         .pdf-bracket-placement h4 { margin: 0 0 5px; color: ${NAVY}; font-size: 9px; text-transform: uppercase; }
         .pdf-layout-cl-multi th { padding-top: 4px !important; padding-bottom: 4px !important; }
@@ -375,7 +392,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
       {/* Participants */}
       {props.participants.length > 0 ? (
-        <section style={{ marginTop: "14px" }}>
+        <section style={{ marginTop: "11px" }}>
           <SectionHeading>Teilnehmer ({props.participants.length})</SectionHeading>
           {props.participantGroups && props.participantGroups.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(props.participantGroups.length, 4)}, minmax(0, 1fr))`, gap: "12px" }}>
@@ -389,9 +406,9 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
               ))}
             </div>
           ) : (
-            <ol style={{ columnCount: props.participants.length > 16 ? 3 : props.participants.length > 8 ? 2 : 1, columnGap: "24px", margin: 0, paddingLeft: "18px", fontSize: "10px" }}>
+            <ol style={{ columnCount: props.participants.length > 12 ? 3 : props.participants.length > 1 ? 2 : 1, columnGap: "20px", margin: 0, paddingLeft: "18px", fontSize: "9.5px", lineHeight: 1.25 }}>
               {props.participants.map((name, index) => (
-                <li key={`${name}-${index}`} style={{ breakInside: "avoid", padding: "1px 0" }}>
+                <li key={`${name}-${index}`} style={{ breakInside: "avoid", padding: "0.5px 0" }}>
                   {name}
                 </li>
               ))}
@@ -401,7 +418,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       ) : null}
 
       {/* Schedule */}
-      <section style={{ marginTop: "16px" }}>
+      <section style={{ marginTop: "13px" }}>
         <SectionHeading>{props.scheduleTitle}</SectionHeading>
         {props.timelineRows && props.timelineRows.length > 0 ? (
           <TimelineTable

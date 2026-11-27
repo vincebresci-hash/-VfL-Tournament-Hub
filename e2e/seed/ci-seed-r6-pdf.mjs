@@ -22,6 +22,15 @@ if (!serviceKey) fail("SUPABASE_SERVICE_ROLE_KEY is required (local only)");
 
 const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
+const REALISTIC_LEGACY_NAMES = [
+  { clubName: "FC Nöttingen", teamName: "FC Nöttingen U15" },
+  { clubName: "SG Sonnenhof Großaspach", teamName: "SG Sonnenhof Großaspach U15" },
+  { clubName: "SV Böblingen", teamName: "SV Böblingen U15" },
+  { clubName: "SSV Reutlingen U15", teamName: "U15" },
+  { clubName: "VfL Kirchheim", teamName: "VfL Kirchheim I" },
+  { clubName: "VfL Kirchheim", teamName: "VfL Kirchheim II" },
+];
+
 function roundRobinRounds(n) {
   const arr = [...Array(n).keys()];
   const rounds = [];
@@ -61,6 +70,8 @@ async function seedScenario({
   playFormat = null,
   competitionFormat,
   completedFraction = 0,
+  teamNames = [],
+  seedKnockout = false,
 }) {
   const tournamentId = await ensureTournament(slug, name, ageGroup, playFormat);
 
@@ -76,13 +87,14 @@ async function seedScenario({
 
   const appIds = [];
   for (let i = 0; i < teamCount; i += 1) {
+    const legacyName = teamNames[i];
     const ins = await db
       .from("applications")
       .insert({
         tournament_id: tournamentId,
         status: "accepted",
-        club_name: `Testverein ${i + 1}`,
-        team_name: `${ageGroup} Mannschaft ${i + 1}`,
+        club_name: legacyName?.clubName ?? `Testverein ${i + 1}`,
+        team_name: legacyName?.teamName ?? `${ageGroup} Mannschaft ${i + 1}`,
         age_group: ageGroup,
         contact_email: `cl6-${slug}-${i + 1}@example.test`,
         contact_first_name: `Team ${i + 1}`,
@@ -139,6 +151,51 @@ async function seedScenario({
   const matchInsert = await db.from("tournament_matches").insert(rows).select("id");
   if (matchInsert.error) fail(`match insert failed: ${matchInsert.error.message}`);
 
+  if (seedKnockout) {
+    const knockoutRounds = cutoff === 16
+      ? [
+          ...Array(8).fill("round-of-16"),
+          ...Array(4).fill("quarterfinal"),
+          ...Array(2).fill("semifinal"),
+          "third-place",
+          "final",
+        ]
+      : cutoff === 8
+        ? [...Array(4).fill("quarterfinal"), ...Array(2).fill("semifinal"), "third-place", "final"]
+        : [...Array(2).fill("semifinal"), "third-place", "final"];
+    const waveByRound = new Map([
+      ["round-of-16", 0],
+      ["quarterfinal", 1],
+      ["semifinal", 2],
+      ["third-place", 3],
+      ["final", 3],
+    ]);
+    const waveOffsets = [0, 4, 7, 10];
+    const indexInWave = new Map();
+    const knockoutRows = knockoutRounds.map((round, index) => {
+      const wave = waveByRound.get(round) ?? 0;
+      const waveIndex = indexInWave.get(wave) ?? 0;
+      indexInWave.set(wave, waveIndex + 1);
+      return {
+        tournament_id: tournamentId,
+        group_id: null,
+        field_id: fieldIds[waveIndex % fieldCount],
+        home_application_id: null,
+        away_application_id: null,
+        scheduled_at: new Date(base + (slot + 2 + waveOffsets[wave] + Math.floor(waveIndex / fieldCount)) * slotMinutes * 60_000).toISOString(),
+        duration_minutes: 12,
+        status: "scheduled",
+        home_score: null,
+        away_score: null,
+        phase: "knockout",
+        round,
+        sort_order: 100 + index,
+      };
+    });
+    const knockoutInsert = await db.from("tournament_matches").insert(knockoutRows).select("id");
+    if (knockoutInsert.error) fail(`knockout insert failed: ${knockoutInsert.error.message}`);
+  }
+
   {
     const upd = await db
       .from("tournaments")
@@ -156,12 +213,12 @@ async function seedScenario({
 const seeded = [];
 seeded.push(await seedScenario({ slug: "cl6-pdf-cl-single", name: "CL 10 Teams – ein Feld", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true }));
 seeded.push(await seedScenario({ slug: "cl6-pdf-cl-two", name: "CL 16 Teams – zwei Felder", ageGroup: "U14", teamCount: 16, fieldCount: 2, matchesPerTeam: 8, cutoff: 8, champions: true }));
-seeded.push(await seedScenario({ slug: "cl6-pdf-cl-three", name: "CL 18 Teams – drei Felder", ageGroup: "U15", teamCount: 18, fieldCount: 3, matchesPerTeam: 5, cutoff: 16, champions: true }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-cl-three", name: "CL 18 Teams – drei Felder", ageGroup: "U15", teamCount: 18, fieldCount: 3, matchesPerTeam: 5, cutoff: 16, champions: true, teamNames: REALISTIC_LEGACY_NAMES, seedKnockout: true }));
 seeded.push(await seedScenario({ slug: "cl6-matrix-18x8", name: "CL Matrix 18 × 8", ageGroup: "U16", teamCount: 18, fieldCount: 3, matchesPerTeam: 8, cutoff: 16, champions: true }));
 seeded.push(await seedScenario({ slug: "cl6-pdf-groups", name: "Klassisches Turnier mit zwei Gruppen", ageGroup: "F-Jugend", teamCount: 8, fieldCount: 2, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2 }));
 seeded.push(await seedScenario({ slug: "cl6-pdf-bambini", name: "Bambini-Kinderfestival", ageGroup: "Bambini", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2, playFormat: "Kinderfestival ohne Ergebnisse und Tabelle" }));
 seeded.push(await seedScenario({ slug: "cl61-pdf-groups-only", name: "Klassisches Gruppenturnier ohne Endrunde", ageGroup: "E-Jugend", teamCount: 8, fieldCount: 2, matchesPerTeam: 3, cutoff: null, champions: false, groupCount: 2, competitionFormat: "round-robin" }));
-seeded.push(await seedScenario({ slug: "cl61-pdf-legacy-one-group", name: "Legacy-Turnier mit Endrunde", ageGroup: "D-Jugend", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, competitionFormat: null }));
+seeded.push(await seedScenario({ slug: "cl61-pdf-legacy-one-group", name: "Legacy-Turnier mit Endrunde", ageGroup: "D-Jugend", teamCount: 8, fieldCount: 1, matchesPerTeam: 3, cutoff: null, champions: false, competitionFormat: null, teamNames: REALISTIC_LEGACY_NAMES, seedKnockout: true }));
 seeded.push(await seedScenario({ slug: "cl61-pdf-partial", name: "CL mit teilweise gespielter Ligaphase", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true, completedFraction: 0.5 }));
 seeded.push(await seedScenario({ slug: "cl61-pdf-complete", name: "CL mit vollstÃ¤ndiger Ligaphase", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true, completedFraction: 1 }));
 

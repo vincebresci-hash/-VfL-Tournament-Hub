@@ -51,7 +51,6 @@ export function teamLabelsFromParticipants(participants: TournamentParticipant[]
           deriveTeamDisplayName({
             clubName: participant.clubName,
             teamName: participant.teamName,
-            override: participant.displayName,
           }),
         ],
       ];

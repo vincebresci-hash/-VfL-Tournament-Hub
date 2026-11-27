@@ -174,6 +174,7 @@ export function tournamentParticipantsToPublicRoster(
   participants: TournamentParticipant[],
 ): Array<{
   applicationId: string;
+  displayName: string;
   clubName: string;
   teamName: string;
   ageGroup: string | null;
@@ -187,6 +188,7 @@ export function tournamentParticipantsToPublicRoster(
 }> {
   return participants.map((participant) => ({
     applicationId: participant.applicationId ?? participant.externalTeamId ?? participant.id,
+    displayName: participant.displayName,
     clubName: participant.clubName,
     teamName: participant.teamName,
     ageGroup: participant.ageGroup,

@@ -1,36 +1,25 @@
 /**
- * CL Release 6 — central team display-name logic.
+ * Central, presentation-only team-name normalization.
  *
- * One source of truth for how a team is shown everywhere (participant admin,
- * schedule preview, saved schedule, league table, groups, results, knockout,
- * public pages, PDF). It keeps the CLUB IDENTITY (canonical) separate from the
- * DISPLAY NAME, never rewrites the stored application/team data, and never
- * merges distinct teams that happen to render the same.
- *
- * Rules (from the release examples):
- *  - A manual override always wins (e.g. "TV Altenstadt B2").
- *  - Age-group suffixes are dropped (U16, B-Jugend/"Bjugend", Bambini, …).
- *  - Team numbers / distinguishing codes are kept ("1", "2", "II", "B2").
- *  - No redundant "Club · Club 1" — if the team name already carries the club,
- *    the team name is the label ("VfL Kirchheim 1").
- *  - A short acronym that loses the club ("SGS" for "SG Sonnenhof Großaspach")
- *    yields the full club name; a concise variant that keeps the key tokens
- *    ("SGM Neckartenzlingen/Grafenberg") is kept.
+ * Stored club/team values are never changed. The helper only removes redundant
+ * club repetitions and age-class markers while preserving real team
+ * differentiators such as I/II, 1/2 or B2. An explicit manual override wins.
  */
 
 export type TeamDisplayNameInput = {
   clubName?: string | null;
   teamName?: string | null;
-  /** Manual, admin-edited display name. Wins verbatim when set. */
+  /** Explicit admin-maintained display name, if a caller actually has one. */
   override?: string | null;
 };
 
-const AGE_SUFFIX_PATTERNS: RegExp[] = [
-  /^u\s?\d{1,2}$/i, // U13, U 16
-  /^[a-g]-?jugend$/i, // A-Jugend, Bjugend
+const AGE_MARKER_PATTERNS: RegExp[] = [
+  /^u\s?\d{1,2}$/i,
+  /^[a-g]-?jugend$/i,
   /^(jugend|junioren|juniorinnen|bambini|minis|senioren|herren|damen|frauen|maenner|männer)$/i,
 ];
 
+const TEAM_DESIGNATOR_PATTERN = /^(?:[ivx]{1,5}|\d{1,2}|[a-z]\d{1,2})$/i;
 const SIGNIFICANT_TOKEN_MIN = 4;
 
 function norm(value: string | null | undefined): string {
@@ -38,19 +27,25 @@ function norm(value: string | null | undefined): string {
 }
 
 function eqCI(a: string, b: string): boolean {
-  return a.toLowerCase() === b.toLowerCase();
+  return a.localeCompare(b, "de", { sensitivity: "base" }) === 0;
 }
 
-/** Drop trailing age-group tokens (repeatedly), keeping numbers and codes. */
+function isAgeMarker(value: string): boolean {
+  return AGE_MARKER_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function stripAgeMarkers(value: string): string {
+  return norm(value)
+    .split(" ")
+    .filter((token) => !isAgeMarker(token))
+    .join(" ");
+}
+
+/** Drop trailing age-class tokens while preserving team numbers/codes. */
 export function stripAgeGroupSuffix(value: string): string {
   let tokens = norm(value).split(" ").filter(Boolean);
-  while (tokens.length > 1) {
-    const last = tokens[tokens.length - 1];
-    if (AGE_SUFFIX_PATTERNS.some((pattern) => pattern.test(last))) {
-      tokens = tokens.slice(0, -1);
-      continue;
-    }
-    break;
+  while (tokens.length > 0 && isAgeMarker(tokens[tokens.length - 1] ?? "")) {
+    tokens = tokens.slice(0, -1);
   }
   return tokens.join(" ");
 }
@@ -65,53 +60,52 @@ function significantTokens(value: string): string[] {
 
 function sharesSignificantToken(a: string, b: string): boolean {
   const left = new Set(significantTokens(a));
-  for (const token of significantTokens(b)) {
-    if (left.has(token)) {
-      return true;
-    }
-  }
-  return false;
+  return significantTokens(b).some((token) => left.has(token));
 }
 
-/**
- * The single, canonical display name for a team.
- * Pure: never mutates inputs, never merges teams.
- */
+function redundantClubPrefixRemainder(team: string, club: string): string | null {
+  const teamLower = team.toLocaleLowerCase("de");
+  const clubLower = club.toLocaleLowerCase("de");
+  if (teamLower === clubLower) return "";
+  if (!teamLower.startsWith(`${clubLower} `)) return null;
+  return norm(team.slice(club.length));
+}
+
+/** Pure display-name derivation; never mutates or persists source values. */
 export function deriveTeamDisplayName(input: TeamDisplayNameInput): string {
   const override = norm(input.override);
-  if (override) {
-    return override;
+  if (override) return override;
+
+  const rawClub = norm(input.clubName);
+  const rawTeam = norm(input.teamName);
+  const club = stripAgeGroupSuffix(rawClub) || rawClub;
+
+  if (!rawTeam) return club || "Team";
+
+  const teamWithoutAge = stripAgeMarkers(rawTeam);
+  if (!club) return teamWithoutAge || rawTeam;
+
+  // A team value containing only the age class adds no useful identity.
+  if (!teamWithoutAge) return club;
+
+  // Preserve a short, meaningful team suffix entered separately (I, II, 1, B2).
+  if (TEAM_DESIGNATOR_PATTERN.test(teamWithoutAge)) {
+    return `${club} ${teamWithoutAge}`;
   }
 
-  const club = norm(input.clubName);
-  const team = norm(input.teamName);
-
-  if (!team) {
-    return club || "Team";
+  // Remove a duplicated club prefix, but retain a real suffix after it.
+  const remainder = redundantClubPrefixRemainder(teamWithoutAge, club);
+  if (remainder != null) {
+    return remainder ? `${club} ${remainder}` : club;
   }
 
-  const teamClean = stripAgeGroupSuffix(team) || team;
+  if (eqCI(teamWithoutAge, club)) return club;
 
-  if (!club) {
-    return teamClean;
-  }
-  // Team is exactly the club (after dropping an age suffix) → show the club once.
-  if (eqCI(teamClean, club)) {
-    return club;
-  }
-  // Team carries the club plus a distinguisher ("VfL Kirchheim 1"), or a concise
-  // variant that still shares the club's key tokens ("SGM …/Grafenberg").
-  if (sharesSignificantToken(teamClean, club)) {
-    return teamClean;
-  }
-  // Team is a lossy acronym etc. → the full club name is clearer.
+  // A concise real variant can stand on its own; a lossy acronym/age label cannot.
+  if (sharesSignificantToken(teamWithoutAge, club)) return teamWithoutAge;
   return club;
 }
 
-/**
- * Whether two values describe the SAME display but must still be kept distinct
- * because their identities differ. Callers use this to warn, never to merge.
- */
 export function displayNamesCollide(a: TeamDisplayNameInput, b: TeamDisplayNameInput): boolean {
   return eqCI(deriveTeamDisplayName(a), deriveTeamDisplayName(b));
 }
