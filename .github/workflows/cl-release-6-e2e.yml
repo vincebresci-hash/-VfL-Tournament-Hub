@@ -141,7 +141,7 @@ jobs:
           printf '%s: %s pages\n' "champions-league-echter-entwurf" "$draft_pages" >> e2e/pdf/pdf-page-counts.txt
           # Full end-round schedule and all Top-16 seeds must survive the real
           # Chromium PDF renderer, independent of the final page allocation.
-          pdftotext -layout e2e/pdf/champions-league-3-felder.pdf - e2e/pdf/champions-league-3-felder.txt
+          pdftotext -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Endrunden-Spielplan' e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Platz 16' e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Finale' e2e/pdf/champions-league-3-felder.txt
