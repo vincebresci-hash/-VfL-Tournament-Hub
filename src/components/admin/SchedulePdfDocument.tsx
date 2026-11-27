@@ -323,7 +323,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
   return (
     <div
-      className={`pdf-root pdf-layout-${props.layout}${props.participants.length <= 10 ? " pdf-small-tournament" : ""}`}
+      className={`pdf-root pdf-layout-${props.layout}${props.participants.length <= 10 ? " pdf-small-tournament" : ""}${props.singleColumnMatches.length > 60 ? " pdf-long-league" : ""}`}
       style={{ background: "white", color: "#13223d", fontFamily: "'Segoe UI', Arial, sans-serif" }}
     >
       <style>{`
@@ -350,6 +350,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
           .pdf-root .pdf-section-heading { margin-bottom: 4px !important; font-size: 12px !important; }
           .pdf-root .pdf-participant-list { font-size: 8.5px !important; line-height: 1.15 !important; }
           .pdf-small-tournament .pdf-knockout-section { break-before: page; page-break-before: always; }
+          .pdf-long-league .pdf-knockout-section { break-before: page; page-break-before: always; }
           .pdf-layout-cl-single .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
           .pdf-layout-cl-single td { padding-top: 1.8px !important; padding-bottom: 1.8px !important; }
           .pdf-small-tournament .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
@@ -358,9 +359,9 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
           .pdf-small-tournament .pdf-content-section { margin-top: 5px !important; }
           .pdf-small-tournament .pdf-result-fields > span { width: 15px !important; height: 11px !important; }
           .pdf-small-tournament .pdf-result-fields-compact > span { width: 11px !important; height: 9px !important; }
-          .pdf-root:not(.pdf-small-tournament) .pdf-knockout-schedule th { padding-top: 2px !important; padding-bottom: 2px !important; }
-          .pdf-root:not(.pdf-small-tournament) .pdf-knockout-schedule td { padding-top: 1px !important; padding-bottom: 1px !important; font-size: 7.8px !important; line-height: 1.05 !important; }
-          .pdf-root:not(.pdf-small-tournament) .pdf-knockout-schedule .pdf-result-fields > span { width: 14px !important; height: 10px !important; }
+          .pdf-root:not(.pdf-small-tournament):not(.pdf-long-league) .pdf-knockout-schedule th { padding-top: 2px !important; padding-bottom: 2px !important; }
+          .pdf-root:not(.pdf-small-tournament):not(.pdf-long-league) .pdf-knockout-schedule td { padding-top: 1px !important; padding-bottom: 1px !important; font-size: 7.8px !important; line-height: 1.05 !important; }
+          .pdf-root:not(.pdf-small-tournament):not(.pdf-long-league) .pdf-knockout-schedule .pdf-result-fields > span { width: 14px !important; height: 10px !important; }
         }
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
