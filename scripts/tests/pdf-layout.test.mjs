@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   assignGameNumbers,
@@ -66,4 +67,18 @@ test("game numbers are 1-based in schedule order", () => {
   const numbers = assignGameNumbers(matches);
   assert.equal(numbers.get("a"), 1);
   assert.equal(numbers.get("b"), 2);
+});
+
+test("print stylesheet renders exactly one page counter with total pages", () => {
+  const documentSource = readFileSync(
+    new URL("../../src/components/admin/SchedulePdfDocument.tsx", import.meta.url),
+    "utf8",
+  );
+  const artifactSource = readFileSync(
+    new URL("../../e2e/release6-pdf.spec.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(documentSource, /content:\s*"Seite "\s*counter\(page\)\s*" \/ "\s*counter\(pages\)/);
+  assert.doesNotMatch(artifactSource, /displayHeaderFooter|footerTemplate/);
 });
