@@ -65,7 +65,15 @@ async function seedScenario({ slug, name, ageGroup, teamCount, fieldCount, match
   for (let i = 0; i < teamCount; i += 1) {
     const ins = await db
       .from("applications")
-      .insert({ tournament_id: tournamentId, status: "accepted", contact_email: `cl6-${slug}-${i + 1}@example.test`, contact_first_name: `Team ${i + 1}` })
+      .insert({
+        tournament_id: tournamentId,
+        status: "accepted",
+        club_name: `Testverein ${i + 1}`,
+        team_name: `${ageGroup} Mannschaft ${i + 1}`,
+        age_group: ageGroup,
+        contact_email: `cl6-${slug}-${i + 1}@example.test`,
+        contact_first_name: `Team ${i + 1}`,
+      })
       .select("id")
       .single();
     if (ins.error) fail(`application insert failed: ${ins.error.message}`);

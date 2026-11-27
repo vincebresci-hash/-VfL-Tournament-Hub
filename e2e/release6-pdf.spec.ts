@@ -32,6 +32,8 @@ for (const scenario of SCENARIOS) {
     await expect(page.locator(".pdf-root")).toHaveAttribute("class", /pdf-root/);
     await expect(page.locator("[data-match-key]")).toHaveCount(scenario.matches);
     await expect(page.getByText(new RegExp(`${scenario.fields} Feld(?:er)?`)).first()).toBeVisible();
+    await expect(page.getByText("Verein · Mannschaft", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(new RegExp(`Testverein 1.*${scenario.kind === "bambini" ? "Bambini" : scenario.kind === "groups" ? "F-Jugend" : "U1[345]"} Mannschaft 1`)).first()).toBeVisible();
 
     if (scenario.kind === "bambini") {
       await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toHaveCount(0);
