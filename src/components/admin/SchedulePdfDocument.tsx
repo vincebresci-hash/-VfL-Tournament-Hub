@@ -349,7 +349,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
           .pdf-root .pdf-content-section { margin-top: 7px !important; }
           .pdf-root .pdf-section-heading { margin-bottom: 4px !important; font-size: 12px !important; }
           .pdf-root .pdf-participant-list { font-size: 8.5px !important; line-height: 1.15 !important; }
-          .pdf-root .pdf-knockout-section { break-before: page; page-break-before: always; }
+          .pdf-small-tournament .pdf-knockout-section { break-before: page; page-break-before: always; }
           .pdf-layout-cl-single .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
           .pdf-layout-cl-single td { padding-top: 1.8px !important; padding-bottom: 1.8px !important; }
           .pdf-small-tournament .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
