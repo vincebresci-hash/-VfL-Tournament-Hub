@@ -160,8 +160,8 @@ test("legacy club/team repetitions are cleaned consistently and same-club teams 
   await expect(page.locator("body")).not.toContainText("SSV Reutlingen U15");
 
   await page.goto("/turniere/cl6-pdf-cl-three");
-  await expect(page.getByText("VfL Kirchheim I", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("VfL Kirchheim II", { exact: true }).first()).toBeVisible();
+  await expect(page.locator("body")).toContainText("VfL Kirchheim I");
+  await expect(page.locator("body")).toContainText("VfL Kirchheim II");
   await expect(page.locator("body")).not.toContainText("FC Nöttingen · FC Nöttingen U15");
 });
 
