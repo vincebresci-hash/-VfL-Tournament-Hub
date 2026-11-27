@@ -80,6 +80,8 @@ test("print stylesheet renders exactly one page counter with total pages", () =>
   );
 
   assert.match(documentSource, /content:\s*"Seite "\s*counter\(page\)\s*" \/ "\s*counter\(pages\)/);
+  assert.match(documentSource, /\.pdf-standings-section, \.pdf-knockout-schedule, \.pdf-bracket-block \{ break-inside: avoid/);
+  assert.match(documentSource, /\.pdf-document-footer \{ display: none !important/);
   assert.doesNotMatch(artifactSource, /displayHeaderFooter|footerTemplate/);
 });
 

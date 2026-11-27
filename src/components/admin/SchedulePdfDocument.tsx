@@ -317,11 +317,13 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
           @bottom-left { content: "VfL Kirchheim/Teck"; color: #66758d; font-size: 8px; }
           @bottom-right { content: "Seite " counter(page) " / " counter(pages); color: #66758d; font-size: 8px; }
         }
-        @media print { nav, header.app-chrome, button, .print\\:hidden { display: none !important; } body { background: white; } }
+        @media print { nav, header.app-chrome, button, .print\\:hidden, .pdf-document-footer { display: none !important; } body { background: white; } }
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
         .pdf-root tr, .pdf-root h2, .pdf-root h3 { break-inside: avoid; }
         .pdf-section { break-before: auto; }
+        .pdf-standings-section, .pdf-knockout-schedule, .pdf-bracket-block { break-inside: avoid; page-break-inside: avoid; }
+        .pdf-bracket-block { margin-top: 14px; }
         .pdf-bracket { display: grid; gap: 20px; align-items: stretch; }
         .pdf-bracket-round { display: flex; min-width: 0; flex-direction: column; }
         .pdf-bracket-round > h3, .pdf-placement-grid h3 { margin: 0 0 6px; color: ${NAVY}; font-size: 11px; text-transform: uppercase; }
@@ -412,7 +414,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
       {/* Standings */}
       {props.showStandings && props.standings.length > 0 ? (
-        <section className="pdf-section" style={{ marginTop: "16px" }}>
+        <section className="pdf-section pdf-standings-section" style={{ marginTop: "16px" }}>
           <SectionHeading>{props.layout.startsWith("cl") ? "Gesamttabelle (Ligaphase)" : "Tabellen"}</SectionHeading>
           {props.standings.map((table) => (
             <div key={table.title} style={{ marginTop: "10px" }}>
@@ -433,15 +435,18 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       {/* Knockout */}
       {props.layout !== "bambini" && props.knockout.length > 0 ? (
         <section className="pdf-section" style={{ marginTop: "16px" }}>
-          <SectionHeading>Endrunden-Spielplan</SectionHeading>
-          <ScheduleTable rows={props.knockoutSchedule} showResult showRound />
-          <div style={{ height: "14px" }} />
-          <SectionHeading>{props.knockoutTitle}</SectionHeading>
-          <KnockoutBracket matches={props.knockout} />
+          <div className="pdf-knockout-schedule">
+            <SectionHeading>Endrunden-Spielplan</SectionHeading>
+            <ScheduleTable rows={props.knockoutSchedule} showResult showRound />
+          </div>
+          <div className="pdf-bracket-block">
+            <SectionHeading>{props.knockoutTitle}</SectionHeading>
+            <KnockoutBracket matches={props.knockout} />
+          </div>
         </section>
       ) : null}
 
-      <div style={{ marginTop: "18px", borderTop: `1px solid ${BORDER}`, paddingTop: "6px", fontSize: "9px", color: "#7a88a0", display: "flex", justifyContent: "space-between" }}>
+      <div className="pdf-document-footer" style={{ marginTop: "18px", borderTop: `1px solid ${BORDER}`, paddingTop: "6px", fontSize: "9px", color: "#7a88a0", display: "flex", justifyContent: "space-between" }}>
         <span>VfL Kirchheim/Teck · Tournament Hub</span>
         <span>{props.draft ? "Entwurf – noch nicht übernommen" : "Gespeicherter Spielplan"}</span>
       </div>

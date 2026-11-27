@@ -150,6 +150,12 @@ jobs:
           grep -Eq 'Endrunden-Spielplan' e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Platz 16' e2e/pdf/champions-league-3-felder.txt
           grep -Eq 'Finale' e2e/pdf/champions-league-3-felder.txt
+          test "$(pdfinfo e2e/pdf/bambini-turnier.pdf | awk '/^Pages:/ {print $2}')" -eq 1
+          top16_pages="$(pdfinfo e2e/pdf/champions-league-3-felder.pdf | awk '/^Pages:/ {print $2}')"
+          pdftotext -f "$top16_pages" -l "$top16_pages" -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/top16-final-page.txt
+          grep -Eq 'Platz 1' e2e/pdf/top16-final-page.txt
+          grep -Eq 'Platz 11' e2e/pdf/top16-final-page.txt
+          grep -Eq 'Sieger HF1' e2e/pdf/top16-final-page.txt
 
       - name: Upload PDFs + screenshots + report
         if: always()
