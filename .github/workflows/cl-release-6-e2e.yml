@@ -160,6 +160,7 @@ jobs:
           test "$(pdfinfo e2e/pdf/bambini-turnier.pdf | awk '/^Pages:/ {print $2}')" -eq 1
           test "$(pdfinfo e2e/pdf/champions-league-1-feld.pdf | awk '/^Pages:/ {print $2}')" -eq 2
           test "$(pdfinfo e2e/pdf/champions-league-10-top-8.pdf | awk '/^Pages:/ {print $2}')" -eq 2
+          test "$(pdfinfo e2e/pdf/klassisches-gruppenturnier.pdf | awk '/^Pages:/ {print $2}')" -eq 2
           top16_pages="$(pdfinfo e2e/pdf/champions-league-3-felder.pdf | awk '/^Pages:/ {print $2}')"
           pdftotext -f "$top16_pages" -l "$top16_pages" -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/top16-final-page.txt
           grep -Eq 'Platz 1' e2e/pdf/top16-final-page.txt

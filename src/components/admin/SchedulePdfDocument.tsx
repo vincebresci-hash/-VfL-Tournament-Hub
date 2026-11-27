@@ -356,6 +356,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
           .pdf-small-tournament th { padding-top: 2px !important; padding-bottom: 2px !important; }
           .pdf-small-tournament td { padding-top: 1.2px !important; padding-bottom: 1.2px !important; font-size: 7.9px !important; line-height: 1.08 !important; }
           .pdf-small-tournament .pdf-content-section { margin-top: 5px !important; }
+          .pdf-small-tournament .pdf-result-fields > span { width: 15px !important; height: 11px !important; }
           .pdf-small-tournament .pdf-result-fields-compact > span { width: 11px !important; height: 9px !important; }
         }
         .pdf-root section { break-inside: auto; }
