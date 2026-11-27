@@ -101,6 +101,9 @@ jobs:
       - name: Champions League knockout-seeding tests
         run: npm run test:cl-ko-seeding
 
+      - name: Champions League league no-duplicate-pairings tests
+        run: npm run test:cl-no-dup-pairings
+
       - name: PDF layout tests
         run: npm run test:pdf-layout
 

@@ -8,9 +8,14 @@ import { getAdminTournamentStage, type AdminTournamentStage } from "@/lib/db/sch
 import { getTournamentParticipants } from "@/lib/db/tournament-participants-queries";
 import {
   matchSideDbColumns,
+  matchSideParticipantId,
   resolveScheduleParticipantRef,
   scheduleParticipantId,
 } from "@/lib/schedule/admin";
+import {
+  findDuplicateLeaguePairing,
+  LEAGUE_DUPLICATE_PAIRING_MESSAGE,
+} from "@/lib/schedule/league-pairing-guard";
 import { distributeTeams } from "@/lib/schedule/distribute";
 import { fieldDisplayName, groupDisplayName } from "@/lib/schedule/names";
 import {
@@ -830,6 +835,24 @@ export async function saveTournamentMatchAction(
   const awayRef = resolveScheduleParticipantRef(awayParticipantId, participants);
   if (!homeRef || !awayRef) {
     return { error: "Nur bestätigte Teilnehmer können einem Spiel zugeordnet werden." };
+  }
+
+  // P0 (CL Release 6.1): two teams may meet at most once in the league/group
+  // phase. ID-based and unordered; the match being edited is excluded so a no-op
+  // save is allowed; knockout matches are exempt (KO rematches are permitted).
+  const duplicatePairingMatchId = findDuplicateLeaguePairing({
+    matches: stage.matches.map((match) => ({
+      id: match.id,
+      phase: match.phase,
+      homeId: matchSideParticipantId(match, "home"),
+      awayId: matchSideParticipantId(match, "away"),
+    })),
+    homeId: homeParticipantId,
+    awayId: awayParticipantId,
+    excludeMatchId: input.matchId ?? null,
+  });
+  if (duplicatePairingMatchId) {
+    return { error: LEAGUE_DUPLICATE_PAIRING_MESSAGE };
   }
 
   // This action always writes phase=group. C6-F D1: block group mutations once KO exists.
