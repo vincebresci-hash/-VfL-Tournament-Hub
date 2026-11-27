@@ -339,6 +339,8 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-bracket-result { position: absolute; right: 7px; top: 5px; color: ${BLUE}; font-size: 9px; }
         .pdf-bracket-placement { break-inside: avoid; page-break-inside: avoid; border-top: 2px solid ${YELLOW}; padding-top: 6px; }
         .pdf-bracket-placement h4 { margin: 0 0 5px; color: ${NAVY}; font-size: 9px; text-transform: uppercase; }
+        .pdf-layout-cl-multi th { padding-top: 4px !important; padding-bottom: 4px !important; }
+        .pdf-layout-cl-multi td { padding-top: 3px !important; padding-bottom: 3px !important; }
         .pdf-layout-bambini th, .pdf-layout-bambini td { padding-top: 2.5px !important; padding-bottom: 2.5px !important; }
         .pdf-layout-bambini section { margin-top: 10px !important; }
       `}</style>
