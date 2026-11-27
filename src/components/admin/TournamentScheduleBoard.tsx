@@ -137,6 +137,8 @@ type TournamentScheduleBoardProps = {
   clubByParticipantId?: Record<string, string | null>;
   /** Hub clubs available for inline assignment. */
   clubOptions?: Array<{ id: string; name: string; city?: string | null }>;
+  /** Controlled fail-closed state when privileged club lookup is unavailable. */
+  clubDirectoryError?: string | null;
   confirmedRosterError?: string | null;
 };
 
@@ -155,6 +157,7 @@ export function TournamentScheduleBoard({
   storedRestrictSameClub = false,
   clubByParticipantId = {},
   clubOptions = [],
+  clubDirectoryError = null,
   confirmedRosterError = null,
 }: TournamentScheduleBoardProps) {
   const router = useRouter();
@@ -1026,6 +1029,7 @@ export function TournamentScheduleBoard({
           tournamentId={tournament.id}
           entries={clubAssignmentEntries}
           clubs={clubOptions}
+          directoryError={clubDirectoryError}
           totalParticipants={leagueParticipantIds.length}
           participantManagementHref={`/admin/turniere/${tournament.id}?bereich=teilnehmer#teilnehmer`}
           disabled={pending}

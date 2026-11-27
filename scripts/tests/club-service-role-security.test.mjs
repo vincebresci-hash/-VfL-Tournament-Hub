@@ -10,6 +10,8 @@ function read(rel) {
 test("the service-role club query is gated, server-only and leaks nothing sensitive", () => {
   const actions = read("src/lib/db/club-assignment-actions.ts");
   const serviceRole = read("src/lib/supabase/service-role.ts");
+  const schedulePage = read("src/app/admin/turniere/[id]/spielplan/page.tsx");
+  const assignmentPanel = read("src/components/admin/ClubAssignmentPanel.tsx");
 
   // Server action boundary — never bundled into the client.
   assert.ok(actions.trimStart().startsWith('"use server"'), "club actions must be a server module");
@@ -41,4 +43,22 @@ test("the service-role club query is gated, server-only and leaks nothing sensit
 
   // The service-role key is never referenced in the actions file directly.
   assert.ok(!actions.includes("SERVICE_ROLE_KEY"), "actions must not touch the service role key directly");
+
+  // Missing Preview configuration must fail closed without replacing the
+  // privileged lookup with an RLS-bypassing browser/anon client.
+  assert.ok(
+    actions.includes("createServiceRoleClientIfConfigured"),
+    "club actions must use the optional server-only service-role helper",
+  );
+  assert.ok(actions.includes("CLUB_DIRECTORY_UNAVAILABLE"), "missing config must return a controlled error");
+  assert.ok(!actions.includes("createBrowserClient"), "club actions must never fall back to a browser client");
+  assert.ok(
+    serviceRole.includes("if (!process.env.SUPABASE_SERVICE_ROLE_KEY)") && serviceRole.includes("return null"),
+    "optional helper must return null when the key is unavailable",
+  );
+  assert.ok(schedulePage.includes("clubDirectoryError={clubOptions.error}"), "page must pass the controlled state to the UI");
+  assert.ok(
+    assignmentPanel.includes("Vereinszuordnung in der Teilnehmerverwaltung öffnen"),
+    "the controlled state must provide a safe assignment path",
+  );
 });

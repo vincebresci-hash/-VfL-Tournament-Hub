@@ -112,7 +112,8 @@ export default async function AdminTournamentSchedulePage({ params }: SchedulePa
             leagueConfig.status === "ok" ? leagueConfig.restrictSameClub : false
           }
           clubByParticipantId={confirmed.ok ? confirmed.clubByParticipantId : {}}
-          clubOptions={clubOptions}
+          clubOptions={clubOptions.clubs}
+          clubDirectoryError={clubOptions.error}
         />
       )}
     </TournamentAdminChrome>

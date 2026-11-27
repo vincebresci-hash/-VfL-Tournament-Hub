@@ -13,7 +13,7 @@
 
 import { requireScheduleManage } from "@/lib/rbac/action-access";
 import { findDuplicateClubs } from "@/lib/schedule/club-assignment-suggest";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createServiceRoleClientIfConfigured } from "@/lib/supabase/service-role";
 
 export type AssignableClub = { id: string; name: string; city: string | null };
 
@@ -27,20 +27,33 @@ function toClub(row: { id: unknown; name: unknown; city: unknown }): AssignableC
   return { id, name, city: city || null };
 }
 
-async function readAllClubs(): Promise<AssignableClub[]> {
-  const db = createServiceRoleClient();
+const CLUB_DIRECTORY_UNAVAILABLE =
+  "Die vollständige Vereinsliste ist in dieser Umgebung nicht verfügbar. Nutze für Zuordnungen die Teilnehmerverwaltung.";
+
+type ClubDirectoryResult =
+  | { clubs: AssignableClub[]; error: null }
+  | { clubs: []; error: string };
+
+async function readAllClubs(): Promise<ClubDirectoryResult> {
+  const db = createServiceRoleClientIfConfigured();
+  if (!db) {
+    return { clubs: [], error: CLUB_DIRECTORY_UNAVAILABLE };
+  }
   const { data, error } = await db.from("clubs").select("id, name, city").order("name", { ascending: true });
   if (error || !data) {
-    return [];
+    return { clubs: [], error: "Die Vereinsliste konnte nicht geladen werden." };
   }
-  return data.map(toClub).filter((club): club is AssignableClub => club !== null);
+  return {
+    clubs: data.map(toClub).filter((club): club is AssignableClub => club !== null),
+    error: null,
+  };
 }
 
 /** The full assignable club list (schedule.manage only). */
-export async function listAssignableClubOptions(): Promise<AssignableClub[]> {
+export async function listAssignableClubOptions(): Promise<ClubDirectoryResult> {
   const access = await requireScheduleManage();
   if (access.error || !access.session) {
-    return [];
+    return { clubs: [], error: access.error ?? "Keine Berechtigung für diese Aktion." };
   }
   return readAllClubs();
 }
@@ -72,13 +85,19 @@ export async function createAssignableClubAction(input: {
   }
 
   const existing = await readAllClubs();
-  const duplicates = findDuplicateClubs(name, existing);
+  if (existing.error) {
+    return { club: null, error: existing.error, duplicates: [] };
+  }
+  const duplicates = findDuplicateClubs(name, existing.clubs);
   if (duplicates.length > 0 && input.allowDuplicate !== true) {
     // Surface the duplicates; the admin decides (no silent create, no merge).
     return { club: null, error: null, duplicates };
   }
 
-  const db = createServiceRoleClient();
+  const db = createServiceRoleClientIfConfigured();
+  if (!db) {
+    return { club: null, error: CLUB_DIRECTORY_UNAVAILABLE, duplicates };
+  }
   // created_by stays NULL: a tournament-admin-created club is not owned by one
   // profile, and the partial unique index on created_by excludes NULLs.
   const inserted = await db

@@ -30,6 +30,7 @@ type ClubAssignmentPanelProps = {
   tournamentId: string;
   entries: ClubAssignmentEntry[];
   clubs: ClubOptionView[];
+  directoryError: string | null;
   totalParticipants: number;
   participantManagementHref: string;
   disabled: boolean;
@@ -46,6 +47,7 @@ export function ClubAssignmentPanel({
   tournamentId,
   entries,
   clubs,
+  directoryError,
   totalParticipants,
   participantManagementHref,
   disabled,
@@ -197,7 +199,22 @@ export function ClubAssignmentPanel({
           </p>
         ) : null}
 
-        {entries.length > 0 ? (
+        {directoryError ? (
+          <div
+            className={`${adminCardShellClass} border-[#e2c48a] bg-[#fff8e8] px-4 py-3 text-[13px] leading-relaxed text-[#7a5a1e]`}
+            role="status"
+          >
+            <p>{directoryError}</p>
+            <a
+              href={participantManagementHref}
+              className="mt-2 inline-block font-semibold text-ink underline decoration-[#d7a31a] underline-offset-4"
+            >
+              Vereinszuordnung in der Teilnehmerverwaltung öffnen
+            </a>
+          </div>
+        ) : null}
+
+        {entries.length > 0 && !directoryError ? (
           <>
             <ul className="grid gap-3" role="list">
               {entries.map((entry) => {
@@ -285,7 +302,7 @@ export function ClubAssignmentPanel({
           </>
         ) : null}
 
-        <div className={`${adminCardShellClass} grid gap-2 px-3.5 py-3`}>
+        {!directoryError ? <div className={`${adminCardShellClass} grid gap-2 px-3.5 py-3`}>
           <p className="text-[12px] font-semibold tracking-[0.08em] text-ink uppercase">
             Verein fehlt? Direkt anlegen
           </p>
@@ -339,7 +356,7 @@ export function ClubAssignmentPanel({
             </p>
           ) : null}
           {createNotice ? <p className="text-[13px] text-[#1f7a4d]">{createNotice}</p> : null}
-        </div>
+        </div> : null}
       </div>
     </AdminCard>
   );
