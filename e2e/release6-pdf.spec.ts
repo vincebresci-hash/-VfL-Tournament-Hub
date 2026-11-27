@@ -11,8 +11,6 @@ const SCENARIOS = [
   { slug: "cl6-pdf-bambini", label: "bambini-turnier", matches: 12, fields: 1, kind: "bambini" },
 ] as const;
 
-const PDF_FOOTER = `<div style="width:100%;padding:0 12mm;color:#66758d;font-size:8px;text-align:right">Seite <span class="pageNumber"></span> / <span class="totalPages"></span></div>`;
-
 async function login(page: Page) {
   await page.goto("/admin/login");
   await page.getByLabel(/e-?mail/i).fill(ADMIN_EMAIL);
@@ -63,9 +61,6 @@ for (const scenario of SCENARIOS) {
         path: `e2e/pdf/${scenario.label}.pdf`,
         printBackground: true,
         preferCSSPageSize: true,
-        displayHeaderFooter: true,
-        headerTemplate: "<span></span>",
-        footerTemplate: PDF_FOOTER,
       });
     }
   });
@@ -122,9 +117,6 @@ test("real draft PDF uses edited pairing, order, kickoff and field without savin
       path: "e2e/pdf/champions-league-echter-entwurf.pdf",
       printBackground: true,
       preferCSSPageSize: true,
-      displayHeaderFooter: true,
-      headerTemplate: "<span></span>",
-      footerTemplate: PDF_FOOTER,
     });
   }
 });

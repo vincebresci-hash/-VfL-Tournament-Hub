@@ -295,10 +295,10 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-bracket { display: grid; gap: 22px; min-height: 148mm; }
         .pdf-bracket-round { display: flex; min-width: 0; flex-direction: column; }
         .pdf-bracket-round > h3, .pdf-placement-grid h3 { margin: 0 0 6px; color: ${NAVY}; font-size: 11px; text-transform: uppercase; }
-        .pdf-bracket-stack { display: flex; flex: 1; flex-direction: column; justify-content: space-around; gap: 8px; }
-        .pdf-bracket-connector { position: relative; }
+        .pdf-bracket-stack { display: flex; flex: 1; flex-direction: column; justify-content: space-around; gap: 5px; }
+        .pdf-bracket-connector { position: relative; break-inside: avoid; page-break-inside: avoid; }
         .pdf-bracket-connector::after { content: ""; position: absolute; top: 50%; right: -22px; width: 22px; border-top: 2px solid ${BLUE}; }
-        .pdf-bracket-match { position: relative; border: 1px solid ${BORDER}; border-left: 4px solid ${YELLOW}; background: white; padding: 5px 7px; box-shadow: 0 1px 2px rgba(11,42,94,.08); }
+        .pdf-bracket-match { position: relative; break-inside: avoid; page-break-inside: avoid; border: 1px solid ${BORDER}; border-left: 4px solid ${YELLOW}; background: white; padding: 5px 7px; box-shadow: 0 1px 2px rgba(11,42,94,.08); }
         .pdf-bracket-meta { margin: 0 0 3px; color: #66758d; font-size: 8px; }
         .pdf-bracket-team { border-top: 1px solid #e5ebf4; padding: 3px 0; color: ${NAVY}; font-size: 9px; font-weight: 600; }
         .pdf-bracket-result { position: absolute; right: 7px; top: 5px; color: ${BLUE}; font-size: 9px; }

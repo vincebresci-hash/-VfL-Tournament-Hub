@@ -127,6 +127,11 @@ jobs:
             pdfinfo "$file" | grep -Eq 'Page size:[[:space:]]+84[12].*x 59[45].*pts'
             pdftotext -layout "$file" - | grep -Eq 'Seite[[:space:]]+[0-9]+'
           done
+          # The eighth Top-16 pairing must remain a complete card on the
+          # bracket page. A break between Platz 6 and Platz 11 would split one
+          # graphical match card across two PDF pages.
+          pdftotext -f 4 -l 4 -layout e2e/pdf/champions-league-3-felder.pdf - \
+            | grep -Eq 'Platz 11'
           test -s e2e/pdf/champions-league-echter-entwurf.pdf
 
       - name: Upload PDFs + screenshots + report
