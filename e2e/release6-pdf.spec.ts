@@ -46,8 +46,8 @@ for (const scenario of SCENARIOS) {
       await expect(page.getByText(/Gesamttabelle|Tabellen/).first()).toBeVisible();
     }
     if (scenario.kind === "groups") {
-      await expect(page.getByRole("heading", { name: "Gruppe A", exact: true })).toBeVisible();
-      await expect(page.getByRole("heading", { name: "Gruppe B", exact: true })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Gruppe A", exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Gruppe B", exact: true }).first()).toBeVisible();
     }
 
     if (scenario.kind === "cl" || scenario.kind === "groups") {
