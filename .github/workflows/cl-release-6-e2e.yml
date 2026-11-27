@@ -109,7 +109,7 @@ jobs:
       - name: Render Release 6 PDFs + full Release 5 regression (desktop + mobile)
         run: npx playwright test --config e2e/playwright.config.ts release6-pdf admin-schedule
 
-      - name: Verify downloadable landscape PDFs, completeness and page counts
+      - name: Verify downloadable A4 PDFs, completeness and page counts
         run: |
           set -euo pipefail
           sudo apt-get update -qq
@@ -118,15 +118,17 @@ jobs:
           : > e2e/pdf/pdf-page-counts.txt
           expected=(
             champions-league-1-feld
+            champions-league-10-top-8
             champions-league-2-felder
             champions-league-3-felder
+            champions-league-18-teams-8-spiele
             klassisches-gruppenturnier
             bambini-turnier
           )
           for name in "${expected[@]}"; do
             file="e2e/pdf/${name}.pdf"
             test -s "$file"
-            pdfinfo "$file" | grep -Eq 'Page size:[[:space:]]+84[12].*x 59[45].*pts'
+            pdfinfo "$file" | grep -Eq 'Page size:[[:space:]]+(84[12].*x 59[45]|59[45].*x 84[12]).*pts'
             # Chromium paints CSS margin-box counters, but Poppler does not
             # expose that generated text in every PDF text layer. The source
             # contract for page/total-page counters is covered by the Node
@@ -156,6 +158,8 @@ jobs:
           ! grep -Eq 'FC Nöttingen U15' e2e/pdf/champions-league-3-felder.txt
           ! grep -Eq 'Termin offen|Feld offen' e2e/pdf/champions-league-3-felder.txt
           test "$(pdfinfo e2e/pdf/bambini-turnier.pdf | awk '/^Pages:/ {print $2}')" -eq 1
+          test "$(pdfinfo e2e/pdf/champions-league-1-feld.pdf | awk '/^Pages:/ {print $2}')" -eq 2
+          test "$(pdfinfo e2e/pdf/champions-league-10-top-8.pdf | awk '/^Pages:/ {print $2}')" -eq 2
           top16_pages="$(pdfinfo e2e/pdf/champions-league-3-felder.pdf | awk '/^Pages:/ {print $2}')"
           pdftotext -f "$top16_pages" -l "$top16_pages" -layout e2e/pdf/champions-league-3-felder.pdf e2e/pdf/top16-final-page.txt
           grep -Eq 'Platz 1' e2e/pdf/top16-final-page.txt

@@ -54,6 +54,7 @@ export type BuildTournamentMatchdayDashboardModelInput = {
   groups: Array<{ id: string }>;
   memberIdsByGroupId: Record<string, string[]>;
   matches: readonly TournamentMatchRecord[];
+  competitionFormat?: "round-robin" | "groups-knockout" | "champions-league" | null;
   permissions: MatchdayDashboardPermissions;
 };
 
@@ -74,6 +75,7 @@ export type MatchdayQuickAction = {
 
 export type TournamentMatchdayDashboardModel = {
   effective: TournamentLifecycleState;
+  leaguePhase: boolean;
   attention: MatchdayAttention;
   /** Secondary advisory when KO presence locks group results (C6-F). */
   correctionWarning: string | null;
@@ -110,8 +112,9 @@ function resolveAttention(input: {
   groupScheduleExists: boolean;
   groupComplete: boolean;
   completionEligible: boolean;
+  leaguePhase: boolean;
 }): MatchdayAttention {
-  const { effective, base, groupScheduleExists, groupComplete, completionEligible } =
+  const { effective, base, groupScheduleExists, groupComplete, completionEligible, leaguePhase } =
     input;
 
   if (effective === "completed") {
@@ -152,7 +155,7 @@ function resolveAttention(input: {
     if (!groupComplete) {
       return {
         kind: "group_results_pending",
-        title: "Gruppenergebnisse offen",
+        title: leaguePhase ? "Ligaergebnisse offen" : "Gruppenergebnisse offen",
         href: `${base}/ergebnisse`,
         linkLabel: "Zu den Ergebnissen",
       };
@@ -168,7 +171,7 @@ function resolveAttention(input: {
   // setup (and any unexpected fallthrough)
   return {
     kind: "setup_groups_missing",
-    title: "Gruppen fehlen",
+    title: leaguePhase ? "Ligaphase vorbereiten" : "Gruppen fehlen",
     href: `${base}/gruppen`,
     linkLabel: "Gruppen verwalten",
   };
@@ -183,6 +186,7 @@ export function buildTournamentMatchdayDashboardModel(
 ): TournamentMatchdayDashboardModel {
   const { tournamentId, effective, groups, memberIdsByGroupId, matches, permissions } =
     input;
+  const leaguePhase = input.competitionFormat === "champions-league";
   const base = `/admin/turniere/${tournamentId}`;
   const matchList = [...matches];
 
@@ -206,6 +210,7 @@ export function buildTournamentMatchdayDashboardModel(
     groupScheduleExists,
     groupComplete: groupProgress.complete,
     completionEligible,
+    leaguePhase,
   });
 
   const koCompletedCount = koMatches.filter(
@@ -235,8 +240,8 @@ export function buildTournamentMatchdayDashboardModel(
   const quickActions: MatchdayQuickAction[] = [
     {
       key: "groups",
-      label: "Gruppen verwalten",
-      hint: "Gruppen und Zuordnung",
+      label: leaguePhase ? "Ligaphase verwalten" : "Gruppen verwalten",
+      hint: leaguePhase ? "Ligatabelle und Zuordnung" : "Gruppen und Zuordnung",
       href: `${base}/gruppen`,
       emphasized: permissions.canScheduleManage,
     },
@@ -272,6 +277,7 @@ export function buildTournamentMatchdayDashboardModel(
 
   return {
     effective,
+    leaguePhase,
     attention,
     correctionWarning: groupResultsLocked
       ? `${TOURNAMENT_LIFECYCLE_KO_CORRECTION_HINT} ${GROUP_RESULT_LOCK_CORRECTION_MESSAGE}`
@@ -284,7 +290,7 @@ export function buildTournamentMatchdayDashboardModel(
       koMatchCount: koMatches.length,
       koCompletedCount,
       groupProgress,
-      groupProgressLabel: `${groupProgress.completed} von ${groupProgress.expected} Gruppenspielen abgeschlossen`,
+      groupProgressLabel: `${groupProgress.completed} von ${groupProgress.expected} ${leaguePhase ? "Ligaspielen" : "Gruppenspielen"} abgeschlossen`,
       koProgressLabel:
         koMatches.length > 0
           ? `${koCompletedCount} von ${koMatches.length} K.-o.-Spielen abgeschlossen`

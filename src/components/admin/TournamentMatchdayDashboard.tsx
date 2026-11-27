@@ -48,16 +48,18 @@ function MatchRow({
   fields,
   teamLabels,
   badge,
+  leaguePhase,
 }: {
   match: TournamentMatchRecord;
   fields: TournamentFieldRecord[];
   teamLabels: Record<string, string>;
   badge: string;
+  leaguePhase: boolean;
 }) {
   const field = fieldName(fields, match.fieldId);
   const clock = formatBerlinClock(match.scheduledAt);
   const meta = [
-    match.phase === "knockout" ? "K.-o." : "Gruppe",
+    match.phase === "knockout" ? "K.-o." : leaguePhase ? "Ligaphase" : "Gruppe",
     field,
     clock !== "—" ? clock : null,
   ]
@@ -124,9 +126,12 @@ export function TournamentMatchdayDashboard({
         <h2 className={adminSectionTitleClass}>Turnierfortschritt</h2>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
           <ProgressStat label="Teams" value={String(progress.teamCount)} />
-          <ProgressStat label="Gruppen" value={String(progress.groupCount)} />
           <ProgressStat
-            label="Gruppenspiele"
+            label={model.leaguePhase ? "Ligaphase" : "Gruppen"}
+            value={model.leaguePhase ? "1" : String(progress.groupCount)}
+          />
+          <ProgressStat
+            label={model.leaguePhase ? "Ligaspiele" : "Gruppenspiele"}
             value={String(progress.groupMatchCount)}
           />
           <ProgressStat label="K.-o.-Spiele" value={String(progress.koMatchCount)} />
@@ -161,6 +166,7 @@ export function TournamentMatchdayDashboard({
                     fields={fields}
                     teamLabels={teamLabels}
                     badge="Live"
+                    leaguePhase={model.leaguePhase}
                   />
                 ))}
               </div>
@@ -178,6 +184,7 @@ export function TournamentMatchdayDashboard({
                     fields={fields}
                     teamLabels={teamLabels}
                     badge="Geplant"
+                    leaguePhase={model.leaguePhase}
                   />
                 ))}
               </div>
@@ -195,6 +202,7 @@ export function TournamentMatchdayDashboard({
                     fields={fields}
                     teamLabels={teamLabels}
                     badge="Beendet"
+                    leaguePhase={model.leaguePhase}
                   />
                 ))}
               </div>

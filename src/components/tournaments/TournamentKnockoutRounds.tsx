@@ -103,10 +103,16 @@ export function TournamentKnockoutRounds({
       ) : null}
 
       {rounds.length > 0 ? (
-        <div className={cn(
-          "mt-4 grid gap-3",
-          layout === "bracket" && "lg:flex lg:items-start lg:gap-3 lg:overflow-x-auto lg:pb-2",
-        )}>
+        <>
+          {layout === "bracket" && rounds.length > 2 ? (
+            <p className="mt-3 text-[12px] font-medium text-muted lg:hidden">
+              K.-o.-Baum seitlich wischen, um alle Runden zu sehen.
+            </p>
+          ) : null}
+          <div className={cn(
+            "mt-4 grid gap-3",
+            layout === "bracket" && "flex snap-x snap-mandatory items-start gap-3 overflow-x-auto overscroll-x-contain pb-3",
+          )} data-knockout-layout={layout}>
           {rounds.map((round) => {
             const headingId = `ko-round-${round.id}`;
             const isFinal = round.id === "final";
@@ -116,7 +122,7 @@ export function TournamentKnockoutRounds({
                 aria-labelledby={headingId}
                 className={cn(
                   "min-w-0 rounded-[10px] border bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(16,20,28,0.04)]",
-                  layout === "bracket" && "lg:min-w-[15rem] lg:flex-1",
+                  layout === "bracket" && "min-w-[17rem] flex-none snap-start sm:min-w-[19rem] lg:min-w-[15rem] lg:flex-1",
                   isFinal ? "border-navy/35 ring-1 ring-inset ring-brand-yellow/50" : "border-line",
                 )}
               >
@@ -203,7 +209,8 @@ export function TournamentKnockoutRounds({
               </section>
             );
           })}
-        </div>
+          </div>
+        </>
       ) : emptyState ? (
         <p className="mt-4 rounded-[10px] border border-dashed border-line bg-white px-4 py-8 text-center text-[15px] leading-6 text-muted">
           {emptyState}

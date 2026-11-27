@@ -5,8 +5,10 @@ const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "change-me";
 
 const SCENARIOS = [
   { slug: "cl6-pdf-cl-single", label: "champions-league-1-feld", matches: 20, fields: 1, kind: "cl", expectedTeam: "Testverein 1" },
+  { slug: "cl6-pdf-cl-10-top8", label: "champions-league-10-top-8", matches: 20, fields: 2, kind: "cl", expectedTeam: "Testverein 1" },
   { slug: "cl6-pdf-cl-two", label: "champions-league-2-felder", matches: 64, fields: 2, kind: "cl", expectedTeam: "Testverein 1" },
   { slug: "cl6-pdf-cl-three", label: "champions-league-3-felder", matches: 45, fields: 3, kind: "cl", expectedTeam: "FC Nöttingen" },
+  { slug: "cl6-matrix-18x8", label: "champions-league-18-teams-8-spiele", matches: 72, fields: 3, kind: "cl", expectedTeam: "Testverein 1" },
   { slug: "cl6-pdf-groups", label: "klassisches-gruppenturnier", matches: 12, fields: 2, kind: "groups", expectedTeam: "Testverein 1" },
   { slug: "cl6-pdf-bambini", label: "bambini-turnier", matches: 12, fields: 1, kind: "bambini", expectedTeam: "Testverein 1" },
 ] as const;
@@ -36,12 +38,16 @@ for (const scenario of SCENARIOS) {
     await expect(page.getByText(scenario.expectedTeam, { exact: true }).first()).toBeVisible();
     if (scenario.kind !== "bambini") {
       await expect(page.locator(".pdf-result-fields").first()).toBeVisible();
+      if (scenario.fields > 1) {
+        await expect(page.locator(".pdf-timeline-result .pdf-result-fields").first()).toBeVisible();
+      }
     }
 
     if (scenario.kind === "bambini") {
       await expect(page.getByRole("columnheader", { name: "Ergebnis" })).toHaveCount(0);
       await expect(page.locator("[data-match-key] [data-match-result]")).toHaveCount(0);
       await expect(page.getByText(/Gesamttabelle|Tabellen|K\.‑o\.-Runde/)).toHaveCount(0);
+      await expect(page.locator("body")).not.toContainText("Gruppenphase + K.-o.-Runde");
       await expect(page.getByRole("heading", { name: "Gruppe A", exact: true }).first()).toBeVisible();
       await expect(page.getByRole("heading", { name: "Gruppe B", exact: true }).first()).toBeVisible();
     } else {
@@ -199,11 +205,13 @@ test("pure classic group tournament never invents a knockout stage", async ({ pa
 test("qualification names appear only after the league phase is final", async ({ page }, info) => {
   await page.goto("/admin/turniere/cl61-pdf-partial/spielplan/pdf");
   await expect(page.locator(".pdf-bracket")).toContainText("Platz 1");
+  await expect(page.getByText(/Mannschaften stehen erst nach vollständigem Abschluss/)).toBeVisible();
   await expect(page.locator("[data-knockout-key]")).toHaveCount(4);
 
   await page.goto("/admin/turniere/cl61-pdf-complete/spielplan/pdf");
   await expect(page.locator(".pdf-bracket")).not.toContainText("Platz 1");
   await expect(page.locator(".pdf-bracket")).toContainText("Testverein");
+  await expect(page.getByText(/sind nach Abschluss der Ligaphase/)).toBeVisible();
   await expect(page.locator("[data-knockout-key]")).toHaveCount(4);
   if (info.project.name === "desktop-chromium") {
     await page.pdf({
@@ -222,8 +230,15 @@ test("public Champions League view exposes league schedule, standings and knocko
   await expect(page.getByText(/Ligaphase|Spielplan/).first()).toBeVisible();
   await page.getByRole("link", { name: "KO-Runde", exact: true }).click();
   await expect(page.getByRole("heading", { name: "K.-o.-Baum" })).toBeVisible();
+  await expect(page.locator('[data-knockout-layout="bracket"]')).toBeVisible();
   await expect(page.getByText(/vollständigen Ligaphase|wird noch veröffentlicht/)).toBeVisible();
   await expect(page.locator("body")).not.toContainText("example.test");
+});
+
+test("saved Champions League uses Ligaphase in Matchday navigation", async ({ page }) => {
+  await page.goto("/admin/turniere/cl6-pdf-cl-three");
+  await expect(page.getByRole("link", { name: "Ligaphase", exact: true })).toBeVisible();
+  await expect(page.getByText("Aktuell: Ligaphase", { exact: true })).toBeVisible();
 });
 
 test("schedule PDF and draft transport remain admin-protected", async ({ browser }) => {

@@ -212,6 +212,7 @@ async function seedScenario({
 
 const seeded = [];
 seeded.push(await seedScenario({ slug: "cl6-pdf-cl-single", name: "CL 10 Teams – ein Feld", ageGroup: "U13", teamCount: 10, fieldCount: 1, matchesPerTeam: 4, cutoff: 4, champions: true }));
+seeded.push(await seedScenario({ slug: "cl6-pdf-cl-10-top8", name: "CL 10 Teams – Top 8", ageGroup: "U13", teamCount: 10, fieldCount: 2, matchesPerTeam: 4, cutoff: 8, champions: true }));
 seeded.push(await seedScenario({ slug: "cl6-pdf-cl-two", name: "CL 16 Teams – zwei Felder", ageGroup: "U14", teamCount: 16, fieldCount: 2, matchesPerTeam: 8, cutoff: 8, champions: true }));
 seeded.push(await seedScenario({ slug: "cl6-pdf-cl-three", name: "CL 18 Teams – drei Felder", ageGroup: "U15", teamCount: 18, fieldCount: 3, matchesPerTeam: 5, cutoff: 16, champions: true, teamNames: REALISTIC_LEGACY_NAMES, seedKnockout: true }));
 seeded.push(await seedScenario({ slug: "cl6-matrix-18x8", name: "CL Matrix 18 × 8", ageGroup: "U16", teamCount: 18, fieldCount: 3, matchesPerTeam: 8, cutoff: 16, champions: true }));

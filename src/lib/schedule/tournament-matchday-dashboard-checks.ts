@@ -438,6 +438,27 @@ export function runTournamentMatchdayDashboardChecks() {
     "14 results.manage emphasizes KO only",
   );
 
+  const championsLeague = build({
+    effective: "group_stage",
+    competitionFormat: "champions-league",
+    matches: [
+      match({
+        id: "cl-m1",
+        status: "scheduled",
+        homeApplicationId: "a",
+        awayApplicationId: "b",
+      }),
+    ],
+  });
+  assert(championsLeague.leaguePhase, "15 CL format is exposed to presentation");
+  assert(
+    championsLeague.attention.title === "Ligaergebnisse offen" &&
+      championsLeague.progress.groupProgressLabel.includes("Ligaspielen") &&
+      championsLeague.quickActions.find((action) => action.key === "groups")?.label ===
+        "Ligaphase verwalten",
+    "15 saved CL navigation consistently says Ligaphase",
+  );
+
   // --- Structural freezes ---
   const model = read("src/lib/schedule/tournament-matchday-dashboard.ts");
   const ui = read("src/components/admin/TournamentMatchdayDashboard.tsx");

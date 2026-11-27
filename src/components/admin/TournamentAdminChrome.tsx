@@ -23,6 +23,7 @@ type NavKey =
 type TournamentAdminChromeProps = {
   tournament: AdminTournamentRecord;
   lifecycle: AdminLifecyclePanelModel | null;
+  leaguePhase?: boolean;
   current: NavKey;
   children?: ReactNode;
 };
@@ -47,6 +48,7 @@ function navClass(active: boolean) {
 export function TournamentAdminChrome({
   tournament,
   lifecycle,
+  leaguePhase = false,
   current,
   children,
 }: TournamentAdminChromeProps) {
@@ -72,7 +74,7 @@ export function TournamentAdminChrome({
     {
       label: "Vorbereitung",
       items: [
-        { key: "groups", label: "Gruppen", href: `${base}/gruppen` },
+        { key: "groups", label: leaguePhase ? "Ligaphase" : "Gruppen", href: `${base}/gruppen` },
         { key: "schedule", label: "Spielplan", href: `${base}/spielplan` },
       ],
     },
@@ -122,6 +124,7 @@ export function TournamentAdminChrome({
           <TournamentLifecyclePanel
             tournamentId={tournament.id}
             model={lifecycle}
+            leaguePhase={leaguePhase}
           />
         ) : null}
       </div>

@@ -53,6 +53,7 @@ export type SchedulePdfDocumentProps = {
   fieldNames: string[];
   standings: Array<{ title: string; rows: PdfStandingRow[] }>;
   showStandings: boolean;
+  standingsFinalized: boolean;
   knockoutTitle: string;
   knockoutSchedule: PdfMatchRow[];
   knockout: PdfMatchRow[];
@@ -168,16 +169,18 @@ function TimelineTable({
             {row.cells.map((cell) => (
               <td key={cell.fieldId} style={td}>
                 {cell.match ? (
-                  <span data-match-key={cell.match.key}>
-                    <span style={{ color: BLUE, fontWeight: 700 }}>#{cell.match.number} </span>
-                    {cell.match.homeName} – {cell.match.awayName}
+                  <span className="pdf-timeline-match" data-match-key={cell.match.key}>
+                    <span className="pdf-timeline-fixture">
+                      <span style={{ color: BLUE, fontWeight: 700 }}>#{cell.match.number} </span>
+                      {cell.match.homeName} – {cell.match.awayName}
+                    </span>
                     {showResult ? (
-                      <strong
+                      <span
+                        className="pdf-timeline-result"
                         data-match-result={cell.match.result}
-                        style={{ marginLeft: "6px", color: NAVY, whiteSpace: "nowrap" }}
                       >
-                        {cell.match.result}
-                      </strong>
+                        <ResultValue result={cell.match.result} compact />
+                      </span>
                     ) : null}
                   </span>
                 ) : (
@@ -310,9 +313,14 @@ function KnockoutBracket({ matches }: { matches: PdfMatchRow[] }) {
 /**
  * Central, reusable schedule PDF document. All content is derived from the
  * tournament data passed in — nothing is hard-coded from the reference designs.
- * Print-optimised A4 landscape with paged-media headers and page counters.
+ * Print-optimised adaptive A4 layout with paged-media headers and counters.
  */
 export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
+  const pageOrientation =
+    props.layout === "cl-single" || props.layout === "bambini"
+      ? "portrait"
+      : "landscape";
+
   return (
     <div
       className={`pdf-root pdf-layout-${props.layout}`}
@@ -320,16 +328,34 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
     >
       <style>{`
         @page {
-          size: A4 landscape;
-          margin: 18mm 12mm 18mm;
+          size: A4 ${pageOrientation};
+          margin: 13mm 10mm 14mm;
           @top-left { content: "VfL Kirchheim/Teck · Tournament Hub"; color: ${NAVY}; font-size: 9px; font-weight: 700; }
           @top-right { content: "Offizieller Turnierspielplan"; color: ${BLUE}; font-size: 9px; }
           @bottom-left { content: "VfL Kirchheim/Teck"; color: #66758d; font-size: 8px; }
           @bottom-right { content: "Seite " counter(page) " / " counter(pages); color: #66758d; font-size: 8px; }
         }
-        @media print { nav, header.app-chrome, button, .print\\:hidden, .pdf-document-footer { display: none !important; } body { background: white; } }
+        @media print {
+          html, body, main { margin: 0 !important; padding: 0 !important; background: white !important; }
+          nav, header.app-chrome, button, .print\\:hidden, .pdf-document-footer { display: none !important; }
+          .pdf-preview-shell { max-width: none !important; margin: 0 !important; padding: 0 !important; background: white !important; }
+          .pdf-root { width: auto !important; max-width: none !important; margin: 0 !important; padding: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+          .pdf-root th { padding: 3px 5px !important; font-size: 8px !important; }
+          .pdf-root td { padding: 2.4px 5px !important; font-size: 8.4px !important; line-height: 1.18 !important; }
+          .pdf-root .pdf-document-header { gap: 9px !important; padding-bottom: 6px !important; }
+          .pdf-root .pdf-document-header img { width: 42px !important; height: 42px !important; }
+          .pdf-root .pdf-document-title { font-size: 18px !important; }
+          .pdf-root .pdf-description { margin-top: 6px !important; font-size: 9px !important; line-height: 1.3 !important; }
+          .pdf-root .pdf-content-section { margin-top: 7px !important; }
+          .pdf-root .pdf-section-heading { margin-bottom: 4px !important; font-size: 12px !important; }
+          .pdf-root .pdf-participant-list { font-size: 8.5px !important; line-height: 1.15 !important; }
+          .pdf-root .pdf-knockout-section { break-before: page; page-break-before: always; }
+          .pdf-layout-cl-single .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
+          .pdf-layout-cl-single td { padding-top: 1.8px !important; padding-bottom: 1.8px !important; }
+        }
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
+        .pdf-root thead { display: table-header-group; }
         .pdf-root tr, .pdf-root h2, .pdf-root h3 { break-inside: avoid; }
         .pdf-root h2 { break-after: avoid; page-break-after: avoid; }
         .pdf-section { break-before: auto; }
@@ -354,6 +380,9 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
         .pdf-result-fields > b { color: ${NAVY}; font-size: 10px; }
         .pdf-result-fields-compact > span { width: 13px; height: 11px; }
         .pdf-result-fields-compact > b { font-size: 8px; }
+        .pdf-timeline-match { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 5px; }
+        .pdf-timeline-fixture { min-width: 0; overflow-wrap: anywhere; }
+        .pdf-timeline-result { flex: none; color: ${NAVY}; white-space: nowrap; }
         .pdf-bracket-placement { break-inside: avoid; page-break-inside: avoid; border-top: 2px solid ${YELLOW}; padding-top: 6px; }
         .pdf-bracket-placement h4 { margin: 0 0 5px; color: ${NAVY}; font-size: 9px; text-transform: uppercase; }
         .pdf-layout-cl-multi th { padding-top: 4px !important; padding-bottom: 4px !important; }
@@ -363,12 +392,12 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       `}</style>
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "14px", borderBottom: `3px solid ${YELLOW}`, paddingBottom: "10px" }}>
+      <div className="pdf-document-header" style={{ display: "flex", alignItems: "center", gap: "14px", borderBottom: `3px solid ${YELLOW}`, paddingBottom: "10px" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/vfl-logo-transparent.png" alt="VfL Kirchheim/Teck" width={56} height={56} style={{ objectFit: "contain" }} />
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <h1 style={{ color: NAVY, fontSize: "22px", fontWeight: 800, margin: 0 }}>{props.tournamentName}</h1>
+            <h1 className="pdf-document-title" style={{ color: NAVY, fontSize: "22px", fontWeight: 800, margin: 0 }}>{props.tournamentName}</h1>
             {props.draft ? (
               <span style={{ background: YELLOW, color: NAVY, fontSize: "10px", fontWeight: 800, padding: "2px 8px", borderRadius: "3px", letterSpacing: "0.08em" }}>
                 ENTWURF
@@ -387,26 +416,26 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       </div>
 
       {props.description ? (
-        <p style={{ fontSize: "10.5px", color: "#3b485f", margin: "10px 0 0", lineHeight: 1.5 }}>{props.description}</p>
+        <p className="pdf-description" style={{ fontSize: "10.5px", color: "#3b485f", margin: "10px 0 0", lineHeight: 1.5 }}>{props.description}</p>
       ) : null}
 
       {/* Participants */}
       {props.participants.length > 0 ? (
-        <section style={{ marginTop: "11px" }}>
-          <SectionHeading>Teilnehmer ({props.participants.length})</SectionHeading>
+        <section className="pdf-content-section" style={{ marginTop: "11px" }}>
+          <div className="pdf-section-heading"><SectionHeading>Teilnehmer ({props.participants.length})</SectionHeading></div>
           {props.participantGroups && props.participantGroups.length > 0 ? (
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(props.participantGroups.length, 4)}, minmax(0, 1fr))`, gap: "12px" }}>
               {props.participantGroups.map((group) => (
                 <div key={group.title} style={{ breakInside: "avoid" }}>
                   <h3 style={{ color: NAVY, fontSize: "10.5px", margin: "0 0 3px" }}>{group.title}</h3>
-                  <ol style={{ margin: 0, paddingLeft: "18px", fontSize: "9.5px" }}>
+                  <ol className="pdf-participant-list" style={{ margin: 0, paddingLeft: "18px", fontSize: "9.5px" }}>
                     {group.names.map((name, index) => <li key={`${name}-${index}`}>{name}</li>)}
                   </ol>
                 </div>
               ))}
             </div>
           ) : (
-            <ol style={{ columnCount: props.participants.length > 12 ? 3 : props.participants.length > 1 ? 2 : 1, columnGap: "20px", margin: 0, paddingLeft: "18px", fontSize: "9.5px", lineHeight: 1.25 }}>
+            <ol className="pdf-participant-list" style={{ columnCount: props.participants.length > 12 ? 3 : props.participants.length > 1 ? 2 : 1, columnGap: "20px", margin: 0, paddingLeft: "18px", fontSize: "9.5px", lineHeight: 1.25 }}>
               {props.participants.map((name, index) => (
                 <li key={`${name}-${index}`} style={{ breakInside: "avoid", padding: "0.5px 0" }}>
                   {name}
@@ -418,8 +447,8 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
       ) : null}
 
       {/* Schedule */}
-      <section style={{ marginTop: "13px" }}>
-        <SectionHeading>{props.scheduleTitle}</SectionHeading>
+      <section className="pdf-content-section" style={{ marginTop: "13px" }}>
+        <div className="pdf-section-heading"><SectionHeading>{props.scheduleTitle}</SectionHeading></div>
         {props.timelineRows && props.timelineRows.length > 0 ? (
           <TimelineTable
             rows={props.timelineRows}
@@ -435,19 +464,21 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
       {/* Standings */}
       {props.showStandings && props.standings.length > 0 ? (
-        <section className="pdf-section pdf-standings-section" style={{ marginTop: "16px" }}>
-          <SectionHeading>{props.layout.startsWith("cl") ? "Gesamttabelle (Ligaphase)" : "Tabellen"}</SectionHeading>
+        <section className="pdf-section pdf-content-section pdf-standings-section" style={{ marginTop: "16px" }}>
+          <div className="pdf-section-heading"><SectionHeading>{props.layout.startsWith("cl") ? "Gesamttabelle (Ligaphase)" : "Tabellen"}</SectionHeading></div>
           {props.standings.map((table) => (
             <div key={table.title} style={{ marginTop: "10px" }}>
               {props.standings.length > 1 || !props.layout.startsWith("cl") ? (
                 <h3 style={{ color: NAVY, fontSize: "12px", fontWeight: 700, margin: "0 0 5px" }}>{table.title}</h3>
               ) : null}
-              <StandingsTable rows={table.rows} />
+              <div className="pdf-standings-table"><StandingsTable rows={table.rows} /></div>
             </div>
           ))}
           {props.layout.startsWith("cl") ? (
             <p style={{ fontSize: "9.5px", color: "#5a6a85", margin: "6px 0 0" }}>
-              Champions-League-Modus: eine gemeinsame Ligaphase und Gesamttabelle. Markierte Plätze qualifizieren sich für die K.-o.-Runde.
+              {props.standingsFinalized
+                ? "Die gelb markierten Plätze sind nach Abschluss der Ligaphase für die K.-o.-Runde qualifiziert."
+                : "Gelb markierter Qualifikationsbereich: Die Mannschaften stehen erst nach vollständigem Abschluss der Ligaphase fest."}
             </p>
           ) : null}
         </section>
@@ -455,7 +486,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
       {/* Knockout */}
       {props.layout !== "bambini" && props.knockout.length > 0 ? (
-        <section className="pdf-section" style={{ marginTop: "16px" }}>
+        <section className="pdf-section pdf-knockout-section" style={{ marginTop: "16px" }}>
           <div className="pdf-knockout-schedule">
             <SectionHeading>Endrunden-Spielplan</SectionHeading>
             <ScheduleTable rows={props.knockoutSchedule} showResult showRound />

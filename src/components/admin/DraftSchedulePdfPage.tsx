@@ -54,7 +54,7 @@ export function DraftSchedulePdfPage({ tournamentId, storageKey }: DraftSchedule
       <div className="print:hidden" style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px", borderBottom: "1px solid #e5e7eb" }}>
         <PrintScheduleButton />
       </div>
-      <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "18px" }}>
+      <div className="pdf-preview-shell" style={{ maxWidth: "1120px", margin: "0 auto", padding: "18px" }}>
         <SchedulePdfDocument {...result.document} draft />
       </div>
     </>

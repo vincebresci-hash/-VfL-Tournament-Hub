@@ -57,10 +57,20 @@ function formatTournamentDate(value: string) {
   return year && month && day ? `${day}.${month}.${year}` : value;
 }
 
-function modeLabel(format: string | null, groupCount: number) {
-  if (format === "champions-league") return "Champions League";
-  if (format === "round-robin") return "Jeder gegen jeden";
-  if (format === "groups-knockout" || groupCount > 0) return "Gruppenphase + K.-o.-Runde";
+function modeLabel(input: {
+  format: string | null;
+  groupCount: number;
+  layout: ReturnType<typeof resolvePdfLayout>;
+  playFormat: string | null;
+  hasKnockout: boolean;
+}) {
+  if (input.layout === "bambini") {
+    return input.playFormat?.trim() || "Kinderfestival ohne Ergebniswertung";
+  }
+  if (input.format === "champions-league") return "Champions League";
+  if (input.format === "round-robin") return "Jeder gegen jeden";
+  if (input.format === "groups-knockout" || input.hasKnockout) return "Gruppenphase + K.-o.-Runde";
+  if (input.groupCount > 0) return "Gruppenphase";
   return "Jeder gegen jeden";
 }
 
@@ -316,7 +326,7 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
         </Link>
         <PrintScheduleButton />
       </div>
-      <div style={{ maxWidth: "1120px", margin: "0 auto", padding: "18px" }}>
+      <div className="pdf-preview-shell" style={{ maxWidth: "1120px", margin: "0 auto", padding: "18px" }}>
         {!stage.ready ? (
           <p>Die Datenbank ist noch nicht eingerichtet.</p>
         ) : (
@@ -328,7 +338,13 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
             startTimeLabel={tournament.startTime ?? null}
             location={tournament.location}
             description={tournament.description}
-            modeLabel={modeLabel(format, stage.groups.length)}
+            modeLabel={modeLabel({
+              format,
+              groupCount: stage.groups.length,
+              layout,
+              playFormat: tournament.playFormat,
+              hasKnockout: knockout.length > 0,
+            })}
             metaLine={metaParts.join(" · ")}
             participants={participantNames}
             participantGroups={participantGroups}
@@ -338,6 +354,7 @@ export default async function SchedulePdfPage({ params, searchParams }: PdfPageP
             fieldNames={fields.map((field) => field.name)}
             standings={standings}
             showStandings={pdfLayoutShowsStandings(layout)}
+            standingsFinalized={preliminaryComplete}
             knockoutTitle={isChampionsLeague ? "K.-o.-Runde (Endrunde)" : "K.-o.-Runde"}
             knockoutSchedule={sortPdfKnockoutSchedule(knockout)}
             knockout={knockout}

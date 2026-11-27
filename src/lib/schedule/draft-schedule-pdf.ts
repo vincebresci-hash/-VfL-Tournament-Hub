@@ -315,7 +315,14 @@ export function buildDraftSchedulePdfDocument(input: DraftPdfInput): SchedulePdf
     startTimeLabel: input.tournament.startTime,
     location: input.tournament.location,
     description: input.tournament.description,
-    modeLabel: input.preview.mode === "champions-league" ? "Champions League" : input.preview.mode === "groups-knockout" ? "Gruppenphase + K.-o.-Runde" : "Jeder gegen jeden",
+    modeLabel:
+      layout === "bambini"
+        ? input.tournament.playFormat?.trim() || "Kinderfestival ohne Ergebniswertung"
+        : input.preview.mode === "champions-league"
+          ? "Champions League"
+          : input.preview.mode === "groups-knockout"
+            ? "Gruppenphase + K.-o.-Runde"
+            : "Jeder gegen jeden",
     metaLine: meta.join(" · "),
     participants,
     participantGroups,
@@ -325,6 +332,7 @@ export function buildDraftSchedulePdfDocument(input: DraftPdfInput): SchedulePdf
     fieldNames: input.fields.map((field) => field.name),
     standings,
     showStandings: pdfLayoutShowsStandings(layout),
+    standingsFinalized: false,
     knockoutTitle: input.preview.mode === "champions-league" ? "K.-o.-Runde (Endrunde)" : "K.-o.-Runde",
     knockoutSchedule: sortPdfKnockoutSchedule(knockout),
     knockout,
