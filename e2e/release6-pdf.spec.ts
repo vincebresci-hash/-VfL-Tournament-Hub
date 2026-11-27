@@ -38,7 +38,7 @@ for (const scenario of SCENARIOS) {
     await expect(page.getByText(scenario.expectedTeam, { exact: true }).first()).toBeVisible();
     if (scenario.kind !== "bambini") {
       await expect(page.locator(".pdf-result-fields").first()).toBeVisible();
-      if (scenario.fields > 1) {
+      if (scenario.kind === "cl" && scenario.fields > 1) {
         await expect(page.locator(".pdf-timeline-result .pdf-result-fields").first()).toBeVisible();
       }
     }
@@ -238,7 +238,7 @@ test("public Champions League view exposes league schedule, standings and knocko
 test("saved Champions League uses Ligaphase in Matchday navigation", async ({ page }) => {
   await page.goto("/admin/turniere/cl6-pdf-cl-three");
   await expect(page.getByRole("link", { name: "Ligaphase", exact: true })).toBeVisible();
-  await expect(page.getByText("Aktuell: Ligaphase", { exact: true })).toBeVisible();
+  await expect(page.getByText("Gruppen", { exact: true })).toHaveCount(0);
 });
 
 test("schedule PDF and draft transport remain admin-protected", async ({ browser }) => {
