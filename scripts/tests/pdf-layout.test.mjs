@@ -84,6 +84,7 @@ test("print stylesheet renders exactly one page counter with total pages", () =>
   assert.match(documentSource, /\.pdf-preview-shell \{ max-width: none !important/);
   assert.match(documentSource, /\.pdf-root thead \{ display: table-header-group/);
   assert.match(documentSource, /\.pdf-knockout-section \{ break-before: page/);
+  assert.match(documentSource, /\.pdf-small-tournament \.pdf-standings-table \{ break-inside: avoid/);
   assert.match(documentSource, /pdf-timeline-result/);
   assert.match(documentSource, /standingsFinalized/);
   assert.match(documentSource, /\.pdf-knockout-schedule, \.pdf-bracket-block \{ break-inside: avoid/);

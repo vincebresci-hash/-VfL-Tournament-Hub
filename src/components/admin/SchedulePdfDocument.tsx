@@ -323,7 +323,7 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
 
   return (
     <div
-      className={`pdf-root pdf-layout-${props.layout}`}
+      className={`pdf-root pdf-layout-${props.layout}${props.participants.length <= 10 ? " pdf-small-tournament" : ""}`}
       style={{ background: "white", color: "#13223d", fontFamily: "'Segoe UI', Arial, sans-serif" }}
     >
       <style>{`
@@ -352,6 +352,11 @@ export function SchedulePdfDocument(props: SchedulePdfDocumentProps) {
           .pdf-root .pdf-knockout-section { break-before: page; page-break-before: always; }
           .pdf-layout-cl-single .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
           .pdf-layout-cl-single td { padding-top: 1.8px !important; padding-bottom: 1.8px !important; }
+          .pdf-small-tournament .pdf-standings-table { break-inside: avoid; page-break-inside: avoid; }
+          .pdf-small-tournament th { padding-top: 2px !important; padding-bottom: 2px !important; }
+          .pdf-small-tournament td { padding-top: 1.2px !important; padding-bottom: 1.2px !important; font-size: 7.9px !important; line-height: 1.08 !important; }
+          .pdf-small-tournament .pdf-content-section { margin-top: 5px !important; }
+          .pdf-small-tournament .pdf-result-fields-compact > span { width: 11px !important; height: 9px !important; }
         }
         .pdf-root section { break-inside: auto; }
         .pdf-root table { break-inside: auto; }
